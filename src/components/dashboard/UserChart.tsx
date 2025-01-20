@@ -4,7 +4,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
-import { SplitHorizontal } from "lucide-react";
+import { Split } from "lucide-react";
 
 const data = [
   { name: "Jan", users: 400, satisfied: 300, unsatisfied: 100 },
@@ -72,7 +72,7 @@ export function UserChart() {
               onClick={() => setSplitView(!splitView)}
               className="h-8 w-8"
             >
-              <SplitHorizontal className="h-4 w-4" />
+              <Split className="h-4 w-4" />
             </Button>
             <Select value={timeRange} onValueChange={(value) => setTimeRange(value as TimeRange)}>
               <SelectTrigger className="w-[180px]">
