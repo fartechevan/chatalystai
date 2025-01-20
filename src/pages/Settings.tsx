@@ -3,24 +3,55 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useToast } from "@/components/ui/use-toast";
+import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
 
 export default function Settings() {
   const [newUser, setNewUser] = useState({ email: "", name: "", role: "user" });
+  const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    toast({
-      title: "Success",
-      description: "User added successfully",
-    });
-    setNewUser({ email: "", name: "", role: "user" });
+    setIsLoading(true);
+
+    try {
+      // Generate a random password for the user
+      const password = Math.random().toString(36).slice(-8);
+      
+      // Create the user in Supabase Auth
+      const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+        email: newUser.email,
+        password: password,
+        email_confirm: true,
+        user_metadata: {
+          name: newUser.name,
+        }
+      });
+
+      if (authError) throw authError;
+
+      toast({
+        title: "Success",
+        description: "User added successfully. A welcome email has been sent.",
+      });
+      
+      setNewUser({ email: "", name: "", role: "user" });
+    } catch (error: any) {
+      console.error('Error creating user:', error);
+      toast({
+        title: "Error",
+        description: error.message || "Failed to create user",
+        variant: "destructive",
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (
-    <div className="max-w-2xl mx-auto">
-      <Card className="glass-card animate-enter">
+    <div className="max-w-2xl mx-auto p-4">
+      <Card className="animate-enter">
         <CardHeader>
           <CardTitle>Add New User</CardTitle>
         </CardHeader>
@@ -57,7 +88,9 @@ export default function Settings() {
                 </SelectContent>
               </Select>
             </div>
-            <Button type="submit">Add User</Button>
+            <Button type="submit" disabled={isLoading}>
+              {isLoading ? "Adding User..." : "Add User"}
+            </Button>
           </form>
         </CardContent>
       </Card>
