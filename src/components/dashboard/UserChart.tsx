@@ -5,6 +5,8 @@ import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { Split } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/components/ui/use-toast";
 
 const data = [
   { name: "Jan", users: 400, satisfied: 300, unsatisfied: 100 },
@@ -50,14 +52,46 @@ export function UserChart() {
   const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
   const [showConversations, setShowConversations] = useState(false);
   const [showConversationDetail, setShowConversationDetail] = useState(false);
+  const { toast } = useToast();
+
+  const trackActivity = async (activityType: string, metadata: any = {}) => {
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const { error } = await supabase.functions.invoke('track-activity', {
+        body: {
+          activity_type: activityType,
+          user_id: user.id,
+          metadata
+        }
+      });
+
+      if (error) throw error;
+    } catch (error) {
+      console.error('Error tracking activity:', error);
+      toast({
+        title: "Error tracking activity",
+        description: "There was a problem recording your activity.",
+        variant: "destructive"
+      });
+    }
+  };
 
   const handleBarClick = () => {
     setShowConversations(true);
+    trackActivity('view_conversations');
   };
 
   const handleConversationClick = (conversation: Conversation) => {
     setSelectedConversation(conversation);
     setShowConversationDetail(true);
+    trackActivity('view_conversation_detail', { conversation_id: conversation.id });
+  };
+
+  const handleTimeRangeChange = (value: TimeRange) => {
+    setTimeRange(value);
+    trackActivity('change_time_range', { new_range: value });
   };
 
   return (
@@ -69,12 +103,18 @@ export function UserChart() {
             <Button
               variant="outline"
               size="icon"
-              onClick={() => setSplitView(!splitView)}
+              onClick={() => {
+                setSplitView(!splitView);
+                trackActivity('toggle_split_view', { split_enabled: !splitView });
+              }}
               className="h-8 w-8"
             >
               <Split className="h-4 w-4" />
             </Button>
-            <Select value={timeRange} onValueChange={(value) => setTimeRange(value as TimeRange)}>
+            <Select 
+              value={timeRange} 
+              onValueChange={handleTimeRangeChange}
+            >
               <SelectTrigger className="w-[180px]">
                 <SelectValue placeholder="Select time range" />
               </SelectTrigger>
@@ -87,6 +127,7 @@ export function UserChart() {
             </Select>
           </div>
         </CardHeader>
+        
         <CardContent className={splitView ? "grid grid-rows-2 gap-4" : "h-[300px]"}>
           {splitView ? (
             <>
@@ -125,6 +166,7 @@ export function UserChart() {
             </ResponsiveContainer>
           )}
         </CardContent>
+        
       </Card>
 
       <Sheet open={showConversations} onOpenChange={setShowConversations}>
