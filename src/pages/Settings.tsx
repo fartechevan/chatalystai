@@ -19,13 +19,14 @@ export default function Settings() {
       // Generate a random password for the user
       const password = Math.random().toString(36).slice(-8);
       
-      // Create the user in Supabase Auth with email confirmation set to true
-      const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+      // Create the user using signUp instead of admin.createUser
+      const { data: authData, error: authError } = await supabase.auth.signUp({
         email: newUser.email,
         password: password,
-        email_confirm: true,
-        user_metadata: {
-          name: newUser.name,
+        options: {
+          data: {
+            name: newUser.name,
+          },
         }
       });
 
