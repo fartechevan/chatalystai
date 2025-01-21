@@ -18,6 +18,7 @@ export default function Settings() {
     try {
       // Generate a random password for the user
       const password = Math.random().toString(36).slice(-8);
+      console.log('Sample user password:', password); // Log the password for testing
       
       // Create the user using signUp instead of admin.createUser
       const { data: authData, error: authError } = await supabase.auth.signUp({
