@@ -9,24 +9,30 @@ async function fetchUserStats(): Promise<UserStatsType> {
   const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
 
   // Get monthly active users
-  const { count: activeMonthly } = await supabase
+  const { count: activeMonthly, error: monthlyError } = await supabase
     .from('conversations')
     .select('user_id', { count: 'exact', head: true })
     .gte('created_at', thirtyDaysAgo.toISOString())
-    .distinct();
+    .eq('user_id', supabase.auth.getUser());
+
+  if (monthlyError) throw monthlyError;
 
   // Get weekly active users
-  const { count: activeWeekly } = await supabase
+  const { count: activeWeekly, error: weeklyError } = await supabase
     .from('conversations')
     .select('user_id', { count: 'exact', head: true })
     .gte('created_at', sevenDaysAgo.toISOString())
-    .distinct();
+    .eq('user_id', supabase.auth.getUser());
+
+  if (weeklyError) throw weeklyError;
 
   // Get new users in the last 30 days
-  const { count: newUsers } = await supabase
+  const { count: newUsers, error: newUsersError } = await supabase
     .from('profiles')
     .select('id', { count: 'exact', head: true })
     .gte('created_at', thirtyDaysAgo.toISOString());
+
+  if (newUsersError) throw newUsersError;
 
   return {
     activeMonthly: activeMonthly || 0,
