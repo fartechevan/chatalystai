@@ -19,7 +19,7 @@ export default function Settings() {
       // Generate a random password for the user
       const password = Math.random().toString(36).slice(-8);
       
-      // Create the user in Supabase Auth
+      // Create the user in Supabase Auth with email confirmation set to true
       const { data: authData, error: authError } = await supabase.auth.admin.createUser({
         email: newUser.email,
         password: password,
@@ -33,7 +33,7 @@ export default function Settings() {
 
       toast({
         title: "Success",
-        description: "User added successfully. A welcome email has been sent.",
+        description: "User added successfully.",
       });
       
       setNewUser({ email: "", name: "", role: "user" });
