@@ -60,7 +60,12 @@ async function fetchConversations(): Promise<Conversation[]> {
     .limit(20);
 
   if (error) throw error;
-  return data;
+
+  // Transform the messages from Json to ConversationMessage[]
+  return data.map(conv => ({
+    ...conv,
+    messages: conv.messages as ConversationMessage[]
+  }));
 }
 
 export function UserChart() {
