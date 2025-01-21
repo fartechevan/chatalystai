@@ -6,33 +6,22 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-// Handle CORS preflight requests
-const handleCors = (req: Request) => {
+Deno.serve(async (req) => {
+  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders })
   }
-}
-
-// Initialize BigQuery with credentials from environment
-const bigquery = new BigQuery({
-  credentials: JSON.parse(Deno.env.get('google_big_query') || '{}'),
-  projectId: JSON.parse(Deno.env.get('google_big_query') || '{}').project_id,
-})
-
-const supabase = createClient(
-  Deno.env.get('SUPABASE_URL') ?? '',
-  Deno.env.get('SUPABASE_ANON_KEY') ?? ''
-)
-
-Deno.serve(async (req) => {
-  // Handle CORS
-  const corsResponse = handleCors(req)
-  if (corsResponse) return corsResponse
 
   try {
     const { activity_type, user_id, metadata } = await req.json()
     
     console.log('Received activity:', { activity_type, user_id, metadata })
+
+    // Initialize BigQuery with credentials from environment
+    const bigquery = new BigQuery({
+      credentials: JSON.parse(Deno.env.get('google_big_query') || '{}'),
+      projectId: JSON.parse(Deno.env.get('google_big_query') || '{}').project_id,
+    })
 
     // Insert data into BigQuery
     const dataset = bigquery.dataset('user_activity')
