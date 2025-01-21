@@ -6,6 +6,26 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+// Initialize BigQuery with credentials from environment
+let bigquery: BigQuery;
+try {
+  const credentials = Deno.env.get('google_big_query');
+  if (!credentials) {
+    console.error('Missing google_big_query credentials');
+    throw new Error('Missing BigQuery credentials');
+  }
+  
+  const parsedCreds = JSON.parse(credentials);
+  bigquery = new BigQuery({
+    credentials: parsedCreds,
+    projectId: parsedCreds.project_id,
+  });
+  console.log('BigQuery initialized successfully');
+} catch (error) {
+  console.error('Error initializing BigQuery:', error);
+  throw error;
+}
+
 Deno.serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -17,11 +37,16 @@ Deno.serve(async (req) => {
     
     console.log('Received activity:', { activity_type, user_id, metadata })
 
-    // Initialize BigQuery with credentials from environment
-    const bigquery = new BigQuery({
-      credentials: JSON.parse(Deno.env.get('google_big_query') || '{}'),
-      projectId: JSON.parse(Deno.env.get('google_big_query') || '{}').project_id,
-    })
+    if (!activity_type || !user_id) {
+      console.error('Missing required fields:', { activity_type, user_id });
+      return new Response(
+        JSON.stringify({ error: 'Missing required fields' }),
+        { 
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      );
+    }
 
     // Insert data into BigQuery
     const dataset = bigquery.dataset('user_activity')
@@ -45,7 +70,10 @@ Deno.serve(async (req) => {
   } catch (error) {
     console.error('Error tracking activity:', error)
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ 
+        error: error.message,
+        details: error.stack 
+      }),
       { 
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
