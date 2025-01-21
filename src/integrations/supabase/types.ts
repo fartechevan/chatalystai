@@ -9,6 +9,38 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      conversations: {
+        Row: {
+          created_at: string
+          id: string
+          messages: Json
+          session_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          messages?: Json
+          session_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          messages?: Json
+          session_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conversations_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           created_at: string
@@ -29,6 +61,35 @@ export type Database = {
           name?: string | null
         }
         Relationships: []
+      }
+      sentiment_analysis: {
+        Row: {
+          conversation_id: string
+          created_at: string
+          id: string
+          sentiment: Database["public"]["Enums"]["sentiment_level"]
+        }
+        Insert: {
+          conversation_id: string
+          created_at?: string
+          id?: string
+          sentiment: Database["public"]["Enums"]["sentiment_level"]
+        }
+        Update: {
+          conversation_id?: string
+          created_at?: string
+          id?: string
+          sentiment?: Database["public"]["Enums"]["sentiment_level"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sentiment_analysis_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: true
+            referencedRelation: "conversations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       user_roles: {
         Row: {
@@ -68,6 +129,7 @@ export type Database = {
     }
     Enums: {
       app_role: "admin" | "user"
+      sentiment_level: "bad" | "moderate" | "good"
     }
     CompositeTypes: {
       [_ in never]: never

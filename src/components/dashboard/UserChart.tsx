@@ -7,52 +7,80 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import { Split } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
-
-const data = [
-  { name: "Jan", users: 400, satisfied: 300, unsatisfied: 100 },
-  { name: "Feb", users: 300, satisfied: 200, unsatisfied: 100 },
-  { name: "Mar", users: 600, satisfied: 400, unsatisfied: 200 },
-  { name: "Apr", users: 800, satisfied: 600, unsatisfied: 200 },
-  { name: "May", users: 700, satisfied: 500, unsatisfied: 200 },
-];
+import { useQuery } from "@tanstack/react-query";
 
 type TimeRange = "daily" | "weekly" | "monthly" | "yearly";
 
-interface Conversation {
-  id: string;
-  userId: string;
-  sessionId: string;
+interface ConversationMessage {
+  sender: "user" | "bot";
+  content: string;
   timestamp: string;
-  messages: Array<{
-    sender: "user" | "bot";
-    content: string;
-    timestamp: string;
-  }>;
-  satisfied: boolean;
 }
 
-const mockConversations: Conversation[] = [
-  {
-    id: "1",
-    userId: "user123",
-    sessionId: "session_abc123",
-    timestamp: "2024-01-20T10:00:00Z",
-    satisfied: true,
-    messages: [
-      { sender: "user", content: "Hi, I need help with my order", timestamp: "2024-01-20T10:00:00Z" },
-      { sender: "bot", content: "Hello! I'd be happy to help. Could you provide your order number?", timestamp: "2024-01-20T10:00:05Z" },
-    ],
-  },
-  // Add more mock conversations as needed
-];
+interface Conversation {
+  id: string;
+  user_id: string;
+  session_id: string;
+  created_at: string;
+  messages: ConversationMessage[];
+}
+
+interface ChartData {
+  name: string;
+  users: number;
+}
+
+async function fetchConversationData(timeRange: TimeRange): Promise<ChartData[]> {
+  const { data, error } = await supabase
+    .from('conversations')
+    .select('created_at')
+    .order('created_at', { ascending: true });
+
+  if (error) throw error;
+
+  // Group conversations by date and count users
+  const groupedData = data.reduce((acc: { [key: string]: number }, item) => {
+    const date = new Date(item.created_at);
+    const key = date.toLocaleDateString('en-US', { month: 'short' });
+    acc[key] = (acc[key] || 0) + 1;
+    return acc;
+  }, {});
+
+  return Object.entries(groupedData).map(([name, users]) => ({
+    name,
+    users,
+  }));
+}
+
+async function fetchConversations(): Promise<Conversation[]> {
+  const { data, error } = await supabase
+    .from('conversations')
+    .select('*')
+    .order('created_at', { ascending: false })
+    .limit(20);
+
+  if (error) throw error;
+  return data;
+}
 
 export function UserChart() {
   const [timeRange, setTimeRange] = useState<TimeRange>("monthly");
   const [splitView, setSplitView] = useState(false);
-  const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
   const [showConversations, setShowConversations] = useState(false);
   const [showConversationDetail, setShowConversationDetail] = useState(false);
+  const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
   const { toast } = useToast();
+
+  const { data: chartData = [], isLoading: isChartLoading } = useQuery({
+    queryKey: ['conversationStats', timeRange],
+    queryFn: () => fetchConversationData(timeRange),
+  });
+
+  const { data: conversations = [], isLoading: isConversationsLoading } = useQuery({
+    queryKey: ['conversations'],
+    queryFn: fetchConversations,
+    enabled: showConversations,
+  });
 
   const trackActivity = async (activityType: string, metadata: any = {}) => {
     try {
@@ -129,44 +157,49 @@ export function UserChart() {
         </CardHeader>
         
         <CardContent className={splitView ? "grid grid-rows-2 gap-4" : "h-[300px]"}>
-          {splitView ? (
-            <>
-              <div className="h-[140px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={data} onClick={handleBarClick}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="name" />
-                    <YAxis />
-                    <Tooltip />
-                    <Bar dataKey="satisfied" fill="hsl(var(--success))" name="Satisfied Users" />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-              <div className="h-[140px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={data} onClick={handleBarClick}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="name" />
-                    <YAxis />
-                    <Tooltip />
-                    <Bar dataKey="unsatisfied" fill="hsl(var(--warning))" name="Unsatisfied Users" />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </>
+          {isChartLoading ? (
+            <div className="flex items-center justify-center h-full">
+              <p>Loading chart data...</p>
+            </div>
           ) : (
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={data} onClick={handleBarClick}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="name" />
-                <YAxis />
-                <Tooltip />
-                <Bar dataKey="users" fill="hsl(var(--primary))" />
-              </BarChart>
-            </ResponsiveContainer>
+            splitView ? (
+              <>
+                <div className="h-[140px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={chartData} onClick={handleBarClick}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="name" />
+                      <YAxis />
+                      <Tooltip />
+                      <Bar dataKey="users" fill="hsl(var(--primary))" name="Users" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+                <div className="h-[140px]">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={chartData} onClick={handleBarClick}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="name" />
+                      <YAxis />
+                      <Tooltip />
+                      <Bar dataKey="users" fill="hsl(var(--primary))" name="Users" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={chartData} onClick={handleBarClick}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="name" />
+                  <YAxis />
+                  <Tooltip />
+                  <Bar dataKey="users" fill="hsl(var(--primary))" />
+                </BarChart>
+              </ResponsiveContainer>
+            )
           )}
         </CardContent>
-        
       </Card>
 
       <Sheet open={showConversations} onOpenChange={setShowConversations}>
@@ -175,23 +208,24 @@ export function UserChart() {
             <SheetTitle>User Conversations</SheetTitle>
           </SheetHeader>
           <div className="mt-4 space-y-4">
-            {mockConversations.map((conv) => (
-              <div
-                key={conv.id}
-                className="cursor-pointer rounded-lg border p-4 hover:bg-accent"
-                onClick={() => handleConversationClick(conv)}
-              >
-                <div className="flex items-center justify-between">
-                  <span className="font-medium">Session: {conv.sessionId}</span>
-                  <span className={conv.satisfied ? "text-success" : "text-warning"}>
-                    {conv.satisfied ? "Satisfied" : "Unsatisfied"}
-                  </span>
+            {isConversationsLoading ? (
+              <p>Loading conversations...</p>
+            ) : (
+              conversations.map((conv) => (
+                <div
+                  key={conv.id}
+                  className="cursor-pointer rounded-lg border p-4 hover:bg-accent"
+                  onClick={() => handleConversationClick(conv)}
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="font-medium">Session: {conv.session_id}</span>
+                    <span className="text-sm text-muted-foreground">
+                      {new Date(conv.created_at).toLocaleString()}
+                    </span>
+                  </div>
                 </div>
-                <p className="mt-2 text-sm text-muted-foreground">
-                  {new Date(conv.timestamp).toLocaleString()}
-                </p>
-              </div>
-            ))}
+              ))
+            )}
           </div>
         </SheetContent>
       </Sheet>
@@ -199,7 +233,7 @@ export function UserChart() {
       <Sheet open={showConversationDetail} onOpenChange={setShowConversationDetail}>
         <SheetContent side="right" className="w-full sm:w-[640px]">
           <SheetHeader>
-            <SheetTitle>Conversation Detail - Session {selectedConversation?.sessionId}</SheetTitle>
+            <SheetTitle>Conversation Detail - Session {selectedConversation?.session_id}</SheetTitle>
           </SheetHeader>
           <div className="mt-4 space-y-4">
             {selectedConversation?.messages.map((message, index) => (
