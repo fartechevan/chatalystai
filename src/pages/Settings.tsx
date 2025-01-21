@@ -1,101 +1,72 @@
 import { useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { toast } from "@/hooks/use-toast";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
 
-export default function Settings() {
-  const [newUser, setNewUser] = useState({ email: "", name: "", role: "user" });
-  const [isLoading, setIsLoading] = useState(false);
-  const { toast } = useToast();
+const Settings = () => {
+  const [loading, setLoading] = useState(false);
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsLoading(true);
-
+  const createTestUser = async () => {
+    setLoading(true);
     try {
-      // Generate a random password for the user
-      const password = Math.random().toString(36).slice(-8);
-      console.log('Sample user password:', password); // Log the password for testing
-      
-      // Create the user using signUp instead of admin.createUser
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email: newUser.email,
-        password: password,
+      const testUser = {
+        email: 'test@example.com',
+        password: 'test123456',
         options: {
           data: {
-            name: newUser.name,
+            name: 'Test User',
           },
-        }
-      });
+        },
+      };
 
-      if (authError) throw authError;
+      console.log('Creating test user with:', testUser);
 
+      const { data, error } = await supabase.auth.signUp(testUser);
+
+      if (error) throw error;
+
+      console.log('User created successfully:', data);
+      
       toast({
         title: "Success",
-        description: "User added successfully.",
+        description: `Test user created! Email: ${testUser.email}, Password: ${testUser.password}`,
       });
-      
-      setNewUser({ email: "", name: "", role: "user" });
     } catch (error: any) {
       console.error('Error creating user:', error);
       toast({
         title: "Error",
-        description: error.message || "Failed to create user",
+        description: error.message,
         variant: "destructive",
       });
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
   };
 
   return (
-    <div className="max-w-2xl mx-auto p-4">
-      <Card className="animate-enter">
+    <div className="container mx-auto p-6">
+      <Card>
         <CardHeader>
-          <CardTitle>Add New User</CardTitle>
+          <CardTitle>Create Test User</CardTitle>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div className="space-y-2">
-              <Input
-                placeholder="Name"
-                value={newUser.name}
-                onChange={(e) => setNewUser({ ...newUser, name: e.target.value })}
-                required
-              />
-            </div>
-            <div className="space-y-2">
-              <Input
-                type="email"
-                placeholder="Email"
-                value={newUser.email}
-                onChange={(e) => setNewUser({ ...newUser, email: e.target.value })}
-                required
-              />
-            </div>
-            <div className="space-y-2">
-              <Select
-                value={newUser.role}
-                onValueChange={(value) => setNewUser({ ...newUser, role: value })}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select role" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="admin">Admin</SelectItem>
-                  <SelectItem value="user">User</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <Button type="submit" disabled={isLoading}>
-              {isLoading ? "Adding User..." : "Add User"}
-            </Button>
-          </form>
+          <Button 
+            onClick={createTestUser}
+            disabled={loading}
+          >
+            {loading ? "Creating..." : "Create Test User"}
+          </Button>
+          <div className="mt-4 text-sm text-muted-foreground">
+            This will create a test user with:<br />
+            Email: test@example.com<br />
+            Password: test123456
+          </div>
         </CardContent>
       </Card>
     </div>
   );
-}
+};
+
+export default Settings;
