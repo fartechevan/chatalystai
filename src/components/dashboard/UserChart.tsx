@@ -64,7 +64,11 @@ async function fetchConversations(): Promise<Conversation[]> {
   // Transform the messages from Json to ConversationMessage[]
   return data.map(conv => ({
     ...conv,
-    messages: conv.messages as ConversationMessage[]
+    messages: (conv.messages as any[]).map(msg => ({
+      sender: msg.sender as "user" | "bot",
+      content: msg.content as string,
+      timestamp: msg.timestamp as string
+    }))
   }));
 }
 
