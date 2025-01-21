@@ -8,12 +8,15 @@ async function fetchUserStats(): Promise<UserStatsType> {
   const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
   const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
 
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('No user found');
+
   // Get monthly active users
   const { count: activeMonthly, error: monthlyError } = await supabase
     .from('conversations')
     .select('user_id', { count: 'exact', head: true })
     .gte('created_at', thirtyDaysAgo.toISOString())
-    .eq('user_id', supabase.auth.getUser());
+    .eq('user_id', user.id);
 
   if (monthlyError) throw monthlyError;
 
@@ -22,7 +25,7 @@ async function fetchUserStats(): Promise<UserStatsType> {
     .from('conversations')
     .select('user_id', { count: 'exact', head: true })
     .gte('created_at', sevenDaysAgo.toISOString())
-    .eq('user_id', supabase.auth.getUser());
+    .eq('user_id', user.id);
 
   if (weeklyError) throw weeklyError;
 
