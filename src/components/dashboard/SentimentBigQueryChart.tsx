@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/components/ui/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useEffect } from "react";
 
 export function SentimentBigQueryChart() {
   const { toast } = useToast();
@@ -26,13 +27,16 @@ export function SentimentBigQueryChart() {
     },
   });
 
-  if (error) {
-    toast({
-      title: "Error loading sentiment data",
-      description: "There was a problem loading the sentiment data.",
-      variant: "destructive",
-    });
-  }
+  // Handle error with useEffect to prevent infinite re-renders
+  useEffect(() => {
+    if (error) {
+      toast({
+        title: "Error loading sentiment data",
+        description: "There was a problem loading the sentiment data.",
+        variant: "destructive",
+      });
+    }
+  }, [error, toast]);
 
   return (
     <Card className="glass-card animate-enter">

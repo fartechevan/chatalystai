@@ -1,5 +1,4 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
-import { BigQuery } from "https://googleapis.deno.dev/bigquery/v2.ts"
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -13,8 +12,8 @@ serve(async (req) => {
 
   try {
     const credentials = JSON.parse(Deno.env.get('google_big_query') || '{}')
-    const bigquery = new BigQuery({ credentials })
-
+    
+    // Create BigQuery client using native fetch
     const query = `
       SELECT 
         sentiment_score,
@@ -26,7 +25,24 @@ serve(async (req) => {
       LIMIT 100
     `
 
-    const [rows] = await bigquery.query(query)
+    const response = await fetch('https://bigquery.googleapis.com/bigquery/v2/projects/fartech-yvqj/queries', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${credentials.access_token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        query: query,
+        useLegacySql: false,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`BigQuery API error: ${response.statusText}`);
+    }
+
+    const result = await response.json();
+    const rows = result.rows || [];
     
     return new Response(
       JSON.stringify({ data: rows }),
@@ -36,6 +52,7 @@ serve(async (req) => {
       },
     )
   } catch (error) {
+    console.error('Error in fetch-sentiment:', error);
     return new Response(
       JSON.stringify({ error: error.message }),
       { 
