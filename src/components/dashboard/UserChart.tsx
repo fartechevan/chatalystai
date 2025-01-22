@@ -6,7 +6,6 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import { Split } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
-import { useToast } from "@/components/ui/use-toast";
 import { useQuery } from "@tanstack/react-query";
 
 type TimeRange = "daily" | "weekly" | "monthly" | "yearly";
@@ -61,7 +60,6 @@ async function fetchConversations(): Promise<Conversation[]> {
 
   if (error) throw error;
 
-  // Transform the messages from Json to ConversationMessage[]
   return data.map(conv => ({
     ...conv,
     messages: (conv.messages as any[]).map(msg => ({
@@ -78,7 +76,6 @@ export function UserChart() {
   const [showConversations, setShowConversations] = useState(false);
   const [showConversationDetail, setShowConversationDetail] = useState(false);
   const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
-  const { toast } = useToast();
 
   const { data: chartData = [], isLoading: isChartLoading } = useQuery({
     queryKey: ['conversationStats', timeRange],
@@ -116,7 +113,7 @@ export function UserChart() {
             </Button>
             <Select 
               value={timeRange} 
-              onValueChange={setTimeRange}
+              onValueChange={(value: TimeRange) => setTimeRange(value)}
             >
               <SelectTrigger className="w-[180px]">
                 <SelectValue placeholder="Select time range" />
