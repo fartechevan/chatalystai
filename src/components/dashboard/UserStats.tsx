@@ -9,16 +9,13 @@ type UserStatsType = {
 };
 
 async function fetchUserStats(): Promise<UserStatsType> {
-  // Get current month and week
-  const { data: monthData, error: monthError } = await supabase
-    .rpc('get_current_month');
 
   if (monthError) throw monthError;
   if (!monthData || monthData.length === 0) throw new Error('Failed to get current month');
   
   const now = new Date();
   const currentYear = now.getFullYear();
-  const currentMonth = monthData[0].month_number;
+  const currentMonth = new Date().getMonth() + 1; 
 
   const { data: weekData, error: weekError } = await supabase
     .rpc('get_current_week');
