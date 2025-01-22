@@ -18,7 +18,8 @@ async function fetchUserStats(): Promise<UserStatsType> {
   const { data: monthlyData, error: monthlyError } = await supabase
     .from('conversations')
     .select('user_id')
-    .eq('created_at::date_part(\'month\')', currentMonth);
+    .filter('created_at', 'gte', `${new Date().getFullYear()}-${currentMonth}-01`)
+    .filter('created_at', 'lt', `${new Date().getFullYear()}-${currentMonth + 1}-01`);
 
   if (monthlyError) throw monthlyError;
 
@@ -35,7 +36,8 @@ async function fetchUserStats(): Promise<UserStatsType> {
   const { data: weeklyData, error: weeklyError } = await supabase
     .from('conversations')
     .select('user_id')
-    .eq('created_at::date_part(\'week\')', weekOfMonth);
+    .filter('created_at', 'gte', `${new Date().getFullYear()}-${currentMonth}-${(weekOfMonth - 1) * 7 + 1}`)
+    .filter('created_at', 'lt', `${new Date().getFullYear()}-${currentMonth}-${weekOfMonth * 7 + 1}`);
 
   if (weeklyError) throw weeklyError;
 
@@ -47,7 +49,8 @@ async function fetchUserStats(): Promise<UserStatsType> {
   const { data: newUsersData, error: newUsersError } = await supabase
     .from('profiles')
     .select('id')
-    .eq('created_at::date_part(\'month\')', currentMonth);
+    .filter('created_at', 'gte', `${new Date().getFullYear()}-${currentMonth}-01`)
+    .filter('created_at', 'lt', `${new Date().getFullYear()}-${currentMonth + 1}-01`);
 
   if (newUsersError) throw newUsersError;
 
