@@ -26,16 +26,18 @@ async function fetchUserStats(): Promise<UserStatsType> {
   if (weeklyError) throw weeklyError;
 
   // Get new users with conversations in the current month
+  const { data: activeUserIds } = await supabase
+    .from('conversations')
+    .select('user_id')
+    .gte('created_at', firstDayOfMonth.toISOString());
+
+  const uniqueUserIds = [...new Set(activeUserIds?.map(conv => conv.user_id) || [])];
+
   const { count: newUsers, error: newUsersError } = await supabase
     .from('profiles')
     .select('id', { count: 'exact', head: true })
     .gte('created_at', firstDayOfMonth.toISOString())
-    .in('id', (
-      supabase
-        .from('conversations')
-        .select('user_id')
-        .gte('created_at', firstDayOfMonth.toISOString())
-    ));
+    .in('id', uniqueUserIds);
 
   if (newUsersError) throw newUsersError;
 
