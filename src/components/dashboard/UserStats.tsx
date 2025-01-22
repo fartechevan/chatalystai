@@ -16,6 +16,8 @@ async function fetchUserStats(): Promise<UserStatsType> {
   if (monthError) throw monthError;
   if (!monthData || monthData.length === 0) throw new Error('Failed to get current month');
   
+  const now = new Date();
+  const currentYear = now.getFullYear();
   const currentMonth = monthData[0].month_number;
 
   const { data: weekData, error: weekError } = await supabase
@@ -43,11 +45,18 @@ async function fetchUserStats(): Promise<UserStatsType> {
   if (weeklyError) throw weeklyError;
 
   // Get monthly active users
-  const { data: monthlyData, error: monthlyError } = await supabase
-    .from('conversations')
-    .select('user_id')
-    .filter('created_at', 'gte', `${new Date().getFullYear()}-${currentMonth}-01`)
-    .filter('created_at', 'lt', `${new Date().getFullYear()}-${currentMonth + 1}-01`);
+  
+    const startOfMonth = new Date(currentYear, currentMonth, 1).toISOString(); // Start of current month
+    const startOfNextMonth = new Date(currentYear, currentMonth + 1, 1).toISOString(); // Start of next month
+    
+    const { data: monthlyData, error: monthlyError } = await supabase
+      .from('conversations')
+      .select('user_id')
+      .gte('created_at', startOfMonth)
+      .lt('created_at', startOfNextMonth);
+
+    
+
 
   if (monthlyError) throw monthlyError;
 
