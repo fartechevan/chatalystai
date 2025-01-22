@@ -4,38 +4,35 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
 async function fetchUserStats(): Promise<UserStatsType> {
-  const currentYear = new Date().getFullYear();
-  const currentMonth = new Date().getMonth() + 1; // Months are 0-indexed
+  const currentDate = new Date();
+  const currentYear = currentDate.getFullYear();
+  const currentMonth = currentDate.getMonth() + 1; // Months are 0-indexed
 
   // Format months as two digits
   const startMonth = `${currentYear}-${currentMonth.toString().padStart(2, "0")}`;
-  const nextMonth = new Date(currentYear, currentMonth, 1) // Handles year transitions
-    .toISOString()
-    .slice(0, 7); // YYYY-MM format
+  const nextMonthDate = new Date(currentYear, currentMonth, 1); // First day of the next month
+  const nextMonth = nextMonthDate.toISOString().slice(0, 7); // YYYY-MM format
 
   // Fetch monthly active users
   const { data: monthlyData, error: monthlyError } = await supabase
     .from("conversations")
     .select("user_id")
-    .gte("created_at", startMonth)
-    .lt("created_at", nextMonth);
+    .gte("created_at", `${startMonth}-01`)
+    .lt("created_at", `${nextMonth}-01`);
 
   if (monthlyError) throw new Error(`Error fetching monthly data: ${monthlyError.message}`);
 
+  // Calculate the start of the current week (Sunday)
+  const startOfWeek = new Date(currentDate);
+  startOfWeek.setDate(currentDate.getDate() - currentDate.getDay()); // Adjust to Sunday
+  const startOfWeekStr = startOfWeek.toISOString().split("T")[0]; // YYYY-MM-DD format
+
   // Fetch weekly active users
-const now = new Date();
-const startOfWeek = new Date(now.getFullYear(), now.getMonth(), now.getDate() - now.getDay()); // Start of current week (Sunday)
-const startOfWeekStr = startOfWeek.toISOString().split("T")[0]; // YYYY-MM-DD format
-
-console.log("Start of Week:", startOfWeekStr); // Debugging
-
-
-
   const { data: weeklyData, error: weeklyError } = await supabase
     .from("conversations")
     .select("user_id")
     .gte("created_at", startOfWeekStr)
-    .lt("created_at", new Date().toISOString().split("T")[0]);
+    .lt("created_at", currentDate.toISOString().split("T")[0]); // Current date
 
   if (weeklyError) throw new Error(`Error fetching weekly data: ${weeklyError.message}`);
 
