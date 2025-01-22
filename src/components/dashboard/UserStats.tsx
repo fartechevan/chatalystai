@@ -33,11 +33,18 @@ async function fetchUserStats(): Promise<UserStatsType> {
   
   if (!weekOfMonth) throw new Error('Failed to get current week');
 
+  // Calculate the start and end dates for the current week
+  const today = new Date();
+  const startOfWeek = new Date(today);
+  startOfWeek.setDate(today.getDate() - today.getDay()); // Start of current week (Sunday)
+  const endOfWeek = new Date(today);
+  endOfWeek.setDate(today.getDate() + (6 - today.getDay())); // End of current week (Saturday)
+
   const { data: weeklyData, error: weeklyError } = await supabase
     .from('conversations')
     .select('user_id')
-    .filter('created_at', 'gte', `${new Date().getFullYear()}-${currentMonth}-${(weekOfMonth - 1) * 7 + 1}`)
-    .filter('created_at', 'lt', `${new Date().getFullYear()}-${currentMonth}-${weekOfMonth * 7 + 1}`);
+    .filter('created_at', 'gte', startOfWeek.toISOString().split('T')[0])
+    .filter('created_at', 'lt', endOfWeek.toISOString().split('T')[0]);
 
   if (weeklyError) throw weeklyError;
 
