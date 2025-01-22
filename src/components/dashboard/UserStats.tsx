@@ -4,73 +4,64 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
 async function fetchUserStats(): Promise<UserStatsType> {
-  // Get current month using date_part from PostgreSQL
-  const { data: currentMonthData, error: monthError } = await supabase
-    .rpc('get_current_month');
-  
-  if (monthError) throw monthError;
-  
-  const currentMonth = currentMonthData?.[0]?.month_number;
+  const currentYear = new Date().getFullYear();
+  const currentMonth = new Date().getMonth() + 1; // Months are 0-indexed
 
-  if (!currentMonth) throw new Error('Failed to get current month');
+  // Format months as two digits
+  const startMonth = `${currentYear}-${currentMonth.toString().padStart(2, "0")}`;
+  const nextMonth = new Date(currentYear, currentMonth, 1) // Handles year transitions
+    .toISOString()
+    .slice(0, 7); // YYYY-MM format
 
-  // Get monthly active users for current month
+  // Fetch monthly active users
   const { data: monthlyData, error: monthlyError } = await supabase
-    .from('conversations')
-    .select('user_id')
-    .filter('created_at', 'gte', `${new Date().getFullYear()}-${currentMonth}-01`)
-    .filter('created_at', 'lt', `${new Date().getFullYear()}-${currentMonth + 1}-01`);
+    .from("conversations")
+    .select("user_id")
+    .gte("created_at", startMonth)
+    .lt("created_at", nextMonth);
 
-  if (monthlyError) throw monthlyError;
+  if (monthlyError) throw new Error(`Error fetching monthly data: ${monthlyError.message}`);
 
-  // Get weekly active users (current week)
-  const { data: weekData, error: weekError } = await supabase
-    .rpc('get_current_week');
-    
-  if (weekError) throw weekError;
-  
-  const weekOfMonth = weekData?.[0]?.week_of_month;
-  
-  if (!weekOfMonth) throw new Error('Failed to get current week');
+  // Fetch weekly active users
+const now = new Date();
+const startOfWeek = new Date(now.getFullYear(), now.getMonth(), now.getDate() - now.getDay()); // Start of current week (Sunday)
+const startOfWeekStr = startOfWeek.toISOString().split("T")[0]; // YYYY-MM-DD format
 
-  // Calculate the start and end dates for the current week
-  const today = new Date();
-  const startOfWeek = new Date(today);
-  startOfWeek.setDate(today.getDate() - today.getDay()); // Start of current week (Sunday)
-  const endOfWeek = new Date(today);
-  endOfWeek.setDate(today.getDate() + (6 - today.getDay())); // End of current week (Saturday)
+console.log("Start of Week:", startOfWeekStr); // Debugging
+
+
 
   const { data: weeklyData, error: weeklyError } = await supabase
-    .from('conversations')
-    .select('user_id')
-    .filter('created_at', 'gte', startOfWeek.toISOString().split('T')[0])
-    .filter('created_at', 'lt', endOfWeek.toISOString().split('T')[0]);
+    .from("conversations")
+    .select("user_id")
+    .gte("created_at", startOfWeekStr)
+    .lt("created_at", new Date().toISOString().split("T")[0]);
 
-  if (weeklyError) throw weeklyError;
+  if (weeklyError) throw new Error(`Error fetching weekly data: ${weeklyError.message}`);
 
-  // Get unique user counts
-  const uniqueMonthlyUsers = [...new Set(monthlyData?.map(conv => conv.user_id) || [])];
-  const uniqueWeeklyUsers = [...new Set(weeklyData?.map(conv => conv.user_id) || [])];
-
-  // Get new users in the current month
+  // Fetch new users in the current month
   const { data: newUsersData, error: newUsersError } = await supabase
-    .from('profiles')
-    .select('id')
-    .filter('created_at', 'gte', `${new Date().getFullYear()}-${currentMonth}-01`)
-    .filter('created_at', 'lt', `${new Date().getFullYear()}-${currentMonth + 1}-01`);
+    .from("profiles")
+    .select("id")
+    .gte("created_at", `${startMonth}-01`)
+    .lt("created_at", `${nextMonth}-01`);
 
-  if (newUsersError) throw newUsersError;
+  if (newUsersError) throw new Error(`Error fetching new users: ${newUsersError.message}`);
+
+  // Extract unique user IDs
+  const uniqueMonthlyUsers = new Set(monthlyData?.map((conv) => conv.user_id));
+  const uniqueWeeklyUsers = new Set(weeklyData?.map((conv) => conv.user_id));
 
   return {
-    activeMonthly: uniqueMonthlyUsers.length,
-    activeWeekly: uniqueWeeklyUsers.length,
+    activeMonthly: uniqueMonthlyUsers.size,
+    activeWeekly: uniqueWeeklyUsers.size,
     newUsers: newUsersData?.length || 0,
   };
 }
 
 export function UserStats() {
   const { data: stats, isLoading } = useQuery({
-    queryKey: ['userStats'],
+    queryKey: ["userStats"],
     queryFn: fetchUserStats,
     refetchInterval: 30000, // Refetch every 30 seconds
   });
