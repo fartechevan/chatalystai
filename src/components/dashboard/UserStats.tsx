@@ -12,6 +12,8 @@ async function fetchUserStats(): Promise<UserStatsType> {
   
   const currentMonth = currentMonthData?.[0]?.month_number;
 
+  if (!currentMonth) throw new Error('Failed to get current month');
+
   // Get monthly active users for current month
   const { data: monthlyData, error: monthlyError } = await supabase
     .from('conversations')
@@ -21,13 +23,19 @@ async function fetchUserStats(): Promise<UserStatsType> {
   if (monthlyError) throw monthlyError;
 
   // Get weekly active users (current week)
+  const { data: weekData, error: weekError } = await supabase
+    .rpc('get_current_week');
+    
+  if (weekError) throw weekError;
+  
+  const weekOfMonth = weekData?.[0]?.week_of_month;
+  
+  if (!weekOfMonth) throw new Error('Failed to get current week');
+
   const { data: weeklyData, error: weeklyError } = await supabase
     .from('conversations')
     .select('user_id')
-    .eq('created_at::date_part(\'week\')', 
-      // Get the current week number using PostgreSQL
-      (await supabase.rpc('get_current_week')).data?.[0]?.week_of_month
-    );
+    .eq('created_at::date_part(\'week\')', weekOfMonth);
 
   if (weeklyError) throw weeklyError;
 

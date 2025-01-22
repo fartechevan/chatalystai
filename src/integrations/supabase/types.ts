@@ -125,7 +125,20 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      get_current_month: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          today_date: string
+          month_number: number
+        }[]
+      }
+      get_current_week: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          today_date: string
+          week_of_month: number
+        }[]
+      }
     }
     Enums: {
       app_role: "admin" | "user"
