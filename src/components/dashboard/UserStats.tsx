@@ -1,12 +1,12 @@
 async function fetchUserStats(): Promise<UserStatsType> {
   const now = new Date();
   const currentYear = now.getFullYear();
-  const currentMonth = now.getMonth(); // Current month (0-indexed)
+  const currentMonth = now.getMonth(); // 0-indexed (January = 0)
 
   // Start of the current month
-  const startOfMonth = new Date(currentYear, currentMonth, 1).toISOString().split("T")[0]; // YYYY-MM-DD
+  const startOfMonth = new Date(currentYear, currentMonth, 1).toISOString(); // Start of current month
   // Start of the next month
-  const startOfNextMonth = new Date(currentYear, currentMonth + 1, 1).toISOString().split("T")[0]; // YYYY-MM-DD
+  const startOfNextMonth = new Date(currentYear, currentMonth + 1, 1).toISOString(); // Start of next month
 
   console.log("Start of Month:", startOfMonth); // Debugging
   console.log("Start of Next Month:", startOfNextMonth); // Debugging
