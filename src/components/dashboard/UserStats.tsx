@@ -9,11 +9,9 @@ type UserStatsType = {
 };
 
 async function fetchUserStats(): Promise<UserStatsType> {
-  // Get current month and week
-
   const now = new Date();
   const currentYear = now.getFullYear();
-  const currentMonth = new Date().getMonth() + 1; // Months are 0-indexed in JavaScript
+  const currentMonth = now.getMonth() + 1; // Months are 0-indexed in JavaScript
 
   // Calculate the start and end dates for the current week
   const today = new Date();
@@ -22,27 +20,24 @@ async function fetchUserStats(): Promise<UserStatsType> {
   const endOfWeek = new Date(today);
   endOfWeek.setDate(today.getDate() + (6 - today.getDay())); // End of current week (Saturday)
 
+  // Get weekly active users
   const { data: weeklyData, error: weeklyError } = await supabase
     .from('conversations')
     .select('user_id')
-    .filter('created_at', 'gte', startOfWeek.toISOString().split('T')[0])
-    .filter('created_at', 'lt', endOfWeek.toISOString().split('T')[0]);
+    .gte('created_at', startOfWeek.toISOString())
+    .lt('created_at', endOfWeek.toISOString());
 
   if (weeklyError) throw weeklyError;
 
-  // Get monthly active users
+  // Get monthly active users - using first day of current month to last day
+  const startOfMonth = new Date(currentYear, currentMonth - 1, 1);
+  const endOfMonth = new Date(currentYear, currentMonth, 0); // Last day of current month
   
-    const startOfMonth = new Date(currentYear, currentMonth, 1).toISOString(); // Start of current month
-    const startOfNextMonth = new Date(currentYear, currentMonth + 1, 1).toISOString(); // Start of next month
-    
-    const { data: monthlyData, error: monthlyError } = await supabase
-      .from('conversations')
-      .select('user_id')
-      .gte('created_at', startOfMonth)
-      .lt('created_at', startOfNextMonth);
-
-    
-
+  const { data: monthlyData, error: monthlyError } = await supabase
+    .from('conversations')
+    .select('user_id')
+    .gte('created_at', startOfMonth.toISOString())
+    .lte('created_at', endOfMonth.toISOString());
 
   if (monthlyError) throw monthlyError;
 
@@ -50,8 +45,8 @@ async function fetchUserStats(): Promise<UserStatsType> {
   const { data: newUsersData, error: newUsersError } = await supabase
     .from('profiles')
     .select('id')
-    .filter('created_at', 'gte', `${new Date().getFullYear()}-${currentMonth}-01`)
-    .filter('created_at', 'lt', `${new Date().getFullYear()}-${currentMonth + 1}-01`);
+    .gte('created_at', startOfMonth.toISOString())
+    .lte('created_at', endOfMonth.toISOString());
 
   if (newUsersError) throw newUsersError;
 
@@ -77,7 +72,7 @@ export function UserStats() {
   }
 
   if (error) {
-    return <div>Error loading stats: {error.message}</div>;
+    return <div>Error loading stats: {(error as Error).message}</div>;
   }
 
   return (
