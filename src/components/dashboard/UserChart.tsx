@@ -91,44 +91,13 @@ export function UserChart() {
     enabled: showConversations,
   });
 
-  const trackActivity = async (activityType: string, metadata: any = {}) => {
-    try {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return;
-
-      const { error } = await supabase.functions.invoke('track-activity', {
-        body: {
-          activity_type: activityType,
-          user_id: user.id,
-          metadata
-        }
-      });
-
-      if (error) throw error;
-    } catch (error) {
-      console.error('Error tracking activity:', error);
-      toast({
-        title: "Error tracking activity",
-        description: "There was a problem recording your activity.",
-        variant: "destructive"
-      });
-    }
-  };
-
   const handleBarClick = () => {
     setShowConversations(true);
-    trackActivity('view_conversations');
   };
 
   const handleConversationClick = (conversation: Conversation) => {
     setSelectedConversation(conversation);
     setShowConversationDetail(true);
-    trackActivity('view_conversation_detail', { conversation_id: conversation.id });
-  };
-
-  const handleTimeRangeChange = (value: TimeRange) => {
-    setTimeRange(value);
-    trackActivity('change_time_range', { new_range: value });
   };
 
   return (
@@ -140,17 +109,14 @@ export function UserChart() {
             <Button
               variant="outline"
               size="icon"
-              onClick={() => {
-                setSplitView(!splitView);
-                trackActivity('toggle_split_view', { split_enabled: !splitView });
-              }}
+              onClick={() => setSplitView(!splitView)}
               className="h-8 w-8"
             >
               <Split className="h-4 w-4" />
             </Button>
             <Select 
               value={timeRange} 
-              onValueChange={handleTimeRangeChange}
+              onValueChange={setTimeRange}
             >
               <SelectTrigger className="w-[180px]">
                 <SelectValue placeholder="Select time range" />
