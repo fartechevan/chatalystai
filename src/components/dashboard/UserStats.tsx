@@ -15,15 +15,6 @@ async function fetchUserStats(): Promise<UserStatsType> {
   const currentYear = now.getFullYear();
   const currentMonth = new Date().getMonth() + 1; // Months are 0-indexed in JavaScript
 
-  const { data: weekData, error: weekError } = await supabase
-    .rpc('get_current_week');
-
-  if (weekError) throw weekError;
-  if (!weekData || weekData.length === 0) throw new Error('Failed to get current week');
-
-  const weekOfMonth = weekData[0].week_of_month;
-  if (!weekOfMonth) throw new Error('Failed to get current week');
-
   // Calculate the start and end dates for the current week
   const today = new Date();
   const startOfWeek = new Date(today);
