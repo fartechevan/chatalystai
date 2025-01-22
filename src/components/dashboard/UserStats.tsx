@@ -5,30 +5,37 @@ import { supabase } from "@/integrations/supabase/client";
 
 async function fetchUserStats(): Promise<UserStatsType> {
   const now = new Date();
-  const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
-  const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+  const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  const firstDayOfWeek = new Date(now);
+  firstDayOfWeek.setDate(now.getDate() - now.getDay()); // Start of current week (Sunday)
 
-  // Get monthly active users
+  // Get monthly active users (current month)
   const { count: activeMonthly, error: monthlyError } = await supabase
     .from('conversations')
     .select('*', { count: 'exact', head: true })
-    .gte('created_at', thirtyDaysAgo.toISOString());
+    .gte('created_at', firstDayOfMonth.toISOString());
 
   if (monthlyError) throw monthlyError;
 
-  // Get weekly active users
+  // Get weekly active users (current week)
   const { count: activeWeekly, error: weeklyError } = await supabase
     .from('conversations')
     .select('*', { count: 'exact', head: true })
-    .gte('created_at', sevenDaysAgo.toISOString());
+    .gte('created_at', firstDayOfWeek.toISOString());
 
   if (weeklyError) throw weeklyError;
 
-  // Get new users in the last 30 days
+  // Get new users with conversations in the current month
   const { count: newUsers, error: newUsersError } = await supabase
     .from('profiles')
-    .select('*', { count: 'exact', head: true })
-    .gte('created_at', thirtyDaysAgo.toISOString());
+    .select('id', { count: 'exact', head: true })
+    .gte('created_at', firstDayOfMonth.toISOString())
+    .in('id', (
+      supabase
+        .from('conversations')
+        .select('user_id')
+        .gte('created_at', firstDayOfMonth.toISOString())
+    ));
 
   if (newUsersError) throw newUsersError;
 
@@ -83,7 +90,7 @@ export function UserStats() {
       </Card>
       <Card className="glass-card animate-enter [animation-delay:200ms]">
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">New Users</CardTitle>
+          <CardTitle className="text-sm font-medium">New Active Users</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="text-2xl font-bold">{stats?.newUsers}</div>

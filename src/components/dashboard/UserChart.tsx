@@ -41,7 +41,7 @@ async function fetchConversationData(timeRange: TimeRange): Promise<ChartData[]>
       break;
     case "weekly":
       startDate = new Date(now.getTime() - 4 * 7 * 24 * 60 * 60 * 1000);
-      dateFormat = { week: 'numeric' };
+      dateFormat = { day: 'numeric', month: 'short' }; // Fixed: Using valid DateTimeFormatOptions
       break;
     case "yearly":
       startDate = new Date(now.getTime() - 12 * 30 * 24 * 60 * 60 * 1000);
