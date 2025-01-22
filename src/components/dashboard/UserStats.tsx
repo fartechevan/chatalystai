@@ -10,41 +10,37 @@ async function fetchUserStats(): Promise<UserStatsType> {
   firstDayOfWeek.setDate(now.getDate() - now.getDay()); // Start of current week (Sunday)
 
   // Get monthly active users (current month)
-  const { count: activeMonthly, error: monthlyError } = await supabase
+  const { data: monthlyData, error: monthlyError } = await supabase
     .from('conversations')
-    .select('*', { count: 'exact', head: true })
+    .select('user_id')
     .gte('created_at', firstDayOfMonth.toISOString());
 
   if (monthlyError) throw monthlyError;
 
   // Get weekly active users (current week)
-  const { count: activeWeekly, error: weeklyError } = await supabase
+  const { data: weeklyData, error: weeklyError } = await supabase
     .from('conversations')
-    .select('*', { count: 'exact', head: true })
+    .select('user_id')
     .gte('created_at', firstDayOfWeek.toISOString());
 
   if (weeklyError) throw weeklyError;
 
-  // Get new users with conversations in the current month
-  const { data: activeUserIds } = await supabase
-    .from('conversations')
-    .select('user_id')
-    .gte('created_at', firstDayOfMonth.toISOString());
+  // Get unique user counts
+  const uniqueMonthlyUsers = [...new Set(monthlyData?.map(conv => conv.user_id) || [])];
+  const uniqueWeeklyUsers = [...new Set(weeklyData?.map(conv => conv.user_id) || [])];
 
-  const uniqueUserIds = [...new Set(activeUserIds?.map(conv => conv.user_id) || [])];
-
-  const { count: newUsers, error: newUsersError } = await supabase
+  // Get new users in the current month
+  const { data: newUsersData, error: newUsersError } = await supabase
     .from('profiles')
-    .select('id', { count: 'exact', head: true })
-    .gte('created_at', firstDayOfMonth.toISOString())
-    .in('id', uniqueUserIds);
+    .select('id')
+    .gte('created_at', firstDayOfMonth.toISOString());
 
   if (newUsersError) throw newUsersError;
 
   return {
-    activeMonthly: activeMonthly || 0,
-    activeWeekly: activeWeekly || 0,
-    newUsers: newUsers || 0,
+    activeMonthly: uniqueMonthlyUsers.length,
+    activeWeekly: uniqueWeeklyUsers.length,
+    newUsers: newUsersData?.length || 0,
   };
 }
 
