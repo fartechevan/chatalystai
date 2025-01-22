@@ -8,31 +8,26 @@ async function fetchUserStats(): Promise<UserStatsType> {
   const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
   const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
 
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) throw new Error('No user found');
-
   // Get monthly active users
   const { count: activeMonthly, error: monthlyError } = await supabase
     .from('conversations')
-    .select('user_id', { count: 'exact', head: true })
-    .gte('created_at', thirtyDaysAgo.toISOString())
-    .eq('user_id', user.id);
+    .select('*', { count: 'exact', head: true })
+    .gte('created_at', thirtyDaysAgo.toISOString());
 
   if (monthlyError) throw monthlyError;
 
   // Get weekly active users
   const { count: activeWeekly, error: weeklyError } = await supabase
     .from('conversations')
-    .select('user_id', { count: 'exact', head: true })
-    .gte('created_at', sevenDaysAgo.toISOString())
-    .eq('user_id', user.id);
+    .select('*', { count: 'exact', head: true })
+    .gte('created_at', sevenDaysAgo.toISOString());
 
   if (weeklyError) throw weeklyError;
 
   // Get new users in the last 30 days
   const { count: newUsers, error: newUsersError } = await supabase
     .from('profiles')
-    .select('id', { count: 'exact', head: true })
+    .select('*', { count: 'exact', head: true })
     .gte('created_at', thirtyDaysAgo.toISOString());
 
   if (newUsersError) throw newUsersError;

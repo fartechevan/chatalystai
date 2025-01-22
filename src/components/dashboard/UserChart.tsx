@@ -30,9 +30,32 @@ interface ChartData {
 }
 
 async function fetchConversationData(timeRange: TimeRange): Promise<ChartData[]> {
+  const now = new Date();
+  let startDate: Date;
+  let dateFormat: Intl.DateTimeFormatOptions = {};
+
+  switch (timeRange) {
+    case "daily":
+      startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+      dateFormat = { weekday: 'short' };
+      break;
+    case "weekly":
+      startDate = new Date(now.getTime() - 4 * 7 * 24 * 60 * 60 * 1000);
+      dateFormat = { week: 'numeric' };
+      break;
+    case "yearly":
+      startDate = new Date(now.getTime() - 12 * 30 * 24 * 60 * 60 * 1000);
+      dateFormat = { month: 'short' };
+      break;
+    default: // monthly
+      startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+      dateFormat = { month: 'short', day: 'numeric' };
+  }
+
   const { data, error } = await supabase
     .from('conversations')
     .select('created_at')
+    .gte('created_at', startDate.toISOString())
     .order('created_at', { ascending: true });
 
   if (error) throw error;
@@ -40,7 +63,7 @@ async function fetchConversationData(timeRange: TimeRange): Promise<ChartData[]>
   // Group conversations by date and count users
   const groupedData = data.reduce((acc: { [key: string]: number }, item) => {
     const date = new Date(item.created_at);
-    const key = date.toLocaleDateString('en-US', { month: 'short' });
+    const key = date.toLocaleDateString('en-US', dateFormat);
     acc[key] = (acc[key] || 0) + 1;
     return acc;
   }, {});
