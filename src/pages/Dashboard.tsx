@@ -5,7 +5,7 @@ import { Outlet } from "react-router-dom";
 export default function Dashboard() {
   return (
     <SidebarProvider>
-      <div className="min-h-screen flex w-full">
+      <div className="min-h-screen flex w-full bg-background">
         <DashboardSidebar />
         <main className="flex-1 p-8 overflow-auto">
           <Outlet />
