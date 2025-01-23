@@ -15,19 +15,23 @@ async function fetchConversationData(timeRange: TimeRange): Promise<ChartData[]>
 
   switch (timeRange) {
     case "daily":
-      startDate = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+      startDate = new Date(now);
+      startDate.setDate(now.getDate() - 7);
       dateFormat = { weekday: 'short' };
       break;
     case "weekly":
-      startDate = new Date(now.getTime() - 4 * 7 * 24 * 60 * 60 * 1000);
+      startDate = new Date(now);
+      startDate.setDate(now.getDate() - 28); // 4 weeks
       dateFormat = { day: 'numeric', month: 'short' };
       break;
     case "yearly":
-      startDate = new Date(now.getTime() - 12 * 30 * 24 * 60 * 60 * 1000);
+      startDate = new Date(now);
+      startDate.setFullYear(now.getFullYear() - 1);
       dateFormat = { month: 'short' };
       break;
     default: // monthly
-      startDate = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+      startDate = new Date(now);
+      startDate.setMonth(now.getMonth() - 1);
       dateFormat = { month: 'short', day: 'numeric' };
   }
 
@@ -37,7 +41,10 @@ async function fetchConversationData(timeRange: TimeRange): Promise<ChartData[]>
     .gte('created_at', startDate.toISOString())
     .order('created_at', { ascending: true });
 
-  if (error) throw error;
+  if (error) {
+    console.error("Error fetching conversation data:", error);
+    throw error;
+  }
 
   const groupedData = data.reduce((acc: { [key: string]: number }, item) => {
     const date = new Date(item.created_at);
@@ -48,7 +55,7 @@ async function fetchConversationData(timeRange: TimeRange): Promise<ChartData[]>
 
   return Object.entries(groupedData).map(([name, users]) => ({
     name,
-    users,
+    users: users as number, // Explicitly cast `users` to `number`
   }));
 }
 
@@ -59,11 +66,14 @@ async function fetchConversations(): Promise<Conversation[]> {
     .order('created_at', { ascending: false })
     .limit(20);
 
-  if (error) throw error;
+  if (error) {
+    console.error("Error fetching conversations:", error);
+    throw error;
+  }
 
   return data.map(conv => ({
     ...conv,
-    messages: (conv.messages as any[]).map(msg => ({
+    messages: conv.messages.map(msg => ({
       sender: msg.sender as "user" | "bot",
       content: msg.content as string,
       timestamp: msg.timestamp as string
@@ -115,19 +125,17 @@ export function UserChart() {
             <div className="flex items-center justify-center h-full">
               <p>Loading chart data...</p>
             </div>
+          ) : splitView ? (
+            <>
+              <div className="h-[140px]">
+                <DataChart data={chartData} onClick={handleBarClick} />
+              </div>
+              <div className="h-[140px]">
+                <DataChart data={chartData} onClick={handleBarClick} />
+              </div>
+            </>
           ) : (
-            splitView ? (
-              <>
-                <div className="h-[140px]">
-                  <DataChart data={chartData} onClick={handleBarClick} />
-                </div>
-                <div className="h-[140px]">
-                  <DataChart data={chartData} onClick={handleBarClick} />
-                </div>
-              </>
-            ) : (
-              <DataChart data={chartData} onClick={handleBarClick} />
-            )
+            <DataChart data={chartData} onClick={handleBarClick} />
           )}
         </CardContent>
       </Card>
