@@ -33,9 +33,9 @@ async function fetchUserStats(): Promise<UserStatsType> {
   const startOfMonth = new Date(currentYear, currentMonth - 1, 1);
   const endOfMonth = new Date(currentYear, currentMonth, 0); // Last day of current month
   
-  const { data: monthlyData, error: monthlyError } = await supabase
+  const { data: monthlyCount, error: monthlyError } = await supabase
     .from('conversations')
-    .select('user_id')
+    .select("user_id", { count: "exact", head: true }) // Get a distinct count
     .gte('created_at', startOfMonth.toISOString())
     .lte('created_at', endOfMonth.toISOString());
 
@@ -51,11 +51,10 @@ async function fetchUserStats(): Promise<UserStatsType> {
   if (newUsersError) throw newUsersError;
 
   // Count unique users
-  const uniqueMonthlyUsers = new Set(monthlyData?.map(conv => conv.user_id));
   const uniqueWeeklyUsers = new Set(weeklyData?.map(conv => conv.user_id));
 
   return {
-    activeMonthly: uniqueMonthlyUsers.size,
+    activeMonthly: monthlyCount || 0,
     activeWeekly: uniqueWeeklyUsers.size,
     newUsers: newUsersData?.length || 0,
   };
