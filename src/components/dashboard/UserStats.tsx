@@ -12,6 +12,7 @@ import {
 import { format } from "date-fns";
 import { Input } from "@/components/ui/input";
 import { useState } from "react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 type UserStatsType = {
   activeMonthly: number;
@@ -68,6 +69,7 @@ async function fetchUserStats(searchEmail?: string): Promise<UserStatsType> {
 
 export function UserStats() {
   const [searchEmail, setSearchEmail] = useState("");
+  const [showNewUsersDialog, setShowNewUsersDialog] = useState(false);
 
   const { data, isLoading, refetch } = useQuery({
     queryKey: ['userStats', searchEmail],
@@ -108,7 +110,10 @@ export function UserStats() {
             <div className="text-2xl font-bold">{data?.activeWeekly}</div>
           </CardContent>
         </Card>
-        <Card>
+        <Card 
+          className="cursor-pointer transition-colors hover:bg-accent"
+          onClick={() => setShowNewUsersDialog(true)}
+        >
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">New Users This Month</CardTitle>
           </CardHeader>
@@ -118,12 +123,12 @@ export function UserStats() {
         </Card>
       </div>
 
-      {data?.newUserDetails && (
-        <Card>
-          <CardHeader>
-            <CardTitle>User Details</CardTitle>
-          </CardHeader>
-          <CardContent>
+      <Dialog open={showNewUsersDialog} onOpenChange={setShowNewUsersDialog}>
+        <DialogContent className="max-w-full h-[90vh] flex flex-col">
+          <DialogHeader>
+            <DialogTitle>User Details</DialogTitle>
+          </DialogHeader>
+          <div className="flex-1 overflow-y-auto">
             <div className="mb-4">
               <Input
                 type="email"
@@ -142,7 +147,7 @@ export function UserStats() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {data.newUserDetails.map((user) => (
+                {data?.newUserDetails.map((user) => (
                   <TableRow key={user.id}>
                     <TableCell className="font-mono">{user.id}</TableCell>
                     <TableCell>{user.email}</TableCell>
@@ -153,9 +158,9 @@ export function UserStats() {
                 ))}
               </TableBody>
             </Table>
-          </CardContent>
-        </Card>
-      )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
