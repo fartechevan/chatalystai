@@ -4,35 +4,62 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { toast } from "@/hooks/use-toast";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Label } from "@/components/ui/label";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useForm } from "react-hook-form";
+import * as z from "zod";
+
+const createUserSchema = z.object({
+  name: z.string().min(2, "Name must be at least 2 characters"),
+  email: z.string().email("Please enter a valid email"),
+  password: z.string().min(6, "Password must be at least 6 characters"),
+});
+
+type CreateUserForm = z.infer<typeof createUserSchema>;
 
 const Settings = () => {
   const [loading, setLoading] = useState(false);
 
-  const createTestUser = async () => {
+  const form = useForm<CreateUserForm>({
+    resolver: zodResolver(createUserSchema),
+    defaultValues: {
+      name: "",
+      email: "",
+      password: "",
+    },
+  });
+
+  const createUser = async (data: CreateUserForm) => {
     setLoading(true);
     try {
-      const testUser = {
-        email: 'test@example.com',
-        password: 'test123456',
+      const { data: authData, error: signUpError } = await supabase.auth.signUp({
+        email: data.email,
+        password: data.password,
         options: {
           data: {
-            name: 'Test User',
+            name: data.name,
           },
         },
-      };
+      });
 
-      console.log('Creating test user with:', testUser);
+      if (signUpError) throw signUpError;
 
-      const { data, error } = await supabase.auth.signUp(testUser);
-
-      if (error) throw error;
-
-      console.log('User created successfully:', data);
+      console.log('User created successfully:', authData);
       
       toast({
         title: "Success",
-        description: `Test user created! Email: ${testUser.email}, Password: ${testUser.password}`,
+        description: `User created successfully!`,
       });
+
+      form.reset();
     } catch (error: any) {
       console.error('Error creating user:', error);
       toast({
@@ -49,20 +76,62 @@ const Settings = () => {
     <div className="container mx-auto p-6">
       <Card>
         <CardHeader>
-          <CardTitle>Create Test User</CardTitle>
+          <CardTitle>Create User</CardTitle>
         </CardHeader>
         <CardContent>
-          <Button 
-            onClick={createTestUser}
-            disabled={loading}
-          >
-            {loading ? "Creating..." : "Create Test User"}
-          </Button>
-          <div className="mt-4 text-sm text-muted-foreground">
-            This will create a test user with:<br />
-            Email: test@example.com<br />
-            Password: test123456
-          </div>
+          <Form {...form}>
+            <form onSubmit={form.handleSubmit(createUser)} className="space-y-4">
+              <FormField
+                control={form.control}
+                name="name"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Name</FormLabel>
+                    <FormControl>
+                      <Input placeholder="Enter name" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="email"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Email</FormLabel>
+                    <FormControl>
+                      <Input type="email" placeholder="Enter email" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="password"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Password</FormLabel>
+                    <FormControl>
+                      <Input 
+                        type="password" 
+                        placeholder="Enter password" 
+                        {...field} 
+                      />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <Button type="submit" disabled={loading}>
+                {loading ? "Creating..." : "Create User"}
+              </Button>
+            </form>
+          </Form>
         </CardContent>
       </Card>
     </div>
