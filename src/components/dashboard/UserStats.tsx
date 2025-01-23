@@ -90,8 +90,8 @@ const uniqueUserCount = uniqueUserIds.size;
   const totalPages = count ? Math.ceil(count / itemsPerPage) : 1;
 
   return {
-    activeMonthly: 111,
-    activeWeekly: 222,
+    activeMonthly: uniqueUserCount,
+    activeWeekly: uniqueWeeklyUsers.size,
     newUsers: count || 0,
     newUserDetails: newUsers || [],
     totalPages,
