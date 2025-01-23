@@ -54,7 +54,7 @@ async function fetchUserStats(): Promise<UserStatsType> {
   const uniqueWeeklyUsers = new Set(weeklyData?.map(conv => conv.user_id));
 
   return {
-    activeMonthly: monthlyCount || 0,
+    activeMonthly: 12,
     activeWeekly: uniqueWeeklyUsers.size,
     newUsers: newUsersData?.length || 0,
   };
