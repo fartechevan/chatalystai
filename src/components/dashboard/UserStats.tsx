@@ -48,18 +48,23 @@ async function fetchUserStats(): Promise<UserStatsType> {
   console.log("Monthly Active Users:", uniqueMonthlyUsers.size);
 
   // Get new users in current month
-  const { count: newUsersCount, error: newUsersError } = await supabase
+  const { data: newUsers, error: newUsersError } = await supabase
     .from("profiles")
-    .select("id", { count: "exact", head: true })
+    .select("id, created_at")
     .gte("created_at", startOfMonth.toISOString())
     .lte("created_at", endOfMonth.toISOString());
 
   if (newUsersError) throw newUsersError;
+  
+  console.log("New Users this month:", newUsers?.map(user => ({
+    id: user.id,
+    created_at: user.created_at
+  })));
 
   return {
     activeMonthly: uniqueMonthlyUsers.size,
     activeWeekly: uniqueWeeklyUsers.size,
-    newUsers: newUsersCount || 0,
+    newUsers: newUsers?.length || 0,
   };
 }
 
