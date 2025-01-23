@@ -10,6 +10,8 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { format } from "date-fns";
+import { Input } from "@/components/ui/input";
+import { useState } from "react";
 
 type UserStatsType = {
   activeMonthly: number;
@@ -22,7 +24,7 @@ type UserStatsType = {
   }>;
 };
 
-async function fetchUserStats(): Promise<UserStatsType> {
+async function fetchUserStats(searchEmail?: string): Promise<UserStatsType> {
   // Fetch monthly active users
   const { data: monthlyUsers } = await supabase
     .from('conversations')
@@ -35,14 +37,22 @@ async function fetchUserStats(): Promise<UserStatsType> {
     .select('user_id, created_at')
     .gte('created_at', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString());
 
-  // Fetch new users this month
-  const { data: newUsers } = await supabase
+  // Fetch users based on search criteria
+  let query = supabase
     .from('profiles')
     .select('id, created_at, email')
-    .gte('created_at', new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString())
     .order('created_at', { ascending: false });
 
-  console.log('New Users this month:', newUsers);
+  if (searchEmail) {
+    query = query.ilike('email', `%${searchEmail}%`);
+  } else {
+    // If no search, show only this month's users
+    query = query.gte('created_at', new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString());
+  }
+
+  const { data: newUsers } = await query;
+
+  console.log('Users found:', newUsers);
 
   // Calculate unique users
   const uniqueMonthlyUsers = new Set(monthlyUsers?.map(user => user.user_id) || []);
@@ -57,11 +67,17 @@ async function fetchUserStats(): Promise<UserStatsType> {
 }
 
 export function UserStats() {
-  const { data, isLoading } = useQuery({
-    queryKey: ['userStats'],
-    queryFn: fetchUserStats,
+  const [searchEmail, setSearchEmail] = useState("");
+
+  const { data, isLoading, refetch } = useQuery({
+    queryKey: ['userStats', searchEmail],
+    queryFn: () => fetchUserStats(searchEmail),
     refetchInterval: 30000, // Refetch every 30 seconds
   });
+
+  const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setSearchEmail(e.target.value);
+  };
 
   if (isLoading) {
     return (
@@ -102,12 +118,21 @@ export function UserStats() {
         </Card>
       </div>
 
-      {data?.newUserDetails && data.newUserDetails.length > 0 && (
+      {data?.newUserDetails && (
         <Card>
           <CardHeader>
-            <CardTitle>New Users Details</CardTitle>
+            <CardTitle>User Details</CardTitle>
           </CardHeader>
           <CardContent>
+            <div className="mb-4">
+              <Input
+                type="email"
+                placeholder="Search by email..."
+                value={searchEmail}
+                onChange={handleSearch}
+                className="max-w-sm"
+              />
+            </div>
             <Table>
               <TableHeader>
                 <TableRow>
