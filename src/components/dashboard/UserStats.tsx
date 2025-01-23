@@ -21,6 +21,8 @@ import {
   PaginationNext,
   PaginationPrevious,
 } from "@/components/ui/pagination";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 
 type UserStatsType = {
   activeMonthly: number;
@@ -35,7 +37,7 @@ type UserStatsType = {
   totalPages: number;
 };
 
-async function fetchUserStats(searchEmail?: string, page: number = 1): Promise<UserStatsType> {
+async function fetchUserStats(searchEmail?: string, page: number = 1, filterByMonth: boolean = false): Promise<UserStatsType> {
   const itemsPerPage = 10;
   const startIndex = (page - 1) * itemsPerPage;
 
@@ -59,8 +61,9 @@ async function fetchUserStats(searchEmail?: string, page: number = 1): Promise<U
 
   if (searchEmail) {
     query = query.ilike('email', `%${searchEmail}%`);
-  } else {
-    // If no search, show only this month's users
+  }
+  
+  if (filterByMonth) {
     query = query.gte('created_at', new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString());
   }
 
@@ -89,10 +92,11 @@ export function UserStats() {
   const [searchEmail, setSearchEmail] = useState("");
   const [showNewUsersDialog, setShowNewUsersDialog] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
+  const [filterByMonth, setFilterByMonth] = useState(false);
 
   const { data, isLoading } = useQuery({
-    queryKey: ['userStats', searchEmail, currentPage],
-    queryFn: () => fetchUserStats(searchEmail, currentPage),
+    queryKey: ['userStats', searchEmail, currentPage, filterByMonth],
+    queryFn: () => fetchUserStats(searchEmail, currentPage, filterByMonth),
     refetchInterval: 30000, // Refetch every 30 seconds
   });
 
@@ -139,7 +143,7 @@ export function UserStats() {
           onClick={() => setShowNewUsersDialog(true)}
         >
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">New Users This Month</CardTitle>
+            <CardTitle className="text-sm font-medium">Total Users</CardTitle>
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{data?.newUsers}</div>
@@ -150,17 +154,27 @@ export function UserStats() {
       <Dialog open={showNewUsersDialog} onOpenChange={setShowNewUsersDialog}>
         <DialogContent className="max-w-full h-[90vh] flex flex-col">
           <DialogHeader>
-            <DialogTitle>New Users This Month</DialogTitle>
+            <DialogTitle>User List</DialogTitle>
           </DialogHeader>
           <div className="flex-1 overflow-y-auto p-6">
-            <div className="mb-4">
-              <Input
-                type="email"
-                placeholder="Search by email..."
-                value={searchEmail}
-                onChange={handleSearch}
-                className="max-w-sm"
-              />
+            <div className="mb-4 space-y-4">
+              <div className="flex items-center justify-between">
+                <Input
+                  type="email"
+                  placeholder="Search by email..."
+                  value={searchEmail}
+                  onChange={handleSearch}
+                  className="max-w-sm"
+                />
+                <div className="flex items-center space-x-2">
+                  <Switch
+                    id="filter-month"
+                    checked={filterByMonth}
+                    onCheckedChange={setFilterByMonth}
+                  />
+                  <Label htmlFor="filter-month">Show only this month</Label>
+                </div>
+              </div>
             </div>
             <Table>
               <TableHeader>
