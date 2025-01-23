@@ -11,7 +11,7 @@ type UserStatsType = {
 async function fetchUserStats(): Promise<UserStatsType> {
   const now = new Date();
   const currentYear = now.getFullYear();
-  const currentMonth = now.getMonth(); // Months are 0-indexed in JavaScript
+  const currentMonth = now.getMonth() + 1; // Months are 0-indexed in JavaScript
 
   // Calculate the start and end dates for the current week
   const today = new Date();
@@ -27,37 +27,36 @@ async function fetchUserStats(): Promise<UserStatsType> {
     .gte("created_at", startOfWeek.toISOString())
     .lt("created_at", endOfWeek.toISOString());
 
-  if (weeklyError) throw new Error(`Error fetching weekly users: ${weeklyError.message}`);
+  if (weeklyError) throw weeklyError;
 
-  // Calculate the start and end dates for the current month
-  const startOfMonth = new Date(currentYear, currentMonth, 1); // Start of the current month
-  const endOfMonth = new Date(currentYear, currentMonth + 1, 0); // Last day of the current month
+  // Get monthly active users - using first day of current month to last day
+  const startOfMonth = new Date(currentYear, currentMonth - 1, 1);
+  const endOfMonth = new Date(currentYear, currentMonth, 0); // Last day of current month
 
-  // Fetch distinct monthly active users count
   const { count: monthlyCount, error: monthlyError } = await supabase
     .from("conversations")
-    .select("user_id", { count: "exact", head: true }) // Only count distinct users
+    .select("user_id", { count: "exact", head: true }) // Distinct count from Supabase
     .gte("created_at", startOfMonth.toISOString())
     .lte("created_at", endOfMonth.toISOString());
 
-  if (monthlyError) throw new Error(`Error fetching monthly users: ${monthlyError.message}`);
+  if (monthlyError) throw monthlyError;
 
-  // Fetch new users created in the current month
-  const { count: newUsersCount, error: newUsersError } = await supabase
+  // Get new users in current month
+  const { data: newUsersData, error: newUsersError } = await supabase
     .from("profiles")
-    .select("id", { count: "exact", head: true }) // Count new users
+    .select("id")
     .gte("created_at", startOfMonth.toISOString())
     .lte("created_at", endOfMonth.toISOString());
 
-  if (newUsersError) throw new Error(`Error fetching new users: ${newUsersError.message}`);
+  if (newUsersError) throw newUsersError;
 
-  // Extract unique users from the weekly data
+  // Extract unique weekly users
   const uniqueWeeklyUsers = new Set(weeklyData?.map((conv) => conv.user_id));
 
   return {
-    activeMonthly: monthlyCount || 0,
+    activeMonthly: monthlyCount || 0, // Use Supabase's distinct count directly
     activeWeekly: uniqueWeeklyUsers.size,
-    newUsers: newUsersCount || 0,
+    newUsers: newUsersData?.length || 0,
   };
 }
 
@@ -65,7 +64,6 @@ export function UserStats() {
   const { data, isLoading, error } = useQuery({
     queryKey: ["userStats"],
     queryFn: fetchUserStats,
-    refetchOnWindowFocus: false,
   });
 
   if (isLoading) {
