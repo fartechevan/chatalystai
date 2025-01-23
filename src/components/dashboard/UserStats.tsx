@@ -20,43 +20,45 @@ async function fetchUserStats(): Promise<UserStatsType> {
   const endOfWeek = new Date(today);
   endOfWeek.setDate(today.getDate() + (6 - today.getDay())); // End of current week (Saturday)
 
-  // Get weekly active users
-  const { count: weeklyCount, error: weeklyError } = await supabase
+  // Get weekly active users - using DISTINCT
+  const { data: weeklyData, error: weeklyError } = await supabase
     .from("conversations")
-    .select("user_id", { count: "exact", head: true }) // Distinct count from Supabase
+    .select("user_id")
     .gte("created_at", startOfWeek.toISOString())
     .lt("created_at", endOfWeek.toISOString());
 
-    console.log("Weekly Count:", weeklyCount); // Directly log to verify
-
   if (weeklyError) throw weeklyError;
+  
+  const uniqueWeeklyUsers = new Set(weeklyData?.map(row => row.user_id));
+  console.log("Weekly Unique Users:", uniqueWeeklyUsers.size);
 
-  // Get monthly active users - using first day of current month to last day
+  // Get monthly active users - using DISTINCT
   const startOfMonth = new Date(currentYear, currentMonth - 1, 1);
-  const endOfMonth = new Date(currentYear, currentMonth, 0); // Last day of current month
+  const endOfMonth = new Date(currentYear, currentMonth, 0);
 
-  const { count: monthlyCount, error: monthlyError } = await supabase
+  const { data: monthlyData, error: monthlyError } = await supabase
     .from("conversations")
-    .select("user_id", { count: "exact", head: true }) // Distinct count from Supabase
+    .select("user_id")
     .gte("created_at", startOfMonth.toISOString())
     .lte("created_at", endOfMonth.toISOString());
 
-    console.log("Monthly Count:", monthlyCount); // Directly log to verify
-
   if (monthlyError) throw monthlyError;
+
+  const uniqueMonthlyUsers = new Set(monthlyData?.map(row => row.user_id));
+  console.log("Monthly Unique Users:", uniqueMonthlyUsers.size);
 
   // Get new users in current month
   const { count: newUsersCount, error: newUsersError } = await supabase
     .from("profiles")
-    .select("id", { count: "exact", head: true }) // Distinct count from Supabase
+    .select("id", { count: "exact", head: true })
     .gte("created_at", startOfMonth.toISOString())
     .lte("created_at", endOfMonth.toISOString());
 
   if (newUsersError) throw newUsersError;
 
   return {
-    activeMonthly: monthlyCount || 0,
-    activeWeekly: weeklyCount || 0,
+    activeMonthly: uniqueMonthlyUsers.size,
+    activeWeekly: uniqueWeeklyUsers.size,
     newUsers: newUsersCount || 0,
   };
 }
