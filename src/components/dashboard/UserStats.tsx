@@ -124,11 +124,11 @@ export function UserStats() {
       </div>
 
       <Dialog open={showNewUsersDialog} onOpenChange={setShowNewUsersDialog}>
-        <DialogContent className="max-w-full h-[90vh] flex flex-col">
+        <DialogContent className="max-w-full h-[90vh] flex flex-col overflow-hidden">
           <DialogHeader>
             <DialogTitle>User Details</DialogTitle>
           </DialogHeader>
-          <div className="flex-1 overflow-y-auto">
+          <div className="flex-1 overflow-y-auto px-6 pb-6">
             <div className="mb-4">
               <Input
                 type="email"
