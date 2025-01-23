@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useQuery } from "@tanstack/react-query";
 
 type UserStatsType = {
+  totalUsers: number;
   activeMonthly: number;
   activeWeekly: number;
   newUsers: number;
@@ -11,14 +12,22 @@ type UserStatsType = {
 async function fetchUserStats(): Promise<UserStatsType> {
   const now = new Date();
   const currentYear = now.getFullYear();
-  const currentMonth = now.getMonth() + 1; // Months are 0-indexed in JavaScript
+  const currentMonth = now.getMonth() + 1;
+
+  // Get total users count
+  const { count: totalUsers, error: totalError } = await supabase
+    .from("profiles")
+    .select("*", { count: "exact", head: true });
+
+  if (totalError) throw totalError;
+  console.log("Total Users:", totalUsers);
 
   // Calculate the start and end dates for the current week
   const today = new Date();
   const startOfWeek = new Date(today);
-  startOfWeek.setDate(today.getDate() - today.getDay()); // Start of current week (Sunday)
+  startOfWeek.setDate(today.getDate() - today.getDay());
   const endOfWeek = new Date(today);
-  endOfWeek.setDate(today.getDate() + (6 - today.getDay())); // End of current week (Saturday)
+  endOfWeek.setDate(today.getDate() + (6 - today.getDay()));
 
   // Get weekly active users - using DISTINCT
   const { data: weeklyData, error: weeklyError } = await supabase
@@ -30,7 +39,7 @@ async function fetchUserStats(): Promise<UserStatsType> {
   if (weeklyError) throw weeklyError;
   
   const uniqueWeeklyUsers = new Set(weeklyData?.map(row => row.user_id));
-  console.log("Weekly Unique Users:", uniqueWeeklyUsers.size);
+  console.log("Weekly Active Users:", uniqueWeeklyUsers.size);
 
   // Get monthly active users - using DISTINCT
   const startOfMonth = new Date(currentYear, currentMonth - 1, 1);
@@ -45,7 +54,7 @@ async function fetchUserStats(): Promise<UserStatsType> {
   if (monthlyError) throw monthlyError;
 
   const uniqueMonthlyUsers = new Set(monthlyData?.map(row => row.user_id));
-  console.log("Monthly Unique Users:", uniqueMonthlyUsers.size);
+  console.log("Monthly Active Users:", uniqueMonthlyUsers.size);
 
   // Get new users in current month
   const { count: newUsersCount, error: newUsersError } = await supabase
@@ -57,6 +66,7 @@ async function fetchUserStats(): Promise<UserStatsType> {
   if (newUsersError) throw newUsersError;
 
   return {
+    totalUsers: totalUsers || 0,
     activeMonthly: uniqueMonthlyUsers.size,
     activeWeekly: uniqueWeeklyUsers.size,
     newUsers: newUsersCount || 0,
@@ -78,7 +88,15 @@ export function UserStats() {
   }
 
   return (
-    <div className="grid gap-4 md:grid-cols-3">
+    <div className="grid gap-4 md:grid-cols-4">
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+          <CardTitle className="text-sm font-medium">Total Users</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="text-2xl font-bold">{data?.totalUsers}</div>
+        </CardContent>
+      </Card>
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="text-sm font-medium">Monthly Active Users</CardTitle>
