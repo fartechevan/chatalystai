@@ -13,6 +13,14 @@ import { format } from "date-fns";
 import { Input } from "@/components/ui/input";
 import { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
 
 type UserStatsType = {
   activeMonthly: number;
@@ -24,9 +32,13 @@ type UserStatsType = {
     email: string;
     name: string | null;
   }>;
+  totalPages: number;
 };
 
-async function fetchUserStats(searchEmail?: string): Promise<UserStatsType> {
+async function fetchUserStats(searchEmail?: string, page: number = 1): Promise<UserStatsType> {
+  const itemsPerPage = 10;
+  const startIndex = (page - 1) * itemsPerPage;
+
   // Fetch monthly active users
   const { data: monthlyUsers } = await supabase
     .from('conversations')
@@ -42,7 +54,7 @@ async function fetchUserStats(searchEmail?: string): Promise<UserStatsType> {
   // Fetch users based on search criteria
   let query = supabase
     .from('profiles')
-    .select('id, created_at, email, name')
+    .select('id, created_at, email, name', { count: 'exact' })
     .order('created_at', { ascending: false });
 
   if (searchEmail) {
@@ -52,7 +64,9 @@ async function fetchUserStats(searchEmail?: string): Promise<UserStatsType> {
     query = query.gte('created_at', new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString());
   }
 
-  const { data: newUsers } = await query;
+  // Add pagination
+  const { data: newUsers, count } = await query
+    .range(startIndex, startIndex + itemsPerPage - 1);
 
   console.log('Users found:', newUsers);
 
@@ -60,26 +74,35 @@ async function fetchUserStats(searchEmail?: string): Promise<UserStatsType> {
   const uniqueMonthlyUsers = new Set(monthlyUsers?.map(user => user.user_id) || []);
   const uniqueWeeklyUsers = new Set(weeklyUsers?.map(user => user.user_id) || []);
 
+  const totalPages = count ? Math.ceil(count / itemsPerPage) : 1;
+
   return {
     activeMonthly: uniqueMonthlyUsers.size,
     activeWeekly: uniqueWeeklyUsers.size,
-    newUsers: newUsers?.length || 0,
+    newUsers: count || 0,
     newUserDetails: newUsers || [],
+    totalPages,
   };
 }
 
 export function UserStats() {
   const [searchEmail, setSearchEmail] = useState("");
   const [showNewUsersDialog, setShowNewUsersDialog] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
 
   const { data, isLoading } = useQuery({
-    queryKey: ['userStats', searchEmail],
-    queryFn: () => fetchUserStats(searchEmail),
+    queryKey: ['userStats', searchEmail, currentPage],
+    queryFn: () => fetchUserStats(searchEmail, currentPage),
     refetchInterval: 30000, // Refetch every 30 seconds
   });
 
   const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchEmail(e.target.value);
+    setCurrentPage(1); // Reset to first page on new search
+  };
+
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page);
   };
 
   if (isLoading) {
@@ -159,6 +182,36 @@ export function UserStats() {
                 ))}
               </TableBody>
             </Table>
+            {data && data.totalPages > 1 && (
+              <div className="mt-4 flex justify-center">
+                <Pagination>
+                  <PaginationContent>
+                    <PaginationItem>
+                      <PaginationPrevious 
+                        onClick={() => handlePageChange(currentPage - 1)}
+                        className={currentPage === 1 ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                      />
+                    </PaginationItem>
+                    {Array.from({ length: data.totalPages }, (_, i) => i + 1).map((page) => (
+                      <PaginationItem key={page}>
+                        <PaginationLink
+                          onClick={() => handlePageChange(page)}
+                          isActive={currentPage === page}
+                        >
+                          {page}
+                        </PaginationLink>
+                      </PaginationItem>
+                    ))}
+                    <PaginationItem>
+                      <PaginationNext
+                        onClick={() => handlePageChange(currentPage + 1)}
+                        className={currentPage === data.totalPages ? 'pointer-events-none opacity-50' : 'cursor-pointer'}
+                      />
+                    </PaginationItem>
+                  </PaginationContent>
+                </Pagination>
+              </div>
+            )}
           </div>
         </DialogContent>
       </Dialog>
