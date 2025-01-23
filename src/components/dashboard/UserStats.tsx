@@ -21,7 +21,7 @@ async function fetchUserStats(): Promise<UserStatsType> {
   endOfWeek.setDate(today.getDate() + (6 - today.getDay())); // End of current week (Saturday)
 
   // Get weekly active users
-  const { data: weeklyCount, error: weeklyError } = await supabase
+  const { count: weeklyCount, error: weeklyError } = await supabase
     .from("conversations")
     .select("user_id", { count: "exact", head: true }) // Distinct count from Supabase
     .gte("created_at", startOfWeek.toISOString())
@@ -42,7 +42,7 @@ async function fetchUserStats(): Promise<UserStatsType> {
   if (monthlyError) throw monthlyError;
 
   // Get new users in current month
-  const { data: newUsersCount, error: newUsersError } = await supabase
+  const { count: newUsersCount, error: newUsersError } = await supabase
     .from("profiles")
     .select("id", { count: "exact", head: true }) // Distinct count from Supabase
     .gte("created_at", startOfMonth.toISOString())
@@ -51,9 +51,9 @@ async function fetchUserStats(): Promise<UserStatsType> {
   if (newUsersError) throw newUsersError;
 
   return {
-    activeMonthly: monthlyCount || 0, 
-    activeWeekly: weeklyCount || 0
-    newUsers: newUsersCount 0,
+    activeMonthly: monthlyCount || 0,
+    activeWeekly: weeklyCount || 0,
+    newUsers: newUsersCount || 0,
   };
 }
 
