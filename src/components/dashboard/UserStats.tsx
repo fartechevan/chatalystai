@@ -22,6 +22,7 @@ type UserStatsType = {
     id: string;
     created_at: string;
     email: string;
+    name: string | null;
   }>;
 };
 
@@ -41,7 +42,7 @@ async function fetchUserStats(searchEmail?: string): Promise<UserStatsType> {
   // Fetch users based on search criteria
   let query = supabase
     .from('profiles')
-    .select('id, created_at, email')
+    .select('id, created_at, email, name')
     .order('created_at', { ascending: false });
 
   if (searchEmail) {
@@ -71,7 +72,7 @@ export function UserStats() {
   const [searchEmail, setSearchEmail] = useState("");
   const [showNewUsersDialog, setShowNewUsersDialog] = useState(false);
 
-  const { data, isLoading, refetch } = useQuery({
+  const { data, isLoading } = useQuery({
     queryKey: ['userStats', searchEmail],
     queryFn: () => fetchUserStats(searchEmail),
     refetchInterval: 30000, // Refetch every 30 seconds
@@ -124,11 +125,11 @@ export function UserStats() {
       </div>
 
       <Dialog open={showNewUsersDialog} onOpenChange={setShowNewUsersDialog}>
-        <DialogContent className="max-w-full h-[90vh] flex flex-col overflow-hidden">
+        <DialogContent className="max-w-full h-[90vh] flex flex-col">
           <DialogHeader>
-            <DialogTitle>User Details</DialogTitle>
+            <DialogTitle>New Users This Month</DialogTitle>
           </DialogHeader>
-          <div className="flex-1 overflow-y-auto px-6 pb-6">
+          <div className="flex-1 overflow-y-auto p-6">
             <div className="mb-4">
               <Input
                 type="email"
@@ -141,15 +142,15 @@ export function UserStats() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>User ID</TableHead>
+                  <TableHead>Name</TableHead>
                   <TableHead>Email</TableHead>
-                  <TableHead>Created At</TableHead>
+                  <TableHead>Joined Date</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {data?.newUserDetails.map((user) => (
                   <TableRow key={user.id}>
-                    <TableCell className="font-mono">{user.id}</TableCell>
+                    <TableCell>{user.name || 'N/A'}</TableCell>
                     <TableCell>{user.email}</TableCell>
                     <TableCell>
                       {format(new Date(user.created_at), "PPpp")}
