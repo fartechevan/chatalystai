@@ -91,7 +91,7 @@ const uniqueUserCount = uniqueUserIds.size;
 
   return {
     activeMonthly: 111,
-    activeWeekly: uniqueWeeklyUsers.size,
+    activeWeekly: 222,
     newUsers: count || 0,
     newUserDetails: newUsers || [],
     totalPages,
