@@ -42,10 +42,20 @@ async function fetchUserStats(searchEmail?: string, page: number = 1, filterByMo
   const startIndex = (page - 1) * itemsPerPage;
 
   // Fetch monthly active users
-  const { data: monthlyUsers } = await supabase
-    .from('conversations')
-    .select('user_id, created_at')
-    .gte('created_at', new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString());
+  // const { data: monthlyUsers } = await supabase
+  //   .from('conversations')
+  //   .select('user_id, created_at')
+  //   .gte('created_at', new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString());
+
+    const { data: monthlyUsers, error } = await supabase
+  .from('conversations')
+  .select('user_id, created_at')
+  .gte('created_at', new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString())
+  .lte('created_at', new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).toISOString());
+
+  const uniqueUserIds = new Set(monthlyUsers.map(user => user.user_id));
+const uniqueUserCount = uniqueUserIds.size;
+
 
   // Fetch weekly active users
   const { data: weeklyUsers } = await supabase
@@ -80,7 +90,7 @@ async function fetchUserStats(searchEmail?: string, page: number = 1, filterByMo
   const totalPages = count ? Math.ceil(count / itemsPerPage) : 1;
 
   return {
-    activeMonthly: uniqueMonthlyUsers.size,
+    activeMonthly: uniqueUserCount,
     activeWeekly: uniqueWeeklyUsers.size,
     newUsers: count || 0,
     newUserDetails: newUsers || [],
