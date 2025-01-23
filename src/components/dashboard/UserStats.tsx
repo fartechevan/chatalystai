@@ -3,7 +3,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useQuery } from "@tanstack/react-query";
 
 type UserStatsType = {
-  totalUsers: number;
   activeMonthly: number;
   activeWeekly: number;
   newUsers: number;
@@ -13,14 +12,6 @@ async function fetchUserStats(): Promise<UserStatsType> {
   const now = new Date();
   const currentYear = now.getFullYear();
   const currentMonth = now.getMonth() + 1;
-
-  // Get total users count
-  const { count: totalUsers, error: totalError } = await supabase
-    .from("profiles")
-    .select("*", { count: "exact", head: true });
-
-  if (totalError) throw totalError;
-  console.log("Total Users:", totalUsers);
 
   // Calculate the start and end dates for the current week
   const today = new Date();
@@ -66,7 +57,6 @@ async function fetchUserStats(): Promise<UserStatsType> {
   if (newUsersError) throw newUsersError;
 
   return {
-    totalUsers: totalUsers || 0,
     activeMonthly: uniqueMonthlyUsers.size,
     activeWeekly: uniqueWeeklyUsers.size,
     newUsers: newUsersCount || 0,
@@ -88,15 +78,7 @@ export function UserStats() {
   }
 
   return (
-    <div className="grid gap-4 md:grid-cols-4">
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Total Users</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="text-2xl font-bold">{data?.totalUsers}</div>
-        </CardContent>
-      </Card>
+    <div className="grid gap-4 md:grid-cols-3">
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="text-sm font-medium">Monthly Active Users</CardTitle>
