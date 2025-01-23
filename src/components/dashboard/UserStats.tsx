@@ -18,61 +18,35 @@ type UserStatsType = {
   newUserDetails: Array<{
     id: string;
     created_at: string;
+    email: string;
   }>;
 };
 
 async function fetchUserStats(): Promise<UserStatsType> {
-  const now = new Date();
-  const currentYear = now.getFullYear();
-  const currentMonth = now.getMonth() + 1;
+  // Fetch monthly active users
+  const { data: monthlyUsers } = await supabase
+    .from('conversations')
+    .select('user_id, created_at')
+    .gte('created_at', new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString());
 
-  // Calculate the start and end dates for the current week
-  const today = new Date();
-  const startOfWeek = new Date(today);
-  startOfWeek.setDate(today.getDate() - today.getDay());
-  const endOfWeek = new Date(today);
-  endOfWeek.setDate(today.getDate() + (6 - today.getDay()));
+  // Fetch weekly active users
+  const { data: weeklyUsers } = await supabase
+    .from('conversations')
+    .select('user_id, created_at')
+    .gte('created_at', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString());
 
-  // Get weekly active users - using DISTINCT
-  const { data: weeklyData, error: weeklyError } = await supabase
-    .from("conversations")
-    .select("user_id")
-    .gte("created_at", startOfWeek.toISOString())
-    .lt("created_at", endOfWeek.toISOString());
+  // Fetch new users this month
+  const { data: newUsers } = await supabase
+    .from('profiles')
+    .select('id, created_at, email')
+    .gte('created_at', new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString())
+    .order('created_at', { ascending: false });
 
-  if (weeklyError) throw weeklyError;
-  
-  const uniqueWeeklyUsers = new Set(weeklyData?.map(row => row.user_id));
-  console.log("Weekly Active Users:", uniqueWeeklyUsers.size);
+  console.log('New Users this month:', newUsers);
 
-  // Get monthly active users - using DISTINCT
-  const startOfMonth = new Date(currentYear, currentMonth - 1, 1);
-  const endOfMonth = new Date(currentYear, currentMonth, 0);
-
-  const { data: monthlyData, error: monthlyError } = await supabase
-    .from("conversations")
-    .select("user_id")
-    .gte("created_at", startOfMonth.toISOString())
-    .lte("created_at", endOfMonth.toISOString());
-
-  if (monthlyError) throw monthlyError;
-
-  const uniqueMonthlyUsers = new Set(monthlyData?.map(row => row.user_id));
-  console.log("Monthly Active Users:", uniqueMonthlyUsers.size);
-
-  // Get new users in current month
-  const { data: newUsers, error: newUsersError } = await supabase
-    .from("profiles")
-    .select("id, created_at")
-    .gte("created_at", startOfMonth.toISOString())
-    .lte("created_at", endOfMonth.toISOString());
-
-  if (newUsersError) throw newUsersError;
-  
-  console.log("New Users this month:", newUsers?.map(user => ({
-    id: user.id,
-    created_at: user.created_at
-  })));
+  // Calculate unique users
+  const uniqueMonthlyUsers = new Set(monthlyUsers?.map(user => user.user_id) || []);
+  const uniqueWeeklyUsers = new Set(weeklyUsers?.map(user => user.user_id) || []);
 
   return {
     activeMonthly: uniqueMonthlyUsers.size,
@@ -83,17 +57,20 @@ async function fetchUserStats(): Promise<UserStatsType> {
 }
 
 export function UserStats() {
-  const { data, isLoading, error } = useQuery({
-    queryKey: ["userStats"],
+  const { data, isLoading } = useQuery({
+    queryKey: ['userStats'],
     queryFn: fetchUserStats,
+    refetchInterval: 30000, // Refetch every 30 seconds
   });
 
   if (isLoading) {
-    return <div>Loading stats...</div>;
-  }
-
-  if (error) {
-    return <div>Error loading stats: {(error as Error).message}</div>;
+    return (
+      <div className="grid gap-4 md:grid-cols-3">
+        <Card>
+          <CardContent>Loading stats...</CardContent>
+        </Card>
+      </div>
+    );
   }
 
   return (
@@ -135,6 +112,7 @@ export function UserStats() {
               <TableHeader>
                 <TableRow>
                   <TableHead>User ID</TableHead>
+                  <TableHead>Email</TableHead>
                   <TableHead>Created At</TableHead>
                 </TableRow>
               </TableHeader>
@@ -142,6 +120,7 @@ export function UserStats() {
                 {data.newUserDetails.map((user) => (
                   <TableRow key={user.id}>
                     <TableCell className="font-mono">{user.id}</TableCell>
+                    <TableCell>{user.email}</TableCell>
                     <TableCell>
                       {format(new Date(user.created_at), "PPpp")}
                     </TableCell>
