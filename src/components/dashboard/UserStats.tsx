@@ -27,6 +27,8 @@ async function fetchUserStats(): Promise<UserStatsType> {
     .gte("created_at", startOfWeek.toISOString())
     .lt("created_at", endOfWeek.toISOString());
 
+    console.log("Weekly Count:", weeklyCount); // Directly log to verify
+
   if (weeklyError) throw weeklyError;
 
   // Get monthly active users - using first day of current month to last day
@@ -38,6 +40,8 @@ async function fetchUserStats(): Promise<UserStatsType> {
     .select("user_id", { count: "exact", head: true }) // Distinct count from Supabase
     .gte("created_at", startOfMonth.toISOString())
     .lte("created_at", endOfMonth.toISOString());
+
+    console.log("Monthly Count:", monthlyCount); // Directly log to verify
 
   if (monthlyError) throw monthlyError;
 
