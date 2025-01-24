@@ -1,4 +1,4 @@
-import { ChevronLeft, Home, Menu, Settings } from "lucide-react";
+import { Menu, ChevronLeft } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -10,8 +10,8 @@ import { Link, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 
 const menuItems = [
-  { title: "Main", icon: Home, path: "/dashboard" },
-  { title: "Settings", icon: Settings, path: "/dashboard/settings" },
+  { title: "Main", icon: Menu, path: "/dashboard" },
+  { title: "Settings", icon: ChevronLeft, path: "/dashboard/settings" },
 ];
 
 export function DashboardSidebar() {
@@ -39,7 +39,7 @@ export function DashboardSidebar() {
                 className="hidden md:flex"
                 onClick={toggleSidebar}
               >
-                <ChevronLeft className={`h-4 w-4 transition-transform ${!open ? 'rotate-180' : ''}`} />
+                <Menu className={`h-4 w-4 transition-transform`} />
               </Button>
             </div>
           </SidebarHeader>
