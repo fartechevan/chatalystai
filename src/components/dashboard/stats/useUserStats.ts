@@ -50,7 +50,7 @@ async function fetchUserStats(
   console.log("Monthly users data:", monthlyUsers);
 
   const uniqueMonthlyUserIds = new Set(monthlyUsers?.map((user) => user.user_id).filter(Boolean) || []);
-  const uniqueMonthlyUserCount = uniqueMonthlyUserIds.size;
+  const uniqueMonthlyUserCount = monthlyUsers.size;
 
   console.log("Unique monthly users:", uniqueMonthlyUserCount);
 
