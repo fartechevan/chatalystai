@@ -59,6 +59,12 @@ async function fetchConversationData(timeRange: TimeRange): Promise<ChartData[]>
   }));
 }
 
+type MessageType = {
+  sender: "user" | "bot";
+  content: string;
+  timestamp: string;
+}
+
 async function fetchConversations(): Promise<Conversation[]> {
   const { data, error } = await supabase
     .from('conversations')
@@ -73,10 +79,10 @@ async function fetchConversations(): Promise<Conversation[]> {
 
   return data.map(conv => ({
     ...conv,
-    messages: conv.messages.map(msg => ({
-      sender: msg.sender as "user" | "bot",
-      content: msg.content as string,
-      timestamp: msg.timestamp as string
+    messages: (conv.messages as MessageType[]).map(msg => ({
+      sender: msg.sender,
+      content: msg.content,
+      timestamp: msg.timestamp
     }))
   }));
 }
