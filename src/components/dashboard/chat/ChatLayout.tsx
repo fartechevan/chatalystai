@@ -14,7 +14,7 @@ export function ChatLayout({ open, onOpenChange }: ChatLayoutProps) {
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-full sm:w-[90vw] p-0">
+      <SheetContent side="right" className="w-[100vw] p-0">
         <div className="flex h-full">
           <ChatSidebar onChatSelect={setActiveChat} />
           <ChatMain activeChat={activeChat} />
