@@ -23,21 +23,31 @@ async function fetchUserStats(searchEmail?: string, page: number = 1, filterByMo
     .from('profiles')
     .select('*', { count: 'exact' });
 
+  console.log('Total users:', totalUsers);
+
   // Fetch monthly active users
-  const { data: monthlyUsers, error } = await supabase
+  const { data: monthlyUsers, error: monthlyError } = await supabase
     .from('conversations')
     .select('user_id, created_at')
     .gte('created_at', new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString())
     .lte('created_at', new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).toISOString());
 
+  console.log('Monthly users data:', monthlyUsers);
+  console.log('Monthly users error:', monthlyError);
+
   const uniqueUserIds = new Set(monthlyUsers?.map(user => user.user_id) || []);
   const uniqueUserCount = uniqueUserIds.size;
 
+  console.log('Unique monthly users:', uniqueUserCount);
+
   // Fetch weekly active users
-  const { data: weeklyUsers } = await supabase
+  const { data: weeklyUsers, error: weeklyError } = await supabase
     .from('conversations')
     .select('user_id, created_at')
     .gte('created_at', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString());
+
+  console.log('Weekly users data:', weeklyUsers);
+  console.log('Weekly users error:', weeklyError);
 
   // Fetch users based on search criteria
   let query = supabase
@@ -58,6 +68,7 @@ async function fetchUserStats(searchEmail?: string, page: number = 1, filterByMo
 
   // Calculate unique users
   const uniqueWeeklyUsers = new Set(weeklyUsers?.map(user => user.user_id) || []);
+  console.log('Unique weekly users:', uniqueWeeklyUsers.size);
 
   const totalPages = count ? Math.ceil(count / itemsPerPage) : 1;
 
