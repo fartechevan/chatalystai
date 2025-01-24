@@ -1,4 +1,4 @@
-import { X, MessageSquare, Users, Send, Smile, Search } from "lucide-react";
+import { X, MessageSquare, Send, Smile, Search } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,7 +14,6 @@ interface ConversationViewProps {
 }
 
 export function ConversationView({ date, onClose }: ConversationViewProps) {
-  const [activeTab, setActiveTab] = useState<"messages" | "participants">("messages");
   const [searchQuery, setSearchQuery] = useState("");
 
   const { data: conversations = [], isLoading } = useQuery({
@@ -91,25 +90,8 @@ export function ConversationView({ date, onClose }: ConversationViewProps) {
           {/* Header */}
           <div className="flex items-center justify-between border-b px-6 py-4">
             <div className="flex items-center gap-4">
-              <h2 className="text-xl font-semibold">Group Chat</h2>
-              <div className="flex gap-2">
-                <Button
-                  variant={activeTab === "messages" ? "default" : "ghost"}
-                  onClick={() => setActiveTab("messages")}
-                  className="h-8"
-                >
-                  <MessageSquare className="mr-2 h-4 w-4" />
-                  Messages
-                </Button>
-                <Button
-                  variant={activeTab === "participants" ? "default" : "ghost"}
-                  onClick={() => setActiveTab("participants")}
-                  className="h-8"
-                >
-                  <Users className="mr-2 h-4 w-4" />
-                  Participants
-                </Button>
-              </div>
+              <h2 className="text-xl font-semibold">Chat</h2>
+              <MessageSquare className="h-4 w-4" />
             </div>
             <Button variant="ghost" size="icon" onClick={onClose}>
               <X className="h-5 w-5" />
@@ -195,25 +177,33 @@ export function ConversationView({ date, onClose }: ConversationViewProps) {
         {/* Right Sidebar */}
         <div className="w-64 border-l bg-muted/30">
           <div className="p-4 border-b">
-            <h3 className="font-medium">Participants</h3>
+            <h3 className="font-medium">User Details</h3>
           </div>
           <ScrollArea className="h-[calc(100vh-5rem)]">
             <div className="space-y-2 p-4">
-              {conversations.map((conv) => (
-                <div
-                  key={conv.id}
-                  className="flex items-center gap-3 p-2 rounded-lg"
-                >
-                  <Avatar className="h-8 w-8">
-                    <AvatarImage src="/placeholder.svg" />
-                    <AvatarFallback>U</AvatarFallback>
-                  </Avatar>
-                  <div>
-                    <p className="text-sm font-medium">User {conv.session_id}</p>
-                    <p className="text-xs text-muted-foreground">Online</p>
+              {currentConversation && (
+                <div className="space-y-4">
+                  <div className="flex items-center gap-3">
+                    <Avatar className="h-16 w-16">
+                      <AvatarImage src="/placeholder.svg" />
+                      <AvatarFallback>U</AvatarFallback>
+                    </Avatar>
+                    <div>
+                      <p className="font-medium">User {currentConversation.session_id}</p>
+                      <p className="text-sm text-muted-foreground">
+                        Session: {currentConversation.session_id}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <h4 className="text-sm font-medium">Chat Info</h4>
+                    <div className="text-sm">
+                      <p>Started: {new Date(currentConversation.created_at).toLocaleString()}</p>
+                      <p>Messages: {currentConversation.messages.length}</p>
+                    </div>
                   </div>
                 </div>
-              ))}
+              )}
             </div>
           </ScrollArea>
         </div>
