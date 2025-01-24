@@ -33,14 +33,6 @@ export function DashboardSidebar() {
           <SidebarHeader>
             <div className="flex items-center justify-between px-4 py-2">
               <span className="text-sm font-medium">Dashboard</span>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="hidden md:flex"
-                onClick={toggleSidebar}
-              >
-                <Menu className={`h-4 w-4 transition-transform`} />
-              </Button>
             </div>
           </SidebarHeader>
           <div className="px-2">
