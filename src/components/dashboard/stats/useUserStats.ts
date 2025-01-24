@@ -38,9 +38,10 @@ async function fetchUserStats(
   const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
   const endOfMonth = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0, 23, 59, 59);
 
+  
   const { data: monthlyUsers, error: monthlyError } = await supabase
     .from("conversations")
-    .select("user_id");
+    .select("*", { count: "exact", head: true });
 
   if (monthlyError) {
     console.error("Error fetching monthly users:", monthlyError);
