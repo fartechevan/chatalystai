@@ -72,7 +72,7 @@ export function ConversationView({ date, onClose }: ConversationViewProps) {
         user_id: conv.user_id,
         session_id: conv.session_id,
         created_at: conv.created_at,
-        messages: (conv.messages as Json as ConversationMessage[]) || [],
+        messages: (conv.messages as Json[] as unknown) as ConversationMessage[],
         profile: conv.profiles as Profile | null,
       }));
     },
