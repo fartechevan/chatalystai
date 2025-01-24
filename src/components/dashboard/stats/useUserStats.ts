@@ -25,12 +25,18 @@ async function fetchUserStats(searchEmail?: string, page: number = 1, filterByMo
 
   console.log('Total users:', totalUsers);
 
-  // Fetch monthly active users
+
+    // Fetch monthly active users
+
+  const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+  const endOfMonth = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0);
+
   const { data: monthlyUsers, error: monthlyError } = await supabase
-    .from('conversations')
-    .select('user_id, created_at')
-    .gte('created_at', new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString())
-    .lte('created_at', new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).toISOString());
+  .from('conversations')
+  .select('user_id, created_at')
+  .gte('created_at', startOfMonth.toISOString()) // Ensure UTC
+  .lte('created_at', endOfMonth.toISOString()); // Ensure UTC
+
 
   console.log('Monthly users data:', monthlyUsers);
   console.log('Monthly users error:', monthlyError);
