@@ -81,8 +81,8 @@ export function SentimentScore({ sentiment }: SentimentScoreProps) {
           />
         </div>
         <div className="absolute inset-0 flex flex-col items-center justify-center pt-4">
-          <span className="text-4xl font-bold">{percentage}%</span>
-          <span className="text-sm text-muted-foreground">Effectiveness</span>
+          <span className="text-2xl font-bold capitalize">{sentiment}</span>
+          <span className="text-sm text-muted-foreground">Rating</span>
         </div>
       </div>
       
