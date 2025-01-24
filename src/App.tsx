@@ -32,19 +32,16 @@ const App = () => {
               <BrowserRouter>
                 <Routes>
                   <Route path="/login" element={<LoginForm />} />
-                  <Route
-                    path="/"
-                    element={
-                      <ProtectedRoute>
-                        <Dashboard />
-                      </ProtectedRoute>
-                    }
-                  >
+                  <Route path="/" element={
+                    <ProtectedRoute>
+                      <Dashboard />
+                    </ProtectedRoute>
+                  }>
                     <Route index element={<Main />} />
                     <Route path="dashboard" element={<Main />} />
                     <Route path="dashboard/settings" element={<Settings />} />
-                    <Route path="*" element={<Navigate to="/" replace />} />
                   </Route>
+                  <Route path="*" element={<Navigate to="/" replace />} />
                 </Routes>
               </BrowserRouter>
             </div>
