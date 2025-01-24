@@ -31,17 +31,19 @@ const App = () => {
               <Sonner />
               <BrowserRouter>
                 <Routes>
+                  <Route path="/" element={<Navigate to="/dashboard" replace />} />
                   <Route path="/login" element={<LoginForm />} />
-                  <Route path="/" element={
-                    <ProtectedRoute>
-                      <Dashboard />
-                    </ProtectedRoute>
-                  }>
+                  <Route
+                    path="/dashboard"
+                    element={
+                      <ProtectedRoute>
+                        <Dashboard />
+                      </ProtectedRoute>
+                    }
+                  >
                     <Route index element={<Main />} />
-                    <Route path="dashboard" element={<Main />} />
-                    <Route path="dashboard/settings" element={<Settings />} />
+                    <Route path="settings" element={<Settings />} />
                   </Route>
-                  <Route path="*" element={<Navigate to="/" replace />} />
                 </Routes>
               </BrowserRouter>
             </div>
