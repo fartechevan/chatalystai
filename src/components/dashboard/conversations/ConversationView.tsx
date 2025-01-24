@@ -6,10 +6,17 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { Json } from "@/integrations/supabase/types";
 
 interface Profile {
   name: string | null;
   email: string;
+}
+
+interface ConversationMessage {
+  sender: "user" | "bot";
+  content: string;
+  timestamp: string;
 }
 
 interface ConversationWithProfile {
@@ -17,11 +24,7 @@ interface ConversationWithProfile {
   user_id: string;
   session_id: string;
   created_at: string;
-  messages: {
-    sender: "user" | "bot";
-    content: string;
-    timestamp: string;
-  }[];
+  messages: ConversationMessage[];
   profile: Profile | null;
 }
 
@@ -69,7 +72,7 @@ export function ConversationView({ date, onClose }: ConversationViewProps) {
         user_id: conv.user_id,
         session_id: conv.session_id,
         created_at: conv.created_at,
-        messages: conv.messages,
+        messages: (conv.messages as Json as ConversationMessage[]) || [],
         profile: conv.profiles as Profile | null,
       }));
     },
