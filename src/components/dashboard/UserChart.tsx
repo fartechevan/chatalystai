@@ -4,7 +4,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
 import { ChartControls } from "./chart/ChartControls";
 import { DataChart } from "./chart/DataChart";
-import { ChatLayout } from "./chat/ChatLayout";
 import type { TimeRange, ChartData } from "./chart/types";
 
 async function fetchConversationData(timeRange: TimeRange): Promise<ChartData[]> {
@@ -54,60 +53,48 @@ async function fetchConversationData(timeRange: TimeRange): Promise<ChartData[]>
 
   return Object.entries(groupedData).map(([name, users]) => ({
     name,
-    users: users as number, // Explicitly cast `users` to `number`
+    users: users as number,
   }));
 }
 
 export function UserChart() {
   const [timeRange, setTimeRange] = useState<TimeRange>("monthly");
   const [splitView, setSplitView] = useState(false);
-  const [showChat, setShowChat] = useState(false);
 
   const { data: chartData = [], isLoading: isChartLoading } = useQuery({
     queryKey: ['conversationStats', timeRange],
     queryFn: () => fetchConversationData(timeRange),
   });
 
-  const handleBarClick = () => {
-    setShowChat(true);
-  };
-
   return (
-    <>
-      <Card className="glass-card animate-enter">
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">User Activity</CardTitle>
-          <ChartControls
-            timeRange={timeRange}
-            splitView={splitView}
-            onTimeRangeChange={setTimeRange}
-            onSplitViewToggle={() => setSplitView(!splitView)}
-          />
-        </CardHeader>
-        <CardContent className={splitView ? "grid grid-rows-2 gap-4" : "h-[300px]"}>
-          {isChartLoading ? (
-            <div className="flex items-center justify-center h-full">
-              <p>Loading chart data...</p>
+    <Card className="glass-card animate-enter">
+      <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+        <CardTitle className="text-sm font-medium">User Activity</CardTitle>
+        <ChartControls
+          timeRange={timeRange}
+          splitView={splitView}
+          onTimeRangeChange={setTimeRange}
+          onSplitViewToggle={() => setSplitView(!splitView)}
+        />
+      </CardHeader>
+      <CardContent className={splitView ? "grid grid-rows-2 gap-4" : "h-[300px]"}>
+        {isChartLoading ? (
+          <div className="flex items-center justify-center h-full">
+            <p>Loading chart data...</p>
+          </div>
+        ) : splitView ? (
+          <>
+            <div className="h-[140px]">
+              <DataChart data={chartData} />
             </div>
-          ) : splitView ? (
-            <>
-              <div className="h-[140px]">
-                <DataChart data={chartData} onClick={handleBarClick} />
-              </div>
-              <div className="h-[140px]">
-                <DataChart data={chartData} onClick={handleBarClick} />
-              </div>
-            </>
-          ) : (
-            <DataChart data={chartData} onClick={handleBarClick} />
-          )}
-        </CardContent>
-      </Card>
-
-      <ChatLayout
-        open={showChat}
-        onOpenChange={setShowChat}
-      />
-    </>
+            <div className="h-[140px]">
+              <DataChart data={chartData} />
+            </div>
+          </>
+        ) : (
+          <DataChart data={chartData} />
+        )}
+      </CardContent>
+    </Card>
   );
 }
