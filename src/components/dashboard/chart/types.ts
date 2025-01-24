@@ -17,4 +17,5 @@ export interface Conversation {
 export interface ChartData {
   name: string;
   users: number;
+  date?: string; // Add the actual date
 }

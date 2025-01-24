@@ -52,9 +52,20 @@ async function fetchConversationData(timeRange: TimeRange): Promise<ChartData[]>
     return acc;
   }, {});
 
+  // Store the actual dates for each display key
+  const dateMap = data.reduce((acc: { [key: string]: string }, item) => {
+    const date = new Date(item.created_at);
+    const key = date.toLocaleDateString('en-US', dateFormat);
+    if (!acc[key]) {
+      acc[key] = item.created_at;
+    }
+    return acc;
+  }, {});
+
   return Object.entries(groupedData).map(([name, users]) => ({
     name,
     users: users as number,
+    date: dateMap[name], // Add the actual date to the chart data
   }));
 }
 
@@ -69,7 +80,7 @@ export function UserChart() {
   });
 
   const handleBarClick = (data: ChartData) => {
-    setSelectedDate(data.name);
+    setSelectedDate(data.date); // Use the actual date from the data
   };
 
   return (

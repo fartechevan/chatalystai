@@ -1,9 +1,5 @@
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
-
-interface ChartData {
-  name: string;
-  users: number;
-}
+import type { ChartData } from "./types";
 
 interface DataChartProps {
   data: ChartData[];
