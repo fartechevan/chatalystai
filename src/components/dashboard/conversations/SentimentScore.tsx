@@ -68,17 +68,10 @@ export function SentimentScore({ sentiment }: SentimentScoreProps) {
       
       <div className="relative w-48 h-24 mx-auto">
         <div className="absolute inset-0">
-          <div className="w-full h-full bg-gradient-to-r from-gray-200 to-gray-300 rounded-full" 
+          <div className="w-full h-full bg-gradient-to-r ${colorClass} rounded-full" 
                style={{ clipPath: 'polygon(0 50%, 100% 50%, 100% 100%, 0% 100%)' }} />
         </div>
         <div className="absolute inset-0">
-          <div 
-            className={`w-full h-full bg-gradient-to-r ${colorClass} rounded-full transform origin-bottom`} 
-            style={{ 
-              clipPath: 'polygon(0 50%, 100% 50%, 100% 100%, 0% 100%)',
-              transform: `rotate(${percentage * 1.8 - 90}deg)`
-            }} 
-          />
         </div>
         <div className="absolute inset-0 flex flex-col items-center justify-center pt-4">
           <span className="text-2xl font-bold capitalize">{sentiment || 'unrated'}</span>
