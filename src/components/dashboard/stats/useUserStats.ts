@@ -14,73 +14,94 @@ type UserStatsType = {
   totalPages: number;
 };
 
-async function fetchUserStats(searchEmail?: string, page: number = 1, filterByMonth: boolean = false): Promise<UserStatsType> {
+async function fetchUserStats(
+  searchEmail?: string,
+  page: number = 1,
+  filterByMonth: boolean = false
+): Promise<UserStatsType> {
   const itemsPerPage = 10;
   const startIndex = (page - 1) * itemsPerPage;
 
   // Get total user count
-  const { count: totalUsers } = await supabase
-    .from('profiles')
-    .select('*', { count: 'exact' });
+  const { count: totalUsers, error: totalUsersError } = await supabase
+    .from("profiles")
+    .select("*", { count: "exact", head: true });
 
-  console.log('Total users:', totalUsers);
+  if (totalUsersError) {
+    console.error("Error fetching total users:", totalUsersError);
+    throw totalUsersError;
+  }
 
+  console.log("Total users:", totalUsers);
 
-    // Fetch monthly active users
-
+  // Fetch monthly active users
   const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
-  const endOfMonth = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0);
+  const endOfMonth = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0, 23, 59, 59);
 
   const { data: monthlyUsers, error: monthlyError } = await supabase
-  .from('conversations')
-  .select('user_id, created_at')
-  .gte('created_at', startOfMonth.toISOString()) // Ensure UTC
-  .lte('created_at', endOfMonth.toISOString()); // Ensure UTC
+    .from("conversations")
+    .select("user_id, created_at")
+    .gte("created_at", startOfMonth.toISOString())
+    .lte("created_at", endOfMonth.toISOString());
 
+  if (monthlyError) {
+    console.error("Error fetching monthly users:", monthlyError);
+    throw monthlyError;
+  }
 
-  console.log('Monthly users data:', monthlyUsers);
-  console.log('Monthly users error:', monthlyError);
+  console.log("Monthly users data:", monthlyUsers);
 
-  const uniqueUserIds = new Set(monthlyUsers?.map(user => user.user_id) || []);
-  const uniqueUserCount = uniqueUserIds.size;
+  const uniqueMonthlyUserIds = new Set(monthlyUsers?.map((user) => user.user_id).filter(Boolean) || []);
+  const uniqueMonthlyUserCount = uniqueMonthlyUserIds.size;
 
-  console.log('Unique monthly users:', uniqueUserCount);
+  console.log("Unique monthly users:", uniqueMonthlyUserCount);
 
   // Fetch weekly active users
+  const startOfWeek = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
   const { data: weeklyUsers, error: weeklyError } = await supabase
-    .from('conversations')
-    .select('user_id, created_at')
-    .gte('created_at', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString());
+    .from("conversations")
+    .select("user_id, created_at")
+    .gte("created_at", startOfWeek.toISOString());
 
-  console.log('Weekly users data:', weeklyUsers);
-  console.log('Weekly users error:', weeklyError);
+  if (weeklyError) {
+    console.error("Error fetching weekly users:", weeklyError);
+    throw weeklyError;
+  }
+
+  console.log("Weekly users data:", weeklyUsers);
+
+  const uniqueWeeklyUserIds = new Set(weeklyUsers?.map((user) => user.user_id).filter(Boolean) || []);
+  const uniqueWeeklyUserCount = uniqueWeeklyUserIds.size;
+
+  console.log("Unique weekly users:", uniqueWeeklyUserCount);
 
   // Fetch users based on search criteria
   let query = supabase
-    .from('profiles')
-    .select('id, created_at, email, name', { count: 'exact' });
+    .from("profiles")
+    .select("id, created_at, email, name", { count: "exact" });
 
   if (searchEmail) {
-    query = query.ilike('email', `%${searchEmail}%`);
+    query = query.ilike("email", `%${searchEmail}%`);
   }
-  
+
   if (filterByMonth) {
-    query = query.gte('created_at', new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString());
+    query = query.gte("created_at", startOfMonth.toISOString());
   }
 
   // Add pagination
-  const { data: newUsers, count } = await query
+  const { data: newUsers, count, error: newUsersError } = await query
     .range(startIndex, startIndex + itemsPerPage - 1);
 
-  // Calculate unique users
-  const uniqueWeeklyUsers = new Set(weeklyUsers?.map(user => user.user_id) || []);
-  console.log('Unique weekly users:', uniqueWeeklyUsers.size);
+  if (newUsersError) {
+    console.error("Error fetching new users:", newUsersError);
+    throw newUsersError;
+  }
 
   const totalPages = count ? Math.ceil(count / itemsPerPage) : 1;
 
   return {
-    activeMonthly: uniqueUserCount,
-    activeWeekly: uniqueWeeklyUsers.size,
+    activeMonthly: uniqueMonthlyUserCount,
+    activeWeekly: uniqueWeeklyUserCount,
     newUsers: totalUsers || 0,
     newUserDetails: newUsers || [],
     totalPages,
@@ -89,7 +110,7 @@ async function fetchUserStats(searchEmail?: string, page: number = 1, filterByMo
 
 export function useUserStats(searchEmail: string, currentPage: number, filterByMonth: boolean) {
   return useQuery({
-    queryKey: ['userStats', searchEmail, currentPage, filterByMonth],
+    queryKey: ["userStats", searchEmail, currentPage, filterByMonth],
     queryFn: () => fetchUserStats(searchEmail, currentPage, filterByMonth),
     refetchInterval: 30000, // Refetch every 30 seconds
   });
