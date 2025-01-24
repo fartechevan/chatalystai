@@ -30,7 +30,7 @@ export default function Dashboard() {
   };
 
   return (
-    <SidebarProvider>
+    <SidebarProvider defaultOpen={true}>
       <div className="flex h-screen w-full bg-background">
         <DashboardSidebar />
         <main className="flex-1 p-8 overflow-auto relative">
