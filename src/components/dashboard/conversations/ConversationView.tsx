@@ -5,7 +5,7 @@ import { ConversationList } from "../chart/ConversationList";
 import { ConversationDetail } from "../chart/ConversationDetail";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import type { Conversation } from "../chart/types";
+import type { Conversation, ConversationMessage } from "../chart/types";
 
 interface ConversationViewProps {
   date: string;
@@ -32,7 +32,19 @@ export function ConversationView({ date, onClose }: ConversationViewProps) {
         .lte('created_at', endOfDay.toISOString());
 
       if (error) throw error;
-      return data as Conversation[];
+
+      // Transform the data to match our Conversation type
+      return data.map(conv => ({
+        id: conv.id,
+        user_id: conv.user_id,
+        session_id: conv.session_id,
+        created_at: conv.created_at,
+        messages: (conv.messages as any[]).map(msg => ({
+          sender: msg.sender as "user" | "bot",
+          content: msg.content as string,
+          timestamp: msg.timestamp as string,
+        })),
+      })) as Conversation[];
     },
   });
 
