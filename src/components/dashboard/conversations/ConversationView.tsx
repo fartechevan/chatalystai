@@ -80,11 +80,15 @@ export function ConversationView({ date, onClose }: ConversationViewProps) {
     },
   });
 
-  // Filter conversations based on search query
-  const filteredConversations = conversations.filter(conv => 
-    conv.profile?.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    conv.session_id.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  // Enhanced filter function to search by name, email, and session ID
+  const filteredConversations = conversations.filter(conv => {
+    const searchLower = searchQuery.toLowerCase();
+    return (
+      conv.profile?.name?.toLowerCase().includes(searchLower) ||
+      conv.profile?.email.toLowerCase().includes(searchLower) ||
+      conv.session_id.toLowerCase().includes(searchLower)
+    );
+  });
 
   return (
     <div className="fixed inset-0 z-50 bg-background">
@@ -93,7 +97,7 @@ export function ConversationView({ date, onClose }: ConversationViewProps) {
         <div className="w-64 border-r bg-muted/30">
           <div className="p-4 border-b">
             <Input
-              placeholder="Search conversations..."
+              placeholder="Search by name, email or session..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="w-full"
