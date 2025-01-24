@@ -2,7 +2,6 @@ import { UserStats } from "@/components/dashboard/UserStats";
 import { UserChart } from "@/components/dashboard/UserChart";
 
 export default function Main() {
-  console.log("Rendering Main component");
   return (
     <div className="space-y-8 animate-fade-up">
       <h1 className="text-3xl font-bold tracking-tight">Dashboard Overview</h1>

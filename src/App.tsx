@@ -31,10 +31,9 @@ const App = () => {
               <Sonner />
               <BrowserRouter>
                 <Routes>
-                  <Route path="/" element={<Navigate to="/dashboard" replace />} />
                   <Route path="/login" element={<LoginForm />} />
                   <Route
-                    path="/dashboard"
+                    path="/"
                     element={
                       <ProtectedRoute>
                         <Dashboard />
@@ -42,7 +41,9 @@ const App = () => {
                     }
                   >
                     <Route index element={<Main />} />
-                    <Route path="settings" element={<Settings />} />
+                    <Route path="dashboard" element={<Main />} />
+                    <Route path="dashboard/settings" element={<Settings />} />
+                    <Route path="*" element={<Navigate to="/" replace />} />
                   </Route>
                 </Routes>
               </BrowserRouter>
