@@ -1,4 +1,4 @@
-import { ChevronLeft, Home, Menu, Settings } from "lucide-react";
+import { Home, Menu, Settings } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -16,7 +16,7 @@ const menuItems = [
 
 export function DashboardSidebar() {
   const location = useLocation();
-  const { toggleSidebar, open } = useSidebar();
+  const { toggleSidebar } = useSidebar();
 
   return (
     <>
@@ -31,16 +31,8 @@ export function DashboardSidebar() {
       <Sidebar collapsible="icon">
         <SidebarContent>
           <SidebarHeader>
-            <div className="flex items-center justify-between px-4 py-2">
+            <div className="flex items-center px-4 py-2">
               <span className="text-sm font-medium">Dashboard</span>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="hidden md:flex"
-                onClick={toggleSidebar}
-              >
-                <ChevronLeft className={`h-4 w-4 transition-transform ${!open ? 'rotate-180' : ''}`} />
-              </Button>
             </div>
           </SidebarHeader>
           <div className="px-2">
