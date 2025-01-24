@@ -60,23 +60,34 @@ export function ConversationView({ date, onClose }: ConversationViewProps) {
         <div className="flex flex-1">
           <div className="flex-1 overflow-auto p-4">
             <div className="grid gap-4">
-              {conversations.map((conv) => (
-                <div
-                  key={conv.id}
-                  className="cursor-pointer rounded-lg border p-4 hover:bg-accent"
-                  onClick={() => {
-                    setSelectedConversation(conv);
-                    setShowDetail(true);
-                  }}
-                >
-                  <div className="flex items-center justify-between">
-                    <span className="font-medium">Session: {conv.session_id}</span>
-                    <span className="text-sm text-muted-foreground">
-                      {new Date(conv.created_at).toLocaleTimeString()}
-                    </span>
+              {isLoading ? (
+                <p>Loading conversations...</p>
+              ) : conversations.length === 0 ? (
+                <p>No conversations found for this date.</p>
+              ) : (
+                conversations.map((conv) => (
+                  <div
+                    key={conv.id}
+                    className="cursor-pointer rounded-lg border p-4 hover:bg-accent"
+                    onClick={() => {
+                      setSelectedConversation(conv);
+                      setShowDetail(true);
+                    }}
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="font-medium">Session: {conv.session_id}</span>
+                      <span className="text-sm text-muted-foreground">
+                        {new Date(conv.created_at).toLocaleTimeString()}
+                      </span>
+                    </div>
+                    {conv.messages.length > 0 && (
+                      <p className="mt-2 text-sm text-muted-foreground truncate">
+                        {conv.messages[conv.messages.length - 1].content}
+                      </p>
+                    )}
                   </div>
-                </div>
-              ))}
+                ))
+              )}
             </div>
           </div>
         </div>
