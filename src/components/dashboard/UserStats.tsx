@@ -3,6 +3,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { StatsCards } from "./stats/StatsCards";
 import { UserTable } from "./stats/UserTable";
 import { useUserStats } from "./stats/useUserStats";
+import { useDebounce } from "@/hooks/use-debounce";
 
 export function UserStats() {
   const [searchEmail, setSearchEmail] = useState("");
@@ -10,18 +11,22 @@ export function UserStats() {
   const [currentPage, setCurrentPage] = useState(1);
   const [filterByMonth, setFilterByMonth] = useState(false);
 
-  const { data, isLoading } = useUserStats(searchEmail, currentPage, filterByMonth);
+  // Debounce the search input to prevent too many API calls
+  const debouncedSearch = useDebounce(searchEmail, 300);
+
+  // Use the debounced search value in the query
+  const { data, isLoading } = useUserStats(debouncedSearch, currentPage, filterByMonth);
 
   const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
     setSearchEmail(e.target.value);
-    setCurrentPage(1); // Reset to first page on new search
+    // Don't reset page immediately, let the debounced search handle it
   };
 
   const handlePageChange = (page: number) => {
     setCurrentPage(page);
   };
 
-  if (isLoading) {
+  if (isLoading && !showNewUsersDialog) {
     return (
       <div className="grid gap-4 md:grid-cols-3">
         <div>Loading stats...</div>
@@ -53,6 +58,7 @@ export function UserStats() {
               onSearchChange={handleSearch}
               onFilterChange={setFilterByMonth}
               onPageChange={handlePageChange}
+              isLoading={isLoading}
             />
           </div>
         </DialogContent>

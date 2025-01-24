@@ -23,6 +23,7 @@ type UserTableProps = {
   currentPage: number;
   searchEmail: string;
   filterByMonth: boolean;
+  isLoading: boolean;
   onSearchChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onFilterChange: (checked: boolean) => void;
   onPageChange: (page: number) => void;
@@ -34,6 +35,7 @@ export function UserTable({
   currentPage,
   searchEmail,
   filterByMonth,
+  isLoading,
   onSearchChange,
   onFilterChange,
   onPageChange,
@@ -67,15 +69,29 @@ export function UserTable({
           </TableRow>
         </TableHeader>
         <TableBody>
-          {users.map((user) => (
-            <TableRow key={user.id}>
-              <TableCell>{user.name || 'N/A'}</TableCell>
-              <TableCell>{user.email}</TableCell>
-              <TableCell>
-                {format(new Date(user.created_at), "PPpp")}
+          {isLoading ? (
+            <TableRow>
+              <TableCell colSpan={3} className="text-center">
+                Loading...
               </TableCell>
             </TableRow>
-          ))}
+          ) : users.length === 0 ? (
+            <TableRow>
+              <TableCell colSpan={3} className="text-center">
+                No users found
+              </TableCell>
+            </TableRow>
+          ) : (
+            users.map((user) => (
+              <TableRow key={user.id}>
+                <TableCell>{user.name || 'N/A'}</TableCell>
+                <TableCell>{user.email}</TableCell>
+                <TableCell>
+                  {format(new Date(user.created_at), "PPpp")}
+                </TableCell>
+              </TableRow>
+            ))
+          )}
         </TableBody>
       </Table>
 
