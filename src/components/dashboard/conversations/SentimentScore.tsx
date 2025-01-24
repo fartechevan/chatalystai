@@ -53,7 +53,7 @@ export function SentimentScore({ sentiment }: SentimentScoreProps) {
   return (
     <Card className="p-6">
       <div className="flex items-center gap-2 mb-4">
-        <h3 className="text-xl font-semibold">Post Score</h3>
+        <h3 className="text-xl font-semibold">Conversation Score</h3>
         <TooltipProvider>
           <Tooltip>
             <TooltipTrigger>
