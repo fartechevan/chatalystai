@@ -89,7 +89,7 @@ export function ConversationView({ date, onClose }: ConversationViewProps) {
         .from('sentiment_analysis')
         .select('sentiment')
         .eq('conversation_id', selectedConversation.id)
-        .single();
+        .maybeSingle(); // Changed from .single() to .maybeSingle()
 
       if (error) {
         console.error('Error fetching sentiment:', error);
@@ -152,7 +152,7 @@ export function ConversationView({ date, onClose }: ConversationViewProps) {
                       <p className="text-sm font-medium truncate">
                         {conv.profile?.name || conv.profile?.email || `User ${conv.session_id}`}
                       </p>
-                      <p className="text-xs text-muted-foreground truncate">
+                      <p className="text-xs text-muted-foreground">
                         {new Date(conv.created_at).toLocaleTimeString()}
                       </p>
                     </div>
@@ -302,7 +302,7 @@ export function ConversationView({ date, onClose }: ConversationViewProps) {
                         <p>Session ID: {selectedConversation.session_id}</p>
                       </div>
                     </div>
-                    {sentimentData && (
+                    {sentimentData?.sentiment && (
                       <SentimentScore sentiment={sentimentData.sentiment} />
                     )}
                   </div>
