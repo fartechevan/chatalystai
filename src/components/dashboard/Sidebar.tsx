@@ -16,7 +16,7 @@ const menuItems = [
 
 export function DashboardSidebar() {
   const location = useLocation();
-  const { toggleSidebar, open } = useSidebar();
+  const { toggleSidebar } = useSidebar();
 
   return (
     <>
