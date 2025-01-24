@@ -6,7 +6,24 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import type { Conversation } from "../chart/types";
+
+interface Profile {
+  name: string | null;
+  email: string;
+}
+
+interface ConversationWithProfile {
+  id: string;
+  user_id: string;
+  session_id: string;
+  created_at: string;
+  messages: {
+    sender: "user" | "bot";
+    content: string;
+    timestamp: string;
+  }[];
+  profile: Profile | null;
+}
 
 interface ConversationViewProps {
   date: string;
@@ -15,7 +32,7 @@ interface ConversationViewProps {
 
 export function ConversationView({ date, onClose }: ConversationViewProps) {
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
+  const [selectedConversation, setSelectedConversation] = useState<ConversationWithProfile | null>(null);
 
   // Fetch conversations for the selected date
   const { data: conversations = [], isLoading } = useQuery({
@@ -45,8 +62,8 @@ export function ConversationView({ date, onClose }: ConversationViewProps) {
           content: msg.content as string,
           timestamp: msg.timestamp as string,
         })),
-        profile: conv.profiles as { name: string | null; email: string } | null,
-      })) as (Conversation & { profile: { name: string | null; email: string } | null })[];
+        profile: conv.profiles as Profile | null,
+      })) as ConversationWithProfile[];
     },
   });
 
