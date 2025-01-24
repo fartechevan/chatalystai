@@ -23,13 +23,13 @@ export function SentimentScore({ sentiment }: SentimentScoreProps) {
   const getColor = (sentiment: string) => {
     switch (sentiment) {
       case 'bad':
-        return 'bg-red-500';
+        return 'from-red-500 to-red-600';
       case 'moderate':
-        return 'bg-yellow-500';
+        return 'from-yellow-500 to-yellow-600';
       case 'good':
-        return 'bg-green-500';
+        return 'from-green-500 to-green-600';
       default:
-        return 'bg-gray-300';
+        return 'from-gray-300 to-gray-400';
     }
   };
 
@@ -53,7 +53,7 @@ export function SentimentScore({ sentiment }: SentimentScoreProps) {
   return (
     <Card className="p-6">
       <div className="flex items-center gap-2 mb-4">
-        <h3 className="text-xl font-semibold">Conversation Score</h3>
+        <h3 className="text-xl font-semibold">Post Score</h3>
         <TooltipProvider>
           <Tooltip>
             <TooltipTrigger>
@@ -66,27 +66,30 @@ export function SentimentScore({ sentiment }: SentimentScoreProps) {
         </TooltipProvider>
       </div>
       
-      <div className="relative pt-1">
-        <div className="flex mb-2 items-center justify-between">
-          <div>
-            <span className="text-xs font-semibold inline-block py-1 px-2 uppercase rounded-full text-white bg-primary">
-              {label}
-            </span>
-          </div>
-          <div className="text-right">
-            <span className="text-xs font-semibold inline-block text-primary">
-              {percentage}%
-            </span>
-          </div>
+      <div className="relative w-48 h-24 mx-auto">
+        <div className="absolute inset-0">
+          <div className="w-full h-full bg-gradient-to-r from-gray-200 to-gray-300 rounded-full" 
+               style={{ clipPath: 'polygon(0 50%, 100% 50%, 100% 100%, 0% 100%)' }} />
         </div>
-        <div className="overflow-hidden h-2 mb-4 text-xs flex rounded bg-gray-200">
-          <div
-            style={{ width: `${percentage}%` }}
-            className={`shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center transition-all duration-500 ${colorClass}`}
+        <div className="absolute inset-0">
+          <div 
+            className={`w-full h-full bg-gradient-to-r ${colorClass} rounded-full transform origin-bottom`} 
+            style={{ 
+              clipPath: 'polygon(0 50%, 100% 50%, 100% 100%, 0% 100%)',
+              transform: `rotate(${percentage * 1.8 - 90}deg)`
+            }} 
           />
         </div>
-        <p className="text-sm text-muted-foreground text-center mt-4">
-          This conversation was {label.toLowerCase()} based on the sentiment analysis.
+        <div className="absolute inset-0 flex flex-col items-center justify-center pt-4">
+          <span className="text-4xl font-bold">{percentage}%</span>
+          <span className="text-sm text-muted-foreground">Effectiveness</span>
+        </div>
+      </div>
+      
+      <div className="mt-6 text-center">
+        <h4 className="text-xl font-semibold">{label}</h4>
+        <p className="text-muted-foreground mt-2">
+          This conversation was {label.toLowerCase()} at helping customers find what they need.
         </p>
       </div>
     </Card>
