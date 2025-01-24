@@ -35,13 +35,14 @@ async function fetchUserStats(
   console.log("Total users:", totalUsers);
 
   // Fetch monthly active users
-  const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
-  const endOfMonth = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0, 23, 59, 59);
+  const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString();
+  const endOfMonth = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0, 23, 59, 59).toISOString();
 
-  
   const { data: monthlyUsers, error: monthlyError } = await supabase
     .from("conversations")
-    .select("*", { count: "exact", head: true });
+    .select("user_id")
+    .gte("created_at", startOfMonth)
+    .lte("created_at", endOfMonth);
 
   if (monthlyError) {
     console.error("Error fetching monthly users:", monthlyError);
@@ -51,16 +52,16 @@ async function fetchUserStats(
   console.log("Monthly users data:", monthlyUsers);
 
   const uniqueMonthlyUserIds = new Set(monthlyUsers?.map((user) => user.user_id).filter(Boolean) || []);
-  const uniqueMonthlyUserCount = monthlyUsers.size;
+  const uniqueMonthlyUserCount = uniqueMonthlyUserIds.size;
 
   console.log("Unique monthly users:", uniqueMonthlyUserCount);
 
   // Fetch weekly active users
-  const startOfWeek = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+  const startOfWeek = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
   const { data: weeklyUsers, error: weeklyError } = await supabase
     .from("conversations")
-    .select("user_id, created_at")
-    .gte("created_at", startOfWeek.toISOString());
+    .select("user_id")
+    .gte("created_at", startOfWeek);
 
   if (weeklyError) {
     console.error("Error fetching weekly users:", weeklyError);
@@ -84,7 +85,7 @@ async function fetchUserStats(
   }
 
   if (filterByMonth) {
-    query = query.gte("created_at", startOfMonth.toISOString());
+    query = query.gte("created_at", startOfMonth);
   }
 
   // Add pagination
