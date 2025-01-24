@@ -7,6 +7,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Json } from "@/integrations/supabase/types";
+import { SentimentScore } from "./SentimentScore";
 
 interface Profile {
   name: string | null;
@@ -76,6 +77,28 @@ export function ConversationView({ date, onClose }: ConversationViewProps) {
         profile: conv.profiles as Profile | null,
       }));
     },
+  });
+
+  // Fetch sentiment analysis for selected conversation
+  const { data: sentimentData } = useQuery({
+    queryKey: ['sentiment', selectedConversation?.id],
+    queryFn: async () => {
+      if (!selectedConversation) return null;
+      
+      const { data, error } = await supabase
+        .from('sentiment_analysis')
+        .select('sentiment')
+        .eq('conversation_id', selectedConversation.id)
+        .single();
+
+      if (error) {
+        console.error('Error fetching sentiment:', error);
+        return null;
+      }
+
+      return data;
+    },
+    enabled: !!selectedConversation,
   });
 
   // Enhanced filter function to search by name, email, and session ID
@@ -249,9 +272,9 @@ export function ConversationView({ date, onClose }: ConversationViewProps) {
               <h3 className="font-medium">User Details</h3>
             </div>
             <ScrollArea className="h-[calc(100vh-5rem)]">
-              <div className="space-y-2 p-4">
+              <div className="space-y-4 p-4">
                 {selectedConversation && (
-                  <div className="space-y-4">
+                  <div className="space-y-6">
                     <div className="flex items-center gap-3">
                       <Avatar className="h-16 w-16">
                         <AvatarImage src="/placeholder.svg" />
@@ -279,6 +302,9 @@ export function ConversationView({ date, onClose }: ConversationViewProps) {
                         <p>Session ID: {selectedConversation.session_id}</p>
                       </div>
                     </div>
+                    {sentimentData && (
+                      <SentimentScore sentiment={sentimentData.sentiment} />
+                    )}
                   </div>
                 )}
               </div>
