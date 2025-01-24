@@ -3,11 +3,11 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { Info } from "lucide-react";
 
 interface SentimentScoreProps {
-  sentiment: 'bad' | 'moderate' | 'good';
+  sentiment: 'bad' | 'moderate' | 'good' | null;
 }
 
 export function SentimentScore({ sentiment }: SentimentScoreProps) {
-  const getPercentage = (sentiment: string) => {
+  const getPercentage = (sentiment: string | null) => {
     switch (sentiment) {
       case 'bad':
         return 30;
@@ -20,7 +20,7 @@ export function SentimentScore({ sentiment }: SentimentScoreProps) {
     }
   };
 
-  const getColor = (sentiment: string) => {
+  const getColor = (sentiment: string | null) => {
     switch (sentiment) {
       case 'bad':
         return 'from-red-500 to-red-600';
@@ -33,7 +33,7 @@ export function SentimentScore({ sentiment }: SentimentScoreProps) {
     }
   };
 
-  const getLabel = (sentiment: string) => {
+  const getLabel = (sentiment: string | null) => {
     switch (sentiment) {
       case 'bad':
         return 'Needs improvement';
@@ -42,7 +42,7 @@ export function SentimentScore({ sentiment }: SentimentScoreProps) {
       case 'good':
         return 'Extremely effective';
       default:
-        return 'No data available';
+        return 'Not yet rated';
     }
   };
 
@@ -81,7 +81,7 @@ export function SentimentScore({ sentiment }: SentimentScoreProps) {
           />
         </div>
         <div className="absolute inset-0 flex flex-col items-center justify-center pt-4">
-          <span className="text-2xl font-bold capitalize">{sentiment}</span>
+          <span className="text-2xl font-bold capitalize">{sentiment || 'unrated'}</span>
           <span className="text-sm text-muted-foreground">Rating</span>
         </div>
       </div>
@@ -89,7 +89,9 @@ export function SentimentScore({ sentiment }: SentimentScoreProps) {
       <div className="mt-6 text-center">
         <h4 className="text-xl font-semibold">{label}</h4>
         <p className="text-muted-foreground mt-2">
-          This conversation was {label.toLowerCase()} at helping customers find what they need.
+          {sentiment ? 
+            `This conversation was ${label.toLowerCase()} at helping customers find what they need.` :
+            'This conversation has not been rated yet.'}
         </p>
       </div>
     </Card>
