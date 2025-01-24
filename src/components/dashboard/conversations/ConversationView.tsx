@@ -1,4 +1,4 @@
-import { X, MessageSquare, Send, Smile, Search } from "lucide-react";
+import { X, MessageSquare, Send, Smile } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -38,19 +38,32 @@ export function ConversationView({ date, onClose }: ConversationViewProps) {
   const { data: conversations = [], isLoading } = useQuery({
     queryKey: ['conversations', date],
     queryFn: async () => {
-      const startOfDay = new Date(date);
+      // Parse the date string to create start and end of day timestamps
+      const selectedDate = new Date(date);
+      const startOfDay = new Date(selectedDate);
       startOfDay.setHours(0, 0, 0, 0);
       
-      const endOfDay = new Date(date);
+      const endOfDay = new Date(selectedDate);
       endOfDay.setHours(23, 59, 59, 999);
+
+      console.log('Fetching conversations for date:', {
+        date,
+        startOfDay: startOfDay.toISOString(),
+        endOfDay: endOfDay.toISOString()
+      });
 
       const { data, error } = await supabase
         .from('conversations')
-        .select('*, profiles:profiles(name, email)')
+        .select('*, profiles(name, email)')
         .gte('created_at', startOfDay.toISOString())
         .lte('created_at', endOfDay.toISOString());
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching conversations:', error);
+        throw error;
+      }
+
+      console.log('Fetched conversations:', data);
 
       return data.map(conv => ({
         id: conv.id,
@@ -107,7 +120,7 @@ export function ConversationView({ date, onClose }: ConversationViewProps) {
                       {conv.profile?.name || conv.profile?.email || `User ${conv.session_id}`}
                     </p>
                     <p className="text-xs text-muted-foreground truncate">
-                      {new Date(conv.created_at).toLocaleDateString()}
+                      {new Date(conv.created_at).toLocaleTimeString()}
                     </p>
                   </div>
                 </div>
