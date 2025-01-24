@@ -1,4 +1,4 @@
-import { X, MessageSquare, Users, Send, Smile } from "lucide-react";
+import { X, MessageSquare, Users, Send, Smile, Search } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,6 +15,7 @@ interface ConversationViewProps {
 
 export function ConversationView({ date, onClose }: ConversationViewProps) {
   const [activeTab, setActiveTab] = useState<"messages" | "participants">("messages");
+  const [searchQuery, setSearchQuery] = useState("");
 
   const { data: conversations = [], isLoading } = useQuery({
     queryKey: ['conversations', date],
@@ -47,117 +48,174 @@ export function ConversationView({ date, onClose }: ConversationViewProps) {
     },
   });
 
-  const currentConversation = conversations[0]; // For now, showing the first conversation
+  const currentConversation = conversations[0];
 
   return (
     <div className="fixed inset-0 z-50 bg-background">
-      <div className="flex h-full flex-col">
-        {/* Header */}
-        <div className="flex items-center justify-between border-b px-6 py-4">
-          <div className="flex items-center gap-4">
-            <h2 className="text-xl font-semibold">Group Chat</h2>
-            <div className="flex gap-2">
-              <Button
-                variant={activeTab === "messages" ? "default" : "ghost"}
-                onClick={() => setActiveTab("messages")}
-                className="h-8"
-              >
-                <MessageSquare className="mr-2 h-4 w-4" />
-                Messages
-              </Button>
-              <Button
-                variant={activeTab === "participants" ? "default" : "ghost"}
-                onClick={() => setActiveTab("participants")}
-                className="h-8"
-              >
-                <Users className="mr-2 h-4 w-4" />
-                Participants
-              </Button>
-            </div>
+      <div className="flex h-full">
+        {/* Left Sidebar */}
+        <div className="w-64 border-r bg-muted/30">
+          <div className="p-4 border-b">
+            <Input
+              placeholder="Search conversations..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full"
+            />
           </div>
-          <Button variant="ghost" size="icon" onClick={onClose}>
-            <X className="h-5 w-5" />
-          </Button>
+          <ScrollArea className="h-[calc(100vh-5rem)]">
+            <div className="space-y-2 p-4">
+              {conversations.map((conv) => (
+                <div
+                  key={conv.id}
+                  className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted cursor-pointer"
+                >
+                  <Avatar className="h-10 w-10">
+                    <AvatarImage src="/placeholder.svg" />
+                    <AvatarFallback>U</AvatarFallback>
+                  </Avatar>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium truncate">User {conv.session_id}</p>
+                    <p className="text-xs text-muted-foreground truncate">
+                      {new Date(conv.created_at).toLocaleDateString()}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </ScrollArea>
         </div>
 
         {/* Main Content */}
-        <div className="flex flex-1">
-          {/* Messages Area */}
-          <div className="flex-1 flex flex-col">
-            <ScrollArea className="flex-1 p-6">
-              {isLoading ? (
-                <div className="flex items-center justify-center h-full">
-                  <p>Loading messages...</p>
-                </div>
-              ) : !currentConversation ? (
-                <div className="flex items-center justify-center h-full">
-                  <p className="text-muted-foreground">No messages found for this date.</p>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {currentConversation.messages.map((message, index) => (
-                    <div
-                      key={index}
-                      className={`flex ${
-                        message.sender === "user" ? "justify-end" : "justify-start"
-                      }`}
-                    >
-                      <div
-                        className={`flex max-w-[70%] items-start gap-2 ${
-                          message.sender === "user" ? "flex-row-reverse" : "flex-row"
-                        }`}
-                      >
-                        <Avatar className="h-8 w-8">
-                          <AvatarImage src="/placeholder.svg" />
-                          <AvatarFallback>
-                            {message.sender === "user" ? "U" : "B"}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div>
-                          <div className="flex items-center gap-2 mb-1">
-                            <span className="text-sm font-medium">
-                              {message.sender === "user" ? "You" : "Assistant"}
-                            </span>
-                            <span className="text-xs text-muted-foreground">
-                              {new Date(message.timestamp).toLocaleTimeString([], {
-                                hour: "numeric",
-                                minute: "2-digit",
-                              })}
-                            </span>
-                          </div>
-                          <div
-                            className={`rounded-lg p-3 ${
-                              message.sender === "user"
-                                ? "bg-primary text-primary-foreground"
-                                : "bg-muted"
-                            }`}
-                          >
-                            <p className="text-sm">{message.content}</p>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </ScrollArea>
-
-            {/* Message Input */}
-            <div className="border-t p-4">
-              <div className="flex items-center gap-2">
-                <Input 
-                  placeholder="Write your message..." 
-                  className="flex-1"
-                />
-                <Button size="icon" variant="ghost">
-                  <Smile className="h-5 w-5" />
+        <div className="flex-1 flex flex-col">
+          {/* Header */}
+          <div className="flex items-center justify-between border-b px-6 py-4">
+            <div className="flex items-center gap-4">
+              <h2 className="text-xl font-semibold">Group Chat</h2>
+              <div className="flex gap-2">
+                <Button
+                  variant={activeTab === "messages" ? "default" : "ghost"}
+                  onClick={() => setActiveTab("messages")}
+                  className="h-8"
+                >
+                  <MessageSquare className="mr-2 h-4 w-4" />
+                  Messages
                 </Button>
-                <Button size="icon">
-                  <Send className="h-5 w-5" />
+                <Button
+                  variant={activeTab === "participants" ? "default" : "ghost"}
+                  onClick={() => setActiveTab("participants")}
+                  className="h-8"
+                >
+                  <Users className="mr-2 h-4 w-4" />
+                  Participants
                 </Button>
               </div>
             </div>
+            <Button variant="ghost" size="icon" onClick={onClose}>
+              <X className="h-5 w-5" />
+            </Button>
           </div>
+
+          {/* Messages Area */}
+          <ScrollArea className="flex-1 px-6 py-4">
+            {isLoading ? (
+              <div className="flex items-center justify-center h-full">
+                <p>Loading messages...</p>
+              </div>
+            ) : !currentConversation ? (
+              <div className="flex items-center justify-center h-full">
+                <p className="text-muted-foreground">No messages found for this date.</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {currentConversation.messages.map((message, index) => (
+                  <div
+                    key={index}
+                    className={`flex ${
+                      message.sender === "user" ? "justify-end" : "justify-start"
+                    }`}
+                  >
+                    <div
+                      className={`flex max-w-[70%] items-start gap-2 ${
+                        message.sender === "user" ? "flex-row-reverse" : "flex-row"
+                      }`}
+                    >
+                      <Avatar className="h-8 w-8">
+                        <AvatarImage src="/placeholder.svg" />
+                        <AvatarFallback>
+                          {message.sender === "user" ? "U" : "B"}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div>
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="text-sm font-medium">
+                            {message.sender === "user" ? "You" : "Assistant"}
+                          </span>
+                          <span className="text-xs text-muted-foreground">
+                            {new Date(message.timestamp).toLocaleTimeString([], {
+                              hour: "numeric",
+                              minute: "2-digit",
+                            })}
+                          </span>
+                        </div>
+                        <div
+                          className={`rounded-lg p-3 ${
+                            message.sender === "user"
+                              ? "bg-primary text-primary-foreground"
+                              : "bg-muted"
+                          }`}
+                        >
+                          <p className="text-sm">{message.content}</p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </ScrollArea>
+
+          {/* Message Input */}
+          <div className="border-t p-4">
+            <div className="flex items-center gap-2">
+              <Input 
+                placeholder="Write your message..." 
+                className="flex-1"
+              />
+              <Button size="icon" variant="ghost">
+                <Smile className="h-5 w-5" />
+              </Button>
+              <Button size="icon">
+                <Send className="h-5 w-5" />
+              </Button>
+            </div>
+          </div>
+        </div>
+
+        {/* Right Sidebar */}
+        <div className="w-64 border-l bg-muted/30">
+          <div className="p-4 border-b">
+            <h3 className="font-medium">Participants</h3>
+          </div>
+          <ScrollArea className="h-[calc(100vh-5rem)]">
+            <div className="space-y-2 p-4">
+              {conversations.map((conv) => (
+                <div
+                  key={conv.id}
+                  className="flex items-center gap-3 p-2 rounded-lg"
+                >
+                  <Avatar className="h-8 w-8">
+                    <AvatarImage src="/placeholder.svg" />
+                    <AvatarFallback>U</AvatarFallback>
+                  </Avatar>
+                  <div>
+                    <p className="text-sm font-medium">User {conv.session_id}</p>
+                    <p className="text-xs text-muted-foreground">Online</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </ScrollArea>
         </div>
       </div>
     </div>
