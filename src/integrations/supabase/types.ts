@@ -67,19 +67,19 @@ export type Database = {
           conversation_id: string
           created_at: string
           id: string
-          sentiment: Database["public"]["Enums"]["sentiment_level"]
+          sentiment: Database["public"]["Enums"]["sentiment_level"] | null
         }
         Insert: {
           conversation_id: string
           created_at?: string
           id?: string
-          sentiment: Database["public"]["Enums"]["sentiment_level"]
+          sentiment?: Database["public"]["Enums"]["sentiment_level"] | null
         }
         Update: {
           conversation_id?: string
           created_at?: string
           id?: string
-          sentiment?: Database["public"]["Enums"]["sentiment_level"]
+          sentiment?: Database["public"]["Enums"]["sentiment_level"] | null
         }
         Relationships: [
           {
