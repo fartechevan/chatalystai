@@ -1,4 +1,4 @@
-import { Menu, ChevronLeft } from "lucide-react";
+import { ChevronLeft, Home, Menu, Settings } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -10,13 +10,13 @@ import { Link, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 
 const menuItems = [
-  { title: "Main", icon: Menu, path: "/dashboard" },
-  { title: "Settings", icon: ChevronLeft, path: "/dashboard/settings" },
+  { title: "Main", icon: Home, path: "/dashboard" },
+  { title: "Settings", icon: Settings, path: "/dashboard/settings" },
 ];
 
 export function DashboardSidebar() {
   const location = useLocation();
-  const { toggleSidebar } = useSidebar();
+  const { toggleSidebar, open } = useSidebar();
 
   return (
     <>
@@ -33,6 +33,14 @@ export function DashboardSidebar() {
           <SidebarHeader>
             <div className="flex items-center justify-between px-4 py-2">
               <span className="text-sm font-medium">Dashboard</span>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="hidden md:flex"
+                onClick={toggleSidebar}
+              >
+                <ChevronLeft className={`h-4 w-4 transition-transform ${!open ? 'rotate-180' : ''}`} />
+              </Button>
             </div>
           </SidebarHeader>
           <div className="px-2">
