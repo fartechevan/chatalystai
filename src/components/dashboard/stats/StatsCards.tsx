@@ -12,7 +12,7 @@ export function StatsCards({ activeMonthly, activeWeekly, totalUsers, onTotalUse
     <div className="grid gap-4 md:grid-cols-3">
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Monthly Active Users</CardTitle>
+          <CardTitle className="text-sm font-medium">This Month Active Users</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="text-2xl font-bold">{activeMonthly}</div>
@@ -20,7 +20,7 @@ export function StatsCards({ activeMonthly, activeWeekly, totalUsers, onTotalUse
       </Card>
       <Card>
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-          <CardTitle className="text-sm font-medium">Weekly Active Users</CardTitle>
+          <CardTitle className="text-sm font-medium">This Week Active Users</CardTitle>
         </CardHeader>
         <CardContent>
           <div className="text-2xl font-bold">{activeWeekly}</div>
