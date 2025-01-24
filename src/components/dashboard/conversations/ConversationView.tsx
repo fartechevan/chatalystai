@@ -1,11 +1,12 @@
-import { X } from "lucide-react";
+import { X, MessageSquare, Users, Send, Smile } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { ConversationList } from "../chart/ConversationList";
-import { ConversationDetail } from "../chart/ConversationDetail";
+import { Input } from "@/components/ui/input";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import type { Conversation, ConversationMessage } from "../chart/types";
+import type { Conversation } from "../chart/types";
 
 interface ConversationViewProps {
   date: string;
@@ -13,8 +14,7 @@ interface ConversationViewProps {
 }
 
 export function ConversationView({ date, onClose }: ConversationViewProps) {
-  const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
-  const [showDetail, setShowDetail] = useState(false);
+  const [activeTab, setActiveTab] = useState<"messages" | "participants">("messages");
 
   const { data: conversations = [], isLoading } = useQuery({
     queryKey: ['conversations', date],
@@ -33,7 +33,6 @@ export function ConversationView({ date, onClose }: ConversationViewProps) {
 
       if (error) throw error;
 
-      // Transform the data to match our Conversation type
       return data.map(conv => ({
         id: conv.id,
         user_id: conv.user_id,
@@ -48,56 +47,119 @@ export function ConversationView({ date, onClose }: ConversationViewProps) {
     },
   });
 
+  const currentConversation = conversations[0]; // For now, showing the first conversation
+
   return (
     <div className="fixed inset-0 z-50 bg-background">
       <div className="flex h-full flex-col">
-        <div className="flex items-center justify-between border-b px-4 py-2">
-          <h2 className="text-lg font-semibold">Conversations for {date}</h2>
+        {/* Header */}
+        <div className="flex items-center justify-between border-b px-6 py-4">
+          <div className="flex items-center gap-4">
+            <h2 className="text-xl font-semibold">Group Chat</h2>
+            <div className="flex gap-2">
+              <Button
+                variant={activeTab === "messages" ? "default" : "ghost"}
+                onClick={() => setActiveTab("messages")}
+                className="h-8"
+              >
+                <MessageSquare className="mr-2 h-4 w-4" />
+                Messages
+              </Button>
+              <Button
+                variant={activeTab === "participants" ? "default" : "ghost"}
+                onClick={() => setActiveTab("participants")}
+                className="h-8"
+              >
+                <Users className="mr-2 h-4 w-4" />
+                Participants
+              </Button>
+            </div>
+          </div>
           <Button variant="ghost" size="icon" onClick={onClose}>
             <X className="h-5 w-5" />
           </Button>
         </div>
+
+        {/* Main Content */}
         <div className="flex flex-1">
-          <div className="flex-1 overflow-auto p-4">
-            <div className="grid gap-4">
+          {/* Messages Area */}
+          <div className="flex-1 flex flex-col">
+            <ScrollArea className="flex-1 p-6">
               {isLoading ? (
-                <p>Loading conversations...</p>
-              ) : conversations.length === 0 ? (
-                <p>No conversations found for this date.</p>
+                <div className="flex items-center justify-center h-full">
+                  <p>Loading messages...</p>
+                </div>
+              ) : !currentConversation ? (
+                <div className="flex items-center justify-center h-full">
+                  <p className="text-muted-foreground">No messages found for this date.</p>
+                </div>
               ) : (
-                conversations.map((conv) => (
-                  <div
-                    key={conv.id}
-                    className="cursor-pointer rounded-lg border p-4 hover:bg-accent"
-                    onClick={() => {
-                      setSelectedConversation(conv);
-                      setShowDetail(true);
-                    }}
-                  >
-                    <div className="flex items-center justify-between">
-                      <span className="font-medium">Session: {conv.session_id}</span>
-                      <span className="text-sm text-muted-foreground">
-                        {new Date(conv.created_at).toLocaleTimeString()}
-                      </span>
+                <div className="space-y-4">
+                  {currentConversation.messages.map((message, index) => (
+                    <div
+                      key={index}
+                      className={`flex ${
+                        message.sender === "user" ? "justify-end" : "justify-start"
+                      }`}
+                    >
+                      <div
+                        className={`flex max-w-[70%] items-start gap-2 ${
+                          message.sender === "user" ? "flex-row-reverse" : "flex-row"
+                        }`}
+                      >
+                        <Avatar className="h-8 w-8">
+                          <AvatarImage src="/placeholder.svg" />
+                          <AvatarFallback>
+                            {message.sender === "user" ? "U" : "B"}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div>
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="text-sm font-medium">
+                              {message.sender === "user" ? "You" : "Assistant"}
+                            </span>
+                            <span className="text-xs text-muted-foreground">
+                              {new Date(message.timestamp).toLocaleTimeString([], {
+                                hour: "numeric",
+                                minute: "2-digit",
+                              })}
+                            </span>
+                          </div>
+                          <div
+                            className={`rounded-lg p-3 ${
+                              message.sender === "user"
+                                ? "bg-primary text-primary-foreground"
+                                : "bg-muted"
+                            }`}
+                          >
+                            <p className="text-sm">{message.content}</p>
+                          </div>
+                        </div>
+                      </div>
                     </div>
-                    {conv.messages.length > 0 && (
-                      <p className="mt-2 text-sm text-muted-foreground truncate">
-                        {conv.messages[conv.messages.length - 1].content}
-                      </p>
-                    )}
-                  </div>
-                ))
+                  ))}
+                </div>
               )}
+            </ScrollArea>
+
+            {/* Message Input */}
+            <div className="border-t p-4">
+              <div className="flex items-center gap-2">
+                <Input 
+                  placeholder="Write your message..." 
+                  className="flex-1"
+                />
+                <Button size="icon" variant="ghost">
+                  <Smile className="h-5 w-5" />
+                </Button>
+                <Button size="icon">
+                  <Send className="h-5 w-5" />
+                </Button>
+              </div>
             </div>
           </div>
         </div>
       </div>
-
-      <ConversationDetail
-        open={showDetail}
-        onOpenChange={setShowDetail}
-        conversation={selectedConversation}
-      />
     </div>
   );
 }
