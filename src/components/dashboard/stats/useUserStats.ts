@@ -40,9 +40,7 @@ async function fetchUserStats(
 
   const { data: monthlyUsers, error: monthlyError } = await supabase
     .from("conversations")
-    .select("user_id, created_at")
-    .gte("created_at", startOfMonth.toISOString())
-    .lte("created_at", endOfMonth.toISOString());
+    .select("user_id, created_at");
 
   if (monthlyError) {
     console.error("Error fetching monthly users:", monthlyError);
