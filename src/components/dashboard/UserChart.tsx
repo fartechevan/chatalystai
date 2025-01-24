@@ -80,12 +80,12 @@ export function UserChart() {
   });
 
   const handleBarClick = (data: ChartData) => {
-    setSelectedDate(data.date); // Use the actual date from the data
+    setSelectedDate(data.date);
   };
 
   return (
     <>
-      <Card className="glass-card animate-enter">
+      <Card className="glass-card animate-enter w-full">
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
           <CardTitle className="text-sm font-medium">User Activity</CardTitle>
           <ChartControls
