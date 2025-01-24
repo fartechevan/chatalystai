@@ -7,18 +7,24 @@ interface ChartData {
 
 interface DataChartProps {
   data: ChartData[];
-  onClick?: () => void;
+  onClick?: (data: ChartData) => void;
 }
 
 export function DataChart({ data, onClick }: DataChartProps) {
   return (
     <ResponsiveContainer width="100%" height="100%">
-      <BarChart data={data} onClick={onClick}>
+      <BarChart data={data}>
         <CartesianGrid strokeDasharray="3 3" />
         <XAxis dataKey="name" />
         <YAxis />
         <Tooltip />
-        <Bar dataKey="users" fill="hsl(var(--primary))" name="Users" />
+        <Bar
+          dataKey="users"
+          fill="hsl(var(--primary))"
+          name="Users"
+          onClick={(data) => onClick?.(data)}
+          style={{ cursor: onClick ? 'pointer' : 'default' }}
+        />
       </BarChart>
     </ResponsiveContainer>
   );
