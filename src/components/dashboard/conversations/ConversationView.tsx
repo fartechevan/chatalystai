@@ -15,7 +15,9 @@ interface ConversationViewProps {
 
 export function ConversationView({ date, onClose }: ConversationViewProps) {
   const [searchQuery, setSearchQuery] = useState("");
+  const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
 
+  // Fetch conversations for the selected date
   const { data: conversations = [], isLoading } = useQuery({
     queryKey: ['conversations', date],
     queryFn: async () => {
@@ -27,7 +29,7 @@ export function ConversationView({ date, onClose }: ConversationViewProps) {
 
       const { data, error } = await supabase
         .from('conversations')
-        .select('*')
+        .select('*, profiles:profiles(name, email)')
         .gte('created_at', startOfDay.toISOString())
         .lte('created_at', endOfDay.toISOString());
 
@@ -43,11 +45,16 @@ export function ConversationView({ date, onClose }: ConversationViewProps) {
           content: msg.content as string,
           timestamp: msg.timestamp as string,
         })),
-      })) as Conversation[];
+        profile: conv.profiles as { name: string | null; email: string } | null,
+      })) as (Conversation & { profile: { name: string | null; email: string } | null })[];
     },
   });
 
-  const currentConversation = conversations[0];
+  // Filter conversations based on search query
+  const filteredConversations = conversations.filter(conv => 
+    conv.profile?.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    conv.session_id.toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   return (
     <div className="fixed inset-0 z-50 bg-background">
@@ -64,17 +71,24 @@ export function ConversationView({ date, onClose }: ConversationViewProps) {
           </div>
           <ScrollArea className="h-[calc(100vh-5rem)]">
             <div className="space-y-2 p-4">
-              {conversations.map((conv) => (
+              {filteredConversations.map((conv) => (
                 <div
                   key={conv.id}
-                  className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted cursor-pointer"
+                  className={`flex items-center gap-3 p-2 rounded-lg hover:bg-muted cursor-pointer ${
+                    selectedConversation?.id === conv.id ? 'bg-muted' : ''
+                  }`}
+                  onClick={() => setSelectedConversation(conv)}
                 >
                   <Avatar className="h-10 w-10">
                     <AvatarImage src="/placeholder.svg" />
-                    <AvatarFallback>U</AvatarFallback>
+                    <AvatarFallback>
+                      {conv.profile?.name?.[0] || conv.profile?.email[0].toUpperCase() || 'U'}
+                    </AvatarFallback>
                   </Avatar>
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate">User {conv.session_id}</p>
+                    <p className="text-sm font-medium truncate">
+                      {conv.profile?.name || conv.profile?.email || `User ${conv.session_id}`}
+                    </p>
                     <p className="text-xs text-muted-foreground truncate">
                       {new Date(conv.created_at).toLocaleDateString()}
                     </p>
@@ -104,13 +118,13 @@ export function ConversationView({ date, onClose }: ConversationViewProps) {
               <div className="flex items-center justify-center h-full">
                 <p>Loading messages...</p>
               </div>
-            ) : !currentConversation ? (
+            ) : !selectedConversation ? (
               <div className="flex items-center justify-center h-full">
-                <p className="text-muted-foreground">No messages found for this date.</p>
+                <p className="text-muted-foreground">Select a conversation to view messages.</p>
               </div>
             ) : (
               <div className="space-y-4">
-                {currentConversation.messages.map((message, index) => (
+                {selectedConversation.messages.map((message, index) => (
                   <div
                     key={index}
                     className={`flex ${
@@ -125,13 +139,22 @@ export function ConversationView({ date, onClose }: ConversationViewProps) {
                       <Avatar className="h-8 w-8">
                         <AvatarImage src="/placeholder.svg" />
                         <AvatarFallback>
-                          {message.sender === "user" ? "U" : "B"}
+                          {message.sender === "user" ? 
+                            (selectedConversation.profile?.name?.[0] || 
+                             selectedConversation.profile?.email[0].toUpperCase() || 'U') : 
+                            'B'
+                          }
                         </AvatarFallback>
                       </Avatar>
                       <div>
                         <div className="flex items-center gap-2 mb-1">
                           <span className="text-sm font-medium">
-                            {message.sender === "user" ? "You" : "Assistant"}
+                            {message.sender === "user" ? 
+                              (selectedConversation.profile?.name || 
+                               selectedConversation.profile?.email || 
+                               "You") : 
+                              "Assistant"
+                            }
                           </span>
                           <span className="text-xs text-muted-foreground">
                             {new Date(message.timestamp).toLocaleTimeString([], {
@@ -181,25 +204,33 @@ export function ConversationView({ date, onClose }: ConversationViewProps) {
           </div>
           <ScrollArea className="h-[calc(100vh-5rem)]">
             <div className="space-y-2 p-4">
-              {currentConversation && (
+              {selectedConversation && (
                 <div className="space-y-4">
                   <div className="flex items-center gap-3">
                     <Avatar className="h-16 w-16">
                       <AvatarImage src="/placeholder.svg" />
-                      <AvatarFallback>U</AvatarFallback>
+                      <AvatarFallback>
+                        {selectedConversation.profile?.name?.[0] || 
+                         selectedConversation.profile?.email[0].toUpperCase() || 'U'}
+                      </AvatarFallback>
                     </Avatar>
                     <div>
-                      <p className="font-medium">User {currentConversation.session_id}</p>
+                      <p className="font-medium">
+                        {selectedConversation.profile?.name || 
+                         selectedConversation.profile?.email || 
+                         `User ${selectedConversation.session_id}`}
+                      </p>
                       <p className="text-sm text-muted-foreground">
-                        Session: {currentConversation.session_id}
+                        {selectedConversation.profile?.email}
                       </p>
                     </div>
                   </div>
                   <div className="space-y-2">
                     <h4 className="text-sm font-medium">Chat Info</h4>
                     <div className="text-sm">
-                      <p>Started: {new Date(currentConversation.created_at).toLocaleString()}</p>
-                      <p>Messages: {currentConversation.messages.length}</p>
+                      <p>Started: {new Date(selectedConversation.created_at).toLocaleString()}</p>
+                      <p>Messages: {selectedConversation.messages.length}</p>
+                      <p>Session ID: {selectedConversation.session_id}</p>
                     </div>
                   </div>
                 </div>
