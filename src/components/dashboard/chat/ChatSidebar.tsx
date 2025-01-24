@@ -33,7 +33,7 @@ export function ChatSidebar({ onChatSelect }: ChatSidebarProps) {
   ];
 
   return (
-    <div className="w-80 border-r bg-background">
+    <div className="flex-1 border-r bg-background">
       <div className="p-4 space-y-4">
         <div className="flex items-center space-x-4">
           <Avatar className="h-10 w-10">
