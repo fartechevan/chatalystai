@@ -11,6 +11,3 @@ port = 54322
 [studio]
 enabled = true
 port = 54323
-
-[[fetch.services]]
-url = "https://vezdxxqzzcjkunoaxcxc.supabase.co"
