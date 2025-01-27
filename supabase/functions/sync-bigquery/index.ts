@@ -1,5 +1,5 @@
-import { createClient } from '@supabase/supabase-js';
-import { BigQuery } from '@google-cloud/bigquery';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { BigQuery } from 'https://esm.sh/@google-cloud/bigquery';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
