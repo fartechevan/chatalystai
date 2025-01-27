@@ -24,15 +24,25 @@ serve(async (req) => {
       },
     }
 
-    // Log configuration (without sensitive data)
-    console.log("BigQuery configuration initialized with project:", credentials.projectId)
+    // Validate credentials before initializing BigQuery
+    if (!credentials.projectId || !credentials.credentials.client_email || !credentials.credentials.private_key) {
+      throw new Error("Missing required Google Cloud credentials");
+    }
 
-    const bigquery = new BigQuery(credentials)
+    console.log("BigQuery configuration initialized with project:", credentials.projectId);
+
+    // Initialize BigQuery with proper configuration object
+    const bigquery = new BigQuery({
+      projectId: credentials.projectId,
+      credentials: {
+        client_email: credentials.credentials.client_email,
+        private_key: credentials.credentials.private_key,
+      },
+    });
     
     // Generate a sync ID
-    const syncId = crypto.randomUUID()
-    
-    console.log(`Sync started with ID: ${syncId}`)
+    const syncId = crypto.randomUUID();
+    console.log(`Sync started with ID: ${syncId}`);
 
     // Your BigQuery sync logic here
     // For now, we'll just return success
@@ -40,7 +50,7 @@ serve(async (req) => {
       syncId,
       status: 'success',
       timestamp: new Date().toISOString()
-    }
+    };
 
     return new Response(
       JSON.stringify(data),
@@ -50,10 +60,10 @@ serve(async (req) => {
           'Content-Type': 'application/json'
         } 
       }
-    )
+    );
 
   } catch (error) {
-    console.error("Error in sync-bigquery function:", error)
+    console.error("Error in sync-bigquery function:", error);
 
     return new Response(
       JSON.stringify({ 
@@ -67,6 +77,6 @@ serve(async (req) => {
           'Content-Type': 'application/json'
         }
       }
-    )
+    );
   }
-})
+});
