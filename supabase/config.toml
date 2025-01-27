@@ -1,4 +1,1 @@
 project_id = "vezdxxqzzcjkunoaxcxc"
-
-[functions.sync-bigquery]
-verify_jwt = false

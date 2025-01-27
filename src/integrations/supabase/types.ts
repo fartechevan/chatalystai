@@ -9,33 +9,6 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      blue_ice_sync: {
-        Row: {
-          created_at: string
-          data: Json
-          error_message: string | null
-          id: string
-          last_synced_at: string | null
-          sync_status: Database["public"]["Enums"]["sync_status"] | null
-        }
-        Insert: {
-          created_at?: string
-          data?: Json
-          error_message?: string | null
-          id?: string
-          last_synced_at?: string | null
-          sync_status?: Database["public"]["Enums"]["sync_status"] | null
-        }
-        Update: {
-          created_at?: string
-          data?: Json
-          error_message?: string | null
-          id?: string
-          last_synced_at?: string | null
-          sync_status?: Database["public"]["Enums"]["sync_status"] | null
-        }
-        Relationships: []
-      }
       conversations: {
         Row: {
           created_at: string
