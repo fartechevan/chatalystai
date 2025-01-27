@@ -21,7 +21,6 @@ port = 54324
 
 [storage]
 enabled = true
-port = 54325
 
 [functions.sync-bigquery]
 verify_jwt = true
