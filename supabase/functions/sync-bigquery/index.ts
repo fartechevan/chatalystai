@@ -24,6 +24,9 @@ serve(async (req) => {
       },
     }
 
+    // Log configuration (without sensitive data)
+    console.log("BigQuery configuration initialized with project:", credentials.projectId)
+
     const bigquery = new BigQuery(credentials)
     
     // Generate a sync ID
@@ -53,7 +56,10 @@ serve(async (req) => {
     console.error("Error in sync-bigquery function:", error)
 
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ 
+        error: error.message,
+        details: error.stack
+      }),
       { 
         status: 500,
         headers: {

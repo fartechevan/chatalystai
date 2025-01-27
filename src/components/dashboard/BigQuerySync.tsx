@@ -10,9 +10,18 @@ export function BigQuerySync() {
   const handleSync = async () => {
     try {
       setIsLoading(true);
-      const { data, error } = await supabase.functions.invoke('sync-bigquery');
+      console.log("Initiating BigQuery sync...");
       
-      if (error) throw error;
+      const { data, error } = await supabase.functions.invoke('sync-bigquery', {
+        body: { timestamp: new Date().toISOString() }
+      });
+      
+      if (error) {
+        console.error('Sync error:', error);
+        throw error;
+      }
+      
+      console.log("Sync response:", data);
       
       toast({
         title: "Sync Successful",
@@ -22,7 +31,7 @@ export function BigQuerySync() {
       console.error('Sync error:', error);
       toast({
         title: "Sync Failed",
-        description: error.message,
+        description: error.message || "Failed to sync with BigQuery",
         variant: "destructive",
       });
     } finally {
