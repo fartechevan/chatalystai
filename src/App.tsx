@@ -7,6 +7,7 @@ import { LoginForm } from "./components/auth/LoginForm";
 import Dashboard from "./pages/Dashboard";
 import Main from "./pages/Main";
 import Settings from "./pages/Settings";
+import Vendor from "./pages/Vendor";
 import { AuthProvider } from "./components/auth/AuthProvider";
 import { ProtectedRoute } from "./components/auth/ProtectedRoute";
 import { SidebarProvider } from "./components/ui/sidebar";
@@ -43,6 +44,7 @@ const App = () => {
                   >
                     <Route index element={<Main />} />
                     <Route path="settings" element={<Settings />} />
+                    <Route path="vendor" element={<Vendor />} />
                   </Route>
                 </Routes>
               </BrowserRouter>
