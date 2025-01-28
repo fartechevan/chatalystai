@@ -1,26 +1,17 @@
-import { BigQuery } from '@google-cloud/bigquery';
-
-const bigquery = new BigQuery({
-  projectId: 'your-project-id', // You'll need to provide this
-  credentials: {
-    client_email: import.meta.env.VITE_GOOGLE_CLIENT_EMAIL,
-    private_key: import.meta.env.VITE_GOOGLE_PRIVATE_KEY,
-  },
-});
-
 export const fetchBlueIceLogs = async () => {
-  const query = `
-    SELECT 
-      incoming,
-      response
-    FROM \`your-project.your-dataset.blue_ice_data_logs\`
-  `;
+  const response = await fetch(
+    `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/fetch-blue-ice-logs`,
+    {
+      headers: {
+        Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`,
+      },
+    }
+  );
 
-  try {
-    const [rows] = await bigquery.query({ query });
-    return rows;
-  } catch (error) {
-    console.error('Error querying BigQuery:', error);
-    throw error;
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.message || 'Failed to fetch logs');
   }
+
+  return response.json();
 };
