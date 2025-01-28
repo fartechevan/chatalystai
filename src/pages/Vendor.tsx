@@ -7,7 +7,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { ChevronDown } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
 import {
   Table,
   TableBody,
@@ -17,9 +16,12 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useToast } from "@/components/ui/use-toast";
-import type { Database } from "@/integrations/supabase/types";
+import { fetchBlueIceLogs } from "@/utils/bigquery";
 
-type BlueIceLog = Database['public']['Tables']['blue_ice_data_logs']['Row'];
+interface BlueIceLog {
+  incoming: string | null;
+  response: string | null;
+}
 
 const Vendor = () => {
   const { toast } = useToast();
@@ -28,11 +30,11 @@ const Vendor = () => {
     queryKey: ['blueIceLogs'],
     queryFn: async () => {
       console.log('Fetching blue ice logs...');
-      const { data, error } = await supabase
-        .from('blue_ice_data_logs')
-        .select('*');
-      
-      if (error) {
+      try {
+        const data = await fetchBlueIceLogs();
+        console.log('Fetched logs:', data);
+        return data as BlueIceLog[];
+      } catch (error) {
         console.error('Error fetching logs:', error);
         toast({
           variant: "destructive",
@@ -41,9 +43,6 @@ const Vendor = () => {
         });
         throw error;
       }
-      
-      console.log('Fetched logs:', data);
-      return data;
     },
   });
 
