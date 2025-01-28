@@ -14,5 +14,5 @@ enabled = true
 port = 54323
 
 [[functions]]
-name = "sync-bigquery-data"
+[functions.sync-bigquery-data]
 verify_jwt = true

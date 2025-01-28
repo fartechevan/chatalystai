@@ -9,7 +9,10 @@ const corsHeaders = {
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
+    return new Response(null, { 
+      headers: corsHeaders,
+      status: 204
+    });
   }
 
   try {
@@ -21,9 +24,18 @@ serve(async (req) => {
       private_key: Deno.env.get('GOOGLE_PRIVATE_KEY')?.replace(/\\n/g, '\n'),
     };
 
+    if (!credentials.client_email || !credentials.private_key) {
+      throw new Error('Missing Google Cloud credentials');
+    }
+
+    const projectId = Deno.env.get('GOOGLE_PROJECT_ID');
+    if (!projectId) {
+      throw new Error('Missing GOOGLE_PROJECT_ID');
+    }
+
     const bigquery = new BigQuery({
       credentials,
-      projectId: Deno.env.get('GOOGLE_PROJECT_ID'),
+      projectId,
     });
 
     // Example query - modify this according to your needs
@@ -81,6 +93,7 @@ serve(async (req) => {
 
   } catch (error) {
     console.error('Error in BigQuery ETL process:', error);
+    
     return new Response(
       JSON.stringify({ 
         success: false, 
