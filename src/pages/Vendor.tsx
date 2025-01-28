@@ -70,7 +70,7 @@ const Vendor = () => {
               </TableRow>
             ) : logs && logs.length > 0 ? (
               logs.map((log) => (
-                <TableRow key={log.id}>
+                <TableRow key={log.incoming}>
                   <TableCell>{log.incoming}</TableCell>
                   <TableCell>{log.response}</TableCell>
                 </TableRow>
