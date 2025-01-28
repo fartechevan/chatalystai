@@ -18,10 +18,8 @@ import {
 } from "@/components/ui/table";
 
 interface BlueIceLog {
-  id: string;
   incoming: string | null;
   response: string | null;
-  created_at: string;
 }
 
 const Vendor = () => {
