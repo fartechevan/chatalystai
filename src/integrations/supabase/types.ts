@@ -9,6 +9,27 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      bigquery_etl_data: {
+        Row: {
+          created_at: string
+          data: Json
+          id: string
+          processed_at: string | null
+        }
+        Insert: {
+          created_at?: string
+          data: Json
+          id?: string
+          processed_at?: string | null
+        }
+        Update: {
+          created_at?: string
+          data?: Json
+          id?: string
+          processed_at?: string | null
+        }
+        Relationships: []
+      }
       blue_ice_data_logs: {
         Row: {
           incoming: string | null
