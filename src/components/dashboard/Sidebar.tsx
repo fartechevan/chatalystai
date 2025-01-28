@@ -1,4 +1,4 @@
-import { Home, Menu, Settings } from "lucide-react";
+import { Home, Menu, Settings, Package } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 const menuItems = [
   { title: "Main", icon: Home, path: "/dashboard" },
   { title: "Settings", icon: Settings, path: "/dashboard/settings" },
+  { title: "Vendor", icon: Package, path: "/dashboard/vendor" },
 ];
 
 export function DashboardSidebar() {
