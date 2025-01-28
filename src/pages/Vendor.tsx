@@ -17,7 +17,7 @@ export default function Vendor() {
       const { data, error } = await supabase
         .from("blue_ice_data_logs")
         .select("*")
-        .limit(100);
+        .limit(10);
 
       if (error) {
         console.error("Error:", error);
@@ -25,7 +25,6 @@ export default function Vendor() {
       } else {
         console.log("Data:", data);
         return data;
-
       }
     },
   });
