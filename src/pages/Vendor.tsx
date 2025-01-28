@@ -17,11 +17,9 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useToast } from "@/components/ui/use-toast";
+import type { Database } from "@/integrations/supabase/types";
 
-interface BlueIceLog {
-  incoming: string | null;
-  response: string | null;
-}
+type BlueIceLog = Database['public']['Tables']['blue_ice_data_logs']['Row'];
 
 const Vendor = () => {
   const { toast } = useToast();
@@ -45,7 +43,7 @@ const Vendor = () => {
       }
       
       console.log('Fetched logs:', data);
-      return data as BlueIceLog[];
+      return data;
     },
   });
 
