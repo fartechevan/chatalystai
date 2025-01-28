@@ -30,14 +30,6 @@ export default function Vendor() {
     },
   });
 
-  const { data, error } = await supabase
-  .from("blue_ice_data_logs")
-  .select("*")
-  .limit(100);
-
-
-
-
   if (isLoading) {
     return <div>Loading...</div>;
   }
