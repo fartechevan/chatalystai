@@ -9,6 +9,21 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      blue_ice_data_logs: {
+        Row: {
+          incoming: string | null
+          response: string | null
+        }
+        Insert: {
+          incoming?: string | null
+          response?: string | null
+        }
+        Update: {
+          incoming?: string | null
+          response?: string | null
+        }
+        Relationships: []
+      }
       conversations: {
         Row: {
           created_at: string
