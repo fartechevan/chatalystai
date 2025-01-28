@@ -29,7 +29,7 @@ const Vendor = () => {
     queryKey: ['blueIceLogs'],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('blue_ice_logs')
+        .from('blue_ice_data_logs')
         .select('*')
         .order('created_at', { ascending: false });
       
