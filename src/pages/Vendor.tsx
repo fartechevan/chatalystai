@@ -16,6 +16,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { useToast } from "@/components/ui/use-toast";
 
 interface BlueIceLog {
   incoming: string | null;
@@ -23,17 +24,40 @@ interface BlueIceLog {
 }
 
 const Vendor = () => {
-  const { data: logs, isLoading } = useQuery({
+  const { toast } = useToast();
+  
+  const { data: logs, isLoading, error } = useQuery({
     queryKey: ['blueIceLogs'],
     queryFn: async () => {
+      console.log('Fetching blue ice logs...');
       const { data, error } = await supabase
         .from('blue_ice_data_logs')
         .select('*');
       
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching logs:', error);
+        toast({
+          variant: "destructive",
+          title: "Error fetching logs",
+          description: error.message,
+        });
+        throw error;
+      }
+      
+      console.log('Fetched logs:', data);
       return data as BlueIceLog[];
     },
   });
+
+  if (error) {
+    return (
+      <div className="container mx-auto p-6">
+        <div className="text-red-500">
+          Error loading logs: {(error as Error).message}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="container mx-auto p-6">
@@ -69,10 +93,14 @@ const Vendor = () => {
                 </TableCell>
               </TableRow>
             ) : logs && logs.length > 0 ? (
-              logs.map((log) => (
-                <TableRow key={log.incoming}>
-                  <TableCell>{log.incoming}</TableCell>
-                  <TableCell>{log.response}</TableCell>
+              logs.map((log, index) => (
+                <TableRow key={index}>
+                  <TableCell className="max-w-[300px] truncate">
+                    {log.incoming}
+                  </TableCell>
+                  <TableCell className="max-w-[300px] truncate">
+                    {log.response}
+                  </TableCell>
                 </TableRow>
               ))
             ) : (
