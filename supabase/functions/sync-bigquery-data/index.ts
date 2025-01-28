@@ -23,7 +23,7 @@ serve(async (req) => {
 
     const bigquery = new BigQuery({
       credentials,
-      projectId: 'your-project-id', // This should be configured as an environment variable
+      projectId: Deno.env.get('GOOGLE_PROJECT_ID'),
     });
 
     // Example query - modify this according to your needs
