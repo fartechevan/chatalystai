@@ -16,12 +16,27 @@ export default function Vendor() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("blue_ice_data_logs")
-        .select("*");
+        .select("*")
+        .limit(100);
 
-      if (error) throw error;
-      return data;
+      if (error) {
+        console.error("Error:", error);
+        throw error;
+      } else {
+        console.log("Data:", data);
+        return data;
+
+      }
     },
   });
+
+  const { data, error } = await supabase
+  .from("blue_ice_data_logs")
+  .select("*")
+  .limit(100);
+
+
+
 
   if (isLoading) {
     return <div>Loading...</div>;
