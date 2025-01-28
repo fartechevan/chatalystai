@@ -17,6 +17,7 @@ export default function Vendor() {
       const { data, error } = await supabase
         .from("blue_ice_data_logs")
         .select("*");
+
       if (error) throw error;
       return data;
     },
