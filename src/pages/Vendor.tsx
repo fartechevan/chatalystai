@@ -59,7 +59,6 @@ const Vendor = () => {
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Created At</TableHead>
               <TableHead>Incoming</TableHead>
               <TableHead>Response</TableHead>
             </TableRow>
@@ -67,23 +66,20 @@ const Vendor = () => {
           <TableBody>
             {isLoading ? (
               <TableRow>
-                <TableCell colSpan={3} className="text-center">
+                <TableCell colSpan={2} className="text-center">
                   Loading...
                 </TableCell>
               </TableRow>
             ) : logs && logs.length > 0 ? (
               logs.map((log) => (
                 <TableRow key={log.id}>
-                  <TableCell>
-                    {new Date(log.created_at).toLocaleString()}
-                  </TableCell>
                   <TableCell>{log.incoming}</TableCell>
                   <TableCell>{log.response}</TableCell>
                 </TableRow>
               ))
             ) : (
               <TableRow>
-                <TableCell colSpan={3} className="text-center">
+                <TableCell colSpan={2} className="text-center">
                   No logs found
                 </TableCell>
               </TableRow>
