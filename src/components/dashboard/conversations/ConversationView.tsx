@@ -178,22 +178,24 @@ export function ConversationView() {
             <MessageSquare className="h-4 w-4" />
           </div>
 
-          <ScrollArea className="flex-1 px-6 py-4">
-            {isLoading ? (
-              <div className="flex items-center justify-center h-full">
-                <p>Loading messages...</p>
-              </div>
-            ) : !selectedConversation ? (
-              <div className="flex items-center justify-center h-full">
-                <p className="text-muted-foreground">Select a conversation to view messages.</p>
-              </div>
-            ) : (
-              <MessageList
-                messages={messages}
-                selectedConversation={selectedConversation}
-              />
-            )}
-          </ScrollArea>
+          <div className="flex-1 min-h-0">
+            <ScrollArea className="h-full px-6 py-4">
+              {isLoading ? (
+                <div className="flex items-center justify-center h-full">
+                  <p>Loading messages...</p>
+                </div>
+              ) : !selectedConversation ? (
+                <div className="flex items-center justify-center h-full">
+                  <p className="text-muted-foreground">Select a conversation to view messages.</p>
+                </div>
+              ) : (
+                <MessageList
+                  messages={messages}
+                  selectedConversation={selectedConversation}
+                />
+              )}
+            </ScrollArea>
+          </div>
 
           <MessageInput
             newMessage={newMessage}

@@ -25,7 +25,7 @@ export function ConversationLeftPanel({
   setSelectedConversation,
 }: ConversationLeftPanelProps) {
   return (
-    <div className={`${leftPanelOpen ? 'w-64' : 'w-12'} border-r bg-muted/30 transition-all duration-300 relative md:w-64`}>
+    <div className={`${leftPanelOpen ? 'w-64' : 'w-12'} border-r bg-muted/30 transition-all duration-300 relative md:w-64 flex flex-col`}>
       <button
         onClick={() => setLeftPanelOpen(!leftPanelOpen)}
         className="md:hidden absolute right-0 top-0 p-2 transform translate-x-full bg-background border rounded-r-lg"
@@ -33,7 +33,7 @@ export function ConversationLeftPanel({
         {leftPanelOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
       </button>
       
-      <div className={`${leftPanelOpen ? 'opacity-100' : 'opacity-0 md:opacity-100'} transition-opacity duration-300`}>
+      <div className={`${leftPanelOpen ? 'opacity-100' : 'opacity-0 md:opacity-100'} transition-opacity duration-300 flex flex-col h-full`}>
         <div className="p-4 border-b">
           <Input
             placeholder="Search conversations..."
@@ -42,7 +42,7 @@ export function ConversationLeftPanel({
             className="w-full"
           />
         </div>
-        <ScrollArea className="h-[calc(100vh-5rem)]">
+        <ScrollArea className="flex-1">
           <div className="space-y-2 p-4">
             {filteredConversations.map((conv) => (
               <div
