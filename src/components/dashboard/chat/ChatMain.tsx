@@ -4,12 +4,17 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { useState } from "react";
+import { Textarea } from "@/components/ui/textarea";
 
 interface ChatMainProps {
   activeChat: string | null;
 }
 
 export function ChatMain({ activeChat }: ChatMainProps) {
+  const [newMessage, setNewMessage] = useState("");
+  const [rows, setRows] = useState(1);
+
   const messages = [
     {
       id: "1",
@@ -33,6 +38,19 @@ export function ChatMain({ activeChat }: ChatMainProps) {
       avatar: ""
     }
   ];
+
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey && activeChat) {
+      e.preventDefault();
+      // Handle send message
+    }
+  };
+
+  const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setNewMessage(e.target.value);
+    const lineCount = e.target.value.split('\n').length;
+    setRows(Math.min(lineCount, 4)); // Maximum 4 rows
+  };
 
   if (!activeChat) {
     return (
@@ -69,11 +87,18 @@ export function ChatMain({ activeChat }: ChatMainProps) {
       </ScrollArea>
       <div className="border-t p-4">
         <div className="flex items-center space-x-2">
-          <Input placeholder="Write your message..." className="flex-1" />
+          <Textarea
+            placeholder="Write your message..."
+            className="flex-1 min-h-[40px] max-h-[120px] resize-none"
+            value={newMessage}
+            onChange={handleChange}
+            onKeyPress={handleKeyPress}
+            rows={rows}
+          />
           <Button size="icon" variant="ghost">
             <Smile className="h-5 w-5" />
           </Button>
-          <Button size="icon">
+          <Button size="icon" disabled={!newMessage.trim()}>
             <Send className="h-5 w-5" />
           </Button>
         </div>
