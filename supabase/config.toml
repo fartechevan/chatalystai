@@ -21,3 +21,7 @@ verify_jwt = true
 [[functions]]
 name = "analyze-sentiment"
 verify_jwt = false
+
+[[functions]]
+name = "summarize-conversation"
+verify_jwt = false
