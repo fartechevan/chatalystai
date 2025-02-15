@@ -52,7 +52,7 @@ export function ConversationView() {
     },
   });
 
-  const { data: messages = [] } = useQuery({
+  const { data: messages = [], refetch: refetchMessages } = useQuery({
     queryKey: ['messages', selectedConversation?.conversation_id],
     queryFn: async () => {
       if (!selectedConversation) return [];
@@ -94,8 +94,13 @@ export function ConversationView() {
       if (error) throw error;
       return data;
     },
-     onSuccess: () => {
-      setNewMessage("")
+    onSuccess: async () => {
+      setNewMessage("");
+      // Immediately refetch messages after sending
+      await refetchMessages();
+      // Also update the conversations list to reflect the latest message
+      queryClient.invalidateQueries({ queryKey: ['conversations'] });
+      toast.success("Message sent successfully");
     },
     onError: (error) => {
       toast.error("Failed to send message");
