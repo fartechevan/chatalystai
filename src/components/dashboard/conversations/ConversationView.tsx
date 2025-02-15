@@ -204,6 +204,7 @@ export function ConversationView() {
             setNewMessage={setNewMessage}
             handleSendMessage={handleSendMessage}
             isLoading={sendMessageMutation.isPending}
+            selectedConversation={!!selectedConversation}
           />
 
           {selectedConversation && (
