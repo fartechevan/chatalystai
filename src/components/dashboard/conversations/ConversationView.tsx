@@ -142,7 +142,6 @@ export function ConversationView({ date, onClose }: ConversationViewProps) {
                     onClick={() => setSelectedConversation(conv)}
                   >
                     <Avatar className="h-10 w-10">
-                      <AvatarImage src="/placeholder.svg" />
                       <AvatarFallback>
                         {conv.profile?.name?.[0] || conv.profile?.email[0].toUpperCase() || 'U'}
                       </AvatarFallback>
