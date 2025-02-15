@@ -1,7 +1,5 @@
-
-import { X, MessageSquare } from "lucide-react";
+import { MessageSquare } from "lucide-react";
 import { useState, useEffect } from "react";
-import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -12,12 +10,7 @@ import { MessageList } from "./MessageList";
 import { MessageInput } from "./MessageInput";
 import { ConversationRightPanel } from "./ConversationRightPanel";
 
-interface ConversationViewProps {
-  date: string;
-  onClose: () => void;
-}
-
-export function ConversationView({ date, onClose }: ConversationViewProps) {
+export function ConversationView() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
   const [leftPanelOpen, setLeftPanelOpen] = useState(true);
@@ -167,7 +160,7 @@ export function ConversationView({ date, onClose }: ConversationViewProps) {
   };
 
   return (
-    <div className="fixed inset-0 z-50 bg-background">
+    <div className="h-full">
       <div className="flex h-full">
         <ConversationLeftPanel
           leftPanelOpen={leftPanelOpen}
@@ -180,14 +173,9 @@ export function ConversationView({ date, onClose }: ConversationViewProps) {
         />
 
         <div className="flex-1 flex flex-col">
-          <div className="flex items-center justify-between border-b px-6 py-4">
-            <div className="flex items-center gap-4">
-              <h2 className="text-xl font-semibold">Chat</h2>
-              <MessageSquare className="h-4 w-4" />
-            </div>
-            <Button variant="ghost" size="icon" onClick={onClose}>
-              <X className="h-5 w-5" />
-            </Button>
+          <div className="flex items-center gap-4 border-b px-6 py-4">
+            <h2 className="text-xl font-semibold">Chat</h2>
+            <MessageSquare className="h-4 w-4" />
           </div>
 
           <ScrollArea className="flex-1 px-6 py-4">

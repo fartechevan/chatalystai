@@ -1,3 +1,4 @@
+
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -11,6 +12,7 @@ import Vendor from "./pages/Vendor";
 import { AuthProvider } from "./components/auth/AuthProvider";
 import { ProtectedRoute } from "./components/auth/ProtectedRoute";
 import { SidebarProvider } from "./components/ui/sidebar";
+import { ConversationView } from "./components/dashboard/conversations/ConversationView";
 
 const App = () => {
   const queryClient = new QueryClient({
@@ -45,6 +47,7 @@ const App = () => {
                     <Route index element={<Main />} />
                     <Route path="settings" element={<Settings />} />
                     <Route path="vendor" element={<Vendor />} />
+                    <Route path="conversations" element={<ConversationView date="" onClose={() => {}} />} />
                   </Route>
                 </Routes>
               </BrowserRouter>
