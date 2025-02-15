@@ -2,7 +2,7 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts"
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 
-const difyApiKey = Deno.env.get('DIFY_API_KEY')
+const openAIApiKey = Deno.env.get('OPENAI_API_KEY')
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -21,27 +21,35 @@ serve(async (req) => {
       content: msg.content
     }))
 
-    const conversationText = formattedMessages
-      .map((msg: any) => `${msg.role}: ${msg.content}`)
-      .join('\n')
-
-    const response = await fetch('https://api.dify.ai/v1/completion-messages', {
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${difyApiKey}`,
+        'Authorization': `Bearer ${openAIApiKey}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        query: `Please summarize this conversation:\n${conversationText}`,
-        response_mode: "blocking",
-        user: "user-1"
+        model: 'gpt-4o-mini',
+        messages: [
+          {
+            role: 'system',
+            content: 'You are a helpful assistant that summarizes conversations. Keep summaries concise and highlight key points.'
+          },
+          {
+            role: 'user',
+            content: `Please summarize this conversation:\n${formattedMessages.map(m => `${m.role}: ${m.content}`).join('\n')}`
+          }
+        ],
       }),
     })
 
     const data = await response.json()
-    console.log('Dify API response:', data)
+    console.log('OpenAI API response:', data)
 
-    return new Response(JSON.stringify({ summary: data.answer }), {
+    if (!data.choices?.[0]?.message?.content) {
+      throw new Error('Invalid response from OpenAI')
+    }
+
+    return new Response(JSON.stringify({ summary: data.choices[0].message.content }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     })
   } catch (error) {

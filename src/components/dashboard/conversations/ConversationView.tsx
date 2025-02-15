@@ -1,3 +1,4 @@
+
 import { MessageSquare, FileText } from "lucide-react";
 import { useState, useEffect } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -17,6 +18,7 @@ export function ConversationView() {
   const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
   const [leftPanelOpen, setLeftPanelOpen] = useState(true);
   const [newMessage, setNewMessage] = useState("");
+  const [summary, setSummary] = useState<string | null>(null);
   const queryClient = useQueryClient();
 
   useEffect(() => {
@@ -162,8 +164,8 @@ export function ConversationView() {
     },
     onSuccess: (summary) => {
       if (summary) {
+        setSummary(summary);
         toast.success("Conversation summarized");
-        console.log("Summary:", summary);
       }
     },
     onError: (error) => {
@@ -238,7 +240,7 @@ export function ConversationView() {
           {selectedConversation && (
             <>
               <div className="border-t bg-muted/30 backdrop-blur-sm p-6">
-                <div className="max-w-5xl mx-auto">
+                <div className="max-w-5xl mx-auto space-y-4">
                   <Button 
                     variant="outline" 
                     size="sm"
@@ -249,6 +251,13 @@ export function ConversationView() {
                     <FileText className="h-4 w-4" />
                     {summarizeMutation.isPending ? "Summarizing..." : "Summarize"}
                   </Button>
+                  
+                  {summary && (
+                    <div className="rounded-lg bg-muted p-4">
+                      <h4 className="text-sm font-medium mb-2">Summary</h4>
+                      <p className="text-sm text-muted-foreground">{summary}</p>
+                    </div>
+                  )}
                 </div>
               </div>
               <Separator />
