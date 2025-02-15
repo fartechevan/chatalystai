@@ -47,7 +47,7 @@ const App = () => {
                     <Route index element={<Main />} />
                     <Route path="settings" element={<Settings />} />
                     <Route path="vendor" element={<Vendor />} />
-                    <Route path="conversations" element={<ConversationView date="" onClose={() => {}} />} />
+                    <Route path="conversations" element={<ConversationView />} />
                   </Route>
                 </Routes>
               </BrowserRouter>

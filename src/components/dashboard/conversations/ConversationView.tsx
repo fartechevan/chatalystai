@@ -160,7 +160,7 @@ export function ConversationView() {
   };
 
   return (
-    <div className="h-full flex flex-col">
+    <div className="h-full flex flex-col relative">
       <div className="flex-1 flex min-h-0">
         <ConversationLeftPanel
           leftPanelOpen={leftPanelOpen}
@@ -205,7 +205,7 @@ export function ConversationView() {
       </div>
 
       {selectedConversation && (
-        <div className="border-t bg-muted/30 p-6">
+        <div className="sticky bottom-0 left-0 right-0 border-t bg-muted/30 backdrop-blur-sm p-6">
           <div className="max-w-5xl mx-auto">
             <h3 className="font-medium mb-4">User Details</h3>
             <div className="flex items-start gap-6">
