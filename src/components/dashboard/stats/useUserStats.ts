@@ -1,117 +1,92 @@
-import { supabase } from "@/integrations/supabase/client";
+
 import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 
-type UserStatsType = {
-  activeMonthly: number;
-  activeWeekly: number;
-  newUsers: number;
-  newUserDetails: Array<{
-    id: string;
-    created_at: string;
-    email: string;
-    name: string | null;
-  }>;
-  totalPages: number;
-};
+export function useUserStats() {
+  const { data: userData } = useQuery({
+    queryKey: ["auth-user"],
+    queryFn: async () => {
+      const { data } = await supabase.auth.getUser();
+      return data.user;
+    },
+  });
 
-async function fetchUserStats(
-  searchEmail?: string,
-  page: number = 1,
-  filterByMonth: boolean = false
-): Promise<UserStatsType> {
-  const itemsPerPage = 10;
-  const startIndex = (page - 1) * itemsPerPage;
+  const { data: currentMonth } = useQuery({
+    queryKey: ["current-month"],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("get_current_month");
+      if (error) throw error;
+      return data[0];
+    },
+  });
 
-  // Get total user count
-  const { count: totalUsers, error: totalUsersError } = await supabase
-    .from("profiles")
-    .select("*", { count: "exact", head: true });
+  const { data: currentWeek } = useQuery({
+    queryKey: ["current-week"],
+    queryFn: async () => {
+      const { data, error } = await supabase.rpc("get_current_week");
+      if (error) throw error;
+      return data[0];
+    },
+  });
 
-  if (totalUsersError) {
-    console.error("Error fetching total users:", totalUsersError);
-    throw totalUsersError;
-  }
+  const { data: monthlyConversations = [] } = useQuery({
+    queryKey: ["monthly-conversations", currentMonth?.month_number],
+    queryFn: async () => {
+      if (!userData?.id || !currentMonth) return [];
 
-  console.log("Total users:", totalUsers);
+      const startDate = new Date();
+      startDate.setDate(1);
+      startDate.setHours(0, 0, 0, 0);
 
-  // Fetch monthly active users
-  const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString();
-  const endOfMonth = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0, 23, 59, 59).toISOString();
+      const endDate = new Date();
+      endDate.setMonth(endDate.getMonth() + 1);
+      endDate.setDate(0);
+      endDate.setHours(23, 59, 59, 999);
 
-  const { data: monthlyUsers, error: monthlyError } = await supabase
-    .from("conversations")
-    .select("user_id")
-    .gte("created_at", startOfMonth)
-    .lte("created_at", endOfMonth);
+      const { data, error } = await supabase
+        .from("conversations")
+        .select("*")
+        .or(`sender_id.eq.${userData.id},receiver_id.eq.${userData.id}`)
+        .gte("created_at", startDate.toISOString())
+        .lte("created_at", endDate.toISOString());
 
-  if (monthlyError) {
-    console.error("Error fetching monthly users:", monthlyError);
-    throw monthlyError;
-  }
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!userData?.id && !!currentMonth,
+  });
 
-  console.log("Monthly users data:", monthlyUsers);
+  const { data: weeklyConversations = [] } = useQuery({
+    queryKey: ["weekly-conversations", currentWeek?.week_of_month],
+    queryFn: async () => {
+      if (!userData?.id || !currentWeek) return [];
 
-  const uniqueMonthlyUserIds = new Set(monthlyUsers?.map((user) => user.user_id).filter(Boolean) || []);
-  const uniqueMonthlyUserCount = uniqueMonthlyUserIds.size;
+      const today = new Date();
+      const startOfWeek = new Date(today);
+      startOfWeek.setDate(today.getDate() - today.getDay());
+      startOfWeek.setHours(0, 0, 0, 0);
 
-  console.log("Unique monthly users:", uniqueMonthlyUserCount);
+      const endOfWeek = new Date(today);
+      endOfWeek.setDate(today.getDate() + (6 - today.getDay()));
+      endOfWeek.setHours(23, 59, 59, 999);
 
-  // Fetch weekly active users
-  const startOfWeek = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
-  const { data: weeklyUsers, error: weeklyError } = await supabase
-    .from("conversations")
-    .select("user_id")
-    .gte("created_at", startOfWeek);
+      const { data, error } = await supabase
+        .from("conversations")
+        .select("*")
+        .or(`sender_id.eq.${userData.id},receiver_id.eq.${userData.id}`)
+        .gte("created_at", startOfWeek.toISOString())
+        .lte("created_at", endOfWeek.toISOString());
 
-  if (weeklyError) {
-    console.error("Error fetching weekly users:", weeklyError);
-    throw weeklyError;
-  }
-
-  console.log("Weekly users data:", weeklyUsers);
-
-  const uniqueWeeklyUserIds = new Set(weeklyUsers?.map((user) => user.user_id).filter(Boolean) || []);
-  const uniqueWeeklyUserCount = uniqueWeeklyUserIds.size;
-
-  console.log("Unique weekly users:", uniqueWeeklyUserCount);
-
-  // Fetch users based on search criteria
-  let query = supabase
-    .from("profiles")
-    .select("id, created_at, email, name", { count: "exact" });
-
-  if (searchEmail) {
-    query = query.ilike("email", `%${searchEmail}%`);
-  }
-
-  if (filterByMonth) {
-    query = query.gte("created_at", startOfMonth);
-  }
-
-  // Add pagination
-  const { data: newUsers, count, error: newUsersError } = await query
-    .range(startIndex, startIndex + itemsPerPage - 1);
-
-  if (newUsersError) {
-    console.error("Error fetching new users:", newUsersError);
-    throw newUsersError;
-  }
-
-  const totalPages = count ? Math.ceil(count / itemsPerPage) : 1;
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!userData?.id && !!currentWeek,
+  });
 
   return {
-    activeMonthly: uniqueMonthlyUserCount,
-    activeWeekly: uniqueWeeklyUserCount,
-    newUsers: totalUsers || 0,
-    newUserDetails: newUsers || [],
-    totalPages,
+    monthlyConversations,
+    weeklyConversations,
+    currentMonth,
+    currentWeek,
   };
-}
-
-export function useUserStats(searchEmail: string, currentPage: number, filterByMonth: boolean) {
-  return useQuery({
-    queryKey: ["userStats", searchEmail, currentPage, filterByMonth],
-    queryFn: () => fetchUserStats(searchEmail, currentPage, filterByMonth),
-    refetchInterval: 30000, // Refetch every 30 seconds
-  });
 }

@@ -1,14 +1,16 @@
 
-import { X, MessageSquare, Send, Smile, Menu } from "lucide-react";
+import { X, MessageSquare } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import type { Profile, Message, Conversation } from "./types";
+import type { Conversation } from "./types";
 import { toast } from "sonner";
+import { ConversationLeftPanel } from "./ConversationLeftPanel";
+import { MessageList } from "./MessageList";
+import { MessageInput } from "./MessageInput";
+import { ConversationRightPanel } from "./ConversationRightPanel";
 
 interface ConversationViewProps {
   date: string;
@@ -68,7 +70,7 @@ export function ConversationView({ date, onClose }: ConversationViewProps) {
         .order('created_at', { ascending: true });
 
       if (error) throw error;
-      return data as Message[];
+      return data;
     },
     enabled: !!selectedConversation,
   });
@@ -119,52 +121,15 @@ export function ConversationView({ date, onClose }: ConversationViewProps) {
   return (
     <div className="fixed inset-0 z-50 bg-background">
       <div className="flex h-full">
-        <div className={`${leftPanelOpen ? 'w-64' : 'w-12'} border-r bg-muted/30 transition-all duration-300 relative md:w-64`}>
-          <button
-            onClick={() => setLeftPanelOpen(!leftPanelOpen)}
-            className="md:hidden absolute right-0 top-0 p-2 transform translate-x-full bg-background border rounded-r-lg"
-          >
-            {leftPanelOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
-          </button>
-          
-          <div className={`${leftPanelOpen ? 'opacity-100' : 'opacity-0 md:opacity-100'} transition-opacity duration-300`}>
-            <div className="p-4 border-b">
-              <Input
-                placeholder="Search conversations..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full"
-              />
-            </div>
-            <ScrollArea className="h-[calc(100vh-5rem)]">
-              <div className="space-y-2 p-4">
-                {filteredConversations.map((conv) => (
-                  <div
-                    key={conv.conversation_id}
-                    className={`flex items-center gap-3 p-2 rounded-lg hover:bg-muted cursor-pointer ${
-                      selectedConversation?.conversation_id === conv.conversation_id ? 'bg-muted' : ''
-                    }`}
-                    onClick={() => setSelectedConversation(conv)}
-                  >
-                    <Avatar className="h-10 w-10">
-                      <AvatarFallback>
-                        {conv.sender.name?.[0] || conv.sender.email[0].toUpperCase()}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">
-                        {conv.sender.name || conv.sender.email}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {new Date(conv.updated_at).toLocaleTimeString()}
-                      </p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </ScrollArea>
-          </div>
-        </div>
+        <ConversationLeftPanel
+          leftPanelOpen={leftPanelOpen}
+          setLeftPanelOpen={setLeftPanelOpen}
+          searchQuery={searchQuery}
+          setSearchQuery={setSearchQuery}
+          filteredConversations={filteredConversations}
+          selectedConversation={selectedConversation}
+          setSelectedConversation={setSelectedConversation}
+        />
 
         <div className="flex-1 flex flex-col">
           <div className="flex items-center justify-between border-b px-6 py-4">
@@ -187,130 +152,27 @@ export function ConversationView({ date, onClose }: ConversationViewProps) {
                 <p className="text-muted-foreground">Select a conversation to view messages.</p>
               </div>
             ) : (
-              <div className="space-y-4">
-                {messages.map((message) => (
-                  <div
-                    key={message.message_id}
-                    className={`flex ${
-                      message.sender_id === selectedConversation.sender_id ? "justify-end" : "justify-start"
-                    }`}
-                  >
-                    <div
-                      className={`flex max-w-[70%] items-start gap-2 ${
-                        message.sender_id === selectedConversation.sender_id ? "flex-row-reverse" : "flex-row"
-                      }`}
-                    >
-                      <Avatar className="h-8 w-8">
-                        <AvatarFallback>
-                          {message.sender_id === selectedConversation.sender_id 
-                            ? (selectedConversation.sender.name?.[0] || selectedConversation.sender.email[0].toUpperCase())
-                            : (selectedConversation.receiver.name?.[0] || selectedConversation.receiver.email[0].toUpperCase())}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div>
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="text-sm font-medium">
-                            {message.sender_id === selectedConversation.sender_id 
-                              ? (selectedConversation.sender.name || selectedConversation.sender.email)
-                              : (selectedConversation.receiver.name || selectedConversation.receiver.email)}
-                          </span>
-                          <span className="text-xs text-muted-foreground">
-                            {new Date(message.created_at).toLocaleTimeString([], {
-                              hour: "numeric",
-                              minute: "2-digit",
-                            })}
-                          </span>
-                        </div>
-                        <div
-                          className={`rounded-lg p-3 ${
-                            message.sender_id === selectedConversation.sender_id
-                              ? "bg-primary text-primary-foreground"
-                              : "bg-muted"
-                          }`}
-                        >
-                          <p className="text-sm">{message.content}</p>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
+              <MessageList
+                messages={messages}
+                selectedConversation={selectedConversation}
+              />
             )}
           </ScrollArea>
 
-          <div className="border-t p-4">
-            <div className="flex items-center gap-2">
-              <Input 
-                placeholder="Write your message..." 
-                className="flex-1"
-                value={newMessage}
-                onChange={(e) => setNewMessage(e.target.value)}
-                onKeyPress={(e) => {
-                  if (e.key === 'Enter') {
-                    handleSendMessage();
-                  }
-                }}
-              />
-              <Button size="icon" variant="ghost">
-                <Smile className="h-5 w-5" />
-              </Button>
-              <Button 
-                size="icon"
-                onClick={handleSendMessage}
-                disabled={!newMessage.trim() || sendMessageMutation.isPending}
-              >
-                <Send className="h-5 w-5" />
-              </Button>
-            </div>
-          </div>
+          <MessageInput
+            newMessage={newMessage}
+            setNewMessage={setNewMessage}
+            handleSendMessage={handleSendMessage}
+            isLoading={sendMessageMutation.isPending}
+          />
         </div>
 
-        <div className={`${rightPanelOpen ? 'w-64' : 'w-12'} border-l bg-muted/30 transition-all duration-300 relative md:w-64`}>
-          <button
-            onClick={() => setRightPanelOpen(!rightPanelOpen)}
-            className="md:hidden absolute left-0 top-0 p-2 transform -translate-x-full bg-background border rounded-l-lg"
-          >
-            {rightPanelOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
-          </button>
-          
-          <div className={`${rightPanelOpen ? 'opacity-100' : 'opacity-0 md:opacity-100'} transition-opacity duration-300`}>
-            <div className="p-4 border-b">
-              <h3 className="font-medium">User Details</h3>
-            </div>
-            <ScrollArea className="h-[calc(100vh-5rem)]">
-              <div className="space-y-4 p-4">
-                {selectedConversation && (
-                  <div className="space-y-6">
-                    <div className="flex items-center gap-3">
-                      <Avatar className="h-16 w-16">
-                        <AvatarFallback>
-                          {selectedConversation.receiver.name?.[0] || 
-                           selectedConversation.receiver.email[0].toUpperCase()}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div>
-                        <p className="font-medium">
-                          {selectedConversation.receiver.name || 
-                           selectedConversation.receiver.email}
-                        </p>
-                        <p className="text-sm text-muted-foreground">
-                          {selectedConversation.receiver.email}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="space-y-2">
-                      <h4 className="text-sm font-medium">Chat Info</h4>
-                      <div className="text-sm">
-                        <p>Started: {new Date(selectedConversation.created_at).toLocaleString()}</p>
-                        <p>Messages: {messages.length}</p>
-                      </div>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </ScrollArea>
-          </div>
-        </div>
+        <ConversationRightPanel
+          rightPanelOpen={rightPanelOpen}
+          setRightPanelOpen={setRightPanelOpen}
+          selectedConversation={selectedConversation}
+          messages={messages}
+        />
       </div>
     </div>
   );
