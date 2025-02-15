@@ -1,3 +1,4 @@
+
 import { Send, Smile } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -51,7 +52,6 @@ export function ChatMain({ activeChat }: ChatMainProps) {
           {messages.map((message) => (
             <div key={message.id} className="flex items-start space-x-3">
               <Avatar className="h-8 w-8">
-                <AvatarImage src={message.avatar || "/placeholder.svg"} />
                 <AvatarFallback>{message.sender[0]}</AvatarFallback>
               </Avatar>
               <div>

@@ -127,6 +127,24 @@ export type Database = {
           },
         ]
       }
+      User_info: {
+        Row: {
+          attrs: Json | null
+          created_at: string | null
+          name: string | null
+        }
+        Insert: {
+          attrs?: Json | null
+          created_at?: string | null
+          name?: string | null
+        }
+        Update: {
+          attrs?: Json | null
+          created_at?: string | null
+          name?: string | null
+        }
+        Relationships: []
+      }
       user_roles: {
         Row: {
           created_at: string

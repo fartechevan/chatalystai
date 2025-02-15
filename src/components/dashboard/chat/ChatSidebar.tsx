@@ -1,3 +1,4 @@
+
 import { Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -38,7 +39,7 @@ export function ChatSidebar({ onChatSelect }: ChatSidebarProps) {
         <div className="flex items-center space-x-4">
           <Avatar className="h-10 w-10">
             <AvatarImage src="/placeholder.svg" />
-            <AvatarFallback>JA</AvatarFallback>
+            <AvatarFallback>J</AvatarFallback>
           </Avatar>
           <div>
             <p className="text-sm font-medium">Jontray Arnold</p>
@@ -59,7 +60,6 @@ export function ChatSidebar({ onChatSelect }: ChatSidebarProps) {
               onClick={() => onChatSelect(chat.id)}
             >
               <Avatar className="h-10 w-10">
-                <AvatarImage src={chat.avatar || "/placeholder.svg"} />
                 <AvatarFallback>{chat.name[0]}</AvatarFallback>
               </Avatar>
               <div className="flex-1 overflow-hidden">
