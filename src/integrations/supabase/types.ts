@@ -47,30 +47,79 @@ export type Database = {
       }
       conversations: {
         Row: {
+          conversation_id: string
           created_at: string
-          id: string
-          messages: Json
-          session_id: string
-          user_id: string
+          receiver_id: string
+          sender_id: string
+          updated_at: string
         }
         Insert: {
+          conversation_id?: string
           created_at?: string
-          id?: string
-          messages?: Json
-          session_id: string
-          user_id: string
+          receiver_id: string
+          sender_id: string
+          updated_at?: string
         }
         Update: {
+          conversation_id?: string
           created_at?: string
-          id?: string
-          messages?: Json
-          session_id?: string
-          user_id?: string
+          receiver_id?: string
+          sender_id?: string
+          updated_at?: string
         }
         Relationships: [
           {
-            foreignKeyName: "conversations_user_id_fkey"
-            columns: ["user_id"]
+            foreignKeyName: "conversations_receiver_id_fkey"
+            columns: ["receiver_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversations_sender_id_fkey"
+            columns: ["sender_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      messages: {
+        Row: {
+          content: string
+          conversation_id: string
+          created_at: string
+          is_read: boolean
+          message_id: string
+          sender_id: string
+        }
+        Insert: {
+          content: string
+          conversation_id: string
+          created_at?: string
+          is_read?: boolean
+          message_id?: string
+          sender_id: string
+        }
+        Update: {
+          content?: string
+          conversation_id?: string
+          created_at?: string
+          is_read?: boolean
+          message_id?: string
+          sender_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "messages_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["conversation_id"]
+          },
+          {
+            foreignKeyName: "messages_sender_id_fkey"
+            columns: ["sender_id"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
@@ -97,35 +146,6 @@ export type Database = {
           name?: string | null
         }
         Relationships: []
-      }
-      sentiment_analysis: {
-        Row: {
-          conversation_id: string
-          created_at: string
-          id: string
-          sentiment: Database["public"]["Enums"]["sentiment_level"] | null
-        }
-        Insert: {
-          conversation_id: string
-          created_at?: string
-          id?: string
-          sentiment?: Database["public"]["Enums"]["sentiment_level"] | null
-        }
-        Update: {
-          conversation_id?: string
-          created_at?: string
-          id?: string
-          sentiment?: Database["public"]["Enums"]["sentiment_level"] | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "sentiment_analysis_conversation_id_fkey"
-            columns: ["conversation_id"]
-            isOneToOne: true
-            referencedRelation: "conversations"
-            referencedColumns: ["id"]
-          },
-        ]
       }
       User_info: {
         Row: {

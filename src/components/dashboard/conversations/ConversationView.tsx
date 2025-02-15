@@ -1,33 +1,14 @@
+
 import { X, MessageSquare, Send, Smile, Menu } from "lucide-react";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Json } from "@/integrations/supabase/types";
-import { SentimentScore } from "./SentimentScore";
-
-interface Profile {
-  name: string | null;
-  email: string;
-}
-
-interface ConversationMessage {
-  sender: "user" | "bot";
-  content: string;
-  timestamp: string;
-}
-
-interface ConversationWithProfile {
-  id: string;
-  user_id: string;
-  session_id: string;
-  created_at: string;
-  messages: ConversationMessage[];
-  profile: Profile | null;
-}
+import type { Profile, Message, Conversation } from "./types";
+import { toast } from "sonner";
 
 interface ConversationViewProps {
   date: string;
@@ -36,9 +17,11 @@ interface ConversationViewProps {
 
 export function ConversationView({ date, onClose }: ConversationViewProps) {
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedConversation, setSelectedConversation] = useState<ConversationWithProfile | null>(null);
+  const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
   const [leftPanelOpen, setLeftPanelOpen] = useState(true);
   const [rightPanelOpen, setRightPanelOpen] = useState(true);
+  const [newMessage, setNewMessage] = useState("");
+  const queryClient = useQueryClient();
 
   const { data: conversations = [], isLoading } = useQuery({
     queryKey: ['conversations', date],
@@ -50,63 +33,88 @@ export function ConversationView({ date, onClose }: ConversationViewProps) {
       const endOfDay = new Date(selectedDate);
       endOfDay.setHours(23, 59, 59, 999);
 
-      console.log('Fetching conversations for date:', {
-        date,
-        startOfDay: startOfDay.toISOString(),
-        endOfDay: endOfDay.toISOString()
-      });
+      const { data: userData } = await supabase.auth.getUser();
+      if (!userData.user) throw new Error('Not authenticated');
 
       const { data, error } = await supabase
         .from('conversations')
-        .select('*, profiles(name, email)')
+        .select(`
+          conversation_id,
+          sender_id,
+          receiver_id,
+          created_at,
+          updated_at,
+          sender:profiles!conversations_sender_id_fkey(id, name, email),
+          receiver:profiles!conversations_receiver_id_fkey(id, name, email)
+        `)
         .gte('created_at', startOfDay.toISOString())
-        .lte('created_at', endOfDay.toISOString());
+        .lte('created_at', endOfDay.toISOString())
+        .or(`sender_id.eq.${userData.user.id},receiver_id.eq.${userData.user.id}`);
 
-      if (error) {
-        console.error('Error fetching conversations:', error);
-        throw error;
-      }
-
-      return data.map(conv => ({
-        id: conv.id,
-        user_id: conv.user_id,
-        session_id: conv.session_id,
-        created_at: conv.created_at,
-        messages: (conv.messages as Json[] as unknown) as ConversationMessage[],
-        profile: conv.profiles as Profile | null,
-      }));
+      if (error) throw error;
+      return data as Conversation[];
     },
   });
 
-  const { data: sentimentData } = useQuery({
-    queryKey: ['sentiment', selectedConversation?.id],
+  const { data: messages = [] } = useQuery({
+    queryKey: ['messages', selectedConversation?.conversation_id],
     queryFn: async () => {
-      if (!selectedConversation) return null;
+      if (!selectedConversation) return [];
       
       const { data, error } = await supabase
-        .from('sentiment_analysis')
-        .select('sentiment')
-        .eq('conversation_id', selectedConversation.id)
-        .maybeSingle();
+        .from('messages')
+        .select('*')
+        .eq('conversation_id', selectedConversation.conversation_id)
+        .order('created_at', { ascending: true });
 
-      if (error) {
-        console.error('Error fetching sentiment:', error);
-        return null;
-      }
-
-      return data;
+      if (error) throw error;
+      return data as Message[];
     },
     enabled: !!selectedConversation,
+  });
+
+  const sendMessageMutation = useMutation({
+    mutationFn: async (content: string) => {
+      const { data: userData } = await supabase.auth.getUser();
+      if (!userData.user || !selectedConversation) throw new Error('Not authenticated or no conversation selected');
+
+      const { data, error } = await supabase
+        .from('messages')
+        .insert([{
+          conversation_id: selectedConversation.conversation_id,
+          sender_id: userData.user.id,
+          content
+        }])
+        .select()
+        .single();
+
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: () => {
+      setNewMessage("");
+      queryClient.invalidateQueries({ queryKey: ['messages', selectedConversation?.conversation_id] });
+    },
+    onError: (error) => {
+      toast.error("Failed to send message");
+      console.error('Error sending message:', error);
+    }
   });
 
   const filteredConversations = conversations.filter(conv => {
     const searchLower = searchQuery.toLowerCase();
     return (
-      conv.profile?.name?.toLowerCase().includes(searchLower) ||
-      conv.profile?.email.toLowerCase().includes(searchLower) ||
-      conv.session_id.toLowerCase().includes(searchLower)
+      conv.sender.name?.toLowerCase().includes(searchLower) ||
+      conv.sender.email.toLowerCase().includes(searchLower) ||
+      conv.receiver.name?.toLowerCase().includes(searchLower) ||
+      conv.receiver.email.toLowerCase().includes(searchLower)
     );
   });
+
+  const handleSendMessage = () => {
+    if (!newMessage.trim()) return;
+    sendMessageMutation.mutate(newMessage.trim());
+  };
 
   return (
     <div className="fixed inset-0 z-50 bg-background">
@@ -122,7 +130,7 @@ export function ConversationView({ date, onClose }: ConversationViewProps) {
           <div className={`${leftPanelOpen ? 'opacity-100' : 'opacity-0 md:opacity-100'} transition-opacity duration-300`}>
             <div className="p-4 border-b">
               <Input
-                placeholder="Search by name, email or session..."
+                placeholder="Search conversations..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full"
@@ -132,23 +140,23 @@ export function ConversationView({ date, onClose }: ConversationViewProps) {
               <div className="space-y-2 p-4">
                 {filteredConversations.map((conv) => (
                   <div
-                    key={conv.id}
+                    key={conv.conversation_id}
                     className={`flex items-center gap-3 p-2 rounded-lg hover:bg-muted cursor-pointer ${
-                      selectedConversation?.id === conv.id ? 'bg-muted' : ''
+                      selectedConversation?.conversation_id === conv.conversation_id ? 'bg-muted' : ''
                     }`}
                     onClick={() => setSelectedConversation(conv)}
                   >
                     <Avatar className="h-10 w-10">
                       <AvatarFallback>
-                        {conv.profile?.name?.[0] || conv.profile?.email[0].toUpperCase() || 'U'}
+                        {conv.sender.name?.[0] || conv.sender.email[0].toUpperCase()}
                       </AvatarFallback>
                     </Avatar>
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium truncate">
-                        {conv.profile?.name || conv.profile?.email || `User ${conv.session_id}`}
+                        {conv.sender.name || conv.sender.email}
                       </p>
                       <p className="text-xs text-muted-foreground">
-                        {new Date(conv.created_at).toLocaleTimeString()}
+                        {new Date(conv.updated_at).toLocaleTimeString()}
                       </p>
                     </div>
                   </div>
@@ -180,39 +188,34 @@ export function ConversationView({ date, onClose }: ConversationViewProps) {
               </div>
             ) : (
               <div className="space-y-4">
-                {selectedConversation.messages.map((message, index) => (
+                {messages.map((message) => (
                   <div
-                    key={index}
+                    key={message.message_id}
                     className={`flex ${
-                      message.sender === "user" ? "justify-end" : "justify-start"
+                      message.sender_id === selectedConversation.sender_id ? "justify-end" : "justify-start"
                     }`}
                   >
                     <div
                       className={`flex max-w-[70%] items-start gap-2 ${
-                        message.sender === "user" ? "flex-row-reverse" : "flex-row"
+                        message.sender_id === selectedConversation.sender_id ? "flex-row-reverse" : "flex-row"
                       }`}
                     >
                       <Avatar className="h-8 w-8">
                         <AvatarFallback>
-                          {message.sender === "user" ? 
-                            (selectedConversation.profile?.name?.[0] || 
-                             selectedConversation.profile?.email[0].toUpperCase() || 'U') : 
-                            'A'
-                          }
+                          {message.sender_id === selectedConversation.sender_id 
+                            ? (selectedConversation.sender.name?.[0] || selectedConversation.sender.email[0].toUpperCase())
+                            : (selectedConversation.receiver.name?.[0] || selectedConversation.receiver.email[0].toUpperCase())}
                         </AvatarFallback>
                       </Avatar>
                       <div>
                         <div className="flex items-center gap-2 mb-1">
                           <span className="text-sm font-medium">
-                            {message.sender === "user" ? 
-                              (selectedConversation.profile?.name || 
-                               selectedConversation.profile?.email || 
-                               "You") : 
-                              "Assistant"
-                            }
+                            {message.sender_id === selectedConversation.sender_id 
+                              ? (selectedConversation.sender.name || selectedConversation.sender.email)
+                              : (selectedConversation.receiver.name || selectedConversation.receiver.email)}
                           </span>
                           <span className="text-xs text-muted-foreground">
-                            {new Date(message.timestamp).toLocaleTimeString([], {
+                            {new Date(message.created_at).toLocaleTimeString([], {
                               hour: "numeric",
                               minute: "2-digit",
                             })}
@@ -220,7 +223,7 @@ export function ConversationView({ date, onClose }: ConversationViewProps) {
                         </div>
                         <div
                           className={`rounded-lg p-3 ${
-                            message.sender === "user"
+                            message.sender_id === selectedConversation.sender_id
                               ? "bg-primary text-primary-foreground"
                               : "bg-muted"
                           }`}
@@ -240,11 +243,22 @@ export function ConversationView({ date, onClose }: ConversationViewProps) {
               <Input 
                 placeholder="Write your message..." 
                 className="flex-1"
+                value={newMessage}
+                onChange={(e) => setNewMessage(e.target.value)}
+                onKeyPress={(e) => {
+                  if (e.key === 'Enter') {
+                    handleSendMessage();
+                  }
+                }}
               />
               <Button size="icon" variant="ghost">
                 <Smile className="h-5 w-5" />
               </Button>
-              <Button size="icon">
+              <Button 
+                size="icon"
+                onClick={handleSendMessage}
+                disabled={!newMessage.trim() || sendMessageMutation.isPending}
+              >
                 <Send className="h-5 w-5" />
               </Button>
             </div>
@@ -270,18 +284,17 @@ export function ConversationView({ date, onClose }: ConversationViewProps) {
                     <div className="flex items-center gap-3">
                       <Avatar className="h-16 w-16">
                         <AvatarFallback>
-                          {selectedConversation.profile?.name?.[0] || 
-                           selectedConversation.profile?.email[0].toUpperCase() || 'U'}
+                          {selectedConversation.receiver.name?.[0] || 
+                           selectedConversation.receiver.email[0].toUpperCase()}
                         </AvatarFallback>
                       </Avatar>
                       <div>
                         <p className="font-medium">
-                          {selectedConversation.profile?.name || 
-                           selectedConversation.profile?.email || 
-                           `User ${selectedConversation.session_id}`}
+                          {selectedConversation.receiver.name || 
+                           selectedConversation.receiver.email}
                         </p>
                         <p className="text-sm text-muted-foreground">
-                          {selectedConversation.profile?.email}
+                          {selectedConversation.receiver.email}
                         </p>
                       </div>
                     </div>
@@ -289,14 +302,9 @@ export function ConversationView({ date, onClose }: ConversationViewProps) {
                       <h4 className="text-sm font-medium">Chat Info</h4>
                       <div className="text-sm">
                         <p>Started: {new Date(selectedConversation.created_at).toLocaleString()}</p>
-                        <p>Messages: {selectedConversation.messages.length}</p>
-                        <p>Session ID: {selectedConversation.session_id}</p>
+                        <p>Messages: {messages.length}</p>
                       </div>
                     </div>
-                    <SentimentScore 
-                      sentiment={sentimentData?.sentiment || null} 
-                      conversationId={selectedConversation.id}
-                    />
                   </div>
                 )}
               </div>
