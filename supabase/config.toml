@@ -1,3 +1,4 @@
+
 # Project configuration
 project_id = "vezdxxqzzcjkunoaxcxc"
 
@@ -16,3 +17,7 @@ port = 54323
 [[functions]]
 [functions.sync-bigquery-data]
 verify_jwt = true
+
+[[functions]]
+name = "analyze-sentiment"
+verify_jwt = false
