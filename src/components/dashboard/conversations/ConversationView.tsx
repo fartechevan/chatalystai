@@ -197,7 +197,6 @@ export function ConversationView({ date, onClose }: ConversationViewProps) {
                       }`}
                     >
                       <Avatar className="h-8 w-8">
-                        <AvatarImage src="/placeholder.svg" />
                         <AvatarFallback>
                           {message.sender === "user" ? 
                             (selectedConversation.profile?.name?.[0] || 
@@ -275,7 +274,6 @@ export function ConversationView({ date, onClose }: ConversationViewProps) {
                   <div className="space-y-6">
                     <div className="flex items-center gap-3">
                       <Avatar className="h-16 w-16">
-                        <AvatarImage src="/placeholder.svg" />
                         <AvatarFallback>
                           {selectedConversation.profile?.name?.[0] || 
                            selectedConversation.profile?.email[0].toUpperCase() || 'U'}
