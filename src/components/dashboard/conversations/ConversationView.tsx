@@ -1,17 +1,18 @@
 
-import { MessageSquare, FileText } from "lucide-react";
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import type { Conversation } from "./types";
 import { toast } from "sonner";
-import { Button } from "@/components/ui/button";
 import { ConversationLeftPanel } from "./ConversationLeftPanel";
 import { MessageList } from "./MessageList";
 import { MessageInput } from "./MessageInput";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
+import { ConversationHeader } from "./ConversationHeader";
+import { ConversationSummary } from "./ConversationSummary";
+import { ConversationUserDetails } from "./ConversationUserDetails";
+import { useConversationRealtime } from "./useConversationRealtime";
 
 export function ConversationView() {
   const [searchQuery, setSearchQuery] = useState("");
@@ -21,51 +22,7 @@ export function ConversationView() {
   const [summary, setSummary] = useState<string | null>(null);
   const queryClient = useQueryClient();
 
-  useEffect(() => {
-    const conversationsChannel = supabase
-      .channel('conversations-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'conversations'
-        },
-        (payload) => {
-          console.log('Conversation change detected:', payload);
-          queryClient.invalidateQueries({ queryKey: ['conversations'] });
-        }
-      )
-      .subscribe();
-
-    const messagesChannel = supabase
-      .channel('messages-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'messages',
-          filter: selectedConversation 
-            ? `conversation_id=eq.${selectedConversation.conversation_id}`
-            : undefined
-        },
-        (payload) => {
-          console.log('Message change detected:', payload);
-          if (selectedConversation) {
-            queryClient.invalidateQueries({ 
-              queryKey: ['messages', selectedConversation.conversation_id] 
-            });
-          }
-        }
-      )
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(conversationsChannel);
-      supabase.removeChannel(messagesChannel);
-    };
-  }, [selectedConversation, queryClient]);
+  useConversationRealtime(queryClient, selectedConversation);
 
   const { data: conversations = [], isLoading } = useQuery({
     queryKey: ['conversations'],
@@ -203,10 +160,7 @@ export function ConversationView() {
         />
 
         <div className="flex-1 flex flex-col min-h-0">
-          <div className="flex items-center gap-4 border-b px-6 py-4 bg-background">
-            <h2 className="text-xl font-semibold">Chat</h2>
-            <MessageSquare className="h-4 w-4" />
-          </div>
+          <ConversationHeader />
 
           <div className="flex-1 overflow-hidden">
             <ScrollArea className="h-full">
@@ -239,59 +193,16 @@ export function ConversationView() {
 
           {selectedConversation && (
             <>
-              <div className="border-t bg-muted/30 backdrop-blur-sm p-6">
-                <div className="max-w-5xl mx-auto space-y-4">
-                  <Button 
-                    variant="outline" 
-                    size="sm"
-                    className="gap-2"
-                    disabled={messages.length === 0 || summarizeMutation.isPending}
-                    onClick={() => summarizeMutation.mutate()}
-                  >
-                    <FileText className="h-4 w-4" />
-                    {summarizeMutation.isPending ? "Summarizing..." : "Summarize"}
-                  </Button>
-                  
-                  {summary && (
-                    <div className="rounded-lg bg-muted p-4">
-                      <h4 className="text-sm font-medium mb-2">Summary</h4>
-                      <p className="text-sm text-muted-foreground">{summary}</p>
-                    </div>
-                  )}
-                </div>
-              </div>
+              <ConversationSummary
+                summarizeMutation={summarizeMutation}
+                summary={summary}
+                hasMessages={messages.length > 0}
+              />
               <Separator />
-              <div className="bg-muted/30 backdrop-blur-sm p-6">
-                <div className="max-w-5xl mx-auto">
-                  <h3 className="font-medium mb-4">User Details</h3>
-                  <div className="flex items-start gap-6">
-                    <div className="flex items-center gap-3">
-                      <Avatar className="h-16 w-16">
-                        <AvatarFallback>
-                          {selectedConversation.receiver.name?.[0] || 
-                           selectedConversation.receiver.email[0].toUpperCase()}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div>
-                        <p className="font-medium">
-                          {selectedConversation.receiver.name || 
-                           selectedConversation.receiver.email}
-                        </p>
-                        <p className="text-sm text-muted-foreground">
-                          {selectedConversation.receiver.email}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="space-y-1">
-                      <h4 className="text-sm font-medium">Chat Info</h4>
-                      <div className="text-sm text-muted-foreground">
-                        <p>Started: {new Date(selectedConversation.created_at).toLocaleString()}</p>
-                        <p>Messages: {messages.length}</p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
+              <ConversationUserDetails
+                conversation={selectedConversation}
+                messages={messages}
+              />
             </>
           )}
         </div>
