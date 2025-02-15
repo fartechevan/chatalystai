@@ -144,6 +144,34 @@ export function ConversationView() {
     }
   });
 
+  const summarizeMutation = useMutation({
+    mutationFn: async () => {
+      if (!selectedConversation || messages.length === 0) return null;
+      
+      const messagesWithConversation = messages.map(msg => ({
+        ...msg,
+        conversation: selectedConversation
+      }));
+
+      const { data, error } = await supabase.functions.invoke('summarize-conversation', {
+        body: { messages: messagesWithConversation }
+      });
+
+      if (error) throw error;
+      return data.summary;
+    },
+    onSuccess: (summary) => {
+      if (summary) {
+        toast.success("Conversation summarized");
+        console.log("Summary:", summary);
+      }
+    },
+    onError: (error) => {
+      toast.error("Failed to summarize conversation");
+      console.error("Summarization error:", error);
+    }
+  });
+
   const filteredConversations = conversations.filter(conv => {
     const searchLower = searchQuery.toLowerCase();
     return (
@@ -215,10 +243,11 @@ export function ConversationView() {
                     variant="outline" 
                     size="sm"
                     className="gap-2"
-                    disabled={messages.length === 0}
+                    disabled={messages.length === 0 || summarizeMutation.isPending}
+                    onClick={() => summarizeMutation.mutate()}
                   >
                     <FileText className="h-4 w-4" />
-                    Summarize
+                    {summarizeMutation.isPending ? "Summarizing..." : "Summarize"}
                   </Button>
                 </div>
               </div>
