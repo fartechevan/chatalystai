@@ -160,7 +160,7 @@ export function ConversationView() {
   };
 
   return (
-    <div className="h-full flex flex-col relative">
+    <div className="h-[calc(100vh-4rem)] flex flex-col relative">
       <div className="flex-1 flex min-h-0">
         <ConversationLeftPanel
           leftPanelOpen={leftPanelOpen}
@@ -173,27 +173,29 @@ export function ConversationView() {
         />
 
         <div className="flex-1 flex flex-col min-h-0">
-          <div className="flex items-center gap-4 border-b px-6 py-4">
+          <div className="flex items-center gap-4 border-b px-6 py-4 bg-background">
             <h2 className="text-xl font-semibold">Chat</h2>
             <MessageSquare className="h-4 w-4" />
           </div>
 
-          <div className="flex-1 min-h-0">
-            <ScrollArea className="h-full px-6 py-4">
-              {isLoading ? (
-                <div className="flex items-center justify-center h-full">
-                  <p>Loading messages...</p>
-                </div>
-              ) : !selectedConversation ? (
-                <div className="flex items-center justify-center h-full">
-                  <p className="text-muted-foreground">Select a conversation to view messages.</p>
-                </div>
-              ) : (
-                <MessageList
-                  messages={messages}
-                  selectedConversation={selectedConversation}
-                />
-              )}
+          <div className="flex-1 overflow-hidden">
+            <ScrollArea className="h-full">
+              <div className="px-6 py-4">
+                {isLoading ? (
+                  <div className="flex items-center justify-center h-full">
+                    <p>Loading messages...</p>
+                  </div>
+                ) : !selectedConversation ? (
+                  <div className="flex items-center justify-center h-full">
+                    <p className="text-muted-foreground">Select a conversation to view messages.</p>
+                  </div>
+                ) : (
+                  <MessageList
+                    messages={messages}
+                    selectedConversation={selectedConversation}
+                  />
+                )}
+              </div>
             </ScrollArea>
           </div>
 
@@ -203,42 +205,42 @@ export function ConversationView() {
             handleSendMessage={handleSendMessage}
             isLoading={sendMessageMutation.isPending}
           />
-        </div>
-      </div>
 
-      {selectedConversation && (
-        <div className="sticky bottom-0 left-0 right-0 border-t bg-muted/30 backdrop-blur-sm p-6">
-          <div className="max-w-5xl mx-auto">
-            <h3 className="font-medium mb-4">User Details</h3>
-            <div className="flex items-start gap-6">
-              <div className="flex items-center gap-3">
-                <Avatar className="h-16 w-16">
-                  <AvatarFallback>
-                    {selectedConversation.receiver.name?.[0] || 
-                     selectedConversation.receiver.email[0].toUpperCase()}
-                  </AvatarFallback>
-                </Avatar>
-                <div>
-                  <p className="font-medium">
-                    {selectedConversation.receiver.name || 
-                     selectedConversation.receiver.email}
-                  </p>
-                  <p className="text-sm text-muted-foreground">
-                    {selectedConversation.receiver.email}
-                  </p>
-                </div>
-              </div>
-              <div className="space-y-1">
-                <h4 className="text-sm font-medium">Chat Info</h4>
-                <div className="text-sm text-muted-foreground">
-                  <p>Started: {new Date(selectedConversation.created_at).toLocaleString()}</p>
-                  <p>Messages: {messages.length}</p>
+          {selectedConversation && (
+            <div className="border-t bg-muted/30 backdrop-blur-sm p-6">
+              <div className="max-w-5xl mx-auto">
+                <h3 className="font-medium mb-4">User Details</h3>
+                <div className="flex items-start gap-6">
+                  <div className="flex items-center gap-3">
+                    <Avatar className="h-16 w-16">
+                      <AvatarFallback>
+                        {selectedConversation.receiver.name?.[0] || 
+                         selectedConversation.receiver.email[0].toUpperCase()}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div>
+                      <p className="font-medium">
+                        {selectedConversation.receiver.name || 
+                         selectedConversation.receiver.email}
+                      </p>
+                      <p className="text-sm text-muted-foreground">
+                        {selectedConversation.receiver.email}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="space-y-1">
+                    <h4 className="text-sm font-medium">Chat Info</h4>
+                    <div className="text-sm text-muted-foreground">
+                      <p>Started: {new Date(selectedConversation.created_at).toLocaleString()}</p>
+                      <p>Messages: {messages.length}</p>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
-          </div>
+          )}
         </div>
-      )}
+      </div>
     </div>
   );
 }
