@@ -38,7 +38,7 @@ export function ChatSidebar({ onChatSelect }: ChatSidebarProps) {
       <div className="p-4 space-y-4">
         <div className="flex items-center space-x-4">
           <Avatar className="h-10 w-10">
-            <AvatarImage src="/placeholder.svg" />
+            <AvatarImage src="" alt="J" />
             <AvatarFallback>J</AvatarFallback>
           </Avatar>
           <div>
@@ -60,6 +60,7 @@ export function ChatSidebar({ onChatSelect }: ChatSidebarProps) {
               onClick={() => onChatSelect(chat.id)}
             >
               <Avatar className="h-10 w-10">
+                <AvatarImage src="" alt={chat.name[0]} />
                 <AvatarFallback>{chat.name[0]}</AvatarFallback>
               </Avatar>
               <div className="flex-1 overflow-hidden">
