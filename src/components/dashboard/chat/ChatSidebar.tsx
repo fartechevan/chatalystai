@@ -59,7 +59,7 @@ export function ChatSidebar({ onChatSelect }: ChatSidebarProps) {
               onClick={() => onChatSelect(chat.id)}
             >
               <Avatar className="h-10 w-10">
-              <AvatarFallback>N</AvatarFallback>
+                <AvatarFallback>N</AvatarFallback>
               </Avatar>
               <div className="flex-1 overflow-hidden">
                 <p className="text-sm font-medium">{chat.name}</p>
