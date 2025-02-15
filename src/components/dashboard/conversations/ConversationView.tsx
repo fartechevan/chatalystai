@@ -1,3 +1,4 @@
+
 import { MessageSquare } from "lucide-react";
 import { useState, useEffect } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -8,13 +9,12 @@ import { toast } from "sonner";
 import { ConversationLeftPanel } from "./ConversationLeftPanel";
 import { MessageList } from "./MessageList";
 import { MessageInput } from "./MessageInput";
-import { ConversationRightPanel } from "./ConversationRightPanel";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 
 export function ConversationView() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
   const [leftPanelOpen, setLeftPanelOpen] = useState(true);
-  const [rightPanelOpen, setRightPanelOpen] = useState(true);
   const [newMessage, setNewMessage] = useState("");
   const queryClient = useQueryClient();
 
@@ -160,8 +160,8 @@ export function ConversationView() {
   };
 
   return (
-    <div className="h-full">
-      <div className="flex h-full">
+    <div className="h-full flex flex-col">
+      <div className="flex-1 flex min-h-0">
         <ConversationLeftPanel
           leftPanelOpen={leftPanelOpen}
           setLeftPanelOpen={setLeftPanelOpen}
@@ -172,7 +172,7 @@ export function ConversationView() {
           setSelectedConversation={setSelectedConversation}
         />
 
-        <div className="flex-1 flex flex-col">
+        <div className="flex-1 flex flex-col min-h-0">
           <div className="flex items-center gap-4 border-b px-6 py-4">
             <h2 className="text-xl font-semibold">Chat</h2>
             <MessageSquare className="h-4 w-4" />
@@ -202,14 +202,41 @@ export function ConversationView() {
             isLoading={sendMessageMutation.isPending}
           />
         </div>
-
-        <ConversationRightPanel
-          rightPanelOpen={rightPanelOpen}
-          setRightPanelOpen={setRightPanelOpen}
-          selectedConversation={selectedConversation}
-          messages={messages}
-        />
       </div>
+
+      {selectedConversation && (
+        <div className="border-t bg-muted/30 p-6">
+          <div className="max-w-5xl mx-auto">
+            <h3 className="font-medium mb-4">User Details</h3>
+            <div className="flex items-start gap-6">
+              <div className="flex items-center gap-3">
+                <Avatar className="h-16 w-16">
+                  <AvatarFallback>
+                    {selectedConversation.receiver.name?.[0] || 
+                     selectedConversation.receiver.email[0].toUpperCase()}
+                  </AvatarFallback>
+                </Avatar>
+                <div>
+                  <p className="font-medium">
+                    {selectedConversation.receiver.name || 
+                     selectedConversation.receiver.email}
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    {selectedConversation.receiver.email}
+                  </p>
+                </div>
+              </div>
+              <div className="space-y-1">
+                <h4 className="text-sm font-medium">Chat Info</h4>
+                <div className="text-sm text-muted-foreground">
+                  <p>Started: {new Date(selectedConversation.created_at).toLocaleString()}</p>
+                  <p>Messages: {messages.length}</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
