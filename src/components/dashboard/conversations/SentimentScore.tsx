@@ -1,6 +1,8 @@
+
 import { Card } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Info } from "lucide-react";
+import { Info, RefreshCw } from "lucide-react";
 
 interface SentimentScoreProps {
   sentiment: 'bad' | 'moderate' | 'good' | null;
@@ -92,6 +94,10 @@ export function SentimentScore({ sentiment }: SentimentScoreProps) {
             `This conversation was ${label.toLowerCase()} at helping customers find what they need.` :
             'This conversation has not been rated yet.'}
         </p>
+        <Button variant="outline" size="sm" className="mt-4">
+          <RefreshCw className="mr-2 h-4 w-4" />
+          Refresh Rating
+        </Button>
       </div>
     </Card>
   );
