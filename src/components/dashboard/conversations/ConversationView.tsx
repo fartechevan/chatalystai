@@ -201,7 +201,7 @@ export function ConversationView({ date, onClose }: ConversationViewProps) {
                           {message.sender === "user" ? 
                             (selectedConversation.profile?.name?.[0] || 
                              selectedConversation.profile?.email[0].toUpperCase() || 'U') : 
-                            'B'
+                            'A'
                           }
                         </AvatarFallback>
                       </Avatar>
