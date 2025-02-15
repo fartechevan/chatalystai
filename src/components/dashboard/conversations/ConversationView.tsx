@@ -1,6 +1,6 @@
 
 import { X, MessageSquare } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -24,6 +24,56 @@ export function ConversationView({ date, onClose }: ConversationViewProps) {
   const [rightPanelOpen, setRightPanelOpen] = useState(true);
   const [newMessage, setNewMessage] = useState("");
   const queryClient = useQueryClient();
+
+  // Set up real-time subscriptions
+  useEffect(() => {
+    // Channel for conversations
+    const conversationsChannel = supabase
+      .channel('conversations-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'conversations'
+        },
+        () => {
+          // Invalidate conversations query to trigger a refetch
+          queryClient.invalidateQueries({ queryKey: ['conversations', date] });
+        }
+      )
+      .subscribe();
+
+    // Channel for messages
+    const messagesChannel = supabase
+      .channel('messages-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'messages',
+          filter: selectedConversation 
+            ? `conversation_id=eq.${selectedConversation.conversation_id}`
+            : undefined
+        },
+        () => {
+          // Invalidate messages query to trigger a refetch
+          if (selectedConversation) {
+            queryClient.invalidateQueries({ 
+              queryKey: ['messages', selectedConversation.conversation_id] 
+            });
+          }
+        }
+      )
+      .subscribe();
+
+    // Cleanup subscriptions
+    return () => {
+      supabase.removeChannel(conversationsChannel);
+      supabase.removeChannel(messagesChannel);
+    };
+  }, [date, selectedConversation, queryClient]);
 
   const { data: conversations = [], isLoading } = useQuery({
     queryKey: ['conversations', date],
@@ -95,7 +145,6 @@ export function ConversationView({ date, onClose }: ConversationViewProps) {
     },
     onSuccess: () => {
       setNewMessage("");
-      queryClient.invalidateQueries({ queryKey: ['messages', selectedConversation?.conversation_id] });
     },
     onError: (error) => {
       toast.error("Failed to send message");
