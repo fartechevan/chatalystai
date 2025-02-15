@@ -27,7 +27,6 @@ export function ConversationView({ date, onClose }: ConversationViewProps) {
 
   // Set up real-time subscriptions
   useEffect(() => {
-    // Channel for conversations
     const conversationsChannel = supabase
       .channel('conversations-changes')
       .on(
@@ -37,14 +36,13 @@ export function ConversationView({ date, onClose }: ConversationViewProps) {
           schema: 'public',
           table: 'conversations'
         },
-        () => {
-          // Invalidate conversations query to trigger a refetch
-          queryClient.invalidateQueries({ queryKey: ['conversations', date] });
+        (payload) => {
+          console.log('Conversation change detected:', payload);
+          queryClient.invalidateQueries({ queryKey: ['conversations'] });
         }
       )
       .subscribe();
 
-    // Channel for messages
     const messagesChannel = supabase
       .channel('messages-changes')
       .on(
@@ -57,8 +55,8 @@ export function ConversationView({ date, onClose }: ConversationViewProps) {
             ? `conversation_id=eq.${selectedConversation.conversation_id}`
             : undefined
         },
-        () => {
-          // Invalidate messages query to trigger a refetch
+        (payload) => {
+          console.log('Message change detected:', payload);
           if (selectedConversation) {
             queryClient.invalidateQueries({ 
               queryKey: ['messages', selectedConversation.conversation_id] 
@@ -68,26 +66,17 @@ export function ConversationView({ date, onClose }: ConversationViewProps) {
       )
       .subscribe();
 
-    // Cleanup subscriptions
     return () => {
       supabase.removeChannel(conversationsChannel);
       supabase.removeChannel(messagesChannel);
     };
-  }, [date, selectedConversation, queryClient]);
+  }, [selectedConversation, queryClient]);
 
   const { data: conversations = [], isLoading } = useQuery({
-    queryKey: ['conversations', date],
+    queryKey: ['conversations'],
     queryFn: async () => {
-      const selectedDate = new Date(date);
-      const startOfDay = new Date(selectedDate);
-      startOfDay.setHours(0, 0, 0, 0);
+      console.log('Fetching conversations...');
       
-      const endOfDay = new Date(selectedDate);
-      endOfDay.setHours(23, 59, 59, 999);
-
-      const { data: userData } = await supabase.auth.getUser();
-      if (!userData.user) throw new Error('Not authenticated');
-
       const { data, error } = await supabase
         .from('conversations')
         .select(`
@@ -99,11 +88,14 @@ export function ConversationView({ date, onClose }: ConversationViewProps) {
           sender:profiles!conversations_sender_id_fkey(id, name, email),
           receiver:profiles!conversations_receiver_id_fkey(id, name, email)
         `)
-        .gte('created_at', startOfDay.toISOString())
-        .lte('created_at', endOfDay.toISOString())
-        .or(`sender_id.eq.${userData.user.id},receiver_id.eq.${userData.user.id}`);
+        .order('updated_at', { ascending: false });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching conversations:', error);
+        throw error;
+      }
+      
+      console.log('Fetched conversations:', data);
       return data as Conversation[];
     },
   });
@@ -113,13 +105,20 @@ export function ConversationView({ date, onClose }: ConversationViewProps) {
     queryFn: async () => {
       if (!selectedConversation) return [];
       
+      console.log('Fetching messages for conversation:', selectedConversation.conversation_id);
+      
       const { data, error } = await supabase
         .from('messages')
         .select('*')
         .eq('conversation_id', selectedConversation.conversation_id)
         .order('created_at', { ascending: true });
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error fetching messages:', error);
+        throw error;
+      }
+      
+      console.log('Fetched messages:', data);
       return data;
     },
     enabled: !!selectedConversation,
