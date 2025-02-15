@@ -1,14 +1,24 @@
 
+import { useState } from "react";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Info, RefreshCw } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/components/ui/use-toast";
 
 interface SentimentScoreProps {
   sentiment: 'bad' | 'moderate' | 'good' | null;
+  conversationId: string;
+  onSentimentUpdate?: (newSentiment: 'bad' | 'moderate' | 'good') => void;
 }
 
-export function SentimentScore({ sentiment }: SentimentScoreProps) {
+export function SentimentScore({ sentiment: initialSentiment, conversationId, onSentimentUpdate }: SentimentScoreProps) {
+  const [sentiment, setSentiment] = useState(initialSentiment);
+  const [isLoading, setIsLoading] = useState(false);
+  const [description, setDescription] = useState<string | null>(null);
+  const { toast } = useToast();
+
   const getPercentage = (sentiment: string | null) => {
     switch (sentiment) {
       case 'bad':
@@ -45,6 +55,37 @@ export function SentimentScore({ sentiment }: SentimentScoreProps) {
         return 'Extremely effective';
       default:
         return 'Not yet rated';
+    }
+  };
+
+  const refreshSentiment = async () => {
+    setIsLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('analyze-sentiment', {
+        body: { conversationId }
+      });
+
+      if (error) throw error;
+
+      setSentiment(data.sentiment);
+      setDescription(data.description);
+      if (onSentimentUpdate) {
+        onSentimentUpdate(data.sentiment);
+      }
+
+      toast({
+        title: "Sentiment Analysis Updated",
+        description: "The conversation has been re-analyzed successfully."
+      });
+    } catch (error) {
+      console.error('Error refreshing sentiment:', error);
+      toast({
+        title: "Error",
+        description: "Failed to update sentiment analysis. Please try again.",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -90,13 +131,19 @@ export function SentimentScore({ sentiment }: SentimentScoreProps) {
       <div className="mt-6 text-center">
         <h4 className="text-xl font-semibold">{label}</h4>
         <p className="text-muted-foreground mt-2">
-          {sentiment ? 
+          {description || (sentiment ? 
             `This conversation was ${label.toLowerCase()} at helping customers find what they need.` :
-            'This conversation has not been rated yet.'}
+            'This conversation has not been rated yet.')}
         </p>
-        <Button variant="outline" size="sm" className="mt-4">
-          <RefreshCw className="mr-2 h-4 w-4" />
-          Refresh Rating
+        <Button 
+          variant="outline" 
+          size="sm" 
+          className="mt-4"
+          onClick={refreshSentiment}
+          disabled={isLoading}
+        >
+          <RefreshCw className={`mr-2 h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+          {isLoading ? 'Analyzing...' : 'Refresh Rating'}
         </Button>
       </div>
     </Card>

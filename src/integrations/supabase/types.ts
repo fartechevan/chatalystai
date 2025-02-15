@@ -197,6 +197,7 @@ export type Database = {
     Enums: {
       app_role: "admin" | "user"
       sentiment_level: "bad" | "moderate" | "good"
+      sentiment_type: "bad" | "moderate" | "good"
       sync_status: "pending" | "completed" | "failed"
     }
     CompositeTypes: {
