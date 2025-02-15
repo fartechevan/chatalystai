@@ -1,4 +1,3 @@
-
 import { MessageSquare, FileText } from "lucide-react";
 import { useState, useEffect } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -20,7 +19,6 @@ export function ConversationView() {
   const [newMessage, setNewMessage] = useState("");
   const queryClient = useQueryClient();
 
-  // Set up real-time subscriptions
   useEffect(() => {
     const conversationsChannel = supabase
       .channel('conversations-changes')
@@ -213,7 +211,6 @@ export function ConversationView() {
             <>
               <div className="border-t bg-muted/30 backdrop-blur-sm p-6">
                 <div className="max-w-5xl mx-auto">
-                  <h3 className="font-medium mb-4">Tools</h3>
                   <Button 
                     variant="outline" 
                     size="sm"
