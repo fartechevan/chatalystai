@@ -40,7 +40,6 @@ export function ConversationView({ date, onClose }: ConversationViewProps) {
   const [leftPanelOpen, setLeftPanelOpen] = useState(true);
   const [rightPanelOpen, setRightPanelOpen] = useState(true);
 
-  // Fetch conversations for the selected date
   const { data: conversations = [], isLoading } = useQuery({
     queryKey: ['conversations', date],
     queryFn: async () => {
@@ -79,7 +78,6 @@ export function ConversationView({ date, onClose }: ConversationViewProps) {
     },
   });
 
-  // Modified sentiment query to always render the component
   const { data: sentimentData } = useQuery({
     queryKey: ['sentiment', selectedConversation?.id],
     queryFn: async () => {
@@ -113,7 +111,6 @@ export function ConversationView({ date, onClose }: ConversationViewProps) {
   return (
     <div className="fixed inset-0 z-50 bg-background">
       <div className="flex h-full">
-        {/* Left Sidebar */}
         <div className={`${leftPanelOpen ? 'w-64' : 'w-12'} border-r bg-muted/30 transition-all duration-300 relative md:w-64`}>
           <button
             onClick={() => setLeftPanelOpen(!leftPanelOpen)}
@@ -161,7 +158,6 @@ export function ConversationView({ date, onClose }: ConversationViewProps) {
           </div>
         </div>
 
-        {/* Main Content */}
         <div className="flex-1 flex flex-col">
           <div className="flex items-center justify-between border-b px-6 py-4">
             <div className="flex items-center gap-4">
@@ -255,7 +251,6 @@ export function ConversationView({ date, onClose }: ConversationViewProps) {
           </div>
         </div>
 
-        {/* Right Sidebar */}
         <div className={`${rightPanelOpen ? 'w-64' : 'w-12'} border-l bg-muted/30 transition-all duration-300 relative md:w-64`}>
           <button
             onClick={() => setRightPanelOpen(!rightPanelOpen)}
@@ -298,8 +293,10 @@ export function ConversationView({ date, onClose }: ConversationViewProps) {
                         <p>Session ID: {selectedConversation.session_id}</p>
                       </div>
                     </div>
-                    {/* Always show SentimentScore, passing null if no data */}
-                    <SentimentScore sentiment={sentimentData?.sentiment || null} />
+                    <SentimentScore 
+                      sentiment={sentimentData?.sentiment || null} 
+                      conversationId={selectedConversation.id}
+                    />
                   </div>
                 )}
               </div>
