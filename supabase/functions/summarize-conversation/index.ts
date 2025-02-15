@@ -21,6 +21,8 @@ serve(async (req) => {
       content: msg.content
     }))
 
+    console.log('Calling OpenAI with formatted messages:', formattedMessages)
+
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
