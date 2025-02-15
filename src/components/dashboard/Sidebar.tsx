@@ -1,4 +1,5 @@
-import { Home, Menu, Settings, Database } from "lucide-react";
+
+import { Home, Menu, Settings, Database, MessageSquare } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -13,6 +14,7 @@ const menuItems = [
   { title: "Main", icon: Home, path: "/dashboard" },
   { title: "Settings", icon: Settings, path: "/dashboard/settings" },
   { title: "Vendor", icon: Database, path: "/dashboard/vendor" },
+  { title: "Conversations", icon: MessageSquare, path: "/dashboard/conversations" },
 ];
 
 export function DashboardSidebar() {
