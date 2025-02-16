@@ -8,6 +8,16 @@ interface MessageListProps {
 }
 
 export function MessageList({ messages, selectedConversation }: MessageListProps) {
+  const getAvatarFallback = (user: { name: string | null; email: string }) => {
+    if (user.name) return user.name[0].toUpperCase();
+    if (user.email) return user.email[0].toUpperCase();
+    return '?';
+  };
+
+  const getUserDisplayName = (user: { name: string | null; email: string }) => {
+    return user.name || user.email;
+  };
+
   return (
     <div className="space-y-4">
       {messages.map((message) => (
@@ -25,16 +35,16 @@ export function MessageList({ messages, selectedConversation }: MessageListProps
             <Avatar className="h-8 w-8">
               <AvatarFallback>
                 {message.sender_id === selectedConversation.sender_id 
-                  ? (selectedConversation.sender.name?.[0] || selectedConversation.sender.email[0].toUpperCase())
-                  : (selectedConversation.receiver.name?.[0] || selectedConversation.receiver.email[0].toUpperCase())}
+                  ? getAvatarFallback(selectedConversation.sender)
+                  : getAvatarFallback(selectedConversation.receiver)}
               </AvatarFallback>
             </Avatar>
             <div>
               <div className="flex items-center gap-2 mb-1">
                 <span className="text-sm font-medium">
                   {message.sender_id === selectedConversation.sender_id 
-                    ? (selectedConversation.sender.name || selectedConversation.sender.email)
-                    : (selectedConversation.receiver.name || selectedConversation.receiver.email)}
+                    ? getUserDisplayName(selectedConversation.sender)
+                    : getUserDisplayName(selectedConversation.receiver)}
                 </span>
                 <span className="text-xs text-muted-foreground">
                   {new Date(message.created_at).toLocaleTimeString([], {

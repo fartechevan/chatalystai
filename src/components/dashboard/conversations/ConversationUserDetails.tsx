@@ -8,6 +8,16 @@ interface ConversationUserDetailsProps {
 }
 
 export function ConversationUserDetails({ conversation, messages }: ConversationUserDetailsProps) {
+  const getAvatarFallback = (user: { name: string | null; email: string }) => {
+    if (user.name) return user.name[0].toUpperCase();
+    if (user.email) return user.email[0].toUpperCase();
+    return '?';
+  };
+
+  const getUserDisplayName = (user: { name: string | null; email: string }) => {
+    return user.name || user.email;
+  };
+
   return (
     <div className="bg-muted/30 backdrop-blur-sm p-6">
       <div className="max-w-5xl mx-auto">
@@ -16,14 +26,12 @@ export function ConversationUserDetails({ conversation, messages }: Conversation
           <div className="flex items-center gap-3">
             <Avatar className="h-16 w-16">
               <AvatarFallback>
-                {conversation.receiver.name?.[0] || 
-                 conversation.receiver.email[0].toUpperCase()}
+                {getAvatarFallback(conversation.receiver)}
               </AvatarFallback>
             </Avatar>
             <div>
               <p className="font-medium">
-                {conversation.receiver.name || 
-                 conversation.receiver.email}
+                {getUserDisplayName(conversation.receiver)}
               </p>
               <p className="text-sm text-muted-foreground">
                 {conversation.receiver.email}
