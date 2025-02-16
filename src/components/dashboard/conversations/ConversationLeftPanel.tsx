@@ -25,7 +25,7 @@ export function ConversationLeftPanel({
   setSelectedConversation,
 }: ConversationLeftPanelProps) {
   return (
-    <div className={`${leftPanelOpen ? 'w-64' : 'w-12'} border-r bg-muted/30 transition-all duration-300 relative md:w-64 flex flex-col`}>
+    <div className={`${leftPanelOpen ? 'w-64' : 'w-12'} border-r bg-muted/30 transition-all duration-300 relative md:w-80 flex flex-col`}>
       <button
         onClick={() => setLeftPanelOpen(!leftPanelOpen)}
         className="md:hidden absolute right-0 top-0 p-2 transform translate-x-full bg-background border rounded-r-lg"
