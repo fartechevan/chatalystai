@@ -152,7 +152,7 @@ export function ConversationView() {
   };
 
   return (
-    <div className="h-[calc(100vh-4rem)] flex flex-col relative">
+    <div className="h-screen w-full flex flex-col relative -mt-8 -mx-8">
       <div className="flex-1 flex min-h-0">
         <ConversationLeftPanel
           leftPanelOpen={leftPanelOpen}
