@@ -27,7 +27,7 @@ export function UserStats() {
             {stats.monthlyConversations.length}
           </div>
           <p className="text-xs text-muted-foreground">
-            Month {stats.currentMonth[0]?.month_number || 'N/A'}
+            Month {stats.currentMonth?.month_number || 'N/A'}
           </p>
         </CardContent>
       </Card>
@@ -42,7 +42,7 @@ export function UserStats() {
             {stats.weeklyConversations.length}
           </div>
           <p className="text-xs text-muted-foreground">
-            Week {stats.currentWeek[0]?.week_of_month || 'N/A'}
+            Week {stats.currentWeek?.week_of_month || 'N/A'}
           </p>
         </CardContent>
       </Card>
