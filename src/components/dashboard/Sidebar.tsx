@@ -11,10 +11,10 @@ import { Link, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 
 const menuItems = [
-  { title: "Main", icon: Home, path: "/dashboard" },
+  { title: "Dashboard", icon: Home, path: "/dashboard" },
   { title: "Settings", icon: Settings, path: "/dashboard/settings" },
   { title: "Vendor", icon: Database, path: "/dashboard/vendor" },
-  { title: "Conversations", icon: MessageSquare, path: "/dashboard/conversations" },
+  { title: "Chat", icon: MessageSquare, path: "/dashboard/conversations" },
 ];
 
 export function DashboardSidebar() {
