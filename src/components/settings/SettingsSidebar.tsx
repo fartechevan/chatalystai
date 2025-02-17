@@ -1,10 +1,11 @@
 
 import { 
   Settings, Package, CreditCard, 
-  Users, MessageSquare, Brain,
-  HelpCircle 
+  Users, MessageSquare, HelpCircle,
+  ChevronLeft, ChevronRight
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useState } from "react";
 
 interface SettingsSidebarProps {
   selectedSection: string;
@@ -21,25 +22,41 @@ const menuItems = [
 ];
 
 export function SettingsSidebar({ selectedSection, onSectionChange }: SettingsSidebarProps) {
+  const [isCollapsed, setIsCollapsed] = useState(false);
+
   return (
-    <div className="w-48 border-r bg-muted/30">
+    <div className={cn(
+      "border-r bg-muted/30 transition-all duration-300 relative flex flex-col",
+      isCollapsed ? "w-14" : "w-48"
+    )}>
       <nav className="p-3 space-y-1">
         {menuItems.map((item) => (
           <button
             key={item.id}
             onClick={() => onSectionChange(item.id)}
             className={cn(
-              "w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm",
+              "w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm truncate",
               selectedSection === item.id 
                 ? "bg-primary text-primary-foreground" 
                 : "hover:bg-muted"
             )}
+            title={item.label}
           >
-            <item.icon className="h-4 w-4" />
-            <span>{item.label}</span>
+            <item.icon className="h-4 w-4 flex-shrink-0" />
+            {!isCollapsed && <span>{item.label}</span>}
           </button>
         ))}
       </nav>
+      <button
+        onClick={() => setIsCollapsed(!isCollapsed)}
+        className={cn(
+          "absolute -right-3 top-3 p-1 rounded-full bg-background border shadow-sm hover:bg-accent",
+          "transition-transform",
+          isCollapsed && "rotate-180"
+        )}
+      >
+        <ChevronLeft className="h-4 w-4" />
+      </button>
     </div>
   );
 }

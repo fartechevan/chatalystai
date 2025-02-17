@@ -15,7 +15,7 @@ export function SettingsLayout() {
         selectedSection={selectedSection}
         onSectionChange={setSelectedSection}
       />
-      <div className="flex-1 flex flex-col">
+      <div className="flex-1 flex flex-col overflow-hidden">
         <div className="border-b p-4 flex items-center justify-between">
           <div className="flex items-center gap-4 flex-1">
             <h1 className="text-xl font-semibold">SETTINGS</h1>
