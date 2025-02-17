@@ -14,22 +14,22 @@ interface SettingsSidebarProps {
 const menuItems = [
   { id: 'integrations', label: 'Integrations', icon: Package },
   { id: 'billing', label: 'Billing', icon: CreditCard },
-  { id: 'general', label: 'General settings', icon: Settings },
+  { id: 'general', label: 'Settings', icon: Settings },
   { id: 'users', label: 'Users', icon: Users },
-  { id: 'communication', label: 'Communication tools', icon: MessageSquare },
-  { id: 'help', label: 'Help Center', icon: HelpCircle },
+  { id: 'communication', label: 'Tools', icon: MessageSquare },
+  { id: 'help', label: 'Support', icon: HelpCircle },
 ];
 
 export function SettingsSidebar({ selectedSection, onSectionChange }: SettingsSidebarProps) {
   return (
-    <div className="w-64 border-r bg-muted/30">
-      <nav className="p-4 space-y-2">
+    <div className="w-48 border-r bg-muted/30">
+      <nav className="p-3 space-y-1">
         {menuItems.map((item) => (
           <button
             key={item.id}
             onClick={() => onSectionChange(item.id)}
             className={cn(
-              "w-full flex items-center gap-3 px-4 py-2 rounded-lg text-sm",
+              "w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm",
               selectedSection === item.id 
                 ? "bg-primary text-primary-foreground" 
                 : "hover:bg-muted"
