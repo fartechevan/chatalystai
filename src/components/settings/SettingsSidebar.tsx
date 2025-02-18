@@ -2,10 +2,13 @@
 import { 
   Settings, Package, CreditCard, 
   Users, MessageSquare, HelpCircle,
-  ChevronLeft, ChevronRight
+  ChevronLeft, LogOut
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { useNavigate } from "react-router-dom";
+import { useToast } from "@/hooks/use-toast";
 
 interface SettingsSidebarProps {
   selectedSection: string;
@@ -23,13 +26,28 @@ const menuItems = [
 
 export function SettingsSidebar({ selectedSection, onSectionChange }: SettingsSidebarProps) {
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const navigate = useNavigate();
+  const { toast } = useToast();
+
+  const handleLogout = async () => {
+    const { error } = await supabase.auth.signOut();
+    if (error) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to log out. Please try again.",
+      });
+    } else {
+      navigate("/login");
+    }
+  };
 
   return (
     <div className={cn(
       "border-r bg-muted/30 transition-all duration-300 relative flex flex-col",
       isCollapsed ? "w-14" : "w-48"
     )}>
-      <nav className="p-3 space-y-1">
+      <nav className="p-3 space-y-1 flex-1">
         {menuItems.map((item) => (
           <button
             key={item.id}
@@ -47,6 +65,16 @@ export function SettingsSidebar({ selectedSection, onSectionChange }: SettingsSi
           </button>
         ))}
       </nav>
+      <div className="p-3 border-t">
+        <button
+          onClick={handleLogout}
+          className="w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm text-destructive hover:bg-destructive/10"
+          title="Logout"
+        >
+          <LogOut className="h-4 w-4 flex-shrink-0" />
+          {!isCollapsed && <span>Logout</span>}
+        </button>
+      </div>
       <button
         onClick={() => setIsCollapsed(!isCollapsed)}
         className={cn(
