@@ -2,10 +2,13 @@
 import { 
   Settings, Package, CreditCard, 
   Users, MessageSquare, HelpCircle,
-  ChevronLeft, ChevronRight
+  ChevronLeft, LogOut
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { useNavigate } from "react-router-dom";
+import { useToast } from "@/hooks/use-toast";
 
 interface SettingsSidebarProps {
   selectedSection: string;
@@ -19,10 +22,30 @@ const menuItems = [
   { id: 'users', label: 'Users', icon: Users },
   { id: 'communication', label: 'Tools', icon: MessageSquare },
   { id: 'help', label: 'Support', icon: HelpCircle },
+  { id: 'logout', label: 'Logout', icon: LogOut },
 ];
 
 export function SettingsSidebar({ selectedSection, onSectionChange }: SettingsSidebarProps) {
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const navigate = useNavigate();
+  const { toast } = useToast();
+
+  const handleItemClick = async (itemId: string) => {
+    if (itemId === 'logout') {
+      const { error } = await supabase.auth.signOut();
+      if (error) {
+        toast({
+          variant: "destructive",
+          title: "Error",
+          description: "Failed to log out. Please try again.",
+        });
+      } else {
+        navigate("/login");
+      }
+    } else {
+      onSectionChange(itemId);
+    }
+  };
 
   return (
     <div className={cn(
@@ -33,9 +56,10 @@ export function SettingsSidebar({ selectedSection, onSectionChange }: SettingsSi
         {menuItems.map((item) => (
           <button
             key={item.id}
-            onClick={() => onSectionChange(item.id)}
+            onClick={() => handleItemClick(item.id)}
             className={cn(
               "w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm truncate",
+              item.id === 'logout' ? "text-destructive hover:bg-destructive/10" :
               selectedSection === item.id 
                 ? "bg-primary text-primary-foreground" 
                 : "hover:bg-muted"

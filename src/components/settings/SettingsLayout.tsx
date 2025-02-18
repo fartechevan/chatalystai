@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { SettingsSidebar } from "./SettingsSidebar";
 import { SettingsContent } from "./SettingsContent";
 import { MoreHorizontal, Plus } from "lucide-react";
+import { ScrollArea } from "../ui/scroll-area";
 
 export function SettingsLayout() {
   const [selectedSection, setSelectedSection] = useState("users");
@@ -34,7 +35,9 @@ export function SettingsLayout() {
             </Button>
           </div>
         </div>
-        <SettingsContent section={selectedSection} />
+        <ScrollArea className="flex-1">
+          <SettingsContent section={selectedSection} />
+        </ScrollArea>
       </div>
     </div>
   );
