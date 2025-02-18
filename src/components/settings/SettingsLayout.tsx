@@ -35,9 +35,9 @@ export function SettingsLayout() {
             </Button>
           </div>
         </div>
-        <ScrollArea className="flex-1">
+        <div className="flex-1 h-0 overflow-hidden">
           <SettingsContent section={selectedSection} />
-        </ScrollArea>
+        </div>
       </div>
     </div>
   );

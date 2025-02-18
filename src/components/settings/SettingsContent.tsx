@@ -3,6 +3,7 @@ import { DataTable } from "./DataTable";
 import { columns } from "./columns";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { ScrollArea } from "../ui/scroll-area";
 
 interface SettingsContentProps {
   section: string;
@@ -29,16 +30,20 @@ export function SettingsContent({ section }: SettingsContentProps) {
 
   if (section !== 'users') {
     return (
-      <div className="p-8">
-        <h2 className="text-lg font-semibold">{section.charAt(0).toUpperCase() + section.slice(1)}</h2>
-        <p className="text-muted-foreground">This section is under development.</p>
-      </div>
+      <ScrollArea className="h-full">
+        <div className="p-8">
+          <h2 className="text-lg font-semibold">{section.charAt(0).toUpperCase() + section.slice(1)}</h2>
+          <p className="text-muted-foreground">This section is under development.</p>
+        </div>
+      </ScrollArea>
     );
   }
 
   return (
-    <div className="p-4">
-      <DataTable columns={columns} data={users} />
-    </div>
+    <ScrollArea className="h-full">
+      <div className="p-4">
+        <DataTable columns={columns} data={users} />
+      </div>
+    </ScrollArea>
   );
 }
