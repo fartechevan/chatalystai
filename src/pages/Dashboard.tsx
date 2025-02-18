@@ -33,9 +33,9 @@ export default function Dashboard() {
     <SidebarProvider defaultOpen={true}>
       <div className="flex h-screen w-full bg-background">
         <DashboardSidebar />
-        <main className="flex-1 p-8 overflow-auto relative">
-          <div className="absolute top-4 right-4 z-50">
-            <Button
+        <main className="flex-1 pt-8 pr8 overflow-auto relative">
+          <div className="absolute top-4 z-50">
+            {/* <Button
               variant="outline"
               size="sm"
               onClick={handleLogout}
@@ -43,9 +43,9 @@ export default function Dashboard() {
             >
               <LogOut className="h-4 w-4" />
               Logout
-            </Button>
+            </Button> */}
           </div>
-          <div className="container mx-auto">
+          <div className="container">
             <Outlet />
           </div>
         </main>

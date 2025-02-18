@@ -50,7 +50,7 @@ export function SettingsSidebar({ selectedSection, onSectionChange }: SettingsSi
   return (
     <div className={cn(
       "border-r bg-muted/30 transition-all duration-300 relative flex flex-col",
-      isCollapsed ? "w-14" : "w-48"
+      isCollapsed ? "" : "w-48"
     )}>
       <nav className="p-3 space-y-1">
         {menuItems.map((item) => (
