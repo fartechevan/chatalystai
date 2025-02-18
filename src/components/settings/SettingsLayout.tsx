@@ -5,7 +5,6 @@ import { Button } from "@/components/ui/button";
 import { SettingsSidebar } from "./SettingsSidebar";
 import { SettingsContent } from "./SettingsContent";
 import { MoreHorizontal, Plus } from "lucide-react";
-import { ScrollArea } from "../ui/scroll-area";
 
 export function SettingsLayout() {
   const [selectedSection, setSelectedSection] = useState("users");
@@ -17,7 +16,7 @@ export function SettingsLayout() {
         onSectionChange={setSelectedSection}
       />
       <div className="flex-1 flex flex-col overflow-hidden">
-        <div className="border-b p-4 flex items-center justify-between">
+        <div className="border-b p-4 flex items-center justify-between bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/50 sticky top-0 z-10">
           <div className="flex items-center gap-4 flex-1">
             <h1 className="text-xl font-semibold">SETTINGS</h1>
             <Input 
@@ -35,7 +34,7 @@ export function SettingsLayout() {
             </Button>
           </div>
         </div>
-        <div className="flex-1 h-0 overflow-hidden">
+        <div className="flex-1 overflow-auto">
           <SettingsContent section={selectedSection} />
         </div>
       </div>
