@@ -45,6 +45,35 @@ export type Database = {
         }
         Relationships: []
       }
+      conversation_summaries: {
+        Row: {
+          conversation_id: string
+          created_at: string | null
+          id: string
+          summary: string
+        }
+        Insert: {
+          conversation_id: string
+          created_at?: string | null
+          id?: string
+          summary: string
+        }
+        Update: {
+          conversation_id?: string
+          created_at?: string | null
+          id?: string
+          summary?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conversation_summaries_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: true
+            referencedRelation: "conversations"
+            referencedColumns: ["conversation_id"]
+          },
+        ]
+      }
       conversations: {
         Row: {
           conversation_id: string

@@ -19,6 +19,7 @@ interface ConversationMainAreaProps {
   sendMessageMutation: UseMutationResult<any, Error, string>;
   summarizeMutation: UseMutationResult<string | null, Error, void>;
   summary: string | null;
+  summaryTimestamp: string | null;
 }
 
 export function ConversationMainArea({
@@ -30,7 +31,8 @@ export function ConversationMainArea({
   handleSendMessage,
   sendMessageMutation,
   summarizeMutation,
-  summary
+  summary,
+  summaryTimestamp
 }: ConversationMainAreaProps) {
   return (
     <div className="flex-1 flex flex-col min-h-0">
@@ -70,6 +72,7 @@ export function ConversationMainArea({
           <ConversationSummary
             summarizeMutation={summarizeMutation}
             summary={summary}
+            summaryTimestamp={summaryTimestamp}
             hasMessages={messages.length > 0}
           />
           <Separator />

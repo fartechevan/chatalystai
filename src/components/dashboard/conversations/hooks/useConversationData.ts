@@ -8,6 +8,7 @@ import { toast } from "sonner";
 export function useConversationData(selectedConversation: Conversation | null) {
   const [newMessage, setNewMessage] = useState("");
   const [summary, setSummary] = useState<string | null>(null);
+  const [summaryTimestamp, setSummaryTimestamp] = useState<string | null>(null);
   const queryClient = useQueryClient();
 
   const { data: conversations = [], isLoading } = useQuery({
@@ -45,19 +46,34 @@ export function useConversationData(selectedConversation: Conversation | null) {
       
       console.log('Fetching messages for conversation:', selectedConversation.conversation_id);
       
-      const { data, error } = await supabase
+      // Fetch messages
+      const { data: messagesData, error: messagesError } = await supabase
         .from('messages')
         .select('*')
         .eq('conversation_id', selectedConversation.conversation_id)
         .order('created_at', { ascending: true });
 
-      if (error) {
-        console.error('Error fetching messages:', error);
-        throw error;
+      if (messagesError) {
+        console.error('Error fetching messages:', messagesError);
+        throw messagesError;
+      }
+
+      // Fetch existing summary
+      const { data: summaryData } = await supabase
+        .from('conversation_summaries')
+        .select('summary, created_at')
+        .eq('conversation_id', selectedConversation.conversation_id)
+        .single();
+
+      if (summaryData) {
+        setSummary(summaryData.summary);
+        setSummaryTimestamp(summaryData.created_at);
+      } else {
+        setSummary(null);
+        setSummaryTimestamp(null);
       }
       
-      console.log('Fetched messages:', data);
-      return data;
+      return messagesData;
     },
     enabled: !!selectedConversation,
   });
@@ -106,11 +122,25 @@ export function useConversationData(selectedConversation: Conversation | null) {
       });
 
       if (error) throw error;
+
+      // Store the summary in the database
+      if (data.summary) {
+        const { error: summaryError } = await supabase
+          .from('conversation_summaries')
+          .upsert({
+            conversation_id: selectedConversation.conversation_id,
+            summary: data.summary,
+          });
+
+        if (summaryError) throw summaryError;
+      }
+
       return data.summary;
     },
     onSuccess: (summary) => {
       if (summary) {
         setSummary(summary);
+        setSummaryTimestamp(new Date().toISOString());
         toast.success("Conversation summarized");
       }
     },
@@ -127,6 +157,7 @@ export function useConversationData(selectedConversation: Conversation | null) {
     newMessage,
     setNewMessage,
     summary,
+    summaryTimestamp,
     sendMessageMutation,
     summarizeMutation
   };
