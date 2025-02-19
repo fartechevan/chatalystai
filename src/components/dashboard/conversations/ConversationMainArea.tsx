@@ -6,7 +6,7 @@ import { MessageList } from "./MessageList";
 import { MessageInput } from "./MessageInput";
 import { ConversationSummary } from "./ConversationSummary";
 import { ConversationUserDetails } from "./ConversationUserDetails";
-import type { Conversation, Message } from "./types";
+import type { Conversation, Message, ConversationSummary as ConversationSummaryType } from "./types";
 import { UseMutationResult } from "@tanstack/react-query";
 
 interface ConversationMainAreaProps {
@@ -17,7 +17,7 @@ interface ConversationMainAreaProps {
   setNewMessage: (message: string) => void;
   handleSendMessage: () => void;
   sendMessageMutation: UseMutationResult<any, Error, string>;
-  summarizeMutation: UseMutationResult<string | null, Error, void>;
+  summarizeMutation: UseMutationResult<ConversationSummaryType | null, Error, void>;
   summary: string | null;
   summaryTimestamp: string | null;
 }

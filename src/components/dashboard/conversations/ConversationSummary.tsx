@@ -3,9 +3,10 @@ import { Button } from "@/components/ui/button";
 import { FileText } from "lucide-react";
 import { UseMutationResult } from "@tanstack/react-query";
 import { format } from "date-fns";
+import type { ConversationSummary as ConversationSummaryType } from "./types";
 
 interface ConversationSummaryProps {
-  summarizeMutation: UseMutationResult<string | null, Error, void, unknown>;
+  summarizeMutation: UseMutationResult<ConversationSummaryType | null, Error, void, unknown>;
   summary: string | null;
   summaryTimestamp: string | null;
   hasMessages: boolean;
