@@ -46,7 +46,6 @@ export function useConversationData(selectedConversation: Conversation | null) {
       
       console.log('Fetching messages for conversation:', selectedConversation.conversation_id);
       
-      // Fetch messages
       const { data: messagesData, error: messagesError } = await supabase
         .from('messages')
         .select('*')
@@ -58,7 +57,7 @@ export function useConversationData(selectedConversation: Conversation | null) {
         throw messagesError;
       }
 
-      // Fetch existing summary using maybeSingle()
+      // Fetch existing summary
       const { data: summaryData } = await supabase
         .from('conversation_summaries')
         .select('summary, created_at')
@@ -111,6 +110,10 @@ export function useConversationData(selectedConversation: Conversation | null) {
   const summarizeMutation = useMutation({
     mutationFn: async () => {
       if (!selectedConversation || messages.length === 0) return null;
+
+      // Get current user
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error('User not authenticated');
       
       const messagesWithConversation = messages.map(msg => ({
         ...msg,
@@ -142,7 +145,22 @@ export function useConversationData(selectedConversation: Conversation | null) {
           throw summaryError;
         }
 
+        // Log token usage
+        const { error: tokenError } = await supabase
+          .from('token_usage')
+          .insert({
+            user_id: user.id,
+            conversation_id: selectedConversation.conversation_id,
+            tokens_used: 1
+          });
+
+        if (tokenError) {
+          console.error('Error logging token usage:', tokenError);
+          throw tokenError;
+        }
+
         console.log('Summary saved successfully:', summaryData);
+        console.log('Token usage logged successfully');
         return summaryData;
       }
 
