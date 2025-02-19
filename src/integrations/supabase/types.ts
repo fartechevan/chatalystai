@@ -147,6 +147,74 @@ export type Database = {
         }
         Relationships: []
       }
+      token_allocations: {
+        Row: {
+          created_at: string | null
+          id: string
+          monthly_tokens: number
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          monthly_tokens?: number
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          monthly_tokens?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "token_allocations_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      token_usage: {
+        Row: {
+          conversation_id: string | null
+          created_at: string | null
+          id: string
+          tokens_used: number
+          user_id: string
+        }
+        Insert: {
+          conversation_id?: string | null
+          created_at?: string | null
+          id?: string
+          tokens_used: number
+          user_id: string
+        }
+        Update: {
+          conversation_id?: string | null
+          created_at?: string | null
+          id?: string
+          tokens_used?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "token_usage_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["conversation_id"]
+          },
+          {
+            foreignKeyName: "token_usage_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       User_info: {
         Row: {
           attrs: Json | null

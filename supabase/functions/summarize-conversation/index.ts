@@ -1,3 +1,4 @@
+
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3'
 import { corsHeaders } from '../_shared/cors.ts'
 
@@ -8,26 +9,7 @@ Deno.serve(async (req) => {
   }
 
   try {
-    const { action, messages } = await req.json()
-
-    if (action === 'get-usage-stats') {
-      // This would normally connect to your logging/monitoring system
-      // For demo purposes, returning mock data
-      return new Response(
-        JSON.stringify({
-          totalInvocations: 1234,
-          avgResponseTime: 245.6,
-          successRate: 0.985,
-          dailyStats: Array.from({ length: 30 }, (_, i) => ({
-            date: new Date(Date.now() - (29 - i) * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-            invocations: Math.floor(Math.random() * 100) + 20
-          }))
-        }),
-        {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        },
-      )
-    }
+    const { messages } = await req.json()
 
     if (!messages || !Array.isArray(messages) || messages.length === 0) {
       return new Response(JSON.stringify({ summary: null }), {
@@ -72,6 +54,28 @@ Deno.serve(async (req) => {
 
     const jsonResponse = await response.json()
     const summary = jsonResponse?.choices?.[0]?.message?.content?.trim() || null
+
+    // Track token usage
+    const tokensUsed = jsonResponse.usage.total_tokens
+    const supabaseClient = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_ANON_KEY') ?? ''
+    )
+
+    const conversationId = messages[0]?.conversation?.conversation_id
+    const userId = messages[0]?.conversation?.sender_id
+
+    if (userId) {
+      await supabaseClient
+        .from('token_usage')
+        .insert([
+          {
+            user_id: userId,
+            tokens_used: tokensUsed,
+            conversation_id: conversationId
+          }
+        ])
+    }
 
     return new Response(
       JSON.stringify({ summary }),
