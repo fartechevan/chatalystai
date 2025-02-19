@@ -58,7 +58,7 @@ export function useConversationData(selectedConversation: Conversation | null) {
         throw messagesError;
       }
 
-      // Fetch existing summary using maybeSingle() instead of single()
+      // Fetch existing summary using maybeSingle()
       const { data: summaryData } = await supabase
         .from('conversation_summaries')
         .select('summary, created_at')
@@ -117,6 +117,7 @@ export function useConversationData(selectedConversation: Conversation | null) {
         conversation: selectedConversation
       }));
 
+      console.log('Calling summarize-conversation function...');
       const { data, error } = await supabase.functions.invoke('summarize-conversation', {
         body: { messages: messagesWithConversation }
       });
@@ -125,22 +126,32 @@ export function useConversationData(selectedConversation: Conversation | null) {
 
       // Store the summary in the database
       if (data.summary) {
-        const { error: summaryError } = await supabase
+        console.log('Saving summary to database...');
+        const { data: summaryData, error: summaryError } = await supabase
           .from('conversation_summaries')
           .upsert({
             conversation_id: selectedConversation.conversation_id,
             summary: data.summary,
-          });
+            created_at: new Date().toISOString()
+          })
+          .select()
+          .single();
 
-        if (summaryError) throw summaryError;
+        if (summaryError) {
+          console.error('Error saving summary:', summaryError);
+          throw summaryError;
+        }
+
+        console.log('Summary saved successfully:', summaryData);
+        return summaryData;
       }
 
-      return data.summary;
+      return null;
     },
-    onSuccess: (summary) => {
-      if (summary) {
-        setSummary(summary);
-        setSummaryTimestamp(new Date().toISOString());
+    onSuccess: (data) => {
+      if (data) {
+        setSummary(data.summary);
+        setSummaryTimestamp(data.created_at);
         toast.success("Conversation summarized");
       }
     },
