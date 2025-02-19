@@ -20,6 +20,7 @@ export function ConversationView() {
     newMessage,
     setNewMessage,
     summary,
+    summaryTimestamp,
     sendMessageMutation,
     summarizeMutation
   } = useConversationData(selectedConversation);
@@ -64,6 +65,7 @@ export function ConversationView() {
           sendMessageMutation={sendMessageMutation}
           summarizeMutation={summarizeMutation}
           summary={summary}
+          summaryTimestamp={summaryTimestamp}
         />
       </div>
     </div>

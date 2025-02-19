@@ -58,12 +58,12 @@ export function useConversationData(selectedConversation: Conversation | null) {
         throw messagesError;
       }
 
-      // Fetch existing summary
+      // Fetch existing summary using maybeSingle() instead of single()
       const { data: summaryData } = await supabase
         .from('conversation_summaries')
         .select('summary, created_at')
         .eq('conversation_id', selectedConversation.conversation_id)
-        .single();
+        .maybeSingle();
 
       if (summaryData) {
         setSummary(summaryData.summary);
