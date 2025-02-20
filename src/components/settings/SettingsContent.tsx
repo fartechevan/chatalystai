@@ -4,6 +4,7 @@ import { columns } from "./columns";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { BillingStats } from "./BillingStats";
+import { IntegrationsView } from "./IntegrationsView";
 
 interface SettingsContentProps {
   section: string;
@@ -42,6 +43,10 @@ export function SettingsContent({ section }: SettingsContentProps) {
         <DataTable columns={columns} data={users} />
       </div>
     );
+  }
+
+  if (section === 'integrations') {
+    return <IntegrationsView />;
   }
 
   return (
