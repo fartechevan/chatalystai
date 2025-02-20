@@ -7,6 +7,13 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Database } from "@/integrations/supabase/types";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 type Integration = {
   id: string;
@@ -22,6 +29,8 @@ const tabs = ["All", "Inbox", "Automations", "Lead sources", "Connected"];
 export function IntegrationsView() {
   const [activeTab, setActiveTab] = useState("All");
   const [searchQuery, setSearchQuery] = useState("");
+  const [instancesData, setInstancesData] = useState<any>(null);
+  const [dialogOpen, setDialogOpen] = useState(false);
   const queryClient = useQueryClient();
 
   const { data: integrations = [], isLoading } = useQuery({
@@ -41,6 +50,8 @@ export function IntegrationsView() {
     const { data, error } = await supabase.functions.invoke('fetch-evolution-instances');
     if (error) throw error;
     console.log('Evolution API response:', data);
+    setInstancesData(data);
+    setDialogOpen(true);
     return data;
   };
 
@@ -78,6 +89,26 @@ export function IntegrationsView() {
 
   return (
     <div className="p-8 max-w-7xl mx-auto space-y-8">
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>WhatsApp Instances</DialogTitle>
+            <DialogDescription>
+              Here are your Evolution API WhatsApp instances:
+            </DialogDescription>
+          </DialogHeader>
+          <div className="mt-4">
+            {instancesData ? (
+              <pre className="bg-muted p-4 rounded-lg overflow-auto max-h-96">
+                {JSON.stringify(instancesData, null, 2)}
+              </pre>
+            ) : (
+              <p>No instance data available</p>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
       <div className="flex items-center justify-between">
         <Input 
           placeholder="Search" 
