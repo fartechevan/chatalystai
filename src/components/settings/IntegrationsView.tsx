@@ -164,7 +164,7 @@ export function IntegrationsView() {
                   <img
                     src={integration.icon_url}
                     alt={integration.name}
-                    className="w-12 h-12 object-contain"
+                    className="object-contain"
                   />
                 </div>
                 <h3 className="font-medium mb-2">{integration.name}</h3>
