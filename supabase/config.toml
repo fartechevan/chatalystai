@@ -15,3 +15,6 @@ port = 54323
 
 [functions.summarize-conversation]
 verify_jwt = false
+
+[functions.fetch-evolution-instances]
+verify_jwt = false

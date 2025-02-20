@@ -37,8 +37,20 @@ export function IntegrationsView() {
     },
   });
 
+  const fetchEvolutionInstances = async () => {
+    const { data, error } = await supabase.functions.invoke('fetch-evolution-instances');
+    if (error) throw error;
+    console.log('Evolution API response:', data);
+    return data;
+  };
+
   const toggleConnectionMutation = useMutation({
-    mutationFn: async ({ id, isConnected }: { id: string; isConnected: boolean }) => {
+    mutationFn: async ({ id, isConnected, name }: { id: string; isConnected: boolean; name: string }) => {
+      if (isConnected && name === 'WhatsApp Lite') {
+        // First fetch instances when connecting WhatsApp Lite
+        await fetchEvolutionInstances();
+      }
+      
       const { error } = await supabase
         .from('integrations')
         .update({ is_connected: isConnected })
@@ -50,7 +62,8 @@ export function IntegrationsView() {
       queryClient.invalidateQueries({ queryKey: ['integrations'] });
       toast.success("Integration status updated");
     },
-    onError: () => {
+    onError: (error) => {
+      console.error('Connection error:', error);
       toast.error("Failed to update integration status");
     }
   });
@@ -143,12 +156,14 @@ export function IntegrationsView() {
                       if (!integration.is_connected) {
                         toggleConnectionMutation.mutate({
                           id: integration.id,
-                          isConnected: true
+                          isConnected: true,
+                          name: integration.name
                         });
                       } else {
                         toggleConnectionMutation.mutate({
                           id: integration.id,
-                          isConnected: false
+                          isConnected: false,
+                          name: integration.name
                         });
                       }
                     }}
