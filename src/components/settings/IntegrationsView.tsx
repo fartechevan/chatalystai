@@ -3,62 +3,64 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Plus } from "lucide-react";
 import { useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
 
-const messengers = [
-  {
-    id: "whatsapp-cloud",
-    name: "WhatsApp Cloud API",
-    icon: "/lovable-uploads/a66609b5-787d-4a5c-bf28-09958af767d8.png",
-    installed: true,
-  },
-  {
-    id: "instagram",
-    name: "Instagram",
-    icon: "/lovable-uploads/a66609b5-787d-4a5c-bf28-09958af767d8.png",
-    installed: false,
-  },
-  {
-    id: "whatsapp-lite",
-    name: "WhatsApp Lite",
-    icon: "/lovable-uploads/a66609b5-787d-4a5c-bf28-09958af767d8.png",
-    installed: true,
-  },
-  {
-    id: "apple-messages",
-    name: "Apple Messages for Business",
-    icon: "/lovable-uploads/a66609b5-787d-4a5c-bf28-09958af767d8.png",
-    installed: false,
-  },
-  {
-    id: "facebook",
-    name: "Facebook",
-    icon: "/lovable-uploads/a66609b5-787d-4a5c-bf28-09958af767d8.png",
-    installed: false,
-  },
-  {
-    id: "viber",
-    name: "Viber",
-    icon: "/lovable-uploads/a66609b5-787d-4a5c-bf28-09958af767d8.png",
-    installed: false,
-  },
-  {
-    id: "telegram",
-    name: "Telegram",
-    icon: "/lovable-uploads/a66609b5-787d-4a5c-bf28-09958af767d8.png",
-    installed: false,
-  },
-  {
-    id: "wechat",
-    name: "WeChat",
-    icon: "/lovable-uploads/a66609b5-787d-4a5c-bf28-09958af767d8.png",
-    installed: false,
-  }
-];
+interface Integration {
+  id: string;
+  name: string;
+  description: string | null;
+  icon_url: string;
+  status: 'available' | 'coming_soon';
+  is_connected: boolean;
+}
 
-const tabs = ["All", "Inbox", "Automations", "Lead sources", "Installed"];
+const tabs = ["All", "Inbox", "Automations", "Lead sources", "Connected"];
 
 export function IntegrationsView() {
   const [activeTab, setActiveTab] = useState("All");
+  const [searchQuery, setSearchQuery] = useState("");
+  const queryClient = useQueryClient();
+
+  const { data: integrations = [], isLoading } = useQuery({
+    queryKey: ['integrations'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('integrations')
+        .select('*')
+        .order('name');
+      
+      if (error) throw error;
+      return data as Integration[];
+    },
+  });
+
+  const toggleConnectionMutation = useMutation({
+    mutationFn: async ({ id, isConnected }: { id: string; isConnected: boolean }) => {
+      const { error } = await supabase
+        .from('integrations')
+        .update({ is_connected: isConnected })
+        .eq('id', id);
+      
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['integrations'] });
+      toast.success("Integration status updated");
+    },
+    onError: () => {
+      toast.error("Failed to update integration status");
+    }
+  });
+
+  const filteredIntegrations = integrations.filter(integration => {
+    const matchesSearch = integration.name.toLowerCase().includes(searchQuery.toLowerCase());
+    if (activeTab === "Connected") {
+      return matchesSearch && integration.is_connected;
+    }
+    return matchesSearch;
+  });
 
   return (
     <div className="p-8 max-w-7xl mx-auto space-y-8">
@@ -66,6 +68,8 @@ export function IntegrationsView() {
         <Input 
           placeholder="Search" 
           className="max-w-sm"
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
         />
         <div className="flex items-center gap-2">
           <Button variant="outline" size="sm">
@@ -89,42 +93,74 @@ export function IntegrationsView() {
                 : "border-transparent text-muted-foreground hover:text-foreground"
             }`}
           >
-            {tab === "Installed" && (
+            {tab === "Connected" && (
               <div className="flex items-center gap-2">
                 <span className="h-2 w-2 rounded-full bg-green-500" />
                 {tab}
               </div>
             )}
-            {tab !== "Installed" && tab}
+            {tab !== "Connected" && tab}
           </button>
         ))}
       </div>
 
       <div className="space-y-6">
         <h2 className="text-lg font-semibold">Messengers</h2>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {messengers.map((messenger) => (
-            <div
-              key={messenger.id}
-              className="border rounded-lg p-4 hover:shadow-md transition-shadow"
-            >
-              <div className="aspect-video rounded-md bg-gradient-to-br from-blue-50 to-blue-100 mb-4 flex items-center justify-center">
-                <img
-                  src={messenger.icon}
-                  alt={messenger.name}
-                  className="w-12 h-12 object-contain"
-                />
-              </div>
-              <h3 className="font-medium mb-4">{messenger.name}</h3>
-              <Button
-                variant={messenger.installed ? "secondary" : "outline"}
-                className="w-full"
+        {isLoading ? (
+          <div className="text-center text-muted-foreground">Loading integrations...</div>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+            {filteredIntegrations.map((integration) => (
+              <div
+                key={integration.id}
+                className="border rounded-lg p-4 hover:shadow-md transition-shadow"
               >
-                {messenger.installed ? "Installed" : "+ Install"}
-              </Button>
-            </div>
-          ))}
-        </div>
+                <div className="aspect-video rounded-md bg-gradient-to-br from-blue-50 to-blue-100 mb-4 flex items-center justify-center">
+                  <img
+                    src={integration.icon_url}
+                    alt={integration.name}
+                    className="w-12 h-12 object-contain"
+                  />
+                </div>
+                <h3 className="font-medium mb-2">{integration.name}</h3>
+                {integration.description && (
+                  <p className="text-sm text-muted-foreground mb-4">{integration.description}</p>
+                )}
+                {integration.status === 'coming_soon' ? (
+                  <Button
+                    variant="outline"
+                    className="w-full"
+                    disabled
+                  >
+                    Coming Soon
+                  </Button>
+                ) : (
+                  <Button
+                    variant={integration.is_connected ? "secondary" : "outline"}
+                    className="w-full"
+                    onClick={() => {
+                      if (!integration.is_connected) {
+                        // Here you would typically show a configuration modal
+                        // For now, we'll just toggle the status
+                        toggleConnectionMutation.mutate({
+                          id: integration.id,
+                          isConnected: true
+                        });
+                      } else {
+                        toggleConnectionMutation.mutate({
+                          id: integration.id,
+                          isConnected: false
+                        });
+                      }
+                    }}
+                  >
+                    {integration.is_connected ? "Connected" : "Connect"}
+                  </Button>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
