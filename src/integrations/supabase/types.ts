@@ -113,6 +113,39 @@ export type Database = {
           },
         ]
       }
+      integrations: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          icon_url: string | null
+          id: string
+          is_connected: boolean | null
+          name: string
+          status: Database["public"]["Enums"]["integration_status"]
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          icon_url?: string | null
+          id?: string
+          is_connected?: boolean | null
+          name: string
+          status?: Database["public"]["Enums"]["integration_status"]
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          icon_url?: string | null
+          id?: string
+          is_connected?: boolean | null
+          name?: string
+          status?: Database["public"]["Enums"]["integration_status"]
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       messages: {
         Row: {
           content: string
@@ -313,6 +346,7 @@ export type Database = {
     }
     Enums: {
       app_role: "admin" | "user"
+      integration_status: "available" | "coming_soon"
       sentiment_level: "bad" | "moderate" | "good"
       sentiment_type: "bad" | "moderate" | "good"
       sync_status: "pending" | "completed" | "failed"

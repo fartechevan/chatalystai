@@ -6,8 +6,9 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { Database } from "@/integrations/supabase/types";
 
-interface Integration {
+type Integration = {
   id: string;
   name: string;
   description: string | null;
@@ -140,8 +141,6 @@ export function IntegrationsView() {
                     className="w-full"
                     onClick={() => {
                       if (!integration.is_connected) {
-                        // Here you would typically show a configuration modal
-                        // For now, we'll just toggle the status
                         toggleConnectionMutation.mutate({
                           id: integration.id,
                           isConnected: true
