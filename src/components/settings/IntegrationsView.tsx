@@ -6,14 +6,15 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { Database } from "@/integrations/supabase/types";
 import {
   Dialog,
   DialogContent,
   DialogDescription,
   DialogHeader,
   DialogTitle,
+  DialogClose,
 } from "@/components/ui/dialog";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 type Integration = {
   id: string;
@@ -29,7 +30,6 @@ const tabs = ["All", "Inbox", "Automations", "Lead sources", "Connected"];
 export function IntegrationsView() {
   const [activeTab, setActiveTab] = useState("All");
   const [searchQuery, setSearchQuery] = useState("");
-  const [instancesData, setInstancesData] = useState<any>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const queryClient = useQueryClient();
 
@@ -46,20 +46,11 @@ export function IntegrationsView() {
     },
   });
 
-  const fetchEvolutionInstances = async () => {
-    const { data, error } = await supabase.functions.invoke('fetch-evolution-instances');
-    if (error) throw error;
-    console.log('Evolution API response:', data);
-    setInstancesData(data);
-    setDialogOpen(true);
-    return data;
-  };
-
   const toggleConnectionMutation = useMutation({
     mutationFn: async ({ id, isConnected, name }: { id: string; isConnected: boolean; name: string }) => {
       if (isConnected && name === 'WhatsApp Lite') {
-        // First fetch instances when connecting WhatsApp Lite
-        await fetchEvolutionInstances();
+        setDialogOpen(true);
+        return; // Don't proceed with the connection yet
       }
       
       const { error } = await supabase
@@ -90,22 +81,39 @@ export function IntegrationsView() {
   return (
     <div className="p-8 max-w-7xl mx-auto space-y-8">
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent>
+        <DialogContent className="max-w-xl">
           <DialogHeader>
-            <DialogTitle>WhatsApp Instances</DialogTitle>
+            <DialogTitle>Connect WhatsApp</DialogTitle>
             <DialogDescription>
-              Here are your Evolution API WhatsApp instances:
+              Connect multiple WhatsApp numbers to send important conversations straight to your inbox.
+              Then nurture them with tools like templates and Salesbot!
             </DialogDescription>
           </DialogHeader>
-          <div className="mt-4">
-            {instancesData ? (
-              <pre className="bg-muted p-4 rounded-lg overflow-auto max-h-96">
-                {JSON.stringify(instancesData, null, 2)}
-              </pre>
-            ) : (
-              <p>No instance data available</p>
-            )}
-          </div>
+          <Tabs defaultValue="settings" className="w-full">
+            <TabsList className="w-full">
+              <TabsTrigger value="settings" className="flex-1">Settings</TabsTrigger>
+              <TabsTrigger value="authorization" className="flex-1">Authorization</TabsTrigger>
+            </TabsList>
+            <TabsContent value="settings" className="space-y-4">
+              <div className="space-y-2">
+                <h3 className="text-lg font-semibold">Connect WhatsApp</h3>
+                <p className="text-sm text-muted-foreground">
+                  Connect multiple WhatsApp numbers to send important conversations straight to your inbox.
+                </p>
+                <Button className="w-full" size="lg">
+                  Connect
+                </Button>
+              </div>
+            </TabsContent>
+            <TabsContent value="authorization">
+              <div className="space-y-4">
+                <p className="text-sm text-muted-foreground">
+                  Authorization settings will be available after connecting your WhatsApp account.
+                </p>
+              </div>
+            </TabsContent>
+          </Tabs>
+          <DialogClose />
         </DialogContent>
       </Dialog>
 
