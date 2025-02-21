@@ -3,7 +3,7 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
 import type { Integration } from "../../types";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 export function useWhatsAppConnection(selectedIntegration: Integration | null) {
   const { toast } = useToast();
@@ -34,7 +34,6 @@ export function useWhatsAppConnection(selectedIntegration: Integration | null) {
       });
       return false;
     }
-    console.log("connecting whatsapp");
 
     try {
       const response = await fetch(`${config.base_url}/instance/connect/${config.instance_id}`, {
@@ -47,14 +46,23 @@ export function useWhatsAppConnection(selectedIntegration: Integration | null) {
         throw new Error('Failed to connect to WhatsApp');
       }
 
-      console.log("");
       const data = await response.json();
-      if (data.qrcode?.base64?.value) {
-        // Extract base64 value from the nested structure
-        setQrCodeBase64(data.qrcode.base64.value);
-      }
       console.log('WhatsApp connection response:', data);
-      return true;
+
+      // Extract QR code from the response
+      if (data.qrcode?.base64?.value) {
+        // Since the API returns the full data URL, we can use it directly
+        setQrCodeBase64(data.qrcode.base64.value);
+        return true;
+      } else {
+        console.error('QR code data not found in response:', data);
+        toast({
+          title: "QR Code Error",
+          description: "Failed to get QR code from WhatsApp",
+          variant: "destructive",
+        });
+        return false;
+      }
     } catch (error) {
       toast({
         title: "Connection Error",
@@ -65,6 +73,13 @@ export function useWhatsAppConnection(selectedIntegration: Integration | null) {
       return false;
     }
   };
+
+  // Clean up QR code when component unmounts
+  useEffect(() => {
+    return () => {
+      setQrCodeBase64(null);
+    };
+  }, []);
 
   return { initializeConnection, qrCodeBase64 };
 }

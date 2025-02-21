@@ -15,6 +15,8 @@ interface QRCodeScreenProps {
 }
 
 export function QRCodeScreen({ open, onClose, onOpenChange, qrCodeBase64 }: QRCodeScreenProps) {
+  console.log('QR Code Data:', qrCodeBase64); // Debug log
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-xl">
@@ -40,9 +42,10 @@ export function QRCodeScreen({ open, onClose, onOpenChange, qrCodeBase64 }: QRCo
               <div className="aspect-square w-full max-w-[240px] bg-white p-4 rounded-xl">
                 {qrCodeBase64 ? (
                   <img
-                  src={qrCodeBase64}
-                  alt="WhatsApp QR Code"
-                    className="w-full h-full"
+                    src={qrCodeBase64}
+                    alt="WhatsApp QR Code"
+                    className="w-full h-full object-contain"
+                    onError={(e) => console.error('QR code image error:', e)}
                   />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center text-gray-400">
