@@ -55,28 +55,56 @@ export async function fetchConversationsWithParticipants() {
     .select('id, name, email')
     .in('id', Array.from(customerIds));
 
-  // Create lookup maps for profiles and customers
-  const profilesMap = new Map(profiles?.map(p => [p.id, {
-    id: p.id,
-    name: p.name || 'Profile User',  // Default name for profiles
-    email: p.email
-  }]) || []);
+  console.log('Fetched profiles:', profiles);
+  console.log('Fetched customers:', customers);
 
-  const customersMap = new Map(customers?.map(c => [c.id, {
-    id: c.id,
-    name: c.name || 'Customer',  // Default name for customers
-    email: c.email || ''
-  }]) || []);
+  // Create lookup maps for profiles and customers
+  const profilesMap = new Map();
+  const customersMap = new Map();
+
+  // Populate profiles map
+  profiles?.forEach(profile => {
+    profilesMap.set(profile.id, {
+      id: profile.id,
+      name: profile.name || `Profile ${profile.id.slice(0, 4)}`,
+      email: profile.email
+    });
+  });
+
+  // Populate customers map
+  customers?.forEach(customer => {
+    customersMap.set(customer.id, {
+      id: customer.id,
+      name: customer.name || `Customer ${customer.id.slice(0, 4)}`,
+      email: customer.email || ''
+    });
+  });
 
   // Transform the data
   const transformedData = conversations.map(conv => {
-    const sender = conv.sender_type === 'profile' 
-      ? profilesMap.get(conv.sender_id)
-      : customersMap.get(conv.sender_id);
+    let sender;
+    let receiver;
 
-    const receiver = conv.receiver_type === 'profile'
-      ? profilesMap.get(conv.receiver_id)
-      : customersMap.get(conv.receiver_id);
+    if (conv.sender_type === 'profile') {
+      sender = profilesMap.get(conv.sender_id);
+    } else {
+      sender = customersMap.get(conv.sender_id);
+    }
+
+    if (conv.receiver_type === 'profile') {
+      receiver = profilesMap.get(conv.receiver_id);
+    } else {
+      receiver = customersMap.get(conv.receiver_id);
+    }
+
+    console.log('Mapping conversation:', {
+      sender_type: conv.sender_type,
+      sender_id: conv.sender_id,
+      mapped_sender: sender,
+      receiver_type: conv.receiver_type,
+      receiver_id: conv.receiver_id,
+      mapped_receiver: receiver
+    });
 
     return {
       conversation_id: conv.conversation_id,
@@ -88,12 +116,12 @@ export async function fetchConversationsWithParticipants() {
       updated_at: conv.updated_at,
       sender: sender || {
         id: conv.sender_id,
-        name: conv.sender_type === 'profile' ? 'Profile User' : 'Customer',
+        name: `${conv.sender_type === 'profile' ? 'Profile' : 'Customer'} ${conv.sender_id.slice(0, 4)}`,
         email: ''
       },
       receiver: receiver || {
         id: conv.receiver_id,
-        name: conv.receiver_type === 'profile' ? 'Profile User' : 'Customer',
+        name: `${conv.receiver_type === 'profile' ? 'Profile' : 'Customer'} ${conv.receiver_id.slice(0, 4)}`,
         email: ''
       }
     };
