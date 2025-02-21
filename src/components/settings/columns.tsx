@@ -44,12 +44,12 @@ export const columns: ColumnDef<any>[] = [
     ),
   },
   {
-    accessorKey: "user_roles",
+    accessorKey: "role",
     header: ({ column }) => (
       <DataTableColumnHeader column={column} title="ROLE" />
     ),
     cell: ({ row }) => {
-      const role = row.original.user_roles?.[0]?.role || 'user';
+      const role = row.original.role || 'user';
       return (
         <Badge variant={role === 'admin' ? 'default' : 'secondary'}>
           {role.charAt(0).toUpperCase() + role.slice(1)}

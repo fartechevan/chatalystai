@@ -21,7 +21,7 @@ export function SettingsContent({ section }: SettingsContentProps) {
           email,
           name,
           created_at,
-          user_roles (role)
+          role
         `);
       
       if (error) throw error;
