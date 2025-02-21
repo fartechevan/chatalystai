@@ -1,4 +1,3 @@
-
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -29,19 +28,19 @@ export function IntegrationDialog({
     setShowDeviceSelect(true);
   };
 
-  const handleClose = () => {
-    if (showDeviceSelect) {
-      // If on device select screen, go back to first screen
+  const handleDialogChange = (open: boolean) => {
+    if (!open && showDeviceSelect) {
+      // If closing from device select screen, just go back
       setShowDeviceSelect(false);
-    } else {
-      // If on first screen, close the dialog
-      onOpenChange(false);
+      return;
     }
+    // Otherwise, close the dialog completely
+    onOpenChange(open);
   };
 
   if (showDeviceSelect) {
     return (
-      <Dialog open={open} onOpenChange={onOpenChange}>
+      <Dialog open={open} onOpenChange={handleDialogChange}>
         <DialogContent className="max-w-xl">
           <DialogHeader>
             <DialogTitle>All conversations. One inbox.</DialogTitle>
@@ -75,22 +74,20 @@ export function IntegrationDialog({
               </Button>
             </div>
           </div>
-          <DialogClose asChild>
-            <button
-              onClick={handleClose}
-              className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground"
-            >
-              <span className="sr-only">Close</span>
-              ✕
-            </button>
-          </DialogClose>
+          <button
+            onClick={() => setShowDeviceSelect(false)}
+            className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground"
+          >
+            <span className="sr-only">Close</span>
+            ✕
+          </button>
         </DialogContent>
       </Dialog>
     );
   }
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
+    <Dialog open={open} onOpenChange={handleDialogChange}>
       <DialogContent className="max-w-xl">
         <DialogHeader>
           <DialogTitle>Connect WhatsApp</DialogTitle>
@@ -132,15 +129,13 @@ export function IntegrationDialog({
             </div>
           </TabsContent>
         </Tabs>
-        <DialogClose asChild>
-          <button
-            onClick={handleClose}
-            className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground"
-          >
-            <span className="sr-only">Close</span>
-            ✕
-          </button>
-        </DialogClose>
+        <button
+          onClick={() => onOpenChange(false)}
+          className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground"
+        >
+          <span className="sr-only">Close</span>
+          ✕
+        </button>
       </DialogContent>
     </Dialog>
   );
