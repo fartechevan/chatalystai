@@ -8,33 +8,33 @@ interface ConversationUserDetailsProps {
 }
 
 export function ConversationUserDetails({ conversation, messages }: ConversationUserDetailsProps) {
-  const getAvatarFallback = (user: { name: string | null; email: string }) => {
-    if (user.name) return user.name[0].toUpperCase();
-    if (user.email) return user.email[0].toUpperCase();
-    return '?';
-  };
+  // Determine which participant is the customer
+  const customer = conversation.sender_type === 'customer' 
+    ? conversation.sender 
+    : conversation.receiver;
 
-  const getUserDisplayName = (user: { name: string | null; email: string }) => {
-    return user.name || user.email;
+  const getAvatarFallback = (name: string | null) => {
+    if (!name) return '?';
+    return name[0].toUpperCase();
   };
 
   return (
     <div className="bg-muted/30 backdrop-blur-sm p-6">
       <div className="max-w-5xl mx-auto">
-        <h3 className="font-medium mb-4">User Details</h3>
+        <h3 className="font-medium mb-4">Customer Details</h3>
         <div className="flex items-start gap-6">
           <div className="flex items-center gap-3">
             <Avatar className="h-16 w-16">
               <AvatarFallback>
-                {getAvatarFallback(conversation.receiver)}
+                {getAvatarFallback(customer.name)}
               </AvatarFallback>
             </Avatar>
             <div>
               <p className="font-medium">
-                {getUserDisplayName(conversation.receiver)}
+                {customer.name || 'Unnamed Customer'}
               </p>
               <p className="text-sm text-muted-foreground">
-                {conversation.receiver.email}
+                {customer.email || 'No email provided'}
               </p>
             </div>
           </div>

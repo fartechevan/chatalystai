@@ -24,14 +24,16 @@ export function ConversationLeftPanel({
   selectedConversation,
   setSelectedConversation,
 }: ConversationLeftPanelProps) {
-  const getDisplayName = (user: { name: string | null; email: string } | null) => {
-    if (!user?.name) return 'Unnamed User';
-    return user.name;
+  const getDisplayName = (conversation: Conversation) => {
+    // Show the customer's name based on whether they're the sender or receiver
+    const customer = conversation.sender_type === 'customer' ? conversation.sender : conversation.receiver;
+    return customer?.name || 'Unnamed Customer';
   };
 
-  const getAvatarInitial = (user: { name: string | null; email: string } | null) => {
-    if (!user?.name) return '?';
-    return user.name[0].toUpperCase();
+  const getAvatarInitial = (conversation: Conversation) => {
+    const customer = conversation.sender_type === 'customer' ? conversation.sender : conversation.receiver;
+    if (!customer?.name) return '?';
+    return customer.name[0].toUpperCase();
   };
 
   return (
@@ -64,12 +66,12 @@ export function ConversationLeftPanel({
               >
                 <Avatar className="h-10 w-10">
                   <AvatarFallback>
-                    {getAvatarInitial(conv.sender)}
+                    {getAvatarInitial(conv)}
                   </AvatarFallback>
                 </Avatar>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium truncate">
-                    {getDisplayName(conv.sender)}
+                    {getDisplayName(conv)}
                   </p>
                   <p className="text-xs text-muted-foreground">
                     {new Date(conv.updated_at).toLocaleTimeString([], {
