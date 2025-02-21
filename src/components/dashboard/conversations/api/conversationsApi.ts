@@ -35,7 +35,7 @@ export async function fetchConversationsWithParticipants() {
       receiver_type,
       created_at,
       updated_at,
-      sender_profile:profiles!conversations_sender_id_fkey(
+      sender_profile:profiles(
         id,
         name,
         email
@@ -64,7 +64,7 @@ export async function fetchConversationsWithParticipants() {
   }
 
   // Transform the data to match the expected format
-  const transformedData = (conversationsData as ConversationWithParticipants[]).map(conv => {
+  const transformedData = (conversationsData as unknown as ConversationWithParticipants[]).map(conv => {
     // Get the correct participant data based on type
     const senderData = conv.sender_type === 'profile' 
       ? conv.sender_profile
@@ -101,8 +101,8 @@ export async function fetchConversationsWithParticipants() {
 
   return {
     conversations: transformedData,
-    profiles: [], // These are no longer needed since we're using joins
-    customers: [] // These are no longer needed since we're using joins
+    profiles: [], 
+    customers: [] 
   };
 }
 
