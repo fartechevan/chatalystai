@@ -1,4 +1,3 @@
-
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -10,6 +9,9 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useState } from "react";
 import type { Integration } from "../types";
+import { supabase } from "@/integrations/supabase/client";
+import { useQuery } from "@tanstack/react-query";
+import { useToast } from "@/hooks/use-toast";
 
 interface IntegrationDialogProps {
   open: boolean;
@@ -25,6 +27,23 @@ export function IntegrationDialog({
   const [showDeviceSelect, setShowDeviceSelect] = useState(false);
   const [integrationMainPopup, setIntegrationMainPopup] = useState(true);
   const [integrationQRPopup, setIntegrationQRPopup] = useState(false);
+  const { toast } = useToast();
+
+  const { data: config } = useQuery({
+    queryKey: ['integration-config', selectedIntegration?.id],
+    queryFn: async () => {
+      if (!selectedIntegration?.id) return null;
+      const { data, error } = await supabase
+        .from('integrations_config')
+        .select('*')
+        .eq('integration_id', selectedIntegration.id)
+        .single();
+      
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!selectedIntegration?.id,
+  });
 
   const handleConnect = () => {
     setShowDeviceSelect(true);
@@ -50,9 +69,40 @@ export function IntegrationDialog({
     onOpenChange(open);
   };
 
-  const handleIPhoneSelect = () => {
-    setShowDeviceSelect(false);
-    setIntegrationQRPopup(true);
+  const handleIPhoneSelect = async () => {
+    if (!config) {
+      toast({
+        title: "Configuration Error",
+        description: "Integration configuration not found",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    try {
+      const response = await fetch(`${config.base_url}/instance/connect/${config.instance_id}`, {
+        headers: {
+          'apikey': config.api_key,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to connect to WhatsApp');
+      }
+
+      const data = await response.json();
+      console.log('WhatsApp connection response:', data);
+      
+      setShowDeviceSelect(false);
+      setIntegrationQRPopup(true);
+    } catch (error) {
+      toast({
+        title: "Connection Error",
+        description: "Failed to initialize WhatsApp connection",
+        variant: "destructive",
+      });
+      console.error('WhatsApp connection error:', error);
+    }
   };
 
   if (integrationQRPopup) {
@@ -107,7 +157,7 @@ export function IntegrationDialog({
             className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground"
           >
             <span className="sr-only">Close</span>
-            
+            ✕
           </button>
         </DialogContent>
       </Dialog>

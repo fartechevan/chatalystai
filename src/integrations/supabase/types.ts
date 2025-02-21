@@ -167,6 +167,44 @@ export type Database = {
         }
         Relationships: []
       }
+      integrations_config: {
+        Row: {
+          api_key: string | null
+          base_url: string
+          created_at: string
+          id: string
+          instance_id: string | null
+          integration_id: string
+          updated_at: string
+        }
+        Insert: {
+          api_key?: string | null
+          base_url?: string
+          created_at?: string
+          id?: string
+          instance_id?: string | null
+          integration_id: string
+          updated_at?: string
+        }
+        Update: {
+          api_key?: string | null
+          base_url?: string
+          created_at?: string
+          id?: string
+          instance_id?: string | null
+          integration_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "integrations_config_integration_id_fkey"
+            columns: ["integration_id"]
+            isOneToOne: true
+            referencedRelation: "integrations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       messages: {
         Row: {
           content: string
