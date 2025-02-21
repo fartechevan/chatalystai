@@ -1,65 +1,98 @@
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
 import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
+import { useToast } from "@/components/ui/use-toast";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@supabase/auth-helpers-react";
 
 interface Task {
   id: string;
   title: string;
-  dueDate: string;
-  assignee: string;
+  due_date: string;
+  assignee_id: string;
   type: 'Meeting' | 'Follow-up';
+  status: 'overdue' | 'today' | 'tomorrow';
 }
 
 interface Column {
-  id: string;
+  id: 'overdue' | 'today' | 'tomorrow';
   title: string;
   tasks: Task[];
 }
 
-const initialColumns: Column[] = [
-  {
-    id: 'overdue',
-    title: 'OVERDUE TASKS',
-    tasks: [
-      {
-        id: '1',
-        title: 'Follow-up',
-        dueDate: '17.02.2025 All day',
-        assignee: 'Evan Beh',
-        type: 'Follow-up'
-      }
-    ]
-  },
-  {
-    id: 'today',
-    title: 'TO-DO TODAY',
-    tasks: []
-  },
-  {
-    id: 'tomorrow',
-    title: 'TO-DO TOMORROW',
-    tasks: [
-      {
-        id: '2',
-        title: 'Meeting with Yean',
-        dueDate: 'Tomorrow All day',
-        assignee: 'Evan Beh',
-        type: 'Meeting'
-      }
-    ]
-  }
-];
+const COLUMN_TITLES = {
+  overdue: 'OVERDUE TASKS',
+  today: 'TO-DO TODAY',
+  tomorrow: 'TO-DO TOMORROW',
+};
 
 export function TaskBoard() {
-  const [columns, setColumns] = useState<Column[]>(initialColumns);
+  const [columns, setColumns] = useState<Column[]>([
+    { id: 'overdue', title: COLUMN_TITLES.overdue, tasks: [] },
+    { id: 'today', title: COLUMN_TITLES.today, tasks: [] },
+    { id: 'tomorrow', title: COLUMN_TITLES.tomorrow, tasks: [] },
+  ]);
+  const { toast } = useToast();
+  const user = useAuth();
 
-  const onDragEnd = (result: any) => {
+  useEffect(() => {
+    if (!user) return;
+
+    const fetchTasks = async () => {
+      const { data: tasks, error } = await supabase
+        .from('tasks')
+        .select('*')
+        .or(`created_by.eq.${user.id},assignee_id.eq.${user.id}`);
+
+      if (error) {
+        console.error('Error fetching tasks:', error);
+        toast({
+          title: "Error fetching tasks",
+          description: error.message,
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // Group tasks by status
+      const groupedTasks = columns.map(column => ({
+        ...column,
+        tasks: tasks?.filter(task => task.status === column.id) || []
+      }));
+
+      setColumns(groupedTasks);
+    };
+
+    fetchTasks();
+
+    // Subscribe to realtime changes
+    const subscription = supabase
+      .channel('tasks_changes')
+      .on('postgres_changes', 
+        { 
+          event: '*', 
+          schema: 'public', 
+          table: 'tasks',
+          filter: `created_by=eq.${user.id},assignee_id=eq.${user.id}`
+        }, 
+        () => {
+          fetchTasks();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      subscription.unsubscribe();
+    };
+  }, [user]);
+
+  const onDragEnd = async (result: any) => {
     const { destination, source, draggableId } = result;
 
-    if (!destination) return;
+    if (!destination || !user) return;
 
     if (
       destination.droppableId === source.droppableId &&
@@ -75,14 +108,31 @@ export function TaskBoard() {
 
     const task = sourceColumn.tasks[source.index];
     
+    // Update task status in database
+    const { error } = await supabase
+      .from('tasks')
+      .update({ 
+        status: destination.droppableId,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', draggableId);
+
+    if (error) {
+      toast({
+        title: "Error updating task",
+        description: error.message,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Update local state
     const newColumns = columns.map(col => {
-      // Remove from source column
       if (col.id === source.droppableId) {
         const newTasks = [...col.tasks];
         newTasks.splice(source.index, 1);
         return { ...col, tasks: newTasks };
       }
-      // Add to destination column
       if (col.id === destination.droppableId) {
         const newTasks = [...col.tasks];
         newTasks.splice(destination.index, 0, task);
@@ -148,10 +198,10 @@ export function TaskBoard() {
                             <CardContent className="p-4">
                               <div className="flex flex-col space-y-2">
                                 <div className="text-sm font-medium">
-                                  {task.dueDate}
+                                  {task.due_date}
                                 </div>
                                 <div className="text-muted-foreground text-sm">
-                                  for {task.assignee}
+                                  {task.title}
                                 </div>
                                 <div className="flex items-center mt-2">
                                   <span className="text-sm font-medium">

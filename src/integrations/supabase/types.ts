@@ -264,6 +264,57 @@ export type Database = {
         }
         Relationships: []
       }
+      tasks: {
+        Row: {
+          assignee_id: string
+          created_at: string
+          created_by: string
+          due_date: string
+          id: string
+          status: Database["public"]["Enums"]["task_status"]
+          title: string
+          type: string
+          updated_at: string
+        }
+        Insert: {
+          assignee_id: string
+          created_at?: string
+          created_by: string
+          due_date: string
+          id?: string
+          status?: Database["public"]["Enums"]["task_status"]
+          title: string
+          type: string
+          updated_at?: string
+        }
+        Update: {
+          assignee_id?: string
+          created_at?: string
+          created_by?: string
+          due_date?: string
+          id?: string
+          status?: Database["public"]["Enums"]["task_status"]
+          title?: string
+          type?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tasks_assignee_id_fkey"
+            columns: ["assignee_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tasks_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       token_allocations: {
         Row: {
           created_at: string | null
@@ -404,6 +455,7 @@ export type Database = {
       sentiment_level: "bad" | "moderate" | "good"
       sentiment_type: "bad" | "moderate" | "good"
       sync_status: "pending" | "completed" | "failed"
+      task_status: "overdue" | "today" | "tomorrow"
     }
     CompositeTypes: {
       [_ in never]: never
