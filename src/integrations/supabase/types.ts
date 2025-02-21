@@ -79,67 +79,58 @@ export type Database = {
           conversation_id: string
           created_at: string
           receiver_id: string
+          receiver_type: string
           sender_id: string
+          sender_type: string
           updated_at: string
         }
         Insert: {
           conversation_id?: string
           created_at?: string
           receiver_id: string
+          receiver_type: string
           sender_id: string
+          sender_type: string
           updated_at?: string
         }
         Update: {
           conversation_id?: string
           created_at?: string
           receiver_id?: string
+          receiver_type?: string
           sender_id?: string
+          sender_type?: string
           updated_at?: string
         }
-        Relationships: [
-          {
-            foreignKeyName: "conversations_receiver_id_fkey"
-            columns: ["receiver_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "conversations_sender_id_fkey"
-            columns: ["sender_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       customers: {
         Row: {
-          created_at: string | null
+          created_at: string
           email: string | null
           id: string
           metadata: Json | null
           name: string
           phone_number: string
-          updated_at: string | null
+          updated_at: string
         }
         Insert: {
-          created_at?: string | null
+          created_at?: string
           email?: string | null
           id?: string
           metadata?: Json | null
           name: string
           phone_number: string
-          updated_at?: string | null
+          updated_at?: string
         }
         Update: {
-          created_at?: string | null
+          created_at?: string
           email?: string | null
           id?: string
           metadata?: Json | null
           name?: string
           phone_number?: string
-          updated_at?: string | null
+          updated_at?: string
         }
         Relationships: []
       }
@@ -208,13 +199,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "conversations"
             referencedColumns: ["conversation_id"]
-          },
-          {
-            foreignKeyName: "messages_sender_id_fkey"
-            columns: ["sender_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
           },
         ]
       }
@@ -349,8 +333,9 @@ export type Database = {
       }
     }
     Enums: {
-      app_role: "admin" | "user"
+      app_role: "admin" | "user" | "customer"
       integration_status: "available" | "coming_soon"
+      new_app_role: "user" | "admin"
       sentiment_level: "bad" | "moderate" | "good"
       sentiment_type: "bad" | "moderate" | "good"
       sync_status: "pending" | "completed" | "failed"
