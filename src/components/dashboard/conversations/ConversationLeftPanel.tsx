@@ -24,16 +24,24 @@ export function ConversationLeftPanel({
   selectedConversation,
   setSelectedConversation,
 }: ConversationLeftPanelProps) {
+  const getCustomerFromConversation = (conversation: Conversation) => {
+    // Explicitly identify the customer based on sender_type
+    return conversation.sender_type === 'customer' ? conversation.sender : conversation.receiver;
+  };
+
   const getDisplayName = (conversation: Conversation) => {
-    // Show the customer's name based on whether they're the sender or receiver
-    const customer = conversation.sender_type === 'customer' ? conversation.sender : conversation.receiver;
-    return customer?.name || 'Unnamed Customer';
+    const customer = getCustomerFromConversation(conversation);
+    // Add debug logging to check the customer data
+    console.log('Customer data:', customer);
+    // If there's a name, use it; if not, try email; if neither, use ID
+    return customer.name || customer.email || `Customer ${customer.id.slice(0, 8)}`;
   };
 
   const getAvatarInitial = (conversation: Conversation) => {
-    const customer = conversation.sender_type === 'customer' ? conversation.sender : conversation.receiver;
-    if (!customer?.name) return '?';
-    return customer.name[0].toUpperCase();
+    const customer = getCustomerFromConversation(conversation);
+    if (customer.name) return customer.name[0].toUpperCase();
+    if (customer.email) return customer.email[0].toUpperCase();
+    return 'C';
   };
 
   return (
