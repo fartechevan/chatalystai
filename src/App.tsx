@@ -10,7 +10,6 @@ import Main from "./pages/Main";
 import Settings from "./pages/Settings";
 import { AuthProvider } from "./components/auth/AuthProvider";
 import { ProtectedRoute } from "./components/auth/ProtectedRoute";
-import { ChatLayout } from "./components/dashboard/chat/ChatLayout";
 
 const App = () => {
   const queryClient = new QueryClient({
@@ -42,7 +41,6 @@ const App = () => {
                   }
                 >
                   <Route index element={<Main />} />
-                  <Route path="chat" element={<ChatLayout open={true} onOpenChange={() => {}} />} />
                   <Route path="settings" element={<Settings />} />
                 </Route>
               </Routes>
