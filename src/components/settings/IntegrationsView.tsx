@@ -3,9 +3,8 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Plus } from "lucide-react";
 import { useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { toast } from "sonner";
 import {
   Dialog,
   DialogContent,
@@ -31,7 +30,7 @@ export function IntegrationsView() {
   const [activeTab, setActiveTab] = useState("All");
   const [searchQuery, setSearchQuery] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
-  const queryClient = useQueryClient();
+  const [selectedIntegration, setSelectedIntegration] = useState<Integration | null>(null);
 
   const { data: integrations = [], isLoading } = useQuery({
     queryKey: ['integrations'],
@@ -46,29 +45,10 @@ export function IntegrationsView() {
     },
   });
 
-  const toggleConnectionMutation = useMutation({
-    mutationFn: async ({ id, isConnected, name }: { id: string; isConnected: boolean; name: string }) => {
-      if (isConnected && name === 'WhatsApp Lite') {
-        setDialogOpen(true);
-        return; // Don't proceed with the connection yet
-      }
-      
-      const { error } = await supabase
-        .from('integrations')
-        .update({ is_connected: isConnected })
-        .eq('id', id);
-      
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['integrations'] });
-      toast.success("Integration status updated");
-    },
-    onError: (error) => {
-      console.error('Connection error:', error);
-      toast.error("Failed to update integration status");
-    }
-  });
+  const handleIntegrationClick = (integration: Integration) => {
+    setSelectedIntegration(integration);
+    setDialogOpen(true);
+  };
 
   const filteredIntegrations = integrations.filter(integration => {
     const matchesSearch = integration.name.toLowerCase().includes(searchQuery.toLowerCase());
@@ -95,7 +75,16 @@ export function IntegrationsView() {
               <TabsTrigger value="authorization" className="flex-1">Authorization</TabsTrigger>
             </TabsList>
             <TabsContent value="settings" className="space-y-4">
-              <div className="space-y-2">
+              <div className="space-y-4">
+                {selectedIntegration && (
+                  <div className="aspect-video rounded-md bg-gradient-to-br from-green-50 to-green-100 mb-4 flex items-center justify-center p-8">
+                    <img
+                      src={selectedIntegration.icon_url}
+                      alt={selectedIntegration.name}
+                      className="object-contain max-h-32"
+                    />
+                  </div>
+                )}
                 <h3 className="text-lg font-semibold">Connect WhatsApp</h3>
                 <p className="text-sm text-muted-foreground">
                   Connect multiple WhatsApp numbers to send important conversations straight to your inbox.
@@ -191,21 +180,7 @@ export function IntegrationsView() {
                   <Button
                     variant={integration.is_connected ? "secondary" : "outline"}
                     className="w-full"
-                    onClick={() => {
-                      if (!integration.is_connected) {
-                        toggleConnectionMutation.mutate({
-                          id: integration.id,
-                          isConnected: true,
-                          name: integration.name
-                        });
-                      } else {
-                        toggleConnectionMutation.mutate({
-                          id: integration.id,
-                          isConnected: false,
-                          name: integration.name
-                        });
-                      }
-                    }}
+                    onClick={() => handleIntegrationClick(integration)}
                   >
                     {integration.is_connected ? "Connected" : "Connect"}
                   </Button>
