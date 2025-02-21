@@ -15,10 +15,8 @@ interface ConversationWithParticipants {
   receiver_type: string;
   created_at: string;
   updated_at: string;
-  sender_profile: ParticipantData[] | null;
-  receiver_profile: ParticipantData[] | null;
-  sender_customer: ParticipantData[] | null;
-  receiver_customer: ParticipantData[] | null;
+  sender: ParticipantData | null;
+  receiver: ParticipantData | null;
 }
 
 export async function fetchConversationsWithParticipants() {
@@ -57,9 +55,18 @@ export async function fetchConversationsWithParticipants() {
     .select('id, name, email')
     .in('id', Array.from(customerIds));
 
-  // Create lookup maps
-  const profilesMap = new Map(profiles?.map(p => [p.id, p]) || []);
-  const customersMap = new Map(customers?.map(c => [c.id, c]) || []);
+  // Create lookup maps for profiles and customers
+  const profilesMap = new Map(profiles?.map(p => [p.id, {
+    id: p.id,
+    name: p.name || 'Profile User',  // Default name for profiles
+    email: p.email
+  }]) || []);
+
+  const customersMap = new Map(customers?.map(c => [c.id, {
+    id: c.id,
+    name: c.name || 'Customer',  // Default name for customers
+    email: c.email || ''
+  }]) || []);
 
   // Transform the data
   const transformedData = conversations.map(conv => {
@@ -79,16 +86,16 @@ export async function fetchConversationsWithParticipants() {
       receiver_type: conv.receiver_type,
       created_at: conv.created_at,
       updated_at: conv.updated_at,
-      sender: sender ? {
-        id: sender.id,
-        name: sender.name,
-        email: sender.email
-      } : null,
-      receiver: receiver ? {
-        id: receiver.id,
-        name: receiver.name,
-        email: receiver.email
-      } : null
+      sender: sender || {
+        id: conv.sender_id,
+        name: conv.sender_type === 'profile' ? 'Profile User' : 'Customer',
+        email: ''
+      },
+      receiver: receiver || {
+        id: conv.receiver_id,
+        name: conv.receiver_type === 'profile' ? 'Profile User' : 'Customer',
+        email: ''
+      }
     };
   });
 
