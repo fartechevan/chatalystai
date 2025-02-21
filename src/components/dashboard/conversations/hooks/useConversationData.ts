@@ -22,22 +22,10 @@ export function useConversationData(selectedConversation: Conversation | null) {
     queryFn: async () => {
       console.log('Fetching conversations...');
       
-      // First get the conversations with related data
+      // First get the conversations
       const { data: conversationsData, error: conversationsError } = await supabase
         .from('conversations')
-        .select(`
-          conversation_id,
-          sender_id,
-          receiver_id,
-          sender_type,
-          receiver_type,
-          created_at,
-          updated_at,
-          sender_profile:profiles!conversations_sender_id_fkey(id, name, email),
-          receiver_profile:profiles!conversations_receiver_id_fkey(id, name, email),
-          sender_customer:customers!conversations_sender_customer_id_fkey(id, name, email),
-          receiver_customer:customers!conversations_receiver_customer_id_fkey(id, name, email)
-        `)
+        .select('*')
         .order('updated_at', { ascending: false });
 
       if (conversationsError) {
@@ -45,27 +33,51 @@ export function useConversationData(selectedConversation: Conversation | null) {
         throw conversationsError;
       }
 
+      // Then fetch all profiles and customers that we need
+      const uniqueProfileIds = new Set<string>();
+      const uniqueCustomerIds = new Set<string>();
+
+      conversationsData.forEach(conv => {
+        if (conv.sender_type === 'profile') uniqueProfileIds.add(conv.sender_id);
+        if (conv.receiver_type === 'profile') uniqueProfileIds.add(conv.receiver_id);
+        if (conv.sender_type === 'customer') uniqueCustomerIds.add(conv.sender_id);
+        if (conv.receiver_type === 'customer') uniqueCustomerIds.add(conv.receiver_id);
+      });
+
+      // Fetch profiles
+      const { data: profiles = [] } = await supabase
+        .from('profiles')
+        .select('id, name, email')
+        .in('id', Array.from(uniqueProfileIds));
+
+      // Fetch customers
+      const { data: customers = [] } = await supabase
+        .from('customers')
+        .select('id, name, email')
+        .in('id', Array.from(uniqueCustomerIds));
+
+      // Create lookup maps
+      const profilesMap = new Map(profiles.map(p => [p.id, p]));
+      const customersMap = new Map(customers.map(c => [c.id, c]));
+
       // Transform the data
       const transformedData = conversationsData.map(conv => {
         const sender = conv.sender_type === 'profile' 
-          ? conv.sender_profile
-          : conv.sender_customer;
+          ? profilesMap.get(conv.sender_id)
+          : customersMap.get(conv.sender_id);
           
         const receiver = conv.receiver_type === 'profile'
-          ? conv.receiver_profile
-          : conv.receiver_customer;
-
-        // Clean up the conversation object by removing the raw join data
-        const { 
-          sender_profile, 
-          receiver_profile, 
-          sender_customer, 
-          receiver_customer, 
-          ...restConv 
-        } = conv;
+          ? profilesMap.get(conv.receiver_id)
+          : customersMap.get(conv.receiver_id);
 
         return {
-          ...restConv,
+          conversation_id: conv.conversation_id,
+          sender_id: conv.sender_id,
+          receiver_id: conv.receiver_id,
+          sender_type: conv.sender_type,
+          receiver_type: conv.receiver_type,
+          created_at: conv.created_at,
+          updated_at: conv.updated_at,
           sender: sender ? {
             id: sender.id,
             name: sender.name,
