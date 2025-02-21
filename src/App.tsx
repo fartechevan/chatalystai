@@ -10,6 +10,8 @@ import Main from "./pages/Main";
 import Settings from "./pages/Settings";
 import { AuthProvider } from "./components/auth/AuthProvider";
 import { ProtectedRoute } from "./components/auth/ProtectedRoute";
+import { SidebarProvider } from "./components/ui/sidebar";
+import { ConversationView } from "./components/dashboard/conversations/ConversationView";
 
 const App = () => {
   const queryClient = new QueryClient({
@@ -25,27 +27,30 @@ const App = () => {
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
         <TooltipProvider>
-          <div className="min-h-screen bg-background">
-            <Toaster />
-            <Sonner />
-            <BrowserRouter>
-              <Routes>
-                <Route path="/" element={<Navigate to="/dashboard" replace />} />
-                <Route path="/login" element={<LoginForm />} />
-                <Route
-                  path="/dashboard"
-                  element={
-                    <ProtectedRoute>
-                      <Dashboard />
-                    </ProtectedRoute>
-                  }
-                >
-                  <Route index element={<Main />} />
-                  <Route path="settings" element={<Settings />} />
-                </Route>
-              </Routes>
-            </BrowserRouter>
-          </div>
+          <SidebarProvider>
+            <div className="min-h-screen bg-background">
+              <Toaster />
+              <Sonner />
+              <BrowserRouter>
+                <Routes>
+                  <Route path="/" element={<Navigate to="/dashboard" replace />} />
+                  <Route path="/login" element={<LoginForm />} />
+                  <Route
+                    path="/dashboard"
+                    element={
+                      <ProtectedRoute>
+                        <Dashboard />
+                      </ProtectedRoute>
+                    }
+                  >
+                    <Route index element={<Main />} />
+                    <Route path="settings" element={<Settings />} />
+                    <Route path="conversations" element={<ConversationView />} />
+                  </Route>
+                </Routes>
+              </BrowserRouter>
+            </div>
+          </SidebarProvider>
         </TooltipProvider>
       </AuthProvider>
     </QueryClientProvider>
