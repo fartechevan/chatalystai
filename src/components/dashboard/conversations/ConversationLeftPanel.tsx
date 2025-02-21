@@ -25,13 +25,13 @@ export function ConversationLeftPanel({
   setSelectedConversation,
 }: ConversationLeftPanelProps) {
   const getDisplayName = (user: { name: string | null; email: string } | null) => {
-    if (!user) return 'Unknown User';
-    return user.name || user.email;
+    if (!user?.name) return 'Unnamed User';
+    return user.name;
   };
 
   const getAvatarInitial = (user: { name: string | null; email: string } | null) => {
-    if (!user) return '?';
-    return user.name?.[0] || user.email[0].toUpperCase();
+    if (!user?.name) return '?';
+    return user.name[0].toUpperCase();
   };
 
   return (
@@ -72,7 +72,11 @@ export function ConversationLeftPanel({
                     {getDisplayName(conv.sender)}
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    {new Date(conv.updated_at).toLocaleTimeString()}
+                    {new Date(conv.updated_at).toLocaleTimeString([], {
+                      hour: '2-digit',
+                      minute: '2-digit',
+                      hour12: true
+                    })}
                   </p>
                 </div>
               </div>
