@@ -2,7 +2,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import type { Conversation, Profile } from "../types";
+import type { Conversation, Message, Profile } from "../types";
 import { toast } from "sonner";
 
 interface UserData {
@@ -25,7 +25,13 @@ export function useConversationData(selectedConversation: Conversation | null) {
       // First get the conversations
       const { data: conversationsData, error: conversationsError } = await supabase
         .from('conversations')
-        .select('*')
+        .select(`
+          *,
+          sender_profile:profiles!conversations_sender_id_fkey(*),
+          receiver_profile:profiles!conversations_receiver_id_fkey(*),
+          sender_customer:customers!conversations_sender_id_fkey(*),
+          receiver_customer:customers!conversations_receiver_id_fkey(*)
+        `)
         .order('updated_at', { ascending: false });
 
       if (conversationsError) {
@@ -33,92 +39,41 @@ export function useConversationData(selectedConversation: Conversation | null) {
         throw conversationsError;
       }
 
-      // Separate IDs by type
-      const profileIds = new Set<string>();
-      const customerIds = new Set<string>();
-      
-      conversationsData.forEach(conv => {
-        if (conv.sender_type === 'profile') {
-          profileIds.add(conv.sender_id);
-        } else if (conv.sender_type === 'customer') {
-          customerIds.add(conv.sender_id);
-        }
-        
-        if (conv.receiver_type === 'profile') {
-          profileIds.add(conv.receiver_id);
-        } else if (conv.receiver_type === 'customer') {
-          customerIds.add(conv.receiver_id);
-        }
-      });
-
-      // Fetch profiles
-      const { data: profilesData, error: profilesError } = profileIds.size > 0 ? 
-        await supabase
-          .from('profiles')
-          .select('*')
-          .in('id', Array.from(profileIds)) :
-        { data: [], error: null };
-
-      if (profilesError) {
-        console.error('Error fetching profiles:', profilesError);
-        throw profilesError;
-      }
-
-      // Fetch customers
-      const { data: customersData, error: customersError } = customerIds.size > 0 ?
-        await supabase
-          .from('customers')
-          .select('*')
-          .in('id', Array.from(customerIds)) :
-        { data: [], error: null };
-
-      if (customersError) {
-        console.error('Error fetching customers:', customersError);
-        throw customersError;
-      }
-
-      // Create maps for both profiles and customers
-      const profilesMap = new Map<string, UserData>(
-        (profilesData || []).map(profile => [
-          profile.id,
-          {
-            id: profile.id,
-            name: profile.name,
-            email: profile.email
-          }
-        ])
-      );
-      
-      const customersMap = new Map<string, UserData>(
-        (customersData || []).map(customer => [
-          customer.id,
-          {
-            id: customer.id,
-            name: customer.name,
-            email: customer.email
-          }
-        ])
-      );
-      
-      // Combine the data
+      // Transform the data
       const transformedData = conversationsData.map(conv => {
         const sender = conv.sender_type === 'profile' 
-          ? profilesMap.get(conv.sender_id)
-          : customersMap.get(conv.sender_id);
+          ? conv.sender_profile
+          : conv.sender_customer;
           
         const receiver = conv.receiver_type === 'profile'
-          ? profilesMap.get(conv.receiver_id)
-          : customersMap.get(conv.receiver_id);
+          ? conv.receiver_profile
+          : conv.receiver_customer;
+
+        // Clean up the conversation object by removing the raw join data
+        const { 
+          sender_profile, 
+          receiver_profile, 
+          sender_customer, 
+          receiver_customer, 
+          ...restConv 
+        } = conv;
 
         return {
-          ...conv,
-          sender,
-          receiver
+          ...restConv,
+          sender: {
+            id: sender?.id,
+            name: sender?.name,
+            email: sender?.email
+          },
+          receiver: {
+            id: receiver?.id,
+            name: receiver?.name,
+            email: receiver?.email
+          }
         };
       });
 
       console.log('Transformed conversations:', transformedData);
-      
       return transformedData as Conversation[];
     },
   });
