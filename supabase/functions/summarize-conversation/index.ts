@@ -59,7 +59,7 @@ Deno.serve(async (req) => {
     const tokensUsed = jsonResponse.usage.total_tokens
     const supabaseClient = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? ''
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     )
 
     const conversationId = messages[0]?.conversation?.conversation_id
