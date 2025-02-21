@@ -27,32 +27,79 @@ export function useConversationData(selectedConversation: Conversation | null) {
         throw conversationsError;
       }
 
-      // Then fetch all the profiles for these conversations
+      // Separate IDs by type
       const profileIds = new Set<string>();
+      const customerIds = new Set<string>();
+      
       conversationsData.forEach(conv => {
-        profileIds.add(conv.sender_id);
-        profileIds.add(conv.receiver_id);
+        if (conv.sender_type === 'profile') {
+          profileIds.add(conv.sender_id);
+        } else if (conv.sender_type === 'customer') {
+          customerIds.add(conv.sender_id);
+        }
+        
+        if (conv.receiver_type === 'profile') {
+          profileIds.add(conv.receiver_id);
+        } else if (conv.receiver_type === 'customer') {
+          customerIds.add(conv.receiver_id);
+        }
       });
 
-      const { data: profilesData, error: profilesError } = await supabase
-        .from('profiles')
-        .select('*')
-        .in('id', Array.from(profileIds));
+      // Fetch profiles
+      const { data: profilesData, error: profilesError } = profileIds.size > 0 ? 
+        await supabase
+          .from('profiles')
+          .select('*')
+          .in('id', Array.from(profileIds)) :
+        { data: [], error: null };
 
       if (profilesError) {
         console.error('Error fetching profiles:', profilesError);
         throw profilesError;
       }
 
-      // Create a map of profiles for easy lookup
-      const profilesMap = new Map(profilesData.map(profile => [profile.id, profile]));
+      // Fetch customers
+      const { data: customersData, error: customersError } = customerIds.size > 0 ?
+        await supabase
+          .from('customers')
+          .select('*')
+          .in('id', Array.from(customerIds)) :
+        { data: [], error: null };
+
+      if (customersError) {
+        console.error('Error fetching customers:', customersError);
+        throw customersError;
+      }
+
+      // Create maps for both profiles and customers
+      const profilesMap = new Map(profilesData?.map(profile => [profile.id, {
+        id: profile.id,
+        name: profile.name,
+        email: profile.email
+      }]));
+      
+      const customersMap = new Map(customersData?.map(customer => [customer.id, {
+        id: customer.id,
+        name: customer.name,
+        email: customer.email
+      }]));
       
       // Combine the data
-      const transformedData = conversationsData.map(conv => ({
-        ...conv,
-        sender: profilesMap.get(conv.sender_id),
-        receiver: profilesMap.get(conv.receiver_id)
-      }));
+      const transformedData = conversationsData.map(conv => {
+        const sender = conv.sender_type === 'profile' 
+          ? profilesMap.get(conv.sender_id)
+          : customersMap.get(conv.sender_id);
+          
+        const receiver = conv.receiver_type === 'profile'
+          ? profilesMap.get(conv.receiver_id)
+          : customersMap.get(conv.receiver_id);
+
+        return {
+          ...conv,
+          sender,
+          receiver
+        };
+      });
 
       console.log('Transformed conversations:', transformedData);
       
