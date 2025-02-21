@@ -271,9 +271,8 @@ export type Database = {
           created_by: string
           due_date: string
           id: string
-          status: Database["public"]["Enums"]["task_status"]
           title: string
-          type: string
+          type: Database["public"]["Enums"]["task_status"] | null
           updated_at: string
         }
         Insert: {
@@ -282,9 +281,8 @@ export type Database = {
           created_by: string
           due_date: string
           id?: string
-          status?: Database["public"]["Enums"]["task_status"]
           title: string
-          type: string
+          type?: Database["public"]["Enums"]["task_status"] | null
           updated_at?: string
         }
         Update: {
@@ -293,9 +291,8 @@ export type Database = {
           created_by?: string
           due_date?: string
           id?: string
-          status?: Database["public"]["Enums"]["task_status"]
           title?: string
-          type?: string
+          type?: Database["public"]["Enums"]["task_status"] | null
           updated_at?: string
         }
         Relationships: [
@@ -455,7 +452,7 @@ export type Database = {
       sentiment_level: "bad" | "moderate" | "good"
       sentiment_type: "bad" | "moderate" | "good"
       sync_status: "pending" | "completed" | "failed"
-      task_status: "overdue" | "today" | "tomorrow"
+      task_status: "follow-up" | "meeting"
     }
     CompositeTypes: {
       [_ in never]: never

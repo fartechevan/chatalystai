@@ -13,7 +13,7 @@ interface Task {
   title: string;
   due_date: string;
   assignee_id: string;
-  type: 'Meeting' | 'Follow-up';
+  type: 'follow-up' | 'meeting';
   status: 'overdue' | 'today' | 'tomorrow';
 }
 
@@ -65,7 +65,7 @@ export function TaskBoard() {
           title: task.title,
           due_date: task.due_date,
           assignee_id: task.assignee_id,
-          type: task.type as 'Meeting' | 'Follow-up',
+          type: task.type as 'follow-up' | 'meeting',
           status: task.status as 'overdue' | 'today' | 'tomorrow'
         }))
       }));
@@ -211,8 +211,10 @@ export function TaskBoard() {
                                   {task.title}
                                 </div>
                                 <div className="flex items-center mt-2">
-                                  <span className="text-sm font-medium">
-                                    {task.type}
+                                  <span className={`text-xs font-medium px-2 py-1 rounded-full ${
+                                    task.type === 'meeting' ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800'
+                                  }`}>
+                                    {task.type === 'meeting' ? 'Meeting' : 'Follow-up'}
                                   </span>
                                 </div>
                               </div>
