@@ -16,35 +16,46 @@ export function useConversationData(selectedConversation: Conversation | null) {
     queryFn: async () => {
       console.log('Fetching conversations...');
       
-      const { data, error } = await supabase
+      // First get the conversations
+      const { data: conversationsData, error: conversationsError } = await supabase
         .from('conversations')
-        .select(`
-          conversation_id,
-          sender_id,
-          receiver_id,
-          sender_type,
-          receiver_type,
-          created_at,
-          updated_at,
-          sender:profiles!conversations_sender_id_fkey(id, name, email),
-          receiver:profiles!conversations_receiver_id_fkey(id, name, email)
-        `)
+        .select('*')
         .order('updated_at', { ascending: false });
 
-      if (error) {
-        console.error('Error fetching conversations:', error);
-        throw error;
+      if (conversationsError) {
+        console.error('Error fetching conversations:', conversationsError);
+        throw conversationsError;
       }
-      
-      console.log('Fetched conversations:', data);
 
-      // Transform the data to match our types
-      const transformedData = data.map(conv => ({
+      // Then fetch all the profiles for these conversations
+      const profileIds = new Set<string>();
+      conversationsData.forEach(conv => {
+        profileIds.add(conv.sender_id);
+        profileIds.add(conv.receiver_id);
+      });
+
+      const { data: profilesData, error: profilesError } = await supabase
+        .from('profiles')
+        .select('*')
+        .in('id', Array.from(profileIds));
+
+      if (profilesError) {
+        console.error('Error fetching profiles:', profilesError);
+        throw profilesError;
+      }
+
+      // Create a map of profiles for easy lookup
+      const profilesMap = new Map(profilesData.map(profile => [profile.id, profile]));
+      
+      // Combine the data
+      const transformedData = conversationsData.map(conv => ({
         ...conv,
-        sender: conv.sender[0], // Get first item since it returns an array
-        receiver: conv.receiver[0] // Get first item since it returns an array
+        sender: profilesMap.get(conv.sender_id),
+        receiver: profilesMap.get(conv.receiver_id)
       }));
 
+      console.log('Transformed conversations:', transformedData);
+      
       return transformedData as Conversation[];
     },
   });
