@@ -24,38 +24,10 @@ interface ConversationWithParticipants {
 export async function fetchConversationsWithParticipants() {
   console.log('Fetching conversations with participants...');
   
-  // Get conversations with joined profile and customer data
-  const { data: conversationsData, error: conversationsError } = await supabase
+  // First, get all conversations
+  const { data: conversations, error: conversationsError } = await supabase
     .from('conversations')
-    .select(`
-      conversation_id,
-      sender_id,
-      receiver_id,
-      sender_type,
-      receiver_type,
-      created_at,
-      updated_at,
-      sender_profile:profiles(
-        id,
-        name,
-        email
-      ),
-      receiver_profile:profiles(
-        id,
-        name,
-        email
-      ),
-      sender_customer:customers(
-        id,
-        name,
-        email
-      ),
-      receiver_customer:customers(
-        id,
-        name,
-        email
-      )
-    `)
+    .select('*')
     .order('updated_at', { ascending: false });
 
   if (conversationsError) {
@@ -63,20 +35,41 @@ export async function fetchConversationsWithParticipants() {
     throw conversationsError;
   }
 
-  // Transform the data to match the expected format
-  const transformedData = (conversationsData as unknown as ConversationWithParticipants[]).map(conv => {
-    // Get the correct participant data based on type
-    const senderData = conv.sender_type === 'profile' 
-      ? conv.sender_profile
-      : conv.sender_customer;
-      
-    const receiverData = conv.receiver_type === 'profile'
-      ? conv.receiver_profile
-      : conv.receiver_customer;
+  // Fetch all unique profile IDs and customer IDs
+  const profileIds = new Set<string>();
+  const customerIds = new Set<string>();
 
-    // Extract the first participant from the array (if it exists)
-    const sender = senderData && senderData[0];
-    const receiver = receiverData && receiverData[0];
+  conversations.forEach(conv => {
+    if (conv.sender_type === 'profile') profileIds.add(conv.sender_id);
+    if (conv.receiver_type === 'profile') profileIds.add(conv.receiver_id);
+    if (conv.sender_type === 'customer') customerIds.add(conv.sender_id);
+    if (conv.receiver_type === 'customer') customerIds.add(conv.receiver_id);
+  });
+
+  // Fetch profiles and customers data
+  const { data: profiles } = await supabase
+    .from('profiles')
+    .select('id, name, email')
+    .in('id', Array.from(profileIds));
+
+  const { data: customers } = await supabase
+    .from('customers')
+    .select('id, name, email')
+    .in('id', Array.from(customerIds));
+
+  // Create lookup maps
+  const profilesMap = new Map(profiles?.map(p => [p.id, p]) || []);
+  const customersMap = new Map(customers?.map(c => [c.id, c]) || []);
+
+  // Transform the data
+  const transformedData = conversations.map(conv => {
+    const sender = conv.sender_type === 'profile' 
+      ? profilesMap.get(conv.sender_id)
+      : customersMap.get(conv.sender_id);
+
+    const receiver = conv.receiver_type === 'profile'
+      ? profilesMap.get(conv.receiver_id)
+      : customersMap.get(conv.receiver_id);
 
     return {
       conversation_id: conv.conversation_id,
@@ -101,8 +94,8 @@ export async function fetchConversationsWithParticipants() {
 
   return {
     conversations: transformedData,
-    profiles: [], 
-    customers: [] 
+    profiles: profiles || [], 
+    customers: customers || []
   };
 }
 
