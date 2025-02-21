@@ -1,3 +1,4 @@
+
 export interface Profile {
   id: string;
   name: string | null;
@@ -17,6 +18,8 @@ export interface Conversation {
   conversation_id: string;
   sender_id: string;
   receiver_id: string;
+  sender_type: string;
+  receiver_type: string;
   created_at: string;
   updated_at: string;
   sender: Profile;

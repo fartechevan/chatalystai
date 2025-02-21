@@ -22,6 +22,8 @@ export function useConversationData(selectedConversation: Conversation | null) {
           conversation_id,
           sender_id,
           receiver_id,
+          sender_type,
+          receiver_type,
           created_at,
           updated_at,
           sender:profiles!conversations_sender_id_fkey(id, name, email),
@@ -35,7 +37,15 @@ export function useConversationData(selectedConversation: Conversation | null) {
       }
       
       console.log('Fetched conversations:', data);
-      return data as Conversation[];
+
+      // Transform the data to match our types
+      const transformedData = data.map(conv => ({
+        ...conv,
+        sender: conv.sender[0], // Get first item since it returns an array
+        receiver: conv.receiver[0] // Get first item since it returns an array
+      }));
+
+      return transformedData as Conversation[];
     },
   });
 
