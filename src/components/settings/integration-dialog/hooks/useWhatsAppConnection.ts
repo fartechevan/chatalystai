@@ -49,9 +49,14 @@ export function useWhatsAppConnection(selectedIntegration: Integration | null) {
       const data = await response.json();
       console.log('WhatsApp connection response:', data);
 
+      console.log('WhatsApp connection response 1:', data.qrcode);
+      console.log('WhatsApp connection response 2 :', data.qrcode?.base64);
+      console.log('WhatsApp connection response 3:', data.qrcode?.base64?.value);
+
+
       // Extract QR code from the response and ensure proper formatting
-      if (data.qrcode?.base64?.value) {
-        const base64Value = data.qrcode.base64.value;
+      if (data.qrcode?.base64) {
+        const base64Value = data.qrcode.base64;
         // Check if the value already includes the data URL prefix
         const qrCodeDataUrl = base64Value.startsWith('data:image/')
           ? base64Value
@@ -60,7 +65,18 @@ export function useWhatsAppConnection(selectedIntegration: Integration | null) {
         console.log('Formatted QR code URL:', qrCodeDataUrl);
         setQrCodeBase64(qrCodeDataUrl);
         return true;
-      } else {
+      }
+      else if (data.base64) {
+        const base64Value = data.base64;
+        const qrCodeDataUrl = base64Value.startsWith('data:image/')
+          ? base64Value
+          : `data:image/png;base64,${base64Value}`;
+        
+        console.log('Formatted QR code URL:', qrCodeDataUrl);
+        setQrCodeBase64(qrCodeDataUrl);
+        return true;
+      }
+      else {
         console.error('QR code data not found in response:', data);
         toast({
           title: "QR Code Error",
