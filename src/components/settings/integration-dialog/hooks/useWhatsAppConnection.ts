@@ -3,9 +3,11 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
 import type { Integration } from "../../types";
+import { useState } from "react";
 
 export function useWhatsAppConnection(selectedIntegration: Integration | null) {
   const { toast } = useToast();
+  const [qrCodeBase64, setQrCodeBase64] = useState<string | null>(null);
 
   const { data: config } = useQuery({
     queryKey: ['integration-config', selectedIntegration?.id],
@@ -45,6 +47,9 @@ export function useWhatsAppConnection(selectedIntegration: Integration | null) {
       }
 
       const data = await response.json();
+      if (data.base64) {
+        setQrCodeBase64(data.base64);
+      }
       console.log('WhatsApp connection response:', data);
       return true;
     } catch (error) {
@@ -58,5 +63,5 @@ export function useWhatsAppConnection(selectedIntegration: Integration | null) {
     }
   };
 
-  return { initializeConnection };
+  return { initializeConnection, qrCodeBase64 };
 }

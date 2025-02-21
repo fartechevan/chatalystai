@@ -11,9 +11,10 @@ interface QRCodeScreenProps {
   open: boolean;
   onClose: () => void;
   onOpenChange: (open: boolean) => void;
+  qrCodeBase64?: string | null;
 }
 
-export function QRCodeScreen({ open, onClose, onOpenChange }: QRCodeScreenProps) {
+export function QRCodeScreen({ open, onClose, onOpenChange, qrCodeBase64 }: QRCodeScreenProps) {
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-xl">
@@ -37,11 +38,17 @@ export function QRCodeScreen({ open, onClose, onOpenChange }: QRCodeScreenProps)
             </div>
             <div className="flex items-center justify-center">
               <div className="aspect-square w-full max-w-[240px] bg-white p-4 rounded-xl">
-                <img
-                  src="https://vezdxxqzzcjkunoaxcxc.supabase.co/storage/v1/object/sign/fartech/wa-qr-code.png?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1cmwiOiJmYXJ0ZWNoL3dhLXFyLWNvZGUucG5nIiwiaWF0IjoxNzQwMTQyMjUzLCJleHAiOjIwNTU1MDIyNTN9.IzZbXVzJpb9WnwMjCr5VkI4KfG-r_4PpNEBMyOKr3t4"
-                  alt="WhatsApp QR Code"
-                  className="w-full h-full"
-                />
+                {qrCodeBase64 ? (
+                  <img
+                    src={`data:image/png;base64,${qrCodeBase64}`}
+                    alt="WhatsApp QR Code"
+                    className="w-full h-full"
+                  />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-gray-400">
+                    Loading QR code...
+                  </div>
+                )}
               </div>
             </div>
           </div>

@@ -28,7 +28,7 @@ export function IntegrationDialog({
   const [integrationMainPopup, setIntegrationMainPopup] = useState(true);
   const [integrationQRPopup, setIntegrationQRPopup] = useState(false);
 
-  const { initializeConnection } = useWhatsAppConnection(selectedIntegration);
+  const { initializeConnection, qrCodeBase64 } = useWhatsAppConnection(selectedIntegration);
 
   const handleConnect = () => {
     setShowDeviceSelect(true);
@@ -71,6 +71,7 @@ export function IntegrationDialog({
           setIntegrationQRPopup(false);
           setIntegrationMainPopup(true);
         }}
+        qrCodeBase64={qrCodeBase64}
       />
     );
   }
