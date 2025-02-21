@@ -22,15 +22,21 @@ export function useConversationData(selectedConversation: Conversation | null) {
     queryFn: async () => {
       console.log('Fetching conversations...');
       
-      // First get the conversations
+      // First get the conversations with related data
       const { data: conversationsData, error: conversationsError } = await supabase
         .from('conversations')
         .select(`
-          *,
-          sender_profile:profiles!conversations_sender_id_fkey(*),
-          receiver_profile:profiles!conversations_receiver_id_fkey(*),
-          sender_customer:customers!conversations_sender_id_fkey(*),
-          receiver_customer:customers!conversations_receiver_id_fkey(*)
+          conversation_id,
+          sender_id,
+          receiver_id,
+          sender_type,
+          receiver_type,
+          created_at,
+          updated_at,
+          sender_profile:profiles!conversations_sender_id_fkey(id, name, email),
+          receiver_profile:profiles!conversations_receiver_id_fkey(id, name, email),
+          sender_customer:customers!conversations_sender_customer_id_fkey(id, name, email),
+          receiver_customer:customers!conversations_receiver_customer_id_fkey(id, name, email)
         `)
         .order('updated_at', { ascending: false });
 
@@ -60,21 +66,21 @@ export function useConversationData(selectedConversation: Conversation | null) {
 
         return {
           ...restConv,
-          sender: {
-            id: sender?.id,
-            name: sender?.name,
-            email: sender?.email
-          },
-          receiver: {
-            id: receiver?.id,
-            name: receiver?.name,
-            email: receiver?.email
-          }
-        };
+          sender: sender ? {
+            id: sender.id,
+            name: sender.name,
+            email: sender.email
+          } : null,
+          receiver: receiver ? {
+            id: receiver.id,
+            name: receiver.name,
+            email: receiver.email
+          } : null
+        } as Conversation;
       });
 
       console.log('Transformed conversations:', transformedData);
-      return transformedData as Conversation[];
+      return transformedData;
     },
   });
 
