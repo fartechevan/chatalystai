@@ -1,6 +1,26 @@
 
 import { supabase } from "@/integrations/supabase/client";
 
+interface ParticipantData {
+  id: string;
+  name: string | null;
+  email: string;
+}
+
+interface ConversationWithParticipants {
+  conversation_id: string;
+  sender_id: string;
+  receiver_id: string;
+  sender_type: string;
+  receiver_type: string;
+  created_at: string;
+  updated_at: string;
+  sender_profile: ParticipantData[] | null;
+  receiver_profile: ParticipantData[] | null;
+  sender_customer: ParticipantData[] | null;
+  receiver_customer: ParticipantData[] | null;
+}
+
 export async function fetchConversationsWithParticipants() {
   console.log('Fetching conversations with participants...');
   
@@ -44,14 +64,19 @@ export async function fetchConversationsWithParticipants() {
   }
 
   // Transform the data to match the expected format
-  const transformedData = conversationsData.map(conv => {
-    const sender = conv.sender_type === 'profile' 
+  const transformedData = (conversationsData as ConversationWithParticipants[]).map(conv => {
+    // Get the correct participant data based on type
+    const senderData = conv.sender_type === 'profile' 
       ? conv.sender_profile
       : conv.sender_customer;
       
-    const receiver = conv.receiver_type === 'profile'
+    const receiverData = conv.receiver_type === 'profile'
       ? conv.receiver_profile
       : conv.receiver_customer;
+
+    // Extract the first participant from the array (if it exists)
+    const sender = senderData && senderData[0];
+    const receiver = receiverData && receiverData[0];
 
     return {
       conversation_id: conv.conversation_id,
@@ -61,15 +86,15 @@ export async function fetchConversationsWithParticipants() {
       receiver_type: conv.receiver_type,
       created_at: conv.created_at,
       updated_at: conv.updated_at,
-      sender: sender?.[0] ? {
-        id: sender[0].id,
-        name: sender[0].name,
-        email: sender[0].email
+      sender: sender ? {
+        id: sender.id,
+        name: sender.name,
+        email: sender.email
       } : null,
-      receiver: receiver?.[0] ? {
-        id: receiver[0].id,
-        name: receiver[0].name,
-        email: receiver[0].email
+      receiver: receiver ? {
+        id: receiver.id,
+        name: receiver.name,
+        email: receiver.email
       } : null
     };
   });
