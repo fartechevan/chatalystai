@@ -29,17 +29,9 @@ export function IntegrationDialog({
     setShowDeviceSelect(true);
   };
 
-  const handleDialogChange = (open: boolean) => {
-    if (!open) {
-      // Reset to initial view when dialog is closed
-      setShowDeviceSelect(false);
-    }
-    onOpenChange(open);
-  };
-
   if (showDeviceSelect) {
     return (
-      <Dialog open={open} onOpenChange={handleDialogChange}>
+      <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="max-w-xl">
           <DialogHeader>
             <DialogTitle>All conversations. One inbox.</DialogTitle>
@@ -80,7 +72,7 @@ export function IntegrationDialog({
   }
 
   return (
-    <Dialog open={open} onOpenChange={handleDialogChange}>
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-xl">
         <DialogHeader>
           <DialogTitle>Connect WhatsApp</DialogTitle>
