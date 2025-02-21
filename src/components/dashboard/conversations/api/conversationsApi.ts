@@ -45,6 +45,10 @@ export async function fetchConversationsWithParticipants() {
 
   console.log('Fetched conversations:', conversations);
 
+  console.log('Fetched customerIds:', customerIds);
+  console.log('Fetched profileIds:', profileIds);
+
+
   // Fetch profiles and customers data
   const { data: profiles } = await supabase
     .from('profiles')
