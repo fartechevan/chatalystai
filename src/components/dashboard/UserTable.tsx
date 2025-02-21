@@ -4,7 +4,6 @@ import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { format } from "date-fns";
-import { UserRoleManager } from "@/components/admin/UserRoleManager";
 import {
   Pagination,
   PaginationContent,
@@ -68,19 +67,18 @@ export function UserTable({
             <TableHead>Name</TableHead>
             <TableHead>Email</TableHead>
             <TableHead>Joined Date</TableHead>
-            <TableHead>Role</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
           {isLoading ? (
             <TableRow>
-              <TableCell colSpan={4} className="text-center">
+              <TableCell colSpan={3} className="text-center">
                 Loading...
               </TableCell>
             </TableRow>
           ) : users.length === 0 ? (
             <TableRow>
-              <TableCell colSpan={4} className="text-center">
+              <TableCell colSpan={3} className="text-center">
                 No users found
               </TableCell>
             </TableRow>
@@ -91,9 +89,6 @@ export function UserTable({
                 <TableCell>{user.email}</TableCell>
                 <TableCell>
                   {format(new Date(user.created_at), "PPpp")}
-                </TableCell>
-                <TableCell>
-                  <UserRoleManager userId={user.id} />
                 </TableCell>
               </TableRow>
             ))
