@@ -6,7 +6,7 @@ import { Plus } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@supabase/auth-helpers-react";
+import { useAuth } from "@/components/auth/AuthProvider";
 
 interface Task {
   id: string;
@@ -36,7 +36,7 @@ export function TaskBoard() {
     { id: 'tomorrow', title: COLUMN_TITLES.tomorrow, tasks: [] },
   ]);
   const { toast } = useToast();
-  const user = useAuth();
+  const { user } = useAuth();
 
   useEffect(() => {
     if (!user) return;
@@ -57,10 +57,17 @@ export function TaskBoard() {
         return;
       }
 
-      // Group tasks by status
+      // Group tasks by status and ensure type safety
       const groupedTasks = columns.map(column => ({
         ...column,
-        tasks: tasks?.filter(task => task.status === column.id) || []
+        tasks: (tasks?.filter(task => task.status === column.id) || []).map(task => ({
+          id: task.id,
+          title: task.title,
+          due_date: task.due_date,
+          assignee_id: task.assignee_id,
+          type: task.type as 'Meeting' | 'Follow-up',
+          status: task.status as 'overdue' | 'today' | 'tomorrow'
+        }))
       }));
 
       setColumns(groupedTasks);
