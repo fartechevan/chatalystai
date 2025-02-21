@@ -30,10 +30,10 @@ export function ConversationView() {
   const filteredConversations = conversations.filter(conv => {
     const searchLower = searchQuery.toLowerCase();
     return (
-      conv.sender.name?.toLowerCase().includes(searchLower) ||
-      conv.sender.email.toLowerCase().includes(searchLower) ||
-      conv.receiver.name?.toLowerCase().includes(searchLower) ||
-      conv.receiver.email.toLowerCase().includes(searchLower)
+      (conv.sender?.name?.toLowerCase().includes(searchLower) ||
+       conv.sender?.email?.toLowerCase().includes(searchLower) ||
+       conv.receiver?.name?.toLowerCase().includes(searchLower) ||
+       conv.receiver?.email?.toLowerCase().includes(searchLower)) ?? false
     );
   });
 

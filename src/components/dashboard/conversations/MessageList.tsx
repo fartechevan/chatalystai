@@ -8,13 +8,15 @@ interface MessageListProps {
 }
 
 export function MessageList({ messages, selectedConversation }: MessageListProps) {
-  const getAvatarFallback = (user: { name: string | null; email: string }) => {
+  const getAvatarFallback = (user: { name: string | null; email: string } | null) => {
+    if (!user) return '?';
     if (user.name) return user.name[0].toUpperCase();
     if (user.email) return user.email[0].toUpperCase();
     return '?';
   };
 
-  const getUserDisplayName = (user: { name: string | null; email: string }) => {
+  const getUserDisplayName = (user: { name: string | null; email: string } | null) => {
+    if (!user) return 'Unknown User';
     return user.name || user.email;
   };
 

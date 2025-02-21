@@ -24,6 +24,16 @@ export function ConversationLeftPanel({
   selectedConversation,
   setSelectedConversation,
 }: ConversationLeftPanelProps) {
+  const getDisplayName = (user: { name: string | null; email: string } | null) => {
+    if (!user) return 'Unknown User';
+    return user.name || user.email;
+  };
+
+  const getAvatarInitial = (user: { name: string | null; email: string } | null) => {
+    if (!user) return '?';
+    return user.name?.[0] || user.email[0].toUpperCase();
+  };
+
   return (
     <div className={`${leftPanelOpen ? 'w-64' : 'w-12'} border-r bg-muted/30 transition-all duration-300 relative md:w-80 flex flex-col`}>
       <button
@@ -54,12 +64,12 @@ export function ConversationLeftPanel({
               >
                 <Avatar className="h-10 w-10">
                   <AvatarFallback>
-                    {conv.sender.name?.[0] || conv.sender.email[0].toUpperCase()}
+                    {getAvatarInitial(conv.sender)}
                   </AvatarFallback>
                 </Avatar>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium truncate">
-                    {conv.sender.name || conv.sender.email}
+                    {getDisplayName(conv.sender)}
                   </p>
                   <p className="text-xs text-muted-foreground">
                     {new Date(conv.updated_at).toLocaleTimeString()}
