@@ -14,12 +14,8 @@ export function MessageList({ messages, selectedConversation }: MessageListProps
     return user.email[0].toUpperCase();
   };
 
-  const getUserDisplayName = (user: { name: string | null; email: string } | null, userType: string) => {
-    if (!user) {
-      // If we don't have user data, create a generic name based on type
-      return `${userType === 'profile' ? 'Team Member' : 'Customer'}`;
-    }
-    // Use name if available, otherwise use email
+  const getUserDisplayName = (user: { name: string | null; email: string } | null) => {
+    if (!user) return 'Unknown User';
     return user.name || user.email;
   };
 
@@ -48,7 +44,7 @@ export function MessageList({ messages, selectedConversation }: MessageListProps
               <div>
                 <div className="flex items-center gap-2 mb-1">
                   <span className="text-sm font-medium">
-                    {getUserDisplayName(participant, participantType)}
+                    {getUserDisplayName(participant)}
                   </span>
                   <span className="text-xs text-muted-foreground">
                     {new Date(message.created_at).toLocaleTimeString([], {
