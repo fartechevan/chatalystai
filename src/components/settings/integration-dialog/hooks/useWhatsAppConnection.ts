@@ -36,7 +36,6 @@ export function useWhatsAppConnection(selectedIntegration: Integration | null) {
     }
     console.log("connecting whatsapp");
 
-    console.log("");
     try {
       const response = await fetch(`${config.base_url}/instance/connect/${config.instance_id}`, {
         headers: {
@@ -48,11 +47,11 @@ export function useWhatsAppConnection(selectedIntegration: Integration | null) {
         throw new Error('Failed to connect to WhatsApp');
       }
 
-      console.log("test_log:",response);
-
+      console.log("");
       const data = await response.json();
-      if (data.base64) {
-        setQrCodeBase64(data.base64);
+      if (data.qrcode?.base64?.value) {
+        // Extract base64 value from the nested structure
+        setQrCodeBase64(data.qrcode.base64.value);
       }
       console.log('WhatsApp connection response:', data);
       return true;
