@@ -1,0 +1,70 @@
+
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+
+interface QRCodeScreenProps {
+  open: boolean;
+  onClose: () => void;
+  onOpenChange: (open: boolean) => void;
+}
+
+export function QRCodeScreen({ open, onClose, onOpenChange }: QRCodeScreenProps) {
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-xl">
+        <DialogHeader>
+          <DialogTitle>Scan QR Code</DialogTitle>
+          <DialogDescription>
+            Open WhatsApp on your iPhone and scan the QR code to connect
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-6">
+          <div className="grid grid-cols-2 gap-8">
+            <div className="flex items-center justify-center">
+              <video 
+                src="https://global-core-public-static-files.s3.amazonaws.com/onboarding-com/en/ios-scan-en.mp4"
+                autoPlay 
+                loop 
+                muted 
+                playsInline
+                className="w-full h-auto rounded-lg"
+              />
+            </div>
+            <div className="flex items-center justify-center">
+              <div className="aspect-square w-full max-w-[240px] bg-white p-4 rounded-xl">
+                <img
+                  src="https://vezdxxqzzcjkunoaxcxc.supabase.co/storage/v1/object/sign/fartech/wa-qr-code.png?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1cmwiOiJmYXJ0ZWNoL3dhLXFyLWNvZGUucG5nIiwiaWF0IjoxNzQwMTQyMjUzLCJleHAiOjIwNTU1MDIyNTN9.IzZbXVzJpb9WnwMjCr5VkI4KfG-r_4PpNEBMyOKr3t4"
+                  alt="WhatsApp QR Code"
+                  className="w-full h-full"
+                />
+              </div>
+            </div>
+          </div>
+          <div className="text-center space-y-2">
+            <p className="text-sm font-medium">✋ Read before scanning</p>
+            <p className="text-sm text-muted-foreground">
+              To find WhatsApp's QR scanner, tap Settings ⚙️ {'>'}
+              <br />
+              Linked Devices {'>'} Link a Device.
+            </p>
+            <p className="text-sm text-muted-foreground">
+              <a href="#" className="text-blue-600 hover:underline">Trouble connecting?</a>
+            </p>
+          </div>
+        </div>
+        <button
+          onClick={onClose}
+          className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground"
+        >
+          <span className="sr-only">Close</span>
+          ✕
+        </button>
+      </DialogContent>
+    </Dialog>
+  );
+}
