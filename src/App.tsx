@@ -12,6 +12,7 @@ import { AuthProvider } from "./components/auth/AuthProvider";
 import { ProtectedRoute } from "./components/auth/ProtectedRoute";
 import { SidebarProvider } from "./components/ui/sidebar";
 import { ConversationView } from "./components/dashboard/conversations/ConversationView";
+import { ListsView } from "./components/lists/ListsView";
 
 const App = () => {
   const queryClient = new QueryClient({
@@ -45,6 +46,7 @@ const App = () => {
                   >
                     <Route index element={<Main />} />
                     <Route path="settings" element={<Settings />} />
+                    <Route path="lists" element={<ListsView />} />
                     <Route path="conversations" element={<ConversationView />} />
                   </Route>
                 </Routes>
