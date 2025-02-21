@@ -21,21 +21,24 @@ export function ChatMain({ activeChat }: ChatMainProps) {
       sender: "Kate Johnson",
       content: "Hi everyone, let's start the call soon 👋",
       time: "11:24 AM",
-      avatar: ""
+      avatar: "",
+      sender_type: "user"
     },
     {
       id: "2",
       sender: "Kate Johnson",
       content: "Recently I saw properties in a great location that I did not pay attention to before 😊",
       time: "11:25 AM",
-      avatar: ""
+      avatar: "",
+      sender_type: "user"
     },
     {
       id: "3",
       sender: "Evan Scott",
       content: "Ooo, why don't you say something more",
       time: "11:34 AM",
-      avatar: ""
+      avatar: "",
+      sender_type: "customer"
     }
   ];
 
