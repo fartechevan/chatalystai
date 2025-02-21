@@ -40,7 +40,7 @@ export function QRCodeScreen({ open, onClose, onOpenChange, qrCodeBase64 }: QRCo
               <div className="aspect-square w-full max-w-[240px] bg-white p-4 rounded-xl">
                 {qrCodeBase64 ? (
                   <img
-                    src={`data:image/png;base64,${qrCodeBase64}`}
+                    src={qrCodeBase64}
                     alt="WhatsApp QR Code"
                     className="w-full h-full"
                   />
