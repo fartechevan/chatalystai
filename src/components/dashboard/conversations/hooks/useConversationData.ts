@@ -2,8 +2,14 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import type { Conversation } from "../types";
+import type { Conversation, Profile } from "../types";
 import { toast } from "sonner";
+
+interface UserData {
+  id: string;
+  name: string | null;
+  email: string;
+}
 
 export function useConversationData(selectedConversation: Conversation | null) {
   const [newMessage, setNewMessage] = useState("");
@@ -72,17 +78,27 @@ export function useConversationData(selectedConversation: Conversation | null) {
       }
 
       // Create maps for both profiles and customers
-      const profilesMap = new Map(profilesData?.map(profile => [profile.id, {
-        id: profile.id,
-        name: profile.name,
-        email: profile.email
-      }]));
+      const profilesMap = new Map<string, UserData>(
+        (profilesData || []).map(profile => [
+          profile.id,
+          {
+            id: profile.id,
+            name: profile.name,
+            email: profile.email
+          }
+        ])
+      );
       
-      const customersMap = new Map(customersData?.map(customer => [customer.id, {
-        id: customer.id,
-        name: customer.name,
-        email: customer.email
-      }]));
+      const customersMap = new Map<string, UserData>(
+        (customersData || []).map(customer => [
+          customer.id,
+          {
+            id: customer.id,
+            name: customer.name,
+            email: customer.email
+          }
+        ])
+      );
       
       // Combine the data
       const transformedData = conversationsData.map(conv => {
