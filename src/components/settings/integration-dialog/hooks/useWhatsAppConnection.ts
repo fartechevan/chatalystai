@@ -49,10 +49,16 @@ export function useWhatsAppConnection(selectedIntegration: Integration | null) {
       const data = await response.json();
       console.log('WhatsApp connection response:', data);
 
-      // Extract QR code from the response
+      // Extract QR code from the response and ensure proper formatting
       if (data.qrcode?.base64?.value) {
-        // Since the API returns the full data URL, we can use it directly
-        setQrCodeBase64(data.qrcode.base64.value);
+        const base64Value = data.qrcode.base64.value;
+        // Check if the value already includes the data URL prefix
+        const qrCodeDataUrl = base64Value.startsWith('data:image/')
+          ? base64Value
+          : `data:image/png;base64,${base64Value}`;
+        
+        console.log('Formatted QR code URL:', qrCodeDataUrl);
+        setQrCodeBase64(qrCodeDataUrl);
         return true;
       } else {
         console.error('QR code data not found in response:', data);
@@ -74,7 +80,6 @@ export function useWhatsAppConnection(selectedIntegration: Integration | null) {
     }
   };
 
-  // Clean up QR code when component unmounts
   useEffect(() => {
     return () => {
       setQrCodeBase64(null);
