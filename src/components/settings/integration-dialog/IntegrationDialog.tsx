@@ -1,3 +1,4 @@
+
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -23,15 +24,18 @@ export function IntegrationDialog({
   selectedIntegration,
 }: IntegrationDialogProps) {
   const [showDeviceSelect, setShowDeviceSelect] = useState(false);
+  const [integrationMainPopup, setIntegrationMainPopup] = useState(true);
 
   const handleConnect = () => {
     setShowDeviceSelect(true);
+    setIntegrationMainPopup(false);
   };
 
   const handleDialogChange = (open: boolean) => {
     if (!open && showDeviceSelect) {
       // If closing from device select screen, just go back
       setShowDeviceSelect(false);
+      setIntegrationMainPopup(true);
       return;
     }
     // Otherwise, close the dialog completely
@@ -75,10 +79,14 @@ export function IntegrationDialog({
             </div>
           </div>
           <button
-            onClick={() => setShowDeviceSelect(false)}
+            onClick={() => {
+              setShowDeviceSelect(false);
+              setIntegrationMainPopup(true);
+            }}
             className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground"
           >
             <span className="sr-only">Close</span>
+            ✕
           </button>
         </DialogContent>
       </Dialog>
@@ -133,7 +141,7 @@ export function IntegrationDialog({
           className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground"
         >
           <span className="sr-only">Close</span>
-          
+          ✕
         </button>
       </DialogContent>
     </Dialog>
