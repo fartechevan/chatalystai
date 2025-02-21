@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 
 interface ParticipantData {
@@ -21,7 +20,7 @@ interface ConversationWithParticipants {
 
 export async function fetchConversationsWithParticipants() {
   console.log('Fetching conversations with participants...');
-  
+
   // First, get all conversations
   const { data: conversations, error: conversationsError } = await supabase
     .from('conversations')
@@ -59,14 +58,14 @@ export async function fetchConversationsWithParticipants() {
   console.log('Fetched customers:', customers);
 
   // Create lookup maps for profiles and customers
-  const profilesMap = new Map();
-  const customersMap = new Map();
+  const profilesMap = new Map<string, ParticipantData>();
+  const customersMap = new Map<string, ParticipantData>();
 
   // Populate profiles map
   profiles?.forEach(profile => {
     profilesMap.set(profile.id, {
       id: profile.id,
-      name: profile.name || `Profile ${profile.id.slice(0, 4)}`,
+      name: profile.name || `Unknown Profile`,
       email: profile.email
     });
   });
@@ -75,27 +74,36 @@ export async function fetchConversationsWithParticipants() {
   customers?.forEach(customer => {
     customersMap.set(customer.id, {
       id: customer.id,
-      name: customer.name || `Customer ${customer.id.slice(0, 4)}`,
+      name: customer.name || `Unknown Customer`,
       email: customer.email || ''
     });
   });
 
   // Transform the data
   const transformedData = conversations.map(conv => {
-    let sender;
-    let receiver;
+    const getParticipant = (id: string, type: string): ParticipantData => {
+      if (type === 'profile') {
+        return profilesMap.get(id) || {
+          id,
+          name: `Unknown Profile`,
+          email: ''
+        };
+      } else if (type === 'customer') {
+        return customersMap.get(id) || {
+          id,
+          name: `Unknown Customer`,
+          email: ''
+        };
+      }
+      return {
+        id,
+        name: `Unknown ${type}`,
+        email: ''
+      };
+    };
 
-    if (conv.sender_type === 'profile') {
-      sender = profilesMap.get(conv.sender_id);
-    } else {
-      sender = customersMap.get(conv.sender_id);
-    }
-
-    if (conv.receiver_type === 'profile') {
-      receiver = profilesMap.get(conv.receiver_id);
-    } else {
-      receiver = customersMap.get(conv.receiver_id);
-    }
+    const sender = getParticipant(conv.sender_id, conv.sender_type);
+    const receiver = getParticipant(conv.receiver_id, conv.receiver_type);
 
     console.log('Mapping conversation:', {
       sender_type: conv.sender_type,
@@ -114,22 +122,14 @@ export async function fetchConversationsWithParticipants() {
       receiver_type: conv.receiver_type,
       created_at: conv.created_at,
       updated_at: conv.updated_at,
-      sender: sender || {
-        id: conv.sender_id,
-        name: `${conv.sender_type === 'profile' ? 'Profile' : 'Customer'} ${conv.sender_id.slice(0, 4)}`,
-        email: ''
-      },
-      receiver: receiver || {
-        id: conv.receiver_id,
-        name: `${conv.receiver_type === 'profile' ? 'Profile' : 'Customer'} ${conv.receiver_id.slice(0, 4)}`,
-        email: ''
-      }
+      sender,
+      receiver
     };
   });
 
   return {
     conversations: transformedData,
-    profiles: profiles || [], 
+    profiles: profiles || [],
     customers: customers || []
   };
 }
