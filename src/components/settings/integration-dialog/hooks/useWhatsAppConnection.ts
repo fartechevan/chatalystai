@@ -34,7 +34,9 @@ export function useWhatsAppConnection(selectedIntegration: Integration | null) {
       });
       return false;
     }
+    console.log("connecting whatsapp");
 
+    console.log("");
     try {
       const response = await fetch(`${config.base_url}/instance/connect/${config.instance_id}`, {
         headers: {
@@ -45,6 +47,8 @@ export function useWhatsAppConnection(selectedIntegration: Integration | null) {
       if (!response.ok) {
         throw new Error('Failed to connect to WhatsApp');
       }
+
+      console.log("test_log:",response);
 
       const data = await response.json();
       if (data.base64) {
