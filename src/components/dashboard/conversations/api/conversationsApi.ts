@@ -7,7 +7,15 @@ export async function fetchConversationsWithParticipants() {
   // First get the conversations
   const { data: conversationsData, error: conversationsError } = await supabase
     .from('conversations')
-    .select('*')
+    .select(`
+      conversation_id,
+      sender_id,
+      receiver_id,
+      sender_type,
+      receiver_type,
+      created_at,
+      updated_at
+    `)
     .order('updated_at', { ascending: false });
 
   if (conversationsError) {
@@ -27,16 +35,26 @@ export async function fetchConversationsWithParticipants() {
   });
 
   // Fetch profiles
-  const { data: profiles = [] } = await supabase
+  const { data: profiles = [], error: profilesError } = await supabase
     .from('profiles')
     .select('id, name, email')
     .in('id', Array.from(uniqueProfileIds));
 
+  if (profilesError) {
+    console.error('Error fetching profiles:', profilesError);
+    throw profilesError;
+  }
+
   // Fetch customers
-  const { data: customers = [] } = await supabase
+  const { data: customers = [], error: customersError } = await supabase
     .from('customers')
     .select('id, name, email')
     .in('id', Array.from(uniqueCustomerIds));
+
+  if (customersError) {
+    console.error('Error fetching customers:', customersError);
+    throw customersError;
+  }
 
   return {
     conversations: conversationsData,
