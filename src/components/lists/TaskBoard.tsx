@@ -7,6 +7,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/components/auth/AuthProvider";
+import { format, isToday, isTomorrow, isPast } from "date-fns";
 
 interface Task {
   id: string;
@@ -14,7 +15,6 @@ interface Task {
   due_date: string;
   assignee_id: string;
   type: 'follow-up' | 'meeting';
-  status: 'overdue' | 'today' | 'tomorrow';
 }
 
 interface Column {
@@ -38,6 +38,19 @@ export function TaskBoard() {
   const { toast } = useToast();
   const { user } = useAuth();
 
+  const categorizeTaskByDueDate = (task: Task) => {
+    const dueDate = new Date(task.due_date);
+    
+    if (isPast(dueDate) && !isToday(dueDate)) {
+      return 'overdue';
+    } else if (isToday(dueDate)) {
+      return 'today';
+    } else if (isTomorrow(dueDate)) {
+      return 'tomorrow';
+    }
+    return null; // Task due date is beyond tomorrow
+  };
+
   useEffect(() => {
     if (!user) return;
 
@@ -57,17 +70,18 @@ export function TaskBoard() {
         return;
       }
 
-      // Group tasks by status and ensure type safety
+      // Group tasks by due date status
       const groupedTasks = columns.map(column => ({
         ...column,
-        tasks: (tasks?.filter(task => task.status === column.id) || []).map(task => ({
-          id: task.id,
-          title: task.title,
-          due_date: task.due_date,
-          assignee_id: task.assignee_id,
-          type: task.type as 'follow-up' | 'meeting',
-          status: task.status as 'overdue' | 'today' | 'tomorrow'
-        }))
+        tasks: (tasks || [])
+          .filter(task => categorizeTaskByDueDate(task) === column.id)
+          .map(task => ({
+            id: task.id,
+            title: task.title,
+            due_date: task.due_date,
+            assignee_id: task.assignee_id,
+            type: task.type as 'follow-up' | 'meeting'
+          }))
       }));
 
       setColumns(groupedTasks);
@@ -115,11 +129,17 @@ export function TaskBoard() {
 
     const task = sourceColumn.tasks[source.index];
     
-    // Update task status in database
+    // Calculate new due date based on destination column
+    let newDueDate = new Date();
+    if (destination.droppableId === 'tomorrow') {
+      newDueDate.setDate(newDueDate.getDate() + 1);
+    }
+    
+    // Update task due date in database
     const { error } = await supabase
       .from('tasks')
       .update({ 
-        status: destination.droppableId,
+        due_date: newDueDate.toISOString(),
         updated_at: new Date().toISOString()
       })
       .eq('id', draggableId);
@@ -142,7 +162,10 @@ export function TaskBoard() {
       }
       if (col.id === destination.droppableId) {
         const newTasks = [...col.tasks];
-        newTasks.splice(destination.index, 0, task);
+        newTasks.splice(destination.index, 0, {
+          ...task,
+          due_date: newDueDate.toISOString()
+        });
         return { ...col, tasks: newTasks };
       }
       return col;
@@ -205,7 +228,7 @@ export function TaskBoard() {
                             <CardContent className="p-4">
                               <div className="flex flex-col space-y-2">
                                 <div className="text-sm font-medium">
-                                  {task.due_date}
+                                  {format(new Date(task.due_date), 'PPp')}
                                 </div>
                                 <div className="text-muted-foreground text-sm">
                                   {task.title}
