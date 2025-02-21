@@ -43,6 +43,8 @@ export async function fetchConversationsWithParticipants() {
     if (conv.receiver_type === 'customer') customerIds.add(conv.receiver_id);
   });
 
+  console.log('Fetched conversations:', conversations);
+
   // Fetch profiles and customers data
   const { data: profiles } = await supabase
     .from('profiles')
