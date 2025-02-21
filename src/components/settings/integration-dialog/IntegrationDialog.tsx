@@ -29,17 +29,19 @@ export function IntegrationDialog({
     setShowDeviceSelect(true);
   };
 
-  const handleDialogChange = (open: boolean) => {
-    if (!open) {
-      // Reset to initial view when dialog is closed
+  const handleClose = () => {
+    if (showDeviceSelect) {
+      // If on device select screen, go back to first screen
       setShowDeviceSelect(false);
+    } else {
+      // If on first screen, close the dialog
+      onOpenChange(false);
     }
-    onOpenChange(open);
   };
 
   if (showDeviceSelect) {
     return (
-      <Dialog open={open} onOpenChange={handleDialogChange}>
+      <Dialog open={open} onOpenChange={onOpenChange}>
         <DialogContent className="max-w-xl">
           <DialogHeader>
             <DialogTitle>All conversations. One inbox.</DialogTitle>
@@ -73,14 +75,22 @@ export function IntegrationDialog({
               </Button>
             </div>
           </div>
-          <DialogClose onClick={() => setShowDeviceSelect(false)} />
+          <DialogClose asChild>
+            <button
+              onClick={handleClose}
+              className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground"
+            >
+              <span className="sr-only">Close</span>
+              ✕
+            </button>
+          </DialogClose>
         </DialogContent>
       </Dialog>
     );
   }
 
   return (
-    <Dialog open={open} onOpenChange={handleDialogChange}>
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-xl">
         <DialogHeader>
           <DialogTitle>Connect WhatsApp</DialogTitle>
@@ -122,7 +132,15 @@ export function IntegrationDialog({
             </div>
           </TabsContent>
         </Tabs>
-        <DialogClose />
+        <DialogClose asChild>
+          <button
+            onClick={handleClose}
+            className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground"
+          >
+            <span className="sr-only">Close</span>
+            ✕
+          </button>
+        </DialogClose>
       </DialogContent>
     </Dialog>
   );
