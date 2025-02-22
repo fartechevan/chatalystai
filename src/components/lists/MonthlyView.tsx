@@ -79,11 +79,13 @@ export function MonthlyView({ tasks, selectedDate = new Date(), onTaskUpdate }: 
                 {format(day, 'd')}
               </div>
               <Droppable droppableId={index.toString()} direction="vertical">
-                {(provided) => (
+                {(provided, snapshot) => (
                   <div
                     ref={provided.innerRef}
                     {...provided.droppableProps}
-                    className="space-y-1 overflow-y-auto max-h-[80px]"
+                    className={`space-y-1 overflow-y-auto min-h-[60px] max-h-[80px] rounded ${
+                      snapshot.isDraggingOver ? 'bg-muted/20' : ''
+                    }`}
                   >
                     {dayTasks.map((task, taskIndex) => (
                       <Draggable key={task.id} draggableId={task.id} index={taskIndex}>
