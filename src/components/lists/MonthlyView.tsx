@@ -1,5 +1,5 @@
 
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, addDays, startOfWeek } from "date-fns";
+import { format, startOfMonth, endOfMonth, isSameMonth, addDays, startOfWeek } from "date-fns";
 import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
 import { TaskCard } from "./components/TaskCard";
 
@@ -28,10 +28,6 @@ export function MonthlyView({ tasks, selectedDate = new Date(), onTaskUpdate }: 
 
     if (!destination || !onTaskUpdate) return;
 
-    // Find the task and get its current time
-    const task = tasks.find(t => t.id === draggableId);
-    if (!task) return;
-
     // If dropped in the same spot, do nothing
     if (
       source.droppableId === destination.droppableId &&
@@ -39,6 +35,10 @@ export function MonthlyView({ tasks, selectedDate = new Date(), onTaskUpdate }: 
     ) {
       return;
     }
+
+    // Find the task and get its current time
+    const task = tasks.find(t => t.id === draggableId);
+    if (!task) return;
 
     // Get the current time from the task
     const currentTaskTime = new Date(task.due_date);
@@ -78,7 +78,7 @@ export function MonthlyView({ tasks, selectedDate = new Date(), onTaskUpdate }: 
               <div className="text-sm font-medium mb-2">
                 {format(day, 'd')}
               </div>
-              <Droppable droppableId={index.toString()}>
+              <Droppable droppableId={index.toString()} direction="vertical">
                 {(provided) => (
                   <div
                     ref={provided.innerRef}
