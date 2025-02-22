@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -177,12 +176,58 @@ export function TaskBoard() {
     setColumns(newColumns);
   };
 
+  const handleTaskUpdate = async (taskId: string, newDate: Date) => {
+    const { error } = await supabase
+      .from('tasks')
+      .update({ 
+        due_date: newDate.toISOString(),
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', taskId);
+
+    if (error) {
+      toast({
+        title: "Error updating task",
+        description: error.message,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setTasks(prevTasks => 
+      prevTasks.map(task => 
+        task.id === taskId 
+          ? { ...task, due_date: newDate.toISOString() }
+          : task
+      )
+    );
+
+    const updatedTask = tasks.find(t => t.id === taskId);
+    if (updatedTask) {
+      const newTask = { ...updatedTask, due_date: newDate.toISOString() };
+      const newColumns = columns.map(col => ({
+        ...col,
+        tasks: col.tasks.filter(t => t.id !== taskId)
+      }));
+
+      const category = categorizeTaskByDueDate(newTask);
+      if (category) {
+        const columnIndex = newColumns.findIndex(col => col.id === category);
+        if (columnIndex !== -1) {
+          newColumns[columnIndex].tasks.push(newTask);
+        }
+      }
+
+      setColumns(newColumns);
+    }
+  };
+
   const renderContent = () => {
     switch (viewMode) {
       case 'week':
-        return <WeeklyView tasks={tasks} />;
+        return <WeeklyView tasks={tasks} onTaskUpdate={handleTaskUpdate} />;
       case 'month':
-        return <MonthlyView tasks={tasks} />;
+        return <MonthlyView tasks={tasks} onTaskUpdate={handleTaskUpdate} />;
       default:
         return <DailyView columns={columns} onDragEnd={onDragEnd} />;
     }
