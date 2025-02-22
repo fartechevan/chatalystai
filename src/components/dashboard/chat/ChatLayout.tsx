@@ -1,26 +1,57 @@
-import { useState } from "react";
-import { Sheet, SheetContent } from "@/components/ui/sheet";
+
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { useEvolutionAPI } from "@/hooks/useEvolutionAPI";
 import { ChatSidebar } from "./ChatSidebar";
 import { ChatMain } from "./ChatMain";
-import { ChatFiles } from "./ChatFiles";
+import { useState } from "react";
 
-interface ChatLayoutProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-}
+export function ChatLayout() {
+  const [selectedChatId, setSelectedChatId] = useState<string | null>(null);
+  const [instanceId, setInstanceId] = useState<string>("your-instance-id"); // Replace with your actual instance ID
+  
+  const {
+    instanceInfo,
+    chats,
+    useMessages,
+    sendMessage,
+    isConfigured
+  } = useEvolutionAPI(instanceId);
 
-export function ChatLayout({ open, onOpenChange }: ChatLayoutProps) {
-  const [activeChat, setActiveChat] = useState<string | null>(null);
+  const { data: messages } = useMessages(selectedChatId);
+
+  const handleSendMessage = async (message: string) => {
+    if (!selectedChatId) return;
+    
+    try {
+      await sendMessage.mutateAsync({
+        chatId: selectedChatId,
+        message: message
+      });
+    } catch (error) {
+      console.error('Failed to send message:', error);
+    }
+  };
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent side="right" className="w-screen p-0">
-        <div className="flex h-full">
-          <ChatSidebar onChatSelect={setActiveChat} />
-          <ChatMain activeChat={activeChat} />
-          <ChatFiles />
-        </div>
-      </SheetContent>
-    </Sheet>
+    <div className="flex h-screen overflow-hidden">
+      <div className="w-80 border-r">
+        <ScrollArea className="h-screen">
+          <ChatSidebar
+            chats={chats || []}
+            selectedChatId={selectedChatId}
+            onChatSelect={setSelectedChatId}
+            instanceInfo={instanceInfo?.instance}
+          />
+        </ScrollArea>
+      </div>
+      <div className="flex-1">
+        <ChatMain
+          selectedChat={chats?.find(chat => chat.id === selectedChatId)}
+          messages={messages || []}
+          onSendMessage={handleSendMessage}
+          isLoading={!isConfigured}
+        />
+      </div>
+    </div>
   );
 }

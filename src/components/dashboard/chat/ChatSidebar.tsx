@@ -1,77 +1,73 @@
 
-import { Search } from "lucide-react";
-import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import { Button } from "@/components/ui/button";
 
-interface ChatSidebarProps {
-  onChatSelect: (chatId: string) => void;
+interface Chat {
+  id: string;
+  name: string;
+  lastMessage?: {
+    content: string;
+    timestamp: string;
+  };
 }
 
-export function ChatSidebar({ onChatSelect }: ChatSidebarProps) {
-  const chats = [
-    {
-      id: "1",
-      name: "Real estate deals",
-      lastMessage: "typing...",
-      time: "11:15",
-      avatar: "/lovable-uploads/34c03b61-85fe-40d9-bc3e-0d4c54edc0a5.png"
-    },
-    {
-      id: "2",
-      name: "Kate Johnson",
-      lastMessage: "I will send the document s...",
-      time: "11:15",
-      avatar: ""
-    },
-    {
-      id: "3",
-      name: "Tamara Shevchenko",
-      lastMessage: "are you going to a busine...",
-      time: "10:05",
-      avatar: ""
-    }
-  ];
+interface InstanceInfo {
+  instanceId: string;
+  owner: string;
+  profileName: string;
+  profilePictureUrl: string;
+  phoneNumber: string;
+  state: string;
+}
 
+interface ChatSidebarProps {
+  chats: Chat[];
+  selectedChatId: string | null;
+  onChatSelect: (chatId: string) => void;
+  instanceInfo?: InstanceInfo;
+}
+
+export function ChatSidebar({ chats, selectedChatId, onChatSelect, instanceInfo }: ChatSidebarProps) {
   return (
-    <div className="flex-1 border-r bg-background">
-      <div className="p-4 space-y-4">
-        <div className="flex items-center space-x-4">
-          <Avatar className="h-10 w-10">
-            <AvatarFallback>J</AvatarFallback>
+    <div className="p-4 space-y-4">
+      {instanceInfo && (
+        <div className="flex items-center space-x-4 p-4 bg-muted rounded-lg">
+          <Avatar>
+            <AvatarFallback>
+              {instanceInfo.profileName?.[0] || instanceInfo.phoneNumber?.[0] || '?'}
+            </AvatarFallback>
           </Avatar>
           <div>
-            <p className="text-sm font-medium">Jontray Arnold</p>
-            <p className="text-xs text-muted-foreground">available</p>
+            <h3 className="font-medium">{instanceInfo.profileName}</h3>
+            <p className="text-sm text-muted-foreground">{instanceInfo.phoneNumber}</p>
           </div>
         </div>
-        <div className="relative">
-          <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-          <Input placeholder="Search" className="pl-8" />
-        </div>
-      </div>
-      <ScrollArea className="h-[calc(100vh-8rem)]">
-        <div className="p-2">
-          {chats.map((chat) => (
-            <button
-              key={chat.id}
-              className="w-full text-left p-3 rounded-lg hover:bg-accent flex items-center space-x-4"
-              onClick={() => onChatSelect(chat.id)}
-            >
-              <Avatar className="h-10 w-10">
-                <AvatarFallback>N</AvatarFallback>
+      )}
+      
+      <div className="space-y-2">
+        {chats.map((chat) => (
+          <Button
+            key={chat.id}
+            variant={selectedChatId === chat.id ? "secondary" : "ghost"}
+            className="w-full justify-start"
+            onClick={() => onChatSelect(chat.id)}
+          >
+            <div className="flex items-center space-x-4">
+              <Avatar className="h-8 w-8">
+                <AvatarFallback>{chat.name[0]}</AvatarFallback>
               </Avatar>
               <div className="flex-1 overflow-hidden">
-                <p className="text-sm font-medium">{chat.name}</p>
-                <p className="text-xs text-muted-foreground truncate">
-                  {chat.lastMessage}
-                </p>
+                <p className="text-sm font-medium truncate">{chat.name}</p>
+                {chat.lastMessage && (
+                  <p className="text-xs text-muted-foreground truncate">
+                    {chat.lastMessage.content}
+                  </p>
+                )}
               </div>
-              <span className="text-xs text-muted-foreground">{chat.time}</span>
-            </button>
-          ))}
-        </div>
-      </ScrollArea>
+            </div>
+          </Button>
+        ))}
+      </div>
     </div>
   );
 }
