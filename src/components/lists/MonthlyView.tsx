@@ -1,6 +1,6 @@
 
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth } from "date-fns";
-import { Card, CardContent } from "@/components/ui/card";
+import { TaskCard } from "./components/TaskCard";
 
 interface Task {
   id: string;
@@ -45,18 +45,7 @@ export function MonthlyView({ tasks, selectedDate = new Date() }: MonthlyViewPro
             </div>
             <div className="space-y-1 overflow-y-auto max-h-[80px]">
               {dayTasks.map(task => (
-                <Card key={task.id} className="bg-background">
-                  <CardContent className="p-2">
-                    <div className="text-xs font-medium truncate">
-                      {task.title}
-                    </div>
-                    <span className={`text-xs font-medium px-1.5 py-0.5 rounded-full inline-block mt-1 ${
-                      task.type === 'meeting' ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800'
-                    }`}>
-                      {task.type === 'meeting' ? 'Meeting' : 'Follow-up'}
-                    </span>
-                  </CardContent>
-                </Card>
+                <TaskCard key={task.id} task={task} compact />
               ))}
             </div>
           </div>

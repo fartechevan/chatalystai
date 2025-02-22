@@ -1,14 +1,15 @@
+
 import { useEffect, useState } from "react";
-import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
-import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
-import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/components/auth/AuthProvider";
 import { format, isToday, isTomorrow, isPast } from "date-fns";
 import { WeeklyView } from "./WeeklyView";
 import { MonthlyView } from "./MonthlyView";
+import { ViewSelector } from "./components/ViewSelector";
+import { DailyView } from "./components/DailyView";
 
 interface Task {
   id: string;
@@ -53,7 +54,7 @@ export function TaskBoard() {
     } else if (isTomorrow(dueDate)) {
       return 'tomorrow';
     }
-    return null; // Task due date is beyond tomorrow
+    return null;
   };
 
   useEffect(() => {
@@ -77,7 +78,6 @@ export function TaskBoard() {
 
       setTasks(fetchedTasks || []);
 
-      // Group tasks by due date status for daily view
       const groupedTasks = columns.map(column => ({
         ...column,
         tasks: (fetchedTasks || [])
@@ -96,7 +96,6 @@ export function TaskBoard() {
 
     fetchTasks();
 
-    // Subscribe to realtime changes
     const subscription = supabase
       .channel('tasks_changes')
       .on('postgres_changes', 
@@ -136,13 +135,11 @@ export function TaskBoard() {
 
     const task = sourceColumn.tasks[source.index];
     
-    // Calculate new due date based on destination column
     let newDueDate = new Date();
     if (destination.droppableId === 'tomorrow') {
       newDueDate.setDate(newDueDate.getDate() + 1);
     }
     
-    // Update task due date in database
     const { error } = await supabase
       .from('tasks')
       .update({ 
@@ -160,7 +157,6 @@ export function TaskBoard() {
       return;
     }
 
-    // Update local state
     const newColumns = columns.map(col => {
       if (col.id === source.droppableId) {
         const newTasks = [...col.tasks];
@@ -188,101 +184,14 @@ export function TaskBoard() {
       case 'month':
         return <MonthlyView tasks={tasks} />;
       default:
-        return (
-          <DragDropContext onDragEnd={onDragEnd}>
-            <div className="grid grid-cols-3 gap-6">
-              {columns.map((column) => (
-                <div key={column.id}>
-                  <div className="bg-muted/30 rounded-lg p-4">
-                    <div className="flex justify-between items-center">
-                      <h3 className="font-medium text-sm text-muted-foreground">
-                        {column.title}
-                      </h3>
-                      <span className="text-sm text-muted-foreground">
-                        {column.tasks.length} {column.tasks.length === 1 ? 'to-do' : 'to-dos'}
-                      </span>
-                    </div>
-                  </div>
-                  
-                  <Droppable droppableId={column.id}>
-                    {(provided) => (
-                      <div
-                        {...provided.droppableProps}
-                        ref={provided.innerRef}
-                        className="mt-4 space-y-4"
-                      >
-                        {column.tasks.map((task, index) => (
-                          <Draggable
-                            key={task.id}
-                            draggableId={task.id}
-                            index={index}
-                          >
-                            {(provided) => (
-                              <Card
-                                ref={provided.innerRef}
-                                {...provided.draggableProps}
-                                {...provided.dragHandleProps}
-                                className="bg-background cursor-grab active:cursor-grabbing"
-                              >
-                                <CardContent className="p-4">
-                                  <div className="flex flex-col space-y-2">
-                                    <div className="text-sm font-medium">
-                                      {format(new Date(task.due_date), 'PPp')}
-                                    </div>
-                                    <div className="text-muted-foreground text-sm">
-                                      {task.title}
-                                    </div>
-                                    <div className="flex items-center mt-2">
-                                      <span className={`text-xs font-medium px-2 py-1 rounded-full ${
-                                        task.type === 'meeting' ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800'
-                                      }`}>
-                                        {task.type === 'meeting' ? 'Meeting' : 'Follow-up'}
-                                      </span>
-                                    </div>
-                                  </div>
-                                </CardContent>
-                              </Card>
-                            )}
-                          </Draggable>
-                        ))}
-                        {provided.placeholder}
-                      </div>
-                    )}
-                  </Droppable>
-                </div>
-              ))}
-            </div>
-          </DragDropContext>
-        );
+        return <DailyView columns={columns} onDragEnd={onDragEnd} />;
     }
   };
 
   return (
     <div className="p-4">
       <div className="flex justify-between items-center mb-6">
-        <div className="flex space-x-2">
-          <Button 
-            variant={viewMode === 'day' ? "secondary" : "ghost"}
-            className="text-sm"
-            onClick={() => setViewMode('day')}
-          >
-            DAY
-          </Button>
-          <Button 
-            variant={viewMode === 'week' ? "secondary" : "ghost"}
-            className="text-sm"
-            onClick={() => setViewMode('week')}
-          >
-            WEEK
-          </Button>
-          <Button 
-            variant={viewMode === 'month' ? "secondary" : "ghost"}
-            className="text-sm"
-            onClick={() => setViewMode('month')}
-          >
-            MONTH
-          </Button>
-        </div>
+        <ViewSelector currentView={viewMode} onViewChange={setViewMode} />
         <div className="flex items-center space-x-4">
           <Button>
             <Plus className="mr-2 h-4 w-4" />

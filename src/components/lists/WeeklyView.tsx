@@ -1,6 +1,6 @@
 
 import { format, startOfWeek, addDays } from "date-fns";
-import { Card, CardContent } from "@/components/ui/card";
+import { TaskCard } from "./components/TaskCard";
 
 interface Task {
   id: string;
@@ -16,9 +16,7 @@ interface WeeklyViewProps {
 }
 
 export function WeeklyView({ tasks, selectedDate = new Date() }: WeeklyViewProps) {
-  const startDate = startOfWeek(selectedDate, { weekStartsOn: 1 }); // Start from Monday
-
-  // Generate array of 7 days starting from startDate
+  const startDate = startOfWeek(selectedDate, { weekStartsOn: 1 });
   const weekDays = Array.from({ length: 7 }, (_, i) => addDays(startDate, i));
 
   return (
@@ -36,21 +34,7 @@ export function WeeklyView({ tasks, selectedDate = new Date() }: WeeklyViewProps
             </div>
             <div className="flex-1 p-2 space-y-2 overflow-y-auto bg-muted/10 rounded-b-lg">
               {dayTasks.map(task => (
-                <Card key={task.id} className="bg-background">
-                  <CardContent className="p-2">
-                    <div className="text-xs font-medium">
-                      {format(new Date(task.due_date), 'HH:mm')}
-                    </div>
-                    <div className="text-xs text-muted-foreground truncate">
-                      {task.title}
-                    </div>
-                    <span className={`text-xs font-medium px-1.5 py-0.5 rounded-full inline-block mt-1 ${
-                      task.type === 'meeting' ? 'bg-blue-100 text-blue-800' : 'bg-green-100 text-green-800'
-                    }`}>
-                      {task.type === 'meeting' ? 'Meeting' : 'Follow-up'}
-                    </span>
-                  </CardContent>
-                </Card>
+                <TaskCard key={task.id} task={task} compact />
               ))}
             </div>
           </div>
