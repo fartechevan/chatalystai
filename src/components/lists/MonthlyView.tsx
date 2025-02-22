@@ -1,5 +1,5 @@
 
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth } from "date-fns";
+import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, addDays, startOfWeek } from "date-fns";
 import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
 import { TaskCard } from "./components/TaskCard";
 
@@ -20,16 +20,19 @@ interface MonthlyViewProps {
 export function MonthlyView({ tasks, selectedDate = new Date(), onTaskUpdate }: MonthlyViewProps) {
   const monthStart = startOfMonth(selectedDate);
   const monthEnd = endOfMonth(selectedDate);
-  const daysInMonth = eachDayOfInterval({ start: monthStart, end: monthEnd });
+  const calendarStart = startOfWeek(monthStart, { weekStartsOn: 1 });
+  const daysInView = Array.from({ length: 42 }, (_, i) => addDays(calendarStart, i));
 
   const onDragEnd = async (result: any) => {
     const { destination, source, draggableId } = result;
 
     if (!destination || !onTaskUpdate) return;
 
-    const sourceDay = daysInMonth[parseInt(source.droppableId)];
-    const destinationDay = daysInMonth[parseInt(destination.droppableId)];
+    // Find the task and get its current time
+    const task = tasks.find(t => t.id === draggableId);
+    if (!task) return;
 
+    // If dropped in the same spot, do nothing
     if (
       source.droppableId === destination.droppableId &&
       source.index === destination.index
@@ -37,12 +40,14 @@ export function MonthlyView({ tasks, selectedDate = new Date(), onTaskUpdate }: 
       return;
     }
 
-    // Update the task's due date to the new day
-    const task = tasks.find(t => t.id === draggableId);
-    if (!task) return;
-
+    // Get the current time from the task
     const currentTaskTime = new Date(task.due_date);
-    const newDate = new Date(destinationDay);
+    
+    // Get the target day from our days array
+    const targetDay = daysInView[parseInt(destination.droppableId)];
+    
+    // Create new date preserving the original time
+    const newDate = new Date(targetDay);
     newDate.setHours(currentTaskTime.getHours());
     newDate.setMinutes(currentTaskTime.getMinutes());
 
@@ -58,7 +63,7 @@ export function MonthlyView({ tasks, selectedDate = new Date(), onTaskUpdate }: 
           </div>
         ))}
         
-        {daysInMonth.map((day, index) => {
+        {daysInView.map((day, index) => {
           const dayTasks = tasks.filter(
             task => format(new Date(task.due_date), 'yyyy-MM-dd') === format(day, 'yyyy-MM-dd')
           );
