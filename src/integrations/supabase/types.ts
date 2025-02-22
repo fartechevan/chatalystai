@@ -9,42 +9,6 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      bigquery_etl_data: {
-        Row: {
-          created_at: string
-          data: Json
-          id: string
-          processed_at: string | null
-        }
-        Insert: {
-          created_at?: string
-          data: Json
-          id?: string
-          processed_at?: string | null
-        }
-        Update: {
-          created_at?: string
-          data?: Json
-          id?: string
-          processed_at?: string | null
-        }
-        Relationships: []
-      }
-      blue_ice_data_logs: {
-        Row: {
-          incoming: string | null
-          response: string | null
-        }
-        Insert: {
-          incoming?: string | null
-          response?: string | null
-        }
-        Update: {
-          incoming?: string | null
-          response?: string | null
-        }
-        Relationships: []
-      }
       conversation_summaries: {
         Row: {
           conversation_id: string
@@ -379,24 +343,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
-      }
-      User_info: {
-        Row: {
-          attrs: Json | null
-          created_at: string | null
-          name: string | null
-        }
-        Insert: {
-          attrs?: Json | null
-          created_at?: string | null
-          name?: string | null
-        }
-        Update: {
-          attrs?: Json | null
-          created_at?: string | null
-          name?: string | null
-        }
-        Relationships: []
       }
       whatsapp_events: {
         Row: {

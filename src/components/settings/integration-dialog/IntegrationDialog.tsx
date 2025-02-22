@@ -1,3 +1,4 @@
+
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -7,7 +8,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { Integration } from "../types";
 import { useWhatsAppConnection } from "./hooks/useWhatsAppConnection";
 import { QRCodeScreen } from "./components/QRCodeScreen";
@@ -28,7 +29,17 @@ export function IntegrationDialog({
   const [integrationMainPopup, setIntegrationMainPopup] = useState(true);
   const [integrationQRPopup, setIntegrationQRPopup] = useState(false);
 
-  const { initializeConnection, qrCodeBase64 } = useWhatsAppConnection(selectedIntegration);
+  const { initializeConnection, qrCodeBase64, isConnected } = useWhatsAppConnection(selectedIntegration);
+
+  useEffect(() => {
+    if (isConnected && integrationQRPopup) {
+      // Close all popups when connection is established
+      setIntegrationQRPopup(false);
+      setIntegrationMainPopup(false);
+      setShowDeviceSelect(false);
+      onOpenChange(false);
+    }
+  }, [isConnected, integrationQRPopup, onOpenChange]);
 
   const handleConnect = () => {
     setShowDeviceSelect(true);
@@ -138,7 +149,6 @@ export function IntegrationDialog({
           className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground"
         >
           <span className="sr-only">Close</span>
-          
         </button>
       </DialogContent>
     </Dialog>
