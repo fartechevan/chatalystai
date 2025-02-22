@@ -8,6 +8,7 @@ import { useState, useEffect } from "react";
 export function useWhatsAppConnection(selectedIntegration: Integration | null) {
   const { toast } = useToast();
   const [qrCodeBase64, setQrCodeBase64] = useState<string | null>(null);
+  const [isConnected, setIsConnected] = useState(false);
 
   const { data: config } = useQuery({
     queryKey: ['integration-config', selectedIntegration?.id],
@@ -24,6 +25,43 @@ export function useWhatsAppConnection(selectedIntegration: Integration | null) {
     },
     enabled: !!selectedIntegration?.id,
   });
+
+  const checkConnectionStatus = async () => {
+    if (!config) return;
+
+    try {
+      const response = await fetch(`${config.base_url}/instance/fetchInstances`, {
+        headers: {
+          'apikey': config.api_key,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to check WhatsApp connection status');
+      }
+
+      const data = await response.json();
+      console.log('Connection status:', data);
+
+      // Check if instance exists and is connected
+      const instance = Array.isArray(data) && data.find(inst => inst.instance?.instanceId === config.instance_id);
+      const connected = instance?.instance?.state === 'open';
+      
+      setIsConnected(connected);
+      if (connected) {
+        setQrCodeBase64(null);
+        toast({
+          title: "WhatsApp Connected",
+          description: "Successfully connected to WhatsApp",
+        });
+      }
+
+      return connected;
+    } catch (error) {
+      console.error('Error checking connection status:', error);
+      return false;
+    }
+  };
 
   const initializeConnection = async () => {
     if (!config) {
@@ -49,21 +87,18 @@ export function useWhatsAppConnection(selectedIntegration: Integration | null) {
       const data = await response.json();
       console.log('WhatsApp connection response:', data);
 
-      console.log('WhatsApp connection response 1:', data.qrcode);
-      console.log('WhatsApp connection response 2 :', data.qrcode?.base64);
-      console.log('WhatsApp connection response 3:', data.qrcode?.base64?.value);
-
-
       // Extract QR code from the response and ensure proper formatting
       if (data.qrcode?.base64) {
         const base64Value = data.qrcode.base64;
-        // Check if the value already includes the data URL prefix
         const qrCodeDataUrl = base64Value.startsWith('data:image/')
           ? base64Value
           : `data:image/png;base64,${base64Value}`;
         
         console.log('Formatted QR code URL:', qrCodeDataUrl);
         setQrCodeBase64(qrCodeDataUrl);
+        
+        // Start polling for connection status
+        startPolling();
         return true;
       }
       else if (data.base64) {
@@ -74,6 +109,9 @@ export function useWhatsAppConnection(selectedIntegration: Integration | null) {
         
         console.log('Formatted QR code URL:', qrCodeDataUrl);
         setQrCodeBase64(qrCodeDataUrl);
+        
+        // Start polling for connection status
+        startPolling();
         return true;
       }
       else {
@@ -96,11 +134,33 @@ export function useWhatsAppConnection(selectedIntegration: Integration | null) {
     }
   };
 
+  const startPolling = () => {
+    const pollInterval = setInterval(async () => {
+      const connected = await checkConnectionStatus();
+      if (connected) {
+        clearInterval(pollInterval);
+      }
+    }, 5000); // Check every 5 seconds
+
+    // Cleanup interval after 2 minutes if not connected
+    setTimeout(() => {
+      clearInterval(pollInterval);
+    }, 120000);
+
+    return () => clearInterval(pollInterval);
+  };
+
   useEffect(() => {
+    // Check initial connection status
+    if (config) {
+      checkConnectionStatus();
+    }
+
     return () => {
       setQrCodeBase64(null);
+      setIsConnected(false);
     };
-  }, []);
+  }, [config]);
 
-  return { initializeConnection, qrCodeBase64 };
+  return { initializeConnection, qrCodeBase64, isConnected };
 }
