@@ -2,9 +2,10 @@
 import { useState } from "react";
 import { ContactList } from "./ContactList";
 import { CompanyList } from "./CompanyList";
+import { LeadsList } from "./LeadsList";
 import { ContactDetails } from "./ContactDetails";
 import { Button } from "@/components/ui/button";
-import { ListChecks, UsersIcon, Building2, Users2, Image, Package } from "lucide-react";
+import { ListChecks, UsersIcon, Building2, Users2, Image, Package, Target } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 
@@ -15,6 +16,7 @@ export function ListsView() {
   const listItems = [
     { id: "contacts", label: "Contacts", icon: UsersIcon },
     { id: "companies", label: "Companies", icon: Building2 },
+    { id: "leads", label: "Leads", icon: Target },
     { id: "all", label: "All Contacts and Companies", icon: Users2 },
     { id: "media", label: "Media", icon: Image },
     { id: "products", label: "Products", icon: Package },
@@ -52,6 +54,7 @@ export function ListsView() {
               <ContactList onSelectContact={setSelectedContactId} />
             )}
             {selectedTab === "companies" && <CompanyList />}
+            {selectedTab === "leads" && <LeadsList />}
           </div>
           {selectedContactId && (
             <div className="w-96 border-l">
