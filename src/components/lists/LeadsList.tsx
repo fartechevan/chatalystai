@@ -1,37 +1,26 @@
 
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Plus, MoreHorizontal } from "lucide-react";
-import { Card } from "@/components/ui/card";
-
-interface LeadStatus {
-  title: string;
-  count: number;
-  value: number;
-  color: string;
-}
-
-const statuses: LeadStatus[] = [
-  { title: "INITIAL CONTACT", count: 0, value: 0, color: "border-blue-500" },
-  { title: "OFFER MADE", count: 0, value: 0, color: "border-yellow-500" },
-  { title: "NEGOTIATION", count: 0, value: 0, color: "border-orange-500" },
-];
+import { Checkbox } from "@/components/ui/checkbox";
+import { MoreHorizontal, Plus } from "lucide-react";
 
 export function LeadsList() {
   return (
     <div className="flex flex-col h-full">
       <div className="p-4 border-b flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <div className="flex items-center gap-2 px-2 py-1 bg-emerald-50 text-emerald-700 rounded text-sm">
-            Active leads
-          </div>
+          <h2 className="text-lg font-semibold">LEADS</h2>
+          <Button variant="outline" size="sm" className="h-7 px-2 text-xs">
+            Full list
+          </Button>
           <Input 
             placeholder="Search and filter" 
-            className="w-[200px] h-8 text-sm" 
+            className="w-[200px] h-7 text-sm" 
           />
           <span className="text-sm text-muted-foreground">
-            0 leads: 0 RM
+            0 leads
           </span>
         </div>
         <div className="flex items-center gap-2">
@@ -40,29 +29,45 @@ export function LeadsList() {
           </Button>
           <Button size="sm" className="h-8">
             <Plus className="h-4 w-4 mr-2" />
-            NEW LEAD
+            ADD LEAD
           </Button>
         </div>
       </div>
 
-      <div className="flex-1 min-h-0 p-4">
-        <div className="grid grid-cols-3 gap-4 h-full">
-          {statuses.map((status) => (
-            <div key={status.title} className="flex flex-col">
-              <div className="flex items-center justify-between mb-3">
-                <div className="text-sm font-medium">{status.title}</div>
-                <div className="text-sm text-muted-foreground">
-                  {status.count} leads: {status.value} RM
-                </div>
-              </div>
-              <Card className={`flex-1 border-t-2 ${status.color} bg-muted/5`}>
-                <div className="p-4 text-center text-sm text-muted-foreground">
-                  Quick add
-                </div>
-              </Card>
-            </div>
-          ))}
-        </div>
+      <div className="flex-1 min-h-0">
+        <ScrollArea className="h-full">
+          <table className="w-full">
+            <thead className="sticky top-0 bg-background border-b">
+              <tr>
+                <th className="w-12 p-3">
+                  <Checkbox />
+                </th>
+                <th className="text-left p-3 text-sm font-medium text-muted-foreground">
+                  NAME
+                </th>
+                <th className="text-left p-3 text-sm font-medium text-muted-foreground">
+                  COMPANY
+                </th>
+                <th className="text-left p-3 text-sm font-medium text-muted-foreground">
+                  STATUS
+                </th>
+                <th className="text-left p-3 text-sm font-medium text-muted-foreground">
+                  PHONE
+                </th>
+                <th className="text-left p-3 text-sm font-medium text-muted-foreground">
+                  EMAIL
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr className="text-center text-muted-foreground">
+                <td colSpan={6} className="py-8">
+                  No leads found
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </ScrollArea>
       </div>
     </div>
   );
