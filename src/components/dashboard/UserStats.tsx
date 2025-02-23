@@ -26,9 +26,6 @@ export function UserStats() {
           <div className="text-2xl font-bold">
             {stats.monthlyConversations.length}
           </div>
-          <p className="text-xs text-muted-foreground">
-            Month {stats.currentMonth?.month_number || 'N/A'}
-          </p>
         </CardContent>
       </Card>
       <Card>
@@ -41,9 +38,6 @@ export function UserStats() {
           <div className="text-2xl font-bold">
             {stats.weeklyConversations.length}
           </div>
-          <p className="text-xs text-muted-foreground">
-            Week {stats.currentWeek?.week_of_month || 'N/A'}
-          </p>
         </CardContent>
       </Card>
     </div>
