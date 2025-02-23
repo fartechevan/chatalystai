@@ -1,5 +1,5 @@
 
-import { Home, Menu, Settings, MessageSquare, List, Calendar } from "lucide-react";
+import { Home, Menu, Settings, MessageSquare, List, Calendar, Target } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 
 const menuItems = [
   { title: "Dashboard", icon: Home, path: "/dashboard" },
+  { title: "Leads", icon: Target, path: "/dashboard/leads" },
   { title: "Settings", icon: Settings, path: "/dashboard/settings" },
   { title: "Lists", icon: List, path: "/dashboard/lists" },
   { title: "Calendar", icon: Calendar, path: "/dashboard/calendar" },

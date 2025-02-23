@@ -14,6 +14,7 @@ import { SidebarProvider } from "./components/ui/sidebar";
 import { ConversationView } from "./components/dashboard/conversations/ConversationView";
 import { ListsView } from "./components/lists/ListsView";
 import { TaskBoard } from "./components/lists/TaskBoard";
+import { KanbanBoard } from "./components/leads/KanbanBoard";
 
 const App = () => {
   const queryClient = new QueryClient({
@@ -48,6 +49,7 @@ const App = () => {
                     <Route index element={<Main />} />
                     <Route path="settings" element={<Settings />} />
                     <Route path="lists" element={<ListsView />} />
+                    <Route path="leads" element={<KanbanBoard />} />
                     <Route path="calendar" element={<TaskBoard />} />
                     <Route path="conversations" element={<ConversationView />} />
                   </Route>
