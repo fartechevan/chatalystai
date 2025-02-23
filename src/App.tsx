@@ -17,6 +17,15 @@ import { TaskBoard } from "./components/lists/TaskBoard";
 import { DashboardSidebar } from "@/components/dashboard/Sidebar";
 import { LeadsList } from "@/components/lists/LeadsList";
 
+const DashboardLayout = ({ children }: { children: React.ReactNode }) => (
+  <div className="flex h-screen">
+    <DashboardSidebar />
+    <main className="flex-1 overflow-y-auto p-8">
+      {children}
+    </main>
+  </div>
+);
+
 const App = () => {
   const queryClient = new QueryClient({
     defaultOptions: {
@@ -39,26 +48,20 @@ const App = () => {
                 <Routes>
                   <Route path="/" element={<Navigate to="/dashboard" />} />
                   <Route path="/login" element={<LoginForm />} />
-                  <Route
-                    path="/dashboard"
-                    element={
-                      <ProtectedRoute>
-                        <div className="flex h-screen">
-                          <DashboardSidebar />
-                          <main className="flex-1 overflow-y-auto p-8">
-                            <Routes>
-                              <Route path="" element={<Main />} />
-                              <Route path="settings/*" element={<Settings />} />
-                              <Route path="lists" element={<ListsView />} />
-                              <Route path="leads" element={<LeadsList />} />
-                              <Route path="calendar" element={<TaskBoard />} />
-                              <Route path="conversations" element={<ConversationView />} />
-                            </Routes>
-                          </main>
-                        </div>
-                      </ProtectedRoute>
-                    }
-                  />
+                  <Route path="/dashboard" element={
+                    <ProtectedRoute>
+                      <DashboardLayout>
+                        <Routes>
+                          <Route index element={<Main />} />
+                          <Route path="settings/*" element={<Settings />} />
+                          <Route path="lists" element={<ListsView />} />
+                          <Route path="leads" element={<LeadsList />} />
+                          <Route path="calendar" element={<TaskBoard />} />
+                          <Route path="conversations" element={<ConversationView />} />
+                        </Routes>
+                      </DashboardLayout>
+                    </ProtectedRoute>
+                  } />
                 </Routes>
               </Router>
             </div>
