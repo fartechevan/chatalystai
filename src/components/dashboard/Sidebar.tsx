@@ -1,5 +1,5 @@
 
-import { Home, Menu, Settings, MessageSquare, List, Calendar } from "lucide-react";
+import { Home, Menu, Settings, MessageSquare, List, Calendar, Target } from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -14,6 +14,7 @@ const menuItems = [
   { title: "Dashboard", icon: Home, path: "/dashboard" },
   { title: "Settings", icon: Settings, path: "/dashboard/settings" },
   { title: "Lists", icon: List, path: "/dashboard/lists" },
+  { title: "Leads", icon: Target, path: "/dashboard/leads" },
   { title: "Calendar", icon: Calendar, path: "/dashboard/calendar" },
   { title: "Chat", icon: MessageSquare, path: "/dashboard/conversations" },
 ];
