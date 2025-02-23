@@ -104,7 +104,7 @@ export function ContactList({ onSelectContact }: ContactListProps) {
                     <span className="text-muted-foreground">•</span>
                   </td>
                   <td className="p-3">
-                    {contact.phone}
+                    {contact.phone_number}
                   </td>
                   <td className="p-3">
                     {contact.email}
