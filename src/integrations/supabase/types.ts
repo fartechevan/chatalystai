@@ -204,6 +204,36 @@ export type Database = {
           },
         ]
       }
+      pipeline_statuses: {
+        Row: {
+          color: Database["public"]["Enums"]["pipeline_status_color"] | null
+          created_at: string
+          id: string
+          name: string
+          position: number
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          color?: Database["public"]["Enums"]["pipeline_status_color"] | null
+          created_at?: string
+          id?: string
+          name: string
+          position: number
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          color?: Database["public"]["Enums"]["pipeline_status_color"] | null
+          created_at?: string
+          id?: string
+          name?: string
+          position?: number
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           created_at: string
@@ -395,6 +425,15 @@ export type Database = {
       app_role: "admin" | "user" | "customer"
       integration_status: "available" | "coming_soon"
       new_app_role: "user" | "admin"
+      pipeline_status_color:
+        | "gray"
+        | "red"
+        | "yellow"
+        | "green"
+        | "blue"
+        | "indigo"
+        | "purple"
+        | "pink"
       sentiment_level: "bad" | "moderate" | "good"
       sentiment_type: "bad" | "moderate" | "good"
       sync_status: "pending" | "completed" | "failed"
