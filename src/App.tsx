@@ -1,3 +1,4 @@
+
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -42,17 +43,19 @@ const App = () => {
                     path="/dashboard"
                     element={
                       <ProtectedRoute>
-                        <DashboardSidebar />
-                        <main className="flex-1 overflow-y-auto p-8">
-                          <Routes>
-                            <Route path="" element={<Main />} />
-                            <Route path="settings/*" element={<Settings />} />
-                            <Route path="lists" element={<ListsView />} />
-                            <Route path="leads" element={<LeadsList />} />
-                            <Route path="calendar" element={<TaskBoard />} />
-                            <Route path="conversations" element={<ConversationView />} />
-                          </Routes>
-                        </main>
+                        <div className="flex h-screen">
+                          <DashboardSidebar />
+                          <main className="flex-1 overflow-y-auto p-8">
+                            <Routes>
+                              <Route path="" element={<Main />} />
+                              <Route path="settings/*" element={<Settings />} />
+                              <Route path="lists" element={<ListsView />} />
+                              <Route path="leads" element={<LeadsList />} />
+                              <Route path="calendar" element={<TaskBoard />} />
+                              <Route path="conversations" element={<ConversationView />} />
+                            </Routes>
+                          </main>
+                        </div>
                       </ProtectedRoute>
                     }
                   />
