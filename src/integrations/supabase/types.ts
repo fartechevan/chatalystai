@@ -204,31 +204,63 @@ export type Database = {
           },
         ]
       }
-      pipeline_statuses: {
+      pipeline_stages: {
         Row: {
-          color: Database["public"]["Enums"]["pipeline_status_color"] | null
           created_at: string
           id: string
           name: string
+          pipeline_id: string
           position: number
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          pipeline_id: string
+          position: number
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          pipeline_id?: string
+          position?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pipeline_stages_pipeline_id_fkey"
+            columns: ["pipeline_id"]
+            isOneToOne: false
+            referencedRelation: "pipelines"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pipelines: {
+        Row: {
+          created_at: string
+          id: string
+          is_default: boolean | null
+          name: string
           updated_at: string
           user_id: string
         }
         Insert: {
-          color?: Database["public"]["Enums"]["pipeline_status_color"] | null
           created_at?: string
           id?: string
+          is_default?: boolean | null
           name: string
-          position: number
           updated_at?: string
           user_id: string
         }
         Update: {
-          color?: Database["public"]["Enums"]["pipeline_status_color"] | null
           created_at?: string
           id?: string
+          is_default?: boolean | null
           name?: string
-          position?: number
           updated_at?: string
           user_id?: string
         }
@@ -425,15 +457,6 @@ export type Database = {
       app_role: "admin" | "user" | "customer"
       integration_status: "available" | "coming_soon"
       new_app_role: "user" | "admin"
-      pipeline_status_color:
-        | "gray"
-        | "red"
-        | "yellow"
-        | "green"
-        | "blue"
-        | "indigo"
-        | "purple"
-        | "pink"
       sentiment_level: "bad" | "moderate" | "good"
       sentiment_type: "bad" | "moderate" | "good"
       sync_status: "pending" | "completed" | "failed"

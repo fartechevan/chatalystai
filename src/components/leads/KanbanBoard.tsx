@@ -2,88 +2,164 @@
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Search, Plus, MoreHorizontal, Zap, Settings2, GripVertical } from "lucide-react";
+import { Search, Plus, MoreHorizontal, Zap, Settings2, GripVertical, ChevronDown } from "lucide-react";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/components/auth/AuthProvider";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
-type PipelineStatus = {
+type Pipeline = {
   id: string;
   name: string;
-  color: string;
+  is_default: boolean;
+};
+
+type PipelineStage = {
+  id: string;
+  pipeline_id: string;
+  name: string;
   position: number;
 };
 
 export function KanbanBoard() {
-  const [pipelineStatuses, setPipelineStatuses] = useState<PipelineStatus[]>([]);
+  const [pipelines, setPipelines] = useState<Pipeline[]>([]);
+  const [stages, setStages] = useState<PipelineStage[]>([]);
+  const [selectedPipelineId, setSelectedPipelineId] = useState<string | null>(null);
   const { user } = useAuth();
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    async function fetchPipelineStatuses() {
-      if (!user) return;
-      
-      const { data, error } = await supabase
-        .from('pipeline_statuses')
+    if (!user) return;
+    
+    async function fetchPipelines() {
+      const { data: pipelinesData, error: pipelinesError } = await supabase
+        .from('pipelines')
         .select('*')
-        .order('position');
-      
-      if (error) {
-        console.error('Error fetching pipeline statuses:', error);
+        .order('created_at');
+
+      if (pipelinesError) {
+        console.error('Error fetching pipelines:', pipelinesError);
         return;
       }
 
-      if (data.length === 0) {
-        // Create default statuses if none exist
-        const defaultStatuses = [
-          { name: 'Initial Contact', color: 'blue', position: 0 },
-          { name: 'Offer Made', color: 'yellow', position: 1 },
-          { name: 'Negotiation', color: 'purple', position: 2 },
-        ];
+      if (pipelinesData.length === 0) {
+        // Create default pipeline
+        const { data: defaultPipeline, error: insertError } = await supabase
+          .from('pipelines')
+          .insert({
+            name: 'Default Pipeline',
+            is_default: true,
+            user_id: user.id
+          })
+          .select()
+          .single();
 
-        for (const status of defaultStatuses) {
-          await supabase
-            .from('pipeline_statuses')
-            .insert({ ...status, user_id: user.id });
+        if (insertError) {
+          console.error('Error creating default pipeline:', insertError);
+          return;
         }
 
-        // Fetch again after creating defaults
-        const { data: newData } = await supabase
-          .from('pipeline_statuses')
-          .select('*')
-          .order('position');
-          
-        setPipelineStatuses(newData || []);
+        // Create default stages
+        const defaultStages = [
+          { name: 'Initial Contact', position: 0 },
+          { name: 'Offer Made', position: 1 },
+          { name: 'Negotiation', position: 2 }
+        ];
+
+        const { error: stagesError } = await supabase
+          .from('pipeline_stages')
+          .insert(
+            defaultStages.map(stage => ({
+              ...stage,
+              pipeline_id: defaultPipeline.id
+            }))
+          );
+
+        if (stagesError) {
+          console.error('Error creating default stages:', stagesError);
+          return;
+        }
+
+        setPipelines([defaultPipeline]);
+        setSelectedPipelineId(defaultPipeline.id);
       } else {
-        setPipelineStatuses(data);
+        setPipelines(pipelinesData);
+        setSelectedPipelineId(pipelinesData[0]?.id);
       }
-      
+    }
+
+    fetchPipelines();
+  }, [user]);
+
+  useEffect(() => {
+    async function fetchStages() {
+      if (!selectedPipelineId) return;
+
+      const { data, error } = await supabase
+        .from('pipeline_stages')
+        .select('*')
+        .eq('pipeline_id', selectedPipelineId)
+        .order('position');
+
+      if (error) {
+        console.error('Error fetching stages:', error);
+        return;
+      }
+
+      setStages(data);
       setIsLoading(false);
     }
 
-    fetchPipelineStatuses();
-  }, [user]);
+    fetchStages();
+  }, [selectedPipelineId]);
+
+  const handlePipelineChange = (pipelineId: string) => {
+    setSelectedPipelineId(pipelineId);
+  };
+
+  if (isLoading) {
+    return <div>Loading...</div>;
+  }
 
   return (
     <div className="flex h-full">
       {/* Left Panel */}
       <div className="w-64 border-r bg-muted/30 p-4 flex flex-col">
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-sm font-medium">Pipeline Stages</h2>
+          <Select
+            value={selectedPipelineId || ''}
+            onValueChange={handlePipelineChange}
+          >
+            <SelectTrigger className="w-full">
+              <SelectValue placeholder="Select pipeline" />
+            </SelectTrigger>
+            <SelectContent>
+              {pipelines.map((pipeline) => (
+                <SelectItem key={pipeline.id} value={pipeline.id}>
+                  {pipeline.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           <Button variant="ghost" size="sm">
             <Settings2 className="h-4 w-4" />
           </Button>
         </div>
         
         <div className="space-y-2">
-          {pipelineStatuses.map((status) => (
+          {stages.map((stage) => (
             <div
-              key={status.id}
+              key={stage.id}
               className="flex items-center gap-2 p-2 rounded-md hover:bg-accent cursor-pointer group"
             >
               <GripVertical className="h-4 w-4 text-muted-foreground opacity-0 group-hover:opacity-100" />
-              <div className={`w-2 h-2 rounded-full bg-${status.color}-500`} />
-              <span className="text-sm flex-1">{status.name}</span>
+              <span className="text-sm flex-1">{stage.name}</span>
               <span className="text-xs text-muted-foreground">0</span>
             </div>
           ))}
@@ -132,10 +208,10 @@ export function KanbanBoard() {
 
         <div className="flex-1 min-h-0 p-4">
           <div className="grid grid-cols-3 gap-4 h-full">
-            {pipelineStatuses.map((status) => (
-              <div key={status.id} className="flex flex-col h-full">
+            {stages.map((stage) => (
+              <div key={stage.id} className="flex flex-col h-full">
                 <div className="flex items-center justify-between mb-2">
-                  <h3 className="text-sm font-medium">{status.name}</h3>
+                  <h3 className="text-sm font-medium">{stage.name}</h3>
                   <span className="text-sm text-muted-foreground">
                     0 leads: 0 RM
                   </span>
