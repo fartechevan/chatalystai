@@ -5,6 +5,7 @@ import { useState, useEffect } from "react";
 import { AddLeadDialog } from "./AddLeadDialog";
 import { supabase } from "@/integrations/supabase/client";
 import { Skeleton } from "@/components/ui/skeleton";
+import { cn } from "@/lib/utils";
 
 interface Lead {
   id: string;
@@ -17,9 +18,17 @@ interface Lead {
 interface LeadsStageProps {
   name: string;
   id: string;
+  index?: number;
 }
 
-export function LeadsStage({ name, id }: LeadsStageProps) {
+const stageColors = {
+  0: "border-gray-400", // Incoming leads - neutral gray
+  1: "border-blue-300", // Contacted - light blue
+  2: "border-yellow-200", // Qualified - light yellow
+  3: "border-orange-200", // Nurturing - light orange
+};
+
+export function LeadsStage({ name, id, index = 0 }: LeadsStageProps) {
   const [isAddLeadOpen, setIsAddLeadOpen] = useState(false);
   const [leads, setLeads] = useState<Lead[]>([]);
   const [loading, setLoading] = useState(true);
@@ -72,30 +81,31 @@ export function LeadsStage({ name, id }: LeadsStageProps) {
     };
   }, [id]);
 
-  const totalValue = leads.reduce((sum, lead) => sum + (lead.value || 0), 0);
-
   return (
-    <Card className="h-full flex flex-col">
-      <CardHeader className="flex-row justify-between items-center pb-2">
-        <div className="flex items-center gap-2">
-          <h3 className="text-lg font-semibold tracking-tight">{name}</h3>
-          <span className="text-muted-foreground text-sm">
-            {leads.length} leads: {totalValue.toLocaleString()} RM
-          </span>
+    <div className="flex-1 min-w-[250px]">
+      <div className={cn(
+        "border-b-2 pb-2 mb-4",
+        stageColors[index as keyof typeof stageColors] || "border-gray-400"
+      )}>
+        <div className="flex flex-col">
+          <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">
+            {name}
+          </h3>
+          <div className="text-sm">
+            {leads.length} leads: {leads.reduce((sum, lead) => sum + (lead.value || 0), 0).toLocaleString()} RM
+          </div>
         </div>
-        <Button variant="ghost" size="sm" onClick={() => setIsAddLeadOpen(true)}>
-          Quick Add
-        </Button>
-      </CardHeader>
-      <CardContent className="flex-1 overflow-auto">
+      </div>
+
+      <div className="space-y-2">
         {loading ? (
-          <div className="space-y-2">
+          <>
             {[1, 2, 3].map((i) => (
               <Skeleton key={i} className="h-[72px] w-full" />
             ))}
-          </div>
+          </>
         ) : (
-          <div className="space-y-2">
+          <>
             {leads.map((lead) => (
               <Card key={lead.id} className="p-3">
                 <div className="font-medium">{lead.name}</div>
@@ -107,15 +117,16 @@ export function LeadsStage({ name, id }: LeadsStageProps) {
                 </div>
               </Card>
             ))}
-          </div>
+          </>
         )}
-      </CardContent>
+      </div>
+
       <AddLeadDialog
         isOpen={isAddLeadOpen}
         onClose={() => setIsAddLeadOpen(false)}
         pipelineStageId={id}
         onLeadAdded={loadLeads}
       />
-    </Card>
+    </div>
   );
 }

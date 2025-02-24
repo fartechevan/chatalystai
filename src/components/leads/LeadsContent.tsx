@@ -51,9 +51,11 @@ export function LeadsContent({ pipelineId }: LeadsContentProps) {
     return (
       <div className="p-8">
         <Skeleton className="h-[40px] w-[300px] mb-6" />
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          {[1, 2, 3].map((i) => (
-            <Skeleton key={i} className="h-[200px]" />
+        <div className="flex gap-6">
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className="flex-1">
+              <Skeleton className="h-[200px]" />
+            </div>
           ))}
         </div>
       </div>
@@ -61,16 +63,19 @@ export function LeadsContent({ pipelineId }: LeadsContentProps) {
   }
 
   return (
-    <div className="p-8 space-y-6">
+    <div className="flex flex-col h-full">
       <LeadsHeader selectedPipelineId={pipelineId} />
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {stages.map((stage) => (
-          <LeadsStage
-            key={stage.id}
-            id={stage.id}
-            name={stage.name}
-          />
-        ))}
+      <div className="flex-1 overflow-x-auto p-6">
+        <div className="flex gap-6 min-w-max">
+          {stages.map((stage, index) => (
+            <LeadsStage
+              key={stage.id}
+              id={stage.id}
+              name={stage.name}
+              index={index}
+            />
+          ))}
+        </div>
       </div>
     </div>
   );
