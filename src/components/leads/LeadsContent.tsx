@@ -62,7 +62,7 @@ export function LeadsContent({ pipelineId }: LeadsContentProps) {
 
   return (
     <div className="p-8 space-y-6">
-      <LeadsHeader />
+      <LeadsHeader selectedPipelineId={pipelineId} />
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {stages.map((stage) => (
           <LeadsStage
