@@ -1,33 +1,38 @@
 
-import { Card } from "@/components/ui/card";
+import { Card, CardHeader } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { useState } from "react";
+import { AddLeadDialog } from "./AddLeadDialog";
 
 interface LeadsStageProps {
   name: string;
-  leadsCount?: number;
-  value?: number;
+  id: string;
 }
 
-export function LeadsStage({ 
-  name, 
-  leadsCount = 0, 
-  value = 0 
-}: LeadsStageProps) {
+export function LeadsStage({ name, id }: LeadsStageProps) {
+  const [isAddLeadOpen, setIsAddLeadOpen] = useState(false);
+
+  const handleLeadAdded = () => {
+    // Refresh leads data
+  };
+
   return (
-    <div className="flex flex-col h-full">
-      <div className="flex items-center justify-between mb-2">
-        <h3 className="text-sm font-medium">{name}</h3>
-        <span className="text-sm text-muted-foreground">
-          {leadsCount} leads: {value} RM
-        </span>
-      </div>
-      <Card className="flex-1 bg-muted/30">
-        <div className="h-full flex items-center justify-center border-2 border-dashed rounded-lg m-4">
-          <Button variant="ghost" className="text-sm">
-            Quick add
-          </Button>
+    <Card className="h-full flex flex-col">
+      <CardHeader className="flex-row justify-between items-center pb-2">
+        <div className="flex items-center gap-2">
+          <h3 className="text-lg font-semibold tracking-tight">{name}</h3>
+          <span className="text-muted-foreground text-sm">0 leads: 0 RM</span>
         </div>
-      </Card>
-    </div>
+        <Button variant="ghost" size="sm" onClick={() => setIsAddLeadOpen(true)}>
+          Quick Add
+        </Button>
+      </CardHeader>
+      <AddLeadDialog
+        isOpen={isAddLeadOpen}
+        onClose={() => setIsAddLeadOpen(false)}
+        pipelineStageId={id}
+        onLeadAdded={handleLeadAdded}
+      />
+    </Card>
   );
 }
