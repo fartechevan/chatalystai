@@ -8,7 +8,7 @@ export function PipelineLayout() {
   const [isCollapsed, setIsCollapsed] = useState(false);
   
   return (
-    <div className="flex h-full">
+    <div className="flex h-screen -mt-8 -mx-8">
       <PipelineSidebar 
         selectedPipelineId={selectedPipelineId}
         onPipelineSelect={setSelectedPipelineId}
@@ -16,7 +16,9 @@ export function PipelineLayout() {
         onCollapse={() => setIsCollapsed(!isCollapsed)}
       />
       <div className="flex-1 flex flex-col overflow-hidden">
-        <PipelineContent pipelineId={selectedPipelineId} />
+        <div className="flex-1 overflow-auto">
+          <PipelineContent pipelineId={selectedPipelineId} />
+        </div>
       </div>
     </div>
   );
