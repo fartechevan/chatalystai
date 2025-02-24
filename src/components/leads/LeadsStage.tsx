@@ -26,18 +26,23 @@ export function LeadsStage({ name, id }: LeadsStageProps) {
 
   const loadLeads = async () => {
     const { data, error } = await supabase
-      .from('leads')
+      .from('lead_pipeline')
       .select(`
-        id,
-        name,
-        value,
-        company_name,
-        contact_first_name
+        lead:leads (
+          id,
+          name,
+          value,
+          company_name,
+          contact_first_name
+        )
       `)
-      .eq('pipeline_stage_id', id);
+      .eq('stage_id', id)
+      .order('position');
 
     if (!error && data) {
-      setLeads(data);
+      // Transform the nested data structure
+      const transformedLeads = data.map(item => item.lead) as Lead[];
+      setLeads(transformedLeads);
     }
     setLoading(false);
   };
@@ -45,16 +50,16 @@ export function LeadsStage({ name, id }: LeadsStageProps) {
   useEffect(() => {
     loadLeads();
 
-    // Subscribe to realtime changes
+    // Subscribe to realtime changes for both leads and lead_pipeline
     const channel = supabase
-      .channel('leads-changes')
+      .channel('stage-leads-changes')
       .on(
         'postgres_changes',
         {
           event: '*',
           schema: 'public',
-          table: 'leads',
-          filter: `pipeline_stage_id=eq.${id}`
+          table: 'lead_pipeline',
+          filter: `stage_id=eq.${id}`
         },
         () => {
           loadLeads();

@@ -59,16 +59,41 @@ export function AddLeadDialog({ isOpen, onClose, pipelineStageId, onLeadAdded }:
         return;
       }
 
-      const { error } = await supabase
+      // Get the pipeline ID for the stage
+      const { data: stageData } = await supabase
+        .from('pipeline_stages')
+        .select('pipeline_id')
+        .eq('id', pipelineStageId)
+        .single();
+
+      if (!stageData) {
+        throw new Error('Could not find pipeline stage');
+      }
+
+      // Start a Supabase transaction by inserting the lead first
+      const { data: leadData, error: leadError } = await supabase
         .from('leads')
         .insert({
           ...formData,
           value: parseFloat(formData.value) || 0,
-          pipeline_stage_id: pipelineStageId,
           user_id: user.id
+        })
+        .select()
+        .single();
+
+      if (leadError) throw leadError;
+
+      // Then create the lead_pipeline connection
+      const { error: pipelineError } = await supabase
+        .from('lead_pipeline')
+        .insert({
+          lead_id: leadData.id,
+          pipeline_id: stageData.pipeline_id,
+          stage_id: pipelineStageId,
+          position: 0 // Default to the end of the list
         });
 
-      if (error) throw error;
+      if (pipelineError) throw pipelineError;
 
       toast({
         title: "Success",
