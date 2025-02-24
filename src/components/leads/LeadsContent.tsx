@@ -1,77 +1,76 @@
 
-import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { Skeleton } from "@/components/ui/skeleton";
 import { LeadsHeader } from "./LeadsHeader";
 import { LeadsStage } from "./LeadsStage";
-
-type PipelineStage = {
-  id: string;
-  pipeline_id: string;
-  name: string;
-  position: number;
-};
+import { useState, useEffect } from "react";
+import { supabase } from "@/integrations/supabase/client";
 
 interface LeadsContentProps {
   pipelineId: string | null;
 }
 
 export function LeadsContent({ pipelineId }: LeadsContentProps) {
-  const [stages, setStages] = useState<PipelineStage[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [stages, setStages] = useState<Array<{ id: string; name: string }>>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    async function fetchStages() {
-      if (!pipelineId) {
-        setIsLoading(false);
-        return;
-      }
+    async function loadStages() {
+      if (!pipelineId) return;
 
       const { data, error } = await supabase
         .from('pipeline_stages')
-        .select('*')
+        .select('id, name')
         .eq('pipeline_id', pipelineId)
         .order('position');
 
-      if (error) {
-        console.error('Error fetching stages:', error);
-        return;
+      if (!error && data) {
+        setStages(data);
       }
-
-      setStages(data);
-      setIsLoading(false);
+      setLoading(false);
     }
 
-    fetchStages();
+    loadStages();
   }, [pipelineId]);
 
   if (!pipelineId) {
     return (
-      <div className="flex items-center justify-center h-full text-muted-foreground">
-        Select a pipeline to view its stages
+      <div className="p-8">
+        <div className="max-w-2xl mx-auto text-center">
+          <h2 className="text-2xl font-semibold tracking-tight">
+            Select a Pipeline
+          </h2>
+          <p className="text-muted-foreground mt-2">
+            Choose a pipeline from the sidebar to view and manage your leads.
+          </p>
+        </div>
       </div>
     );
   }
 
-  if (isLoading) {
+  if (loading) {
     return (
-      <div className="flex items-center justify-center h-full text-muted-foreground">
-        Loading...
+      <div className="p-8">
+        <Skeleton className="h-[40px] w-[300px] mb-6" />
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {[1, 2, 3].map((i) => (
+            <Skeleton key={i} className="h-[200px]" />
+          ))}
+        </div>
       </div>
     );
   }
 
   return (
-    <div className="h-full flex flex-col">
+    <div className="p-8 space-y-6">
       <LeadsHeader />
-      <div className="flex-1 p-6 min-h-0">
-        <div className="grid grid-cols-3 gap-4 h-full">
-          {stages.map((stage) => (
-            <LeadsStage 
-              key={stage.id} 
-              name={stage.name}
-            />
-          ))}
-        </div>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {stages.map((stage) => (
+          <LeadsStage
+            key={stage.id}
+            id={stage.id}
+            name={stage.name}
+          />
+        ))}
       </div>
     </div>
   );

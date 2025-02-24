@@ -48,12 +48,24 @@ export function AddLeadDialog({ isOpen, onClose, pipelineStageId, onLeadAdded }:
     }
 
     try {
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) {
+        toast({
+          title: "Error",
+          description: "You must be logged in to add leads",
+          variant: "destructive",
+        });
+        return;
+      }
+
       const { error } = await supabase
         .from('leads')
         .insert({
           ...formData,
           value: parseFloat(formData.value) || 0,
           pipeline_stage_id: pipelineStageId,
+          user_id: user.id
         });
 
       if (error) throw error;
@@ -65,6 +77,15 @@ export function AddLeadDialog({ isOpen, onClose, pipelineStageId, onLeadAdded }:
       
       onLeadAdded();
       onClose();
+      setFormData({
+        name: "",
+        value: "",
+        contact_first_name: "",
+        contact_phone: "",
+        contact_email: "",
+        company_name: "",
+        company_address: ""
+      });
     } catch (error) {
       console.error('Error adding lead:', error);
       toast({
