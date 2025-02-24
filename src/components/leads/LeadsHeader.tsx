@@ -35,6 +35,7 @@ export function LeadsHeader({ selectedPipelineId }) {
     </div>
   );
 }
+  
 
 // Helper function to return the initial stage ID
 function getInitialStageId(pipelineId) {
