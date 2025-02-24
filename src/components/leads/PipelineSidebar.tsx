@@ -95,7 +95,7 @@ export function PipelineSidebar({
 
   return (
     <div className={cn(
-      "border-r bg-muted/30 transition-all duration-300 relative flex flex-col h-full",
+      "h-full border-r bg-muted/30 transition-all duration-300 relative",
       isCollapsed ? "w-0" : "w-48"
     )}>
       <nav className="p-3 space-y-1">
