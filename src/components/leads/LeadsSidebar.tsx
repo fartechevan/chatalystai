@@ -1,8 +1,7 @@
 
 import { 
   Plus, ChevronLeft,
-  Users, Settings,
-  Archive, Trash
+  Users, Archive, Trash
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState, useEffect } from "react";
@@ -16,9 +15,8 @@ interface LeadsSidebarProps {
   onCollapse: () => void;
 }
 
-// Static menu items for settings and system functions
+// Static menu items for system functions
 const systemMenuItems = [
-  { id: 'settings', label: 'Pipeline Settings', icon: Settings },
   { id: 'archived', label: 'Archived', icon: Archive },
   { id: 'trash', label: 'Trash', icon: Trash },
 ];
@@ -30,13 +28,13 @@ export function LeadsSidebar({
   onCollapse,
 }: LeadsSidebarProps) {
   const { toast } = useToast();
-  const [pipelines, setPipelines] = useState<Array<{ id: string; name: string; }>>([]);
+  const [pipelines, setPipelines] = useState<Array<{ id: string; name: string; is_default: boolean }>>([]);
 
   useEffect(() => {
     async function loadPipelines() {
       const { data, error } = await supabase
         .from('pipelines')
-        .select('id, name')
+        .select('id, name, is_default')
         .order('name');
 
       if (error) {
@@ -48,17 +46,17 @@ export function LeadsSidebar({
         return;
       }
 
-      setPipelines(data);
+      setPipelines(data || []);
 
       // If no pipeline is selected, select the default one
-      if (!selectedPipelineId && data.length > 0) {
-        const defaultPipeline = data.find(p => p.id === 'active') || data[0];
+      if (!selectedPipelineId && data && data.length > 0) {
+        const defaultPipeline = data.find(p => p.is_default) || data[0];
         onPipelineSelect(defaultPipeline.id);
       }
     }
 
     loadPipelines();
-  }, [selectedPipelineId, onPipelineSelect]);
+  }, [selectedPipelineId, onPipelineSelect, toast]);
   
   const handleItemClick = async (itemId: string) => {
     if (itemId === 'trash') {
