@@ -1,7 +1,7 @@
 
 import { 
   Plus, ChevronLeft,
-  Users, Archive, Trash
+  Users
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState, useEffect } from "react";
@@ -15,12 +15,6 @@ interface LeadsSidebarProps {
   onCollapse: () => void;
 }
 
-// Static menu items for system functions
-const systemMenuItems = [
-  { id: 'archived', label: 'Archived', icon: Archive },
-  { id: 'trash', label: 'Trash', icon: Trash },
-];
-
 export function LeadsSidebar({
   selectedPipelineId,
   onPipelineSelect,
@@ -32,12 +26,14 @@ export function LeadsSidebar({
 
   useEffect(() => {
     async function loadPipelines() {
+      // Fetch pipelines from the pipelines table
       const { data, error } = await supabase
         .from('pipelines')
         .select('id, name, is_default')
-        .order('name');
+        .order('created_at');
 
       if (error) {
+        console.error('Error loading pipelines:', error);
         toast({
           title: "Error",
           description: "Failed to load pipelines",
@@ -57,18 +53,6 @@ export function LeadsSidebar({
 
     loadPipelines();
   }, [selectedPipelineId, onPipelineSelect, toast]);
-  
-  const handleItemClick = async (itemId: string) => {
-    if (itemId === 'trash') {
-      toast({
-        title: "Access Denied",
-        description: "You don't have permission to access the trash.",
-        variant: "destructive",
-      });
-      return;
-    }
-    onPipelineSelect(itemId);
-  };
 
   return (
     <div className={cn(
@@ -80,7 +64,7 @@ export function LeadsSidebar({
         {pipelines.map((pipeline) => (
           <button
             key={pipeline.id}
-            onClick={() => handleItemClick(pipeline.id)}
+            onClick={() => onPipelineSelect(pipeline.id)}
             className={cn(
               "w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm truncate",
               selectedPipelineId === pipeline.id 
@@ -91,25 +75,6 @@ export function LeadsSidebar({
           >
             <Users className="h-4 w-4 flex-shrink-0" />
             {!isCollapsed && <span>{pipeline.name}</span>}
-          </button>
-        ))}
-
-        {/* System Menu Items */}
-        {systemMenuItems.map((item) => (
-          <button
-            key={item.id}
-            onClick={() => handleItemClick(item.id)}
-            className={cn(
-              "w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm truncate",
-              item.id === 'trash' ? "text-destructive hover:bg-destructive/10" :
-              selectedPipelineId === item.id 
-                ? "bg-primary text-primary-foreground" 
-                : "hover:bg-muted"
-            )}
-            title={item.label}
-          >
-            <item.icon className="h-4 w-4 flex-shrink-0" />
-            {!isCollapsed && <span>{item.label}</span>}
           </button>
         ))}
       </nav>
