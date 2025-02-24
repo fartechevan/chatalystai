@@ -1,16 +1,13 @@
 
-import { Plus, GripVertical, ChevronLeft } from "lucide-react";
+import { 
+  Plus, GripVertical, ChevronLeft,
+  Users, CircleDollarSign, Settings,
+  Archive, Trash
+} from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useState, useEffect } from "react";
-import { Button } from "@/components/ui/button";
+import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/components/auth/AuthProvider";
-
-type Pipeline = {
-  id: string;
-  name: string;
-  is_default: boolean;
-};
+import { useToast } from "@/hooks/use-toast";
 
 interface LeadsSidebarProps {
   selectedPipelineId: string | null;
@@ -19,115 +16,72 @@ interface LeadsSidebarProps {
   onCollapse: () => void;
 }
 
+const menuItems = [
+  { id: 'active', label: 'Active Leads', icon: Users },
+  { id: 'revenue', label: 'Revenue', icon: CircleDollarSign },
+  { id: 'settings', label: 'Pipeline Settings', icon: Settings },
+  { id: 'archived', label: 'Archived', icon: Archive },
+  { id: 'trash', label: 'Trash', icon: Trash },
+];
+
 export function LeadsSidebar({
   selectedPipelineId,
   onPipelineSelect,
   isCollapsed,
   onCollapse,
 }: LeadsSidebarProps) {
-  const [pipelines, setPipelines] = useState<Pipeline[]>([]);
-  const { user } = useAuth();
-
-  useEffect(() => {
-    if (!user) return;
-    
-    async function fetchPipelines() {
-      const { data: pipelinesData, error: pipelinesError } = await supabase
-        .from('pipelines')
-        .select('*')
-        .order('created_at');
-
-      if (pipelinesError) {
-        console.error('Error fetching pipelines:', pipelinesError);
-        return;
-      }
-
-      if (pipelinesData.length === 0) {
-        const { data: defaultPipeline, error: insertError } = await supabase
-          .from('pipelines')
-          .insert({
-            name: 'Default Pipeline',
-            is_default: true,
-            user_id: user.id
-          })
-          .select()
-          .single();
-
-        if (insertError) {
-          console.error('Error creating default pipeline:', insertError);
-          return;
-        }
-
-        const defaultStages = [
-          { name: 'Initial Contact', position: 0 },
-          { name: 'Offer Made', position: 1 },
-          { name: 'Negotiation', position: 2 }
-        ];
-
-        const { error: stagesError } = await supabase
-          .from('pipeline_stages')
-          .insert(
-            defaultStages.map(stage => ({
-              ...stage,
-              pipeline_id: defaultPipeline.id
-            }))
-          );
-
-        if (stagesError) {
-          console.error('Error creating default stages:', stagesError);
-          return;
-        }
-
-        setPipelines([defaultPipeline]);
-        onPipelineSelect(defaultPipeline.id);
-      } else {
-        setPipelines(pipelinesData);
-        if (!selectedPipelineId) {
-          onPipelineSelect(pipelinesData[0]?.id);
-        }
-      }
+  const { toast } = useToast();
+  const [pipelines, setPipelines] = useState<Array<{ id: string; name: string; }>>([]);
+  
+  const handleItemClick = async (itemId: string) => {
+    if (itemId === 'trash') {
+      toast({
+        title: "Access Denied",
+        description: "You don't have permission to access the trash.",
+        variant: "destructive",
+      });
+      return;
     }
-
-    fetchPipelines();
-  }, [user, selectedPipelineId, onPipelineSelect]);
+    onPipelineSelect(itemId);
+  };
 
   return (
     <div className={cn(
-      "h-full border-r bg-background transition-all duration-300",
-      isCollapsed ? "w-0" : "w-64"
+      "border-r bg-muted/30 transition-all duration-300 relative flex flex-col",
+      isCollapsed ? "" : "w-48"
     )}>
-      <div className="h-full flex flex-col">
-        <div className="p-4 border-b">
-          <h2 className="font-semibold">Pipelines</h2>
-        </div>
-        <nav className="flex-1 p-2 space-y-1">
-          {pipelines.map((pipeline) => (
-            <button
-              key={pipeline.id}
-              onClick={() => onPipelineSelect(pipeline.id)}
-              className={cn(
-                "w-full flex items-center gap-2 px-3 py-2 rounded-md text-sm",
-                selectedPipelineId === pipeline.id 
-                  ? "bg-primary text-primary-foreground" 
-                  : "hover:bg-accent"
-              )}
-            >
-              <GripVertical className="h-4 w-4" />
-              {!isCollapsed && <span>{pipeline.name}</span>}
-            </button>
-          ))}
-        </nav>
-        <div className="p-2 border-t">
-          <Button variant="ghost" size="sm" className="w-full justify-start">
-            <Plus className="h-4 w-4 mr-2" />
-            Add pipeline
-          </Button>
-        </div>
+      <nav className="p-3 space-y-1">
+        {menuItems.map((item) => (
+          <button
+            key={item.id}
+            onClick={() => handleItemClick(item.id)}
+            className={cn(
+              "w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm truncate",
+              item.id === 'trash' ? "text-destructive hover:bg-destructive/10" :
+              selectedPipelineId === item.id 
+                ? "bg-primary text-primary-foreground" 
+                : "hover:bg-muted"
+            )}
+            title={item.label}
+          >
+            <item.icon className="h-4 w-4 flex-shrink-0" />
+            {!isCollapsed && <span>{item.label}</span>}
+          </button>
+        ))}
+      </nav>
+      <div className="mt-2 px-3">
+        <button
+          onClick={() => toast({ title: "Coming soon", description: "This feature is not yet available." })}
+          className="w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm text-muted-foreground hover:bg-muted"
+        >
+          <Plus className="h-4 w-4 flex-shrink-0" />
+          {!isCollapsed && <span>New Pipeline</span>}
+        </button>
       </div>
       <button
         onClick={onCollapse}
         className={cn(
-          "absolute top-3 -right-3 p-1 rounded-full bg-background border shadow-sm hover:bg-accent",
+          "absolute -right-3 top-3 p-1 rounded-full bg-background border shadow-sm hover:bg-accent",
           "transition-transform",
           isCollapsed && "rotate-180"
         )}
