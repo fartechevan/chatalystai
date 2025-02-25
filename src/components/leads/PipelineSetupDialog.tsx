@@ -2,77 +2,66 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
 import { X, GripVertical } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-
-const defaultTemplates = {
-  custom: [
-    "Incoming leads",
-    "Contacted",
-    "Qualified",
-    "Negotiation",
-    "Closed - won",
-    "Closed - lost"
-  ],
-  "Online store": [
-    "New order",
-    "Processing",
-    "Shipped",
-    "Delivered",
-    "Refunded"
-  ],
-  "Consulting": [
-    "Lead",
-    "Discovery call",
-    "Proposal sent",
-    "Contract signed",
-    "Project active",
-    "Completed"
-  ],
-  "Services": [
-    "Inquiry",
-    "Consultation",
-    "Quote sent",
-    "Follow up",
-    "Service scheduled",
-    "Completed"
-  ],
-  "Marketing": [
-    "Lead captured",
-    "Nurturing",
-    "Meeting scheduled",
-    "Proposal sent",
-    "Contract sent",
-    "Won"
-  ],
-  "Travel agency": [
-    "Inquiry",
-    "Planning",
-    "Quote sent",
-    "Booking",
-    "Travel docs sent",
-    "Trip completed"
-  ]
-};
+import { TransferLeadsDialog } from "./TransferLeadsDialog";
 
 interface PipelineSetupDialogProps {
   isOpen: boolean;
   onClose: () => void;
   onSave: () => void;
+  pipelineId?: string;
 }
 
 export function PipelineSetupDialog({
   isOpen,
   onClose,
-  onSave
+  onSave,
+  pipelineId
 }: PipelineSetupDialogProps) {
   const { toast } = useToast();
-  const [selectedTemplate, setSelectedTemplate] = useState("custom");
-  const [stages, setStages] = useState(defaultTemplates.custom);
-  const [pipelineName, setPipelineName] = useState("Sales Pipeline");
+  const [stages, setStages] = useState<string[]>([]);
+  const [pipelineName, setPipelineName] = useState("");
+  const [isTransferDialogOpen, setIsTransferDialogOpen] = useState(false);
+  const [stagesToTransfer, setStagesToTransfer] = useState<Array<{ id: string; name: string }>>([]);
+  const [originalStages, setOriginalStages] = useState<Array<{ id: string; name: string; position: number }>>([]);
+
+  useEffect(() => {
+    if (pipelineId) {
+      loadPipeline();
+    } else {
+      // Initialize with default stages for new pipeline
+      setStages(["Incoming leads", "Contacted", "Qualified", "Negotiation"]);
+    }
+  }, [pipelineId]);
+
+  const loadPipeline = async () => {
+    if (!pipelineId) return;
+
+    const { data: pipeline } = await supabase
+      .from('pipelines')
+      .select('name')
+      .eq('id', pipelineId)
+      .single();
+
+    if (pipeline) {
+      setPipelineName(pipeline.name);
+    }
+
+    const { data: stagesData } = await supabase
+      .from('pipeline_stages')
+      .select('id, name, position')
+      .eq('pipeline_id', pipelineId)
+      .order('position');
+
+    if (stagesData) {
+      setStages(stagesData.map(stage => stage.name));
+      setOriginalStages(stagesData);
+    }
+  };
 
   const handleDragEnd = (result: any) => {
     if (!result.destination) return;
@@ -84,12 +73,26 @@ export function PipelineSetupDialog({
     setStages(items);
   };
 
-  const handleTemplateSelect = (template: keyof typeof defaultTemplates) => {
-    setSelectedTemplate(template);
-    setStages(defaultTemplates[template]);
-  };
+  const handleStageDelete = async (index: number) => {
+    if (pipelineId) {
+      // Check if stage has leads
+      const stageId = originalStages[index].id;
+      const { data: leadsCount } = await supabase
+        .from('lead_pipeline')
+        .select('lead_id', { count: 'exact' })
+        .eq('stage_id', stageId);
 
-  const handleStageDelete = (index: number) => {
+      if (leadsCount && leadsCount > 0) {
+        setStagesToTransfer([{
+          id: stageId,
+          name: stages[index]
+        }]);
+        setIsTransferDialogOpen(true);
+        return;
+      }
+    }
+
+    // If no leads or new pipeline, just remove the stage
     setStages(stages.filter((_, i) => i !== index));
   };
 
@@ -103,6 +106,20 @@ export function PipelineSetupDialog({
     setStages([...stages, "New stage"]);
   };
 
+  const handleTransferConfirm = async (transfers: Record<string, string>) => {
+    // Update lead_pipeline records with new stage IDs
+    for (const [oldStageId, newStageId] of Object.entries(transfers)) {
+      await supabase
+        .from('lead_pipeline')
+        .update({ stage_id: newStageId })
+        .eq('stage_id', oldStageId);
+    }
+
+    // Now safe to delete the stage
+    setStages(stages.filter((_, i) => i !== stagesToTransfer[0].id));
+    setIsTransferDialogOpen(false);
+  };
+
   const handleSave = async () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
@@ -110,84 +127,109 @@ export function PipelineSetupDialog({
       if (!user) {
         toast({
           title: "Error",
-          description: "You must be logged in to create a pipeline",
+          description: "You must be logged in to modify pipelines",
           variant: "destructive",
         });
         return;
       }
 
-      // Create the pipeline
-      const { data: pipeline, error: pipelineError } = await supabase
-        .from('pipelines')
-        .insert({
-          name: pipelineName,
-          user_id: user.id,
-        })
-        .select()
-        .single();
+      if (pipelineId) {
+        // Update existing pipeline
+        await supabase
+          .from('pipelines')
+          .update({ name: pipelineName })
+          .eq('id', pipelineId);
 
-      if (pipelineError) throw pipelineError;
+        // Update stages
+        for (let i = 0; i < stages.length; i++) {
+          if (i < originalStages.length) {
+            // Update existing stage
+            await supabase
+              .from('pipeline_stages')
+              .update({
+                name: stages[i],
+                position: i
+              })
+              .eq('id', originalStages[i].id);
+          } else {
+            // Add new stage
+            await supabase
+              .from('pipeline_stages')
+              .insert({
+                name: stages[i],
+                position: i,
+                pipeline_id: pipelineId
+              });
+          }
+        }
 
-      // Create the stages
-      const stageData = stages.map((name, position) => ({
-        name,
-        position,
-        pipeline_id: pipeline.id
-      }));
+        // Delete removed stages
+        const remainingStageIds = originalStages
+          .slice(0, stages.length)
+          .map(stage => stage.id);
 
-      const { error: stagesError } = await supabase
-        .from('pipeline_stages')
-        .insert(stageData);
+        await supabase
+          .from('pipeline_stages')
+          .delete()
+          .eq('pipeline_id', pipelineId)
+          .not('id', 'in', remainingStageIds);
 
-      if (stagesError) throw stagesError;
+      } else {
+        // Create new pipeline
+        const { data: pipeline, error: pipelineError } = await supabase
+          .from('pipelines')
+          .insert({
+            name: pipelineName,
+            user_id: user.id,
+          })
+          .select()
+          .single();
+
+        if (pipelineError) throw pipelineError;
+
+        // Create stages
+        const stageData = stages.map((name, position) => ({
+          name,
+          position,
+          pipeline_id: pipeline.id
+        }));
+
+        const { error: stagesError } = await supabase
+          .from('pipeline_stages')
+          .insert(stageData);
+
+        if (stagesError) throw stagesError;
+      }
 
       toast({
         title: "Success",
-        description: "Pipeline created successfully",
+        description: "Pipeline saved successfully",
       });
       
       onSave();
       onClose();
     } catch (error) {
-      console.error('Error creating pipeline:', error);
+      console.error('Error saving pipeline:', error);
       toast({
         title: "Error",
-        description: "Failed to create pipeline",
+        description: "Failed to save pipeline",
         variant: "destructive",
       });
     }
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-3xl">
-        <DialogHeader>
-          <DialogTitle>Set up your pipeline</DialogTitle>
-          <p className="text-muted-foreground">
-            Building relationships with clients is a process. Customize the stages that you go
-            through when working with clients or choose a pre-built template.
-          </p>
-        </DialogHeader>
-
-        <div className="grid grid-cols-[250px,1fr] gap-8 pt-4">
-          <div className="space-y-4">
-            <h3 className="font-medium mb-2">Templates</h3>
-            <div className="space-y-1">
-              {Object.keys(defaultTemplates).map((template) => (
-                <button
-                  key={template}
-                  onClick={() => handleTemplateSelect(template as keyof typeof defaultTemplates)}
-                  className={`w-full text-left px-3 py-1.5 rounded text-sm ${
-                    selectedTemplate === template
-                      ? "bg-primary text-primary-foreground"
-                      : "hover:bg-muted"
-                  }`}
-                >
-                  {template}
-                </button>
-              ))}
-            </div>
-          </div>
+    <>
+      <Dialog open={isOpen} onOpenChange={onClose}>
+        <DialogContent className="max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>
+              {pipelineId ? 'Edit Pipeline' : 'Set up your pipeline'}
+            </DialogTitle>
+            <p className="text-muted-foreground">
+              Customize the stages that you go through when working with leads.
+            </p>
+          </DialogHeader>
 
           <div className="space-y-6">
             <div>
@@ -265,8 +307,21 @@ export function PipelineSetupDialog({
               </Button>
             </div>
           </div>
-        </div>
-      </DialogContent>
-    </Dialog>
+        </DialogContent>
+      </Dialog>
+
+      <TransferLeadsDialog
+        isOpen={isTransferDialogOpen}
+        onClose={() => setIsTransferDialogOpen(false)}
+        onConfirm={handleTransferConfirm}
+        stagesToTransfer={stagesToTransfer}
+        availableStages={stages
+          .filter((_, i) => !stagesToTransfer.some(s => s.id === originalStages[i]?.id))
+          .map((name, i) => ({
+            id: originalStages[i]?.id || `new-${i}`,
+            name
+          }))}
+      />
+    </>
   );
 }
