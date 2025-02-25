@@ -11,28 +11,87 @@ interface LeadsContentProps {
   pipelineId: string | null;
 }
 
+interface Lead {
+  id: string;
+  name: string;
+  value: number;
+  company_name: string | null;
+  contact_first_name: string | null;
+}
+
+interface StageLeads {
+  [key: string]: Lead[];
+}
+
 export function LeadsContent({ pipelineId }: LeadsContentProps) {
   const { toast } = useToast();
   const [stages, setStages] = useState<Array<{ id: string; name: string; position: number }>>([]);
+  const [stageLeads, setStageLeads] = useState<StageLeads>({});
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    async function loadStages() {
-      if (!pipelineId) return;
+  const loadStages = async () => {
+    if (!pipelineId) return;
 
-      const { data, error } = await supabase
-        .from('pipeline_stages')
-        .select('id, name, position')
-        .eq('pipeline_id', pipelineId)
-        .order('position');
+    const { data, error } = await supabase
+      .from('pipeline_stages')
+      .select('id, name, position')
+      .eq('pipeline_id', pipelineId)
+      .order('position');
 
-      if (!error && data) {
-        setStages(data);
+    if (!error && data) {
+      setStages(data);
+      
+      // Initialize leads for each stage
+      const leadsData: StageLeads = {};
+      for (const stage of data) {
+        const { data: stageLeadsData } = await supabase
+          .from('lead_pipeline')
+          .select(`
+            lead:leads (
+              id,
+              name,
+              value,
+              company_name,
+              contact_first_name
+            )
+          `)
+          .eq('stage_id', stage.id)
+          .order('position');
+
+        leadsData[stage.id] = stageLeadsData?.map(item => item.lead) || [];
       }
-      setLoading(false);
+      setStageLeads(leadsData);
     }
+    setLoading(false);
+  };
 
+  useEffect(() => {
     loadStages();
+  }, [pipelineId]);
+
+  useEffect(() => {
+    if (!pipelineId) return;
+
+    // Subscribe to changes in lead_pipeline table
+    const channel = supabase
+      .channel('lead-pipeline-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'lead_pipeline'
+        },
+        () => {
+          // Reload all stages when any change occurs
+          loadStages();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [pipelineId]);
 
   const handleDragEnd = async (result: any) => {
@@ -57,7 +116,13 @@ export function LeadsContent({ pipelineId }: LeadsContentProps) {
     }
 
     try {
-      // Update the lead's stage in the database
+      // Optimistically update the UI
+      const newStageLeads = { ...stageLeads };
+      const [movedLead] = newStageLeads[sourceStageId].splice(result.source.index, 1);
+      newStageLeads[destinationStageId].splice(result.destination.index, 0, movedLead);
+      setStageLeads(newStageLeads);
+
+      // Update the database
       const { error } = await supabase
         .from('lead_pipeline')
         .update({
@@ -68,13 +133,14 @@ export function LeadsContent({ pipelineId }: LeadsContentProps) {
 
       if (error) throw error;
 
-      // Successful move
       toast({
         title: "Lead moved",
         description: `Lead moved to ${stages[destStageIndex].name}`,
       });
     } catch (error) {
       console.error('Error moving lead:', error);
+      // Revert the optimistic update on error
+      loadStages();
       toast({
         title: "Error",
         description: "Failed to move lead",
@@ -125,6 +191,7 @@ export function LeadsContent({ pipelineId }: LeadsContentProps) {
                 id={stage.id}
                 name={stage.name}
                 index={index}
+                leads={stageLeads[stage.id] || []}
               />
             ))}
           </div>
