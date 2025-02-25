@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils";
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { PipelineSetupDialog } from "./PipelineSetupDialog";
 
 interface LeadsSidebarProps {
   selectedPipelineId: string | null;
@@ -23,36 +24,36 @@ export function LeadsSidebar({
 }: LeadsSidebarProps) {
   const { toast } = useToast();
   const [pipelines, setPipelines] = useState<Array<{ id: string; name: string; is_default: boolean }>>([]);
+  const [isSetupOpen, setIsSetupOpen] = useState(false);
 
-  useEffect(() => {
-    async function loadPipelines() {
-      // Fetch pipelines from the pipelines table
-      const { data, error } = await supabase
-        .from('pipelines')
-        .select('id, name, is_default')
-        .order('created_at');
+  const loadPipelines = async () => {
+    const { data, error } = await supabase
+      .from('pipelines')
+      .select('id, name, is_default')
+      .order('created_at');
 
-      if (error) {
-        console.error('Error loading pipelines:', error);
-        toast({
-          title: "Error",
-          description: "Failed to load pipelines",
-          variant: "destructive",
-        });
-        return;
-      }
-
-      setPipelines(data || []);
-
-      // If no pipeline is selected, select the default one
-      if (!selectedPipelineId && data && data.length > 0) {
-        const defaultPipeline = data.find(p => p.is_default) || data[0];
-        onPipelineSelect(defaultPipeline.id);
-      }
+    if (error) {
+      console.error('Error loading pipelines:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load pipelines",
+        variant: "destructive",
+      });
+      return;
     }
 
+    setPipelines(data || []);
+
+    // If no pipeline is selected, select the default one
+    if (!selectedPipelineId && data && data.length > 0) {
+      const defaultPipeline = data.find(p => p.is_default) || data[0];
+      onPipelineSelect(defaultPipeline.id);
+    }
+  };
+
+  useEffect(() => {
     loadPipelines();
-  }, [selectedPipelineId, onPipelineSelect, toast]);
+  }, [selectedPipelineId, onPipelineSelect]);
 
   return (
     <div className={cn(
@@ -60,7 +61,6 @@ export function LeadsSidebar({
       isCollapsed ? "" : "w-48"
     )}>
       <nav className="p-3 space-y-1">
-        {/* Pipeline Items */}
         {pipelines.map((pipeline) => (
           <button
             key={pipeline.id}
@@ -80,7 +80,7 @@ export function LeadsSidebar({
       </nav>
       <div className="mt-2 px-3">
         <button
-          onClick={() => toast({ title: "Coming soon", description: "This feature is not yet available." })}
+          onClick={() => setIsSetupOpen(true)}
           className="w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm text-muted-foreground hover:bg-muted"
         >
           <Plus className="h-4 w-4 flex-shrink-0" />
@@ -97,6 +97,12 @@ export function LeadsSidebar({
       >
         <ChevronLeft className="h-4 w-4" />
       </button>
+
+      <PipelineSetupDialog
+        isOpen={isSetupOpen}
+        onClose={() => setIsSetupOpen(false)}
+        onSave={loadPipelines}
+      />
     </div>
   );
 }
