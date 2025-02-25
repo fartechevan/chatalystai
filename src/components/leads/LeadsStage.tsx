@@ -6,6 +6,8 @@ import { AddLeadDialog } from "./AddLeadDialog";
 import { supabase } from "@/integrations/supabase/client";
 import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
+import { useToast } from "@/hooks/use-toast";
+import { Draggable, Droppable } from "@hello-pangea/dnd";
 
 interface Lead {
   id: string;
@@ -29,6 +31,7 @@ const stageColors = {
 };
 
 export function LeadsStage({ name, id, index = 0 }: LeadsStageProps) {
+  const { toast } = useToast();
   const [isAddLeadOpen, setIsAddLeadOpen] = useState(false);
   const [leads, setLeads] = useState<Lead[]>([]);
   const [loading, setLoading] = useState(true);
@@ -97,29 +100,59 @@ export function LeadsStage({ name, id, index = 0 }: LeadsStageProps) {
         </div>
       </div>
 
-      <div className="space-y-2">
-        {loading ? (
-          <>
-            {[1, 2, 3].map((i) => (
-              <Skeleton key={i} className="h-[72px] w-full" />
-            ))}
-          </>
-        ) : (
-          <>
-            {leads.map((lead) => (
-              <Card key={lead.id} className="p-3">
-                <div className="font-medium">{lead.name}</div>
-                <div className="text-sm text-muted-foreground">
-                  {lead.company_name || lead.contact_first_name || 'No additional info'}
-                </div>
-                <div className="text-sm font-medium mt-1">
-                  {lead.value?.toLocaleString()} RM
-                </div>
-              </Card>
-            ))}
-          </>
+      <Droppable droppableId={id}>
+        {(provided, snapshot) => (
+          <div
+            ref={provided.innerRef}
+            {...provided.droppableProps}
+            className={cn(
+              "space-y-2 min-h-[200px] rounded-lg transition-colors",
+              snapshot.isDraggingOver && "bg-muted/50"
+            )}
+          >
+            {loading ? (
+              <>
+                {[1, 2, 3].map((i) => (
+                  <Skeleton key={i} className="h-[72px] w-full" />
+                ))}
+              </>
+            ) : (
+              <>
+                {leads.map((lead, leadIndex) => (
+                  <Draggable
+                    key={lead.id}
+                    draggableId={lead.id}
+                    index={leadIndex}
+                  >
+                    {(provided, snapshot) => (
+                      <div
+                        ref={provided.innerRef}
+                        {...provided.draggableProps}
+                        {...provided.dragHandleProps}
+                        className={cn(
+                          "transition-all",
+                          snapshot.isDragging && "opacity-50"
+                        )}
+                      >
+                        <Card className="p-3">
+                          <div className="font-medium">{lead.name}</div>
+                          <div className="text-sm text-muted-foreground">
+                            {lead.company_name || lead.contact_first_name || 'No additional info'}
+                          </div>
+                          <div className="text-sm font-medium mt-1">
+                            {lead.value?.toLocaleString()} RM
+                          </div>
+                        </Card>
+                      </div>
+                    )}
+                  </Draggable>
+                ))}
+              </>
+            )}
+            {provided.placeholder}
+          </div>
         )}
-      </div>
+      </Droppable>
 
       <AddLeadDialog
         isOpen={isAddLeadOpen}
