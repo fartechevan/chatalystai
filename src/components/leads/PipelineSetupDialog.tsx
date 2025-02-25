@@ -77,12 +77,12 @@ export function PipelineSetupDialog({
     if (pipelineId) {
       // Check if stage has leads
       const stageId = originalStages[index].id;
-      const { data: leadsCount } = await supabase
+      const { count } = await supabase
         .from('lead_pipeline')
-        .select('lead_id', { count: 'exact' })
+        .select('lead_id', { count: 'exact', head: true })
         .eq('stage_id', stageId);
 
-      if (leadsCount && leadsCount > 0) {
+      if (count && count > 0) {
         setStagesToTransfer([{
           id: stageId,
           name: stages[index]
@@ -116,7 +116,8 @@ export function PipelineSetupDialog({
     }
 
     // Now safe to delete the stage
-    setStages(stages.filter((_, i) => i !== stagesToTransfer[0].id));
+    const stageToRemove = stagesToTransfer[0];
+    setStages(stages.filter((_, i) => originalStages[i]?.id !== stageToRemove.id));
     setIsTransferDialogOpen(false);
   };
 

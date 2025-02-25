@@ -1,4 +1,3 @@
-
 import { Skeleton } from "@/components/ui/skeleton";
 import { LeadsHeader } from "./LeadsHeader";
 import { LeadsStage } from "./LeadsStage";
@@ -28,6 +27,7 @@ export function LeadsContent({ pipelineId }: LeadsContentProps) {
   const [stages, setStages] = useState<Array<{ id: string; name: string; position: number }>>([]);
   const [stageLeads, setStageLeads] = useState<StageLeads>({});
   const [loading, setLoading] = useState(true);
+  const [isEditPipelineOpen, setIsEditPipelineOpen] = useState(false);
 
   const loadStages = async () => {
     if (!pipelineId) return;
@@ -41,7 +41,6 @@ export function LeadsContent({ pipelineId }: LeadsContentProps) {
     if (!error && data) {
       setStages(data);
       
-      // Initialize leads for each stage
       const leadsData: StageLeads = {};
       for (const stage of data) {
         const { data: stageLeadsData } = await supabase
@@ -72,7 +71,6 @@ export function LeadsContent({ pipelineId }: LeadsContentProps) {
   useEffect(() => {
     if (!pipelineId) return;
 
-    // Subscribe to changes in lead_pipeline table
     const channel = supabase
       .channel('lead-pipeline-changes')
       .on(
@@ -83,7 +81,6 @@ export function LeadsContent({ pipelineId }: LeadsContentProps) {
           table: 'lead_pipeline'
         },
         () => {
-          // Reload all stages when any change occurs
           loadStages();
         }
       )
@@ -101,11 +98,9 @@ export function LeadsContent({ pipelineId }: LeadsContentProps) {
     const destinationStageId = result.destination.droppableId;
     const leadId = result.draggableId;
 
-    // Find source and destination stage indices
     const sourceStageIndex = stages.findIndex(stage => stage.id === sourceStageId);
     const destStageIndex = stages.findIndex(stage => stage.id === destinationStageId);
 
-    // Prevent moving from stage 1 back to stage 0
     if (sourceStageIndex === 1 && destStageIndex === 0) {
       toast({
         title: "Operation not allowed",
@@ -116,13 +111,11 @@ export function LeadsContent({ pipelineId }: LeadsContentProps) {
     }
 
     try {
-      // Optimistically update the UI
       const newStageLeads = { ...stageLeads };
       const [movedLead] = newStageLeads[sourceStageId].splice(result.source.index, 1);
       newStageLeads[destinationStageId].splice(result.destination.index, 0, movedLead);
       setStageLeads(newStageLeads);
 
-      // Update the database
       const { error } = await supabase
         .from('lead_pipeline')
         .update({
@@ -139,7 +132,6 @@ export function LeadsContent({ pipelineId }: LeadsContentProps) {
       });
     } catch (error) {
       console.error('Error moving lead:', error);
-      // Revert the optimistic update on error
       loadStages();
       toast({
         title: "Error",
@@ -192,6 +184,8 @@ export function LeadsContent({ pipelineId }: LeadsContentProps) {
                 name={stage.name}
                 index={index}
                 leads={stageLeads[stage.id] || []}
+                pipelineId={pipelineId || ''}
+                onEditPipeline={() => setIsEditPipelineOpen(true)}
               />
             ))}
           </div>
