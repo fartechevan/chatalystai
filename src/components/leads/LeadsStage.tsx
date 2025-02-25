@@ -5,13 +5,6 @@ import { useState } from "react";
 import { AddLeadDialog } from "./AddLeadDialog";
 import { cn } from "@/lib/utils";
 import { Draggable, Droppable } from "@hello-pangea/dnd";
-import { MoreHorizontal } from "lucide-react";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 
 interface Lead {
   id: string;
@@ -26,8 +19,6 @@ interface LeadsStageProps {
   id: string;
   index?: number;
   leads: Lead[];
-  pipelineId: string;
-  onEditPipeline: () => void;
 }
 
 const stageColors = {
@@ -37,7 +28,7 @@ const stageColors = {
   3: "border-orange-200", // Nurturing - light orange
 };
 
-export function LeadsStage({ name, id, index = 0, leads, pipelineId, onEditPipeline }: LeadsStageProps) {
+export function LeadsStage({ name, id, index = 0, leads }: LeadsStageProps) {
   const [isAddLeadOpen, setIsAddLeadOpen] = useState(false);
 
   return (
@@ -46,27 +37,13 @@ export function LeadsStage({ name, id, index = 0, leads, pipelineId, onEditPipel
         "border-b-2 pb-2 mb-4",
         stageColors[index as keyof typeof stageColors] || "border-gray-400"
       )}>
-        <div className="flex justify-between items-start">
-          <div className="flex flex-col">
-            <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">
-              {name}
-            </h3>
-            <div className="text-sm">
-              {leads.length} leads: {leads.reduce((sum, lead) => sum + (lead.value || 0), 0).toLocaleString()} RM
-            </div>
+        <div className="flex flex-col">
+          <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">
+            {name}
+          </h3>
+          <div className="text-sm">
+            {leads.length} leads: {leads.reduce((sum, lead) => sum + (lead.value || 0), 0).toLocaleString()} RM
           </div>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="ghost" size="icon" className="h-8 w-8">
-                <MoreHorizontal className="h-4 w-4" />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={onEditPipeline}>
-                Edit Pipeline
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
         </div>
       </div>
 

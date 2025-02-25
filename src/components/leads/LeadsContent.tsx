@@ -27,7 +27,6 @@ export function LeadsContent({ pipelineId }: LeadsContentProps) {
   const [stages, setStages] = useState<Array<{ id: string; name: string; position: number }>>([]);
   const [stageLeads, setStageLeads] = useState<StageLeads>({});
   const [loading, setLoading] = useState(true);
-  const [isEditPipelineOpen, setIsEditPipelineOpen] = useState(false);
 
   const loadStages = async () => {
     if (!pipelineId) return;
@@ -184,8 +183,6 @@ export function LeadsContent({ pipelineId }: LeadsContentProps) {
                 name={stage.name}
                 index={index}
                 leads={stageLeads[stage.id] || []}
-                pipelineId={pipelineId || ''}
-                onEditPipeline={() => setIsEditPipelineOpen(true)}
               />
             ))}
           </div>

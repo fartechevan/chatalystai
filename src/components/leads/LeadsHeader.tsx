@@ -2,9 +2,10 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Plus } from "lucide-react";
+import { Plus, Settings2 } from "lucide-react";
 import { AddLeadDialog } from "./AddLeadDialog";
 import { supabase } from "@/integrations/supabase/client";
+import { PipelineSetupDialog } from "./PipelineSetupDialog";
 
 interface LeadsHeaderProps {
   selectedPipelineId: string;
@@ -12,6 +13,7 @@ interface LeadsHeaderProps {
 
 export function LeadsHeader({ selectedPipelineId }: LeadsHeaderProps) {
   const [isAddLeadOpen, setIsAddLeadOpen] = useState(false);
+  const [isEditPipelineOpen, setIsEditPipelineOpen] = useState(false);
   const [initialStageId, setInitialStageId] = useState<string | null>(null);
 
   useEffect(() => {
@@ -46,6 +48,13 @@ export function LeadsHeader({ selectedPipelineId }: LeadsHeaderProps) {
         </div>
         <div className="flex items-center gap-2">
           <Button 
+            variant="outline"
+            onClick={() => setIsEditPipelineOpen(true)}
+          >
+            <Settings2 className="h-4 w-4 mr-2" />
+            Edit Pipeline
+          </Button>
+          <Button 
             onClick={() => setIsAddLeadOpen(true)}
             disabled={!initialStageId}
           >
@@ -63,6 +72,16 @@ export function LeadsHeader({ selectedPipelineId }: LeadsHeaderProps) {
           // Dialog will handle the refresh
           setIsAddLeadOpen(false);
         }}
+      />
+
+      <PipelineSetupDialog
+        isOpen={isEditPipelineOpen}
+        onClose={() => setIsEditPipelineOpen(false)}
+        onSave={() => {
+          // Refresh the pipeline data
+          setIsEditPipelineOpen(false);
+        }}
+        pipelineId={selectedPipelineId}
       />
     </div>
   );
