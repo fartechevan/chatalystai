@@ -127,9 +127,6 @@ export function AddLeadDialog({ isOpen, onClose, pipelineStageId, onLeadAdded }:
         <DialogHeader>
           <DialogTitle className="flex justify-between items-center">
             Initial Contact
-            <Button variant="ghost" size="icon" className="h-8 w-8">
-              <Settings className="h-4 w-4" />
-            </Button>
           </DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="space-y-4">
