@@ -92,12 +92,12 @@ export function LeadsStage({ name, id, index = 0, leads }: LeadsStageProps) {
       </Droppable>
 
       <Button
-        variant="ghost"
-        className="w-full mt-2"
-        onClick={() => setIsAddLeadOpen(true)}
-      >
-        Add lead
-      </Button>
+  variant="ghost"
+  className="w-full mt-2 border border-dotted border-black"
+  onClick={() => setIsAddLeadOpen(true)}
+>
+  Add lead
+</Button>
 
       <AddLeadDialog
         isOpen={isAddLeadOpen}
