@@ -1,13 +1,12 @@
 
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Separator } from "@/components/ui/separator";
-import { ConversationHeader } from "./ConversationHeader";
 import { MessageList } from "./MessageList";
 import { MessageInput } from "./MessageInput";
-import { ConversationSummary } from "./ConversationSummary";
-import { ConversationUserDetails } from "./ConversationUserDetails";
-import type { Conversation, Message, ConversationSummary as ConversationSummaryType } from "./types";
-import { UseMutationResult } from "@tanstack/react-query";
+import { Button } from "@/components/ui/button";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { MoreHorizontal, ChevronLeft } from "lucide-react";
+import type { Conversation, Message } from "./types";
+import type { UseMutationResult } from "@tanstack/react-query";
 
 interface ConversationMainAreaProps {
   selectedConversation: Conversation | null;
@@ -17,7 +16,7 @@ interface ConversationMainAreaProps {
   setNewMessage: (message: string) => void;
   handleSendMessage: () => void;
   sendMessageMutation: UseMutationResult<any, Error, string>;
-  summarizeMutation: UseMutationResult<ConversationSummaryType | null, Error, void>;
+  summarizeMutation: UseMutationResult<any, Error, void>;
   summary: string | null;
   summaryTimestamp: string | null;
 }
@@ -34,30 +33,56 @@ export function ConversationMainArea({
   summary,
   summaryTimestamp
 }: ConversationMainAreaProps) {
-  return (
-    <div className="flex-1 flex flex-col min-h-0">
-      <ConversationHeader />
-
-      <div className="flex-1 overflow-hidden">
-        <ScrollArea className="h-full">
-          <div className="px-6 py-4">
-            {isLoading ? (
-              <div className="flex items-center justify-center h-full">
-                <p>Loading messages...</p>
-              </div>
-            ) : !selectedConversation ? (
-              <div className="flex items-center justify-center h-full">
-                <p className="text-muted-foreground">Select a conversation to view messages.</p>
-              </div>
-            ) : (
-              <MessageList
-                messages={messages}
-                selectedConversation={selectedConversation}
-              />
-            )}
-          </div>
-        </ScrollArea>
+  if (!selectedConversation) {
+    return (
+      <div className="flex-1 flex items-center justify-center">
+        <p className="text-muted-foreground">Select a conversation to start chatting</p>
       </div>
+    );
+  }
+
+  return (
+    <div className="flex-1 flex flex-col bg-background">
+      <div className="border-b p-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <Button variant="ghost" size="icon" className="md:hidden">
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <div>
+              <h2 className="text-lg font-semibold flex items-center gap-2">
+                Lead #{selectedConversation.conversation_id.slice(0, 6)}
+              </h2>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <Tabs defaultValue="main" className="w-auto">
+              <TabsList className="grid w-full grid-cols-4">
+                <TabsTrigger value="main">Main</TabsTrigger>
+                <TabsTrigger value="statistics">Statistics</TabsTrigger>
+                <TabsTrigger value="media">Media</TabsTrigger>
+                <TabsTrigger value="setup">Setup</TabsTrigger>
+              </TabsList>
+            </Tabs>
+            <Button variant="ghost" size="icon">
+              <MoreHorizontal className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      <ScrollArea className="flex-1 p-4">
+        {isLoading ? (
+          <div className="flex items-center justify-center h-full">
+            <p>Loading messages...</p>
+          </div>
+        ) : (
+          <MessageList
+            messages={messages}
+            selectedConversation={selectedConversation}
+          />
+        )}
+      </ScrollArea>
 
       <MessageInput
         newMessage={newMessage}
@@ -66,22 +91,6 @@ export function ConversationMainArea({
         isLoading={sendMessageMutation.isPending}
         selectedConversation={!!selectedConversation}
       />
-
-      {selectedConversation && (
-        <>
-          <ConversationSummary
-            summarizeMutation={summarizeMutation}
-            summary={summary}
-            summaryTimestamp={summaryTimestamp}
-            hasMessages={messages.length > 0}
-          />
-          <Separator />
-          <ConversationUserDetails
-            conversation={selectedConversation}
-            messages={messages}
-          />
-        </>
-      )}
     </div>
   );
 }
