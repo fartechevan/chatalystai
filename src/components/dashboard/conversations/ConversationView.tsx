@@ -4,6 +4,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import type { Conversation } from "./types";
 import { ConversationLeftPanel } from "./ConversationLeftPanel";
 import { ConversationMainArea } from "./ConversationMainArea";
+import { LeadDetailsPanel } from "./LeadDetailsPanel";
 import { useConversationData } from "./hooks/useConversationData";
 import { useConversationRealtime } from "./useConversationRealtime";
 
@@ -11,6 +12,7 @@ export function ConversationView() {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
   const [leftPanelOpen, setLeftPanelOpen] = useState(true);
+  const [leadDetailsExpanded, setLeadDetailsExpanded] = useState(true);
   const queryClient = useQueryClient();
 
   const {
@@ -53,6 +55,11 @@ export function ConversationView() {
           filteredConversations={filteredConversations}
           selectedConversation={selectedConversation}
           setSelectedConversation={setSelectedConversation}
+        />
+
+        <LeadDetailsPanel 
+          isExpanded={leadDetailsExpanded}
+          onToggle={() => setLeadDetailsExpanded(!leadDetailsExpanded)}
         />
 
         <ConversationMainArea
