@@ -52,10 +52,8 @@ export function DashboardSidebar() {
       <Sidebar collapsible="icon" className="bg-[#1C2434]">
         <SidebarContent>
           <SidebarHeader>
-            <div className="flex items-center justify-center p-2">
-              <span className="text-sm font-medium text-white">
-                <Home className="h-5 w-5" />
-              </span>
+            <div className="flex items-center justify-start px-4 py-2">
+              <span className="text-sm font-medium text-white">John Doe</span>
             </div>
           </SidebarHeader>
           <div className="px-2 py-2">
@@ -66,14 +64,15 @@ export function DashboardSidebar() {
                 isActive={location.pathname === item.path}
                 tooltip={item.title}
                 className={cn(
-                  "relative w-full justify-center",
+                  "relative w-full",
                   location.pathname === item.path ? "bg-white/10 text-white" : "text-gray-400 hover:text-white hover:bg-white/5"
                 )}
               >
-                <Link to={item.path}>
+                <Link to={item.path} className="flex items-center gap-3">
                   <item.icon className="h-5 w-5" />
+                  <span className="text-sm">{item.title}</span>
                   {item.badge && (
-                    <span className="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] text-white">
+                    <span className="absolute right-2 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] text-white">
                       {item.badge}
                     </span>
                   )}
@@ -86,10 +85,11 @@ export function DashboardSidebar() {
             <SidebarMenuButton
               asChild
               tooltip="Profile"
-              className="w-full justify-center text-gray-400 hover:text-white hover:bg-white/5"
+              className="w-full text-gray-400 hover:text-white hover:bg-white/5"
             >
-              <Link to="/dashboard/profile">
+              <Link to="/dashboard/profile" className="flex items-center gap-3">
                 <UserRound className="h-5 w-5" />
+                <span className="text-sm">Profile</span>
               </Link>
             </SidebarMenuButton>
           </div>
