@@ -1,4 +1,3 @@
-
 import * as React from "react"
 import { cn } from "@/lib/utils"
 import { Sheet, SheetContent } from "@/components/ui/sheet"
@@ -48,7 +47,7 @@ export const SidebarBase = React.forwardRef<HTMLDivElement, SidebarBaseProps>(
             className="w-[--sidebar-width] bg-sidebar p-0 text-sidebar-foreground [&>button]:hidden"
             style={
               {
-                "--sidebar-width": "10rem",
+                "--sidebar-width": "4rem",
               } as React.CSSProperties
             }
             side={side}
@@ -69,8 +68,8 @@ export const SidebarBase = React.forwardRef<HTMLDivElement, SidebarBaseProps>(
         data-side={side}
         style={
           {
-            "--sidebar-width": "10rem",
-            "--sidebar-width-icon": "3rem",
+            "--sidebar-width": "4rem",
+            "--sidebar-width-icon": "4rem",
           } as React.CSSProperties
         }
       >

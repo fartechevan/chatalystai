@@ -1,5 +1,17 @@
 
-import { Home, Menu, Settings, MessageSquare, List, Calendar, Target } from "lucide-react";
+import { 
+  Home, 
+  Menu, 
+  Settings, 
+  MessageSquare, 
+  List, 
+  Calendar, 
+  Target,
+  Mail,
+  BarChart2,
+  HelpCircle,
+  UserRound
+} from "lucide-react";
 import {
   Sidebar,
   SidebarContent,
@@ -9,14 +21,18 @@ import {
 } from "@/components/ui/sidebar";
 import { Link, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 const menuItems = [
   { title: "Dashboard", icon: Home, path: "/dashboard" },
   { title: "Leads", icon: Target, path: "/dashboard/leads" },
-  { title: "Settings", icon: Settings, path: "/dashboard/settings" },
+  { title: "Chat", icon: MessageSquare, path: "/dashboard/conversations", badge: 2 },
+  { title: "Calendar", icon: Calendar, path: "/dashboard/calendar", badge: 1 },
   { title: "Lists", icon: List, path: "/dashboard/lists" },
-  { title: "Calendar", icon: Calendar, path: "/dashboard/calendar" },
-  { title: "Chat", icon: MessageSquare, path: "/dashboard/conversations" },
+  { title: "Mail", icon: Mail, path: "/dashboard/mail" },
+  { title: "Stats", icon: BarChart2, path: "/dashboard/stats" },
+  { title: "Settings", icon: Settings, path: "/dashboard/settings" },
+  { title: "Help Center", icon: HelpCircle, path: "/dashboard/help" },
 ];
 
 export function DashboardSidebar() {
@@ -33,27 +49,49 @@ export function DashboardSidebar() {
       >
         <Menu className="h-5 w-5" />
       </Button>
-      <Sidebar collapsible="icon">
+      <Sidebar collapsible="icon" className="bg-[#1C2434]">
         <SidebarContent>
           <SidebarHeader>
-            <div className="flex items-center px-4 py-2">
-              <span className="text-sm font-medium">Dashboard</span>
+            <div className="flex items-center justify-center p-2">
+              <span className="text-sm font-medium text-white">
+                <Home className="h-5 w-5" />
+              </span>
             </div>
           </SidebarHeader>
-          <div className="px-2">
+          <div className="px-2 py-2">
             {menuItems.map((item) => (
               <SidebarMenuButton
                 key={item.title}
                 asChild
                 isActive={location.pathname === item.path}
                 tooltip={item.title}
+                className={cn(
+                  "relative w-full justify-center",
+                  location.pathname === item.path ? "bg-white/10 text-white" : "text-gray-400 hover:text-white hover:bg-white/5"
+                )}
               >
                 <Link to={item.path}>
-                  <item.icon className="h-4 w-4" />
-                  <span>{item.title}</span>
+                  <item.icon className="h-5 w-5" />
+                  {item.badge && (
+                    <span className="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] text-white">
+                      {item.badge}
+                    </span>
+                  )}
                 </Link>
               </SidebarMenuButton>
             ))}
+          </div>
+
+          <div className="mt-auto px-2 pb-4">
+            <SidebarMenuButton
+              asChild
+              tooltip="Profile"
+              className="w-full justify-center text-gray-400 hover:text-white hover:bg-white/5"
+            >
+              <Link to="/dashboard/profile">
+                <UserRound className="h-5 w-5" />
+              </Link>
+            </SidebarMenuButton>
           </div>
         </SidebarContent>
       </Sidebar>
