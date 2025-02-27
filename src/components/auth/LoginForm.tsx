@@ -1,4 +1,3 @@
-
 import { Auth } from "@supabase/auth-ui-react";
 import { ThemeSupa } from "@supabase/auth-ui-shared";
 import { supabase } from "@/integrations/supabase/client";
@@ -33,7 +32,7 @@ export const LoginForm = () => {
     <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-[#1C2434] to-background">
       <div className="w-full max-w-md px-8 py-12 rounded-xl bg-card/90 backdrop-blur-sm shadow-2xl animate-enter">
         <div className="flex flex-col items-center mb-8 space-y-4">
-          <div className="w-12 h-12 rounded-xl bg-primary flex items-center justify-center">
+          <div className="w-12 h-12 rounded-xl bg-primary flex items-center justify-center animate-logo-spin">
             <svg 
               viewBox="0 0 24 24" 
               className="w-8 h-8 text-white"
@@ -53,7 +52,7 @@ export const LoginForm = () => {
             <p className="text-muted-foreground text-sm">Communicate smarter, respond faster</p>
           </div>
         </div>
-        
+
         <Auth
           supabaseClient={supabase}
           appearance={{
