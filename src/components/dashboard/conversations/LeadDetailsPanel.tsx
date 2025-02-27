@@ -143,25 +143,22 @@ export function LeadDetailsPanel({ isExpanded, onToggle, selectedConversation }:
               if (leadError) {
                 console.error('Error fetching lead:', leadError);
               } else if (leadData) {
-                // Convert the lead data to our Lead type and add tags if missing
-                const typedLeadData: Lead = {
-                  ...leadData,
-                  tags: leadData.tags || []
-                };
+                setLead(leadData);
                 
-                setLead(typedLeadData);
-                setTags(typedLeadData.tags || []);
+                // For demo purposes, we'll use some mock tags
+                // In a real app, you'd store tags in a separate table or in metadata
+                setTags(['lead', 'follow-up']);
                 
                 // Calculate days since creation
-                const creationDate = new Date(typedLeadData.created_at);
+                const creationDate = new Date(leadData.created_at);
                 const today = new Date();
                 const diffTime = Math.abs(today.getTime() - creationDate.getTime());
                 const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
                 setDaysSinceCreation(diffDays);
                 
                 // If lead has a pipeline_stage_id, select it
-                if (typedLeadData.pipeline_stage_id && selectedPipeline?.stages) {
-                  const stage = selectedPipeline.stages.find(s => s.id === typedLeadData.pipeline_stage_id);
+                if (leadData.pipeline_stage_id && selectedPipeline?.stages) {
+                  const stage = selectedPipeline.stages.find(s => s.id === leadData.pipeline_stage_id);
                   if (stage) {
                     setSelectedStage(stage);
                   }
@@ -174,12 +171,11 @@ export function LeadDetailsPanel({ isExpanded, onToggle, selectedConversation }:
                   created_at: selectedConversation.created_at,
                   updated_at: selectedConversation.updated_at,
                   customer_id: customerId,
-                  tags: [],
                   user_id: selectedConversation.sender_id // Just assign the sender as the user for now
                 };
                 
                 setLead(fakeLead);
-                setTags([]);
+                setTags(['new-lead']);
                 
                 // Calculate days since creation
                 const creationDate = new Date(fakeLead.created_at);
@@ -219,13 +215,12 @@ export function LeadDetailsPanel({ isExpanded, onToggle, selectedConversation }:
         created_at: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(), // 7 days ago
         updated_at: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
         customer_id: mockCustomer.id,
-        tags: ['lead', 'product'],
         user_id: 'mock-user-id'
       };
       
       setCustomer(mockCustomer);
       setLead(mockLead);
-      setTags(mockLead.tags || []);
+      setTags(['lead', 'product']);
       
       // Calculate days since creation
       const creationDate = new Date(mockLead.created_at);
@@ -279,25 +274,31 @@ export function LeadDetailsPanel({ isExpanded, onToggle, selectedConversation }:
     setNewTag("");
     setShowTagInput(false);
     
-    // Update tags in the database if we have a lead ID
+    // For this demo we're just handling tags in local state
+    // In a real app, you might store them in a dedicated tags table
+    console.log(`Added tag ${newTag.trim()} to lead ${lead.id}`);
+    
+    // Example of how you might handle this with a lead_tags table:
+    /*
     if (lead.id) {
       try {
         const { error } = await supabase
-          .from('leads')
-          .update({ 
-            tags: updatedTags 
-          })
-          .eq('id', lead.id);
+          .from('lead_tags')
+          .insert({ 
+            lead_id: lead.id,
+            tag_name: newTag.trim() 
+          });
         
         if (error) {
-          console.error('Error updating lead tags:', error);
+          console.error('Error adding tag:', error);
         } else {
-          console.log(`Updated tags for lead ${lead.id}`);
+          console.log(`Added tag ${newTag.trim()} to lead ${lead.id}`);
         }
       } catch (error) {
         console.error('Error:', error);
       }
     }
+    */
   };
   
   // Handle removing a tag
@@ -307,18 +308,22 @@ export function LeadDetailsPanel({ isExpanded, onToggle, selectedConversation }:
     const updatedTags = tags.filter(tag => tag !== tagToRemove);
     setTags(updatedTags);
     
-    // Update tags in the database if we have a lead ID
+    // For this demo we're just handling tags in local state
+    // In a real app, you would delete from a dedicated tags table
+    console.log(`Removed tag ${tagToRemove} from lead ${lead.id}`);
+    
+    // Example of how you might handle this with a lead_tags table:
+    /*
     if (lead.id) {
       try {
         const { error } = await supabase
-          .from('leads')
-          .update({ 
-            tags: updatedTags 
-          })
-          .eq('id', lead.id);
+          .from('lead_tags')
+          .delete()
+          .eq('lead_id', lead.id)
+          .eq('tag_name', tagToRemove);
         
         if (error) {
-          console.error('Error updating lead tags:', error);
+          console.error('Error removing tag:', error);
         } else {
           console.log(`Removed tag ${tagToRemove} from lead ${lead.id}`);
         }
@@ -326,6 +331,7 @@ export function LeadDetailsPanel({ isExpanded, onToggle, selectedConversation }:
         console.error('Error:', error);
       }
     }
+    */
   };
 
   return (

@@ -60,7 +60,6 @@ export interface Lead {
   updated_at: string;
   pipeline_stage_id?: string;
   customer_id?: string;
-  tags?: string[];
   user_id: string;
   value?: number;
   company_name?: string;
