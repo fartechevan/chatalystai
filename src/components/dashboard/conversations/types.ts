@@ -32,3 +32,31 @@ export interface ConversationSummary {
   id: string;
   summary: string;
 }
+
+export interface PipelineStage {
+  id: string;
+  name: string;
+  position: number;
+}
+
+export interface Pipeline {
+  id: string;
+  name: string;
+  stages?: PipelineStage[];
+}
+
+export interface Customer {
+  id: string;
+  name: string;
+  phone_number: string;
+  email?: string;
+}
+
+export interface Lead {
+  id: string;
+  name: string;
+  created_at: string;
+  pipeline_id?: string;
+  stage_id?: string;
+  customer_id?: string;
+}

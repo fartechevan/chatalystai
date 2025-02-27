@@ -9,7 +9,9 @@ import { Label } from "@/components/ui/label";
 import { ChevronLeft, ChevronRight, Plus, Link as LinkIcon, Check, Trash2, Phone, Mail, Building, ChevronDown, Globe, MapPin, Tag, MoreHorizontal } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
-import { Profile } from "./types";
+import { Profile, Pipeline, PipelineStage, Customer, Lead } from "./types";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Card } from "@/components/ui/card";
 
 interface LeadDetailsPanelProps {
   isExpanded: boolean;
@@ -20,10 +22,16 @@ export function LeadDetailsPanel({ isExpanded, onToggle }: LeadDetailsPanelProps
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [selectedAssignee, setSelectedAssignee] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [pipelines, setPipelines] = useState<Pipeline[]>([]);
+  const [selectedPipeline, setSelectedPipeline] = useState<Pipeline | null>(null);
+  const [selectedStage, setSelectedStage] = useState<PipelineStage | null>(null);
+  const [customer, setCustomer] = useState<Customer | null>(null);
+  const [lead, setLead] = useState<Lead | null>(null);
+  const [daysSinceCreation, setDaysSinceCreation] = useState<number>(0);
 
+  // Fetch profiles
   useEffect(() => {
     async function fetchProfiles() {
-      setIsLoading(true);
       try {
         const { data, error } = await supabase
           .from('profiles')
@@ -40,8 +48,6 @@ export function LeadDetailsPanel({ isExpanded, onToggle }: LeadDetailsPanelProps
         }
       } catch (error) {
         console.error('Error:', error);
-      } finally {
-        setIsLoading(false);
       }
     }
 
@@ -50,7 +56,109 @@ export function LeadDetailsPanel({ isExpanded, onToggle }: LeadDetailsPanelProps
     }
   }, [isExpanded]);
 
+  // Fetch pipelines and stages
+  useEffect(() => {
+    async function fetchPipelines() {
+      try {
+        const { data: pipelinesData, error: pipelinesError } = await supabase
+          .from('pipelines')
+          .select('*')
+          .eq('is_default', true)
+          .maybeSingle();
+        
+        if (pipelinesError) {
+          console.error('Error fetching pipelines:', pipelinesError);
+        } else if (pipelinesData) {
+          // Get stages for the default pipeline
+          const { data: stagesData, error: stagesError } = await supabase
+            .from('pipeline_stages')
+            .select('*')
+            .eq('pipeline_id', pipelinesData.id)
+            .order('position');
+          
+          if (stagesError) {
+            console.error('Error fetching stages:', stagesError);
+          } else if (stagesData) {
+            const pipelineWithStages: Pipeline = {
+              ...pipelinesData,
+              stages: stagesData
+            };
+            
+            setPipelines([pipelineWithStages]);
+            setSelectedPipeline(pipelineWithStages);
+            
+            // Set first stage as default
+            if (stagesData.length > 0) {
+              setSelectedStage(stagesData[0]);
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error:', error);
+      }
+    }
+
+    if (isExpanded) {
+      fetchPipelines();
+    }
+  }, [isExpanded]);
+
+  // Fetch customer and lead data
+  useEffect(() => {
+    async function fetchData() {
+      setIsLoading(true);
+      try {
+        // For demo purposes, we'll mock a customer and lead
+        // In a real app, this would come from the actual conversation data
+        const mockCustomer: Customer = {
+          id: '123',
+          name: 'John Smith',
+          phone_number: '+60192698338',
+          email: 'john@example.com'
+        };
+        
+        const mockLead: Lead = {
+          id: '163674',
+          name: 'New Product Inquiry',
+          created_at: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(), // 7 days ago
+          customer_id: mockCustomer.id
+        };
+        
+        setCustomer(mockCustomer);
+        setLead(mockLead);
+        
+        // Calculate days since creation
+        const creationDate = new Date(mockLead.created_at);
+        const today = new Date();
+        const diffTime = Math.abs(today.getTime() - creationDate.getTime());
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        setDaysSinceCreation(diffDays);
+      } catch (error) {
+        console.error('Error:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+
+    if (isExpanded) {
+      fetchData();
+    }
+  }, [isExpanded]);
+
   const selectedProfile = profiles.find(profile => profile.id === selectedAssignee);
+
+  // Update pipeline stage
+  const handleStageChange = async (stageId: string) => {
+    if (!lead || !selectedPipeline) return;
+    
+    const stage = selectedPipeline.stages?.find(s => s.id === stageId);
+    if (stage) {
+      setSelectedStage(stage);
+      
+      // In a real app, you would update the lead's stage in the database here
+      console.log(`Updating lead ${lead.id} to stage ${stage.name}`);
+    }
+  };
 
   return (
     <div className={cn(
@@ -59,7 +167,7 @@ export function LeadDetailsPanel({ isExpanded, onToggle }: LeadDetailsPanelProps
     )}>
       <div className="flex items-center justify-between p-4 border-b">
         <h3 className={cn("font-medium text-sm truncate flex items-center gap-2", !isExpanded && "hidden")}>
-          Lead #163674
+          Lead #{lead?.id?.slice(0, 6) || '163674'}
           {isExpanded && <MoreHorizontal className="h-4 w-4 ml-auto text-muted-foreground" />}
         </h3>
         <Button variant="ghost" size="icon" onClick={onToggle} className={isExpanded ? "ml-auto" : ""}>
@@ -79,15 +187,45 @@ export function LeadDetailsPanel({ isExpanded, onToggle }: LeadDetailsPanelProps
             {/* Pipeline Section */}
             <div className="space-y-2">
               <label className="text-xs text-muted-foreground">Pipeline</label>
-              <div className="flex items-center justify-between">
-                <div className="text-sm font-medium">Incoming leads</div>
-                <div className="text-sm text-muted-foreground flex items-center">
-                  (7 days)
-                  <ChevronDown className="h-4 w-4 ml-1" />
-                </div>
-              </div>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button variant="outline" size="sm" className="w-full justify-between">
+                    <div className="flex items-center">
+                      <span className="font-medium">{selectedStage?.name || 'Incoming leads'}</span>
+                    </div>
+                    <div className="text-xs text-muted-foreground flex items-center">
+                      ({daysSinceCreation} days)
+                      <ChevronDown className="h-4 w-4 ml-1" />
+                    </div>
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-72 p-2">
+                  {selectedPipeline?.stages?.map((stage) => (
+                    <Card 
+                      key={stage.id} 
+                      className={cn(
+                        "p-2 mb-2 cursor-pointer hover:bg-accent",
+                        stage.id === selectedStage?.id && "border-primary"
+                      )}
+                      onClick={() => handleStageChange(stage.id)}
+                    >
+                      {stage.name}
+                    </Card>
+                  ))}
+                </PopoverContent>
+              </Popover>
               <div className="h-2 bg-muted rounded-full overflow-hidden">
-                <div className="bg-primary h-full w-1/4 rounded-full"></div>
+                {selectedPipeline?.stages && selectedStage && (
+                  <div 
+                    className="bg-primary h-full rounded-full"
+                    style={{
+                      width: `${(
+                        ((selectedPipeline.stages.findIndex(s => s.id === selectedStage.id) + 1) / 
+                        selectedPipeline.stages.length) * 100
+                      )}%`
+                    }}
+                  ></div>
+                )}
               </div>
             </div>
           </div>
@@ -143,10 +281,10 @@ export function LeadDetailsPanel({ isExpanded, onToggle }: LeadDetailsPanelProps
                   <div className="flex items-center gap-3">
                     <Avatar className="h-12 w-12">
                       <AvatarImage src="https://images.unsplash.com/photo-1560250097-0b93528c311a?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=774&q=80" />
-                      <AvatarFallback>B</AvatarFallback>
+                      <AvatarFallback>{customer?.name?.charAt(0) || 'C'}</AvatarFallback>
                     </Avatar>
                     <div className="space-y-1">
-                      <div className="font-medium">Bhargavi</div>
+                      <div className="font-medium">{customer?.name || 'Contact'}</div>
                       <Button variant="outline" size="sm" className="h-6 text-xs">
                         <Phone className="h-3 w-3 mr-1" />
                         WhatsApp Lite
@@ -175,12 +313,12 @@ export function LeadDetailsPanel({ isExpanded, onToggle }: LeadDetailsPanelProps
                 <div className="space-y-4">
                   <div className="grid grid-cols-2 gap-2 items-center">
                     <label className="text-sm text-muted-foreground">Work phone</label>
-                    <div className="text-sm text-muted-foreground">...</div>
+                    <div className="text-sm">{customer?.phone_number || '...'}</div>
                   </div>
                   
                   <div className="grid grid-cols-2 gap-2 items-center">
                     <label className="text-sm text-muted-foreground">Work email</label>
-                    <div className="text-sm text-muted-foreground">...</div>
+                    <div className="text-sm">{customer?.email || '...'}</div>
                   </div>
                   
                   <div className="grid grid-cols-2 gap-2 items-center">
