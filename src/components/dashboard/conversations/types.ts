@@ -52,12 +52,20 @@ export interface Customer {
   email?: string;
 }
 
+// Define our custom Lead interface to match what we're storing in the database
 export interface Lead {
   id: string;
   name: string;
   created_at: string;
-  pipeline_id?: string;
-  stage_id?: string;
+  updated_at: string;
+  pipeline_stage_id?: string;
   customer_id?: string;
   tags?: string[];
+  user_id: string;
+  value?: number;
+  company_name?: string;
+  company_address?: string;
+  contact_email?: string;
+  contact_phone?: string;
+  contact_first_name?: string;
 }

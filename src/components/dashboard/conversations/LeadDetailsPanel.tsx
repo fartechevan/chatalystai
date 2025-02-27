@@ -143,19 +143,25 @@ export function LeadDetailsPanel({ isExpanded, onToggle, selectedConversation }:
               if (leadError) {
                 console.error('Error fetching lead:', leadError);
               } else if (leadData) {
-                setLead(leadData);
-                setTags(leadData.tags || []);
+                // Convert the lead data to our Lead type and add tags if missing
+                const typedLeadData: Lead = {
+                  ...leadData,
+                  tags: leadData.tags || []
+                };
+                
+                setLead(typedLeadData);
+                setTags(typedLeadData.tags || []);
                 
                 // Calculate days since creation
-                const creationDate = new Date(leadData.created_at);
+                const creationDate = new Date(typedLeadData.created_at);
                 const today = new Date();
                 const diffTime = Math.abs(today.getTime() - creationDate.getTime());
                 const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
                 setDaysSinceCreation(diffDays);
                 
-                // If lead has a stage_id, select it
-                if (leadData.stage_id && selectedPipeline?.stages) {
-                  const stage = selectedPipeline.stages.find(s => s.id === leadData.stage_id);
+                // If lead has a pipeline_stage_id, select it
+                if (typedLeadData.pipeline_stage_id && selectedPipeline?.stages) {
+                  const stage = selectedPipeline.stages.find(s => s.id === typedLeadData.pipeline_stage_id);
                   if (stage) {
                     setSelectedStage(stage);
                   }
@@ -166,8 +172,10 @@ export function LeadDetailsPanel({ isExpanded, onToggle, selectedConversation }:
                   id: `LEAD-${selectedConversation.conversation_id.slice(0, 6)}`,
                   name: 'New Product Inquiry',
                   created_at: selectedConversation.created_at,
+                  updated_at: selectedConversation.updated_at,
                   customer_id: customerId,
-                  tags: []
+                  tags: [],
+                  user_id: selectedConversation.sender_id // Just assign the sender as the user for now
                 };
                 
                 setLead(fakeLead);
@@ -209,8 +217,10 @@ export function LeadDetailsPanel({ isExpanded, onToggle, selectedConversation }:
         id: '163674',
         name: 'New Product Inquiry',
         created_at: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(), // 7 days ago
+        updated_at: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
         customer_id: mockCustomer.id,
-        tags: ['lead', 'product']
+        tags: ['lead', 'product'],
+        user_id: 'mock-user-id'
       };
       
       setCustomer(mockCustomer);
@@ -245,7 +255,7 @@ export function LeadDetailsPanel({ isExpanded, onToggle, selectedConversation }:
         try {
           const { error } = await supabase
             .from('leads')
-            .update({ stage_id: stageId })
+            .update({ pipeline_stage_id: stageId })
             .eq('id', lead.id);
           
           if (error) {
@@ -274,7 +284,9 @@ export function LeadDetailsPanel({ isExpanded, onToggle, selectedConversation }:
       try {
         const { error } = await supabase
           .from('leads')
-          .update({ tags: updatedTags })
+          .update({ 
+            tags: updatedTags 
+          })
           .eq('id', lead.id);
         
         if (error) {
@@ -300,7 +312,9 @@ export function LeadDetailsPanel({ isExpanded, onToggle, selectedConversation }:
       try {
         const { error } = await supabase
           .from('leads')
-          .update({ tags: updatedTags })
+          .update({ 
+            tags: updatedTags 
+          })
           .eq('id', lead.id);
         
         if (error) {
