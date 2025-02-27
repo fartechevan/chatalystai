@@ -17,6 +17,7 @@ interface ConversationLeftPanelProps {
   setSelectedConversation: (conversation: Conversation) => void;
 }
 
+
 export function ConversationLeftPanel({
   leftPanelOpen,
   setLeftPanelOpen,
