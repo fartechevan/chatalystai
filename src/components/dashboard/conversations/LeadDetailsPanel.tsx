@@ -143,22 +143,39 @@ export function LeadDetailsPanel({ isExpanded, onToggle, selectedConversation }:
               if (leadError) {
                 console.error('Error fetching lead:', leadError);
               } else if (leadData) {
-                setLead(leadData);
+                // Don't use spread operator here to avoid deep type instantiation
+                const typedLeadData: Lead = {
+                  id: leadData.id,
+                  name: leadData.name,
+                  created_at: leadData.created_at,
+                  updated_at: leadData.updated_at,
+                  pipeline_stage_id: leadData.pipeline_stage_id,
+                  customer_id: leadData.customer_id,
+                  user_id: leadData.user_id,
+                  value: leadData.value,
+                  company_name: leadData.company_name,
+                  company_address: leadData.company_address,
+                  contact_email: leadData.contact_email,
+                  contact_phone: leadData.contact_phone,
+                  contact_first_name: leadData.contact_first_name
+                };
+                
+                setLead(typedLeadData);
                 
                 // For demo purposes, we'll use some mock tags
                 // In a real app, you'd store tags in a separate table or in metadata
                 setTags(['lead', 'follow-up']);
                 
                 // Calculate days since creation
-                const creationDate = new Date(leadData.created_at);
+                const creationDate = new Date(typedLeadData.created_at);
                 const today = new Date();
                 const diffTime = Math.abs(today.getTime() - creationDate.getTime());
                 const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
                 setDaysSinceCreation(diffDays);
                 
                 // If lead has a pipeline_stage_id, select it
-                if (leadData.pipeline_stage_id && selectedPipeline?.stages) {
-                  const stage = selectedPipeline.stages.find(s => s.id === leadData.pipeline_stage_id);
+                if (typedLeadData.pipeline_stage_id && selectedPipeline?.stages) {
+                  const stage = selectedPipeline.stages.find(s => s.id === typedLeadData.pipeline_stage_id);
                   if (stage) {
                     setSelectedStage(stage);
                   }
