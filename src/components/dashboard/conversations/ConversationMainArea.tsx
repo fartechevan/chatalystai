@@ -3,7 +3,6 @@ import { MessageList } from "./MessageList";
 import { MessageInput } from "./MessageInput";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { MoreHorizontal, ChevronLeft } from "lucide-react";
 import type { Conversation, Message } from "./types";
 import type { UseMutationResult } from "@tanstack/react-query";
@@ -55,15 +54,7 @@ export function ConversationMainArea({
               </h2>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            <Tabs defaultValue="main" className="w-auto">
-              <TabsList className="grid w-full grid-cols-4">
-                <TabsTrigger value="main">Main</TabsTrigger>
-                <TabsTrigger value="statistics">Statistics</TabsTrigger>
-                <TabsTrigger value="media">Media</TabsTrigger>
-                <TabsTrigger value="setup">Setup</TabsTrigger>
-              </TabsList>
-            </Tabs>
+          <div className="flex items-center">
             <Button variant="ghost" size="icon">
               <MoreHorizontal className="h-4 w-4" />
             </Button>
