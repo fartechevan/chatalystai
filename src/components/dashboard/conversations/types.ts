@@ -59,4 +59,5 @@ export interface Lead {
   pipeline_id?: string;
   stage_id?: string;
   customer_id?: string;
+  tags?: string[];
 }

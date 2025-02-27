@@ -60,6 +60,7 @@ export function ConversationView() {
         <LeadDetailsPanel 
           isExpanded={leadDetailsExpanded}
           onToggle={() => setLeadDetailsExpanded(!leadDetailsExpanded)}
+          selectedConversation={selectedConversation}
         />
 
         <ConversationMainArea

@@ -9,16 +9,17 @@ import { Label } from "@/components/ui/label";
 import { ChevronLeft, ChevronRight, Plus, Link as LinkIcon, Check, Trash2, Phone, Mail, Building, ChevronDown, Globe, MapPin, Tag, MoreHorizontal } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
-import { Profile, Pipeline, PipelineStage, Customer, Lead } from "./types";
+import { Profile, Pipeline, PipelineStage, Customer, Lead, Conversation } from "./types";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Card } from "@/components/ui/card";
 
 interface LeadDetailsPanelProps {
   isExpanded: boolean;
   onToggle: () => void;
+  selectedConversation: Conversation | null;
 }
 
-export function LeadDetailsPanel({ isExpanded, onToggle }: LeadDetailsPanelProps) {
+export function LeadDetailsPanel({ isExpanded, onToggle, selectedConversation }: LeadDetailsPanelProps) {
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [selectedAssignee, setSelectedAssignee] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -28,6 +29,9 @@ export function LeadDetailsPanel({ isExpanded, onToggle }: LeadDetailsPanelProps
   const [customer, setCustomer] = useState<Customer | null>(null);
   const [lead, setLead] = useState<Lead | null>(null);
   const [daysSinceCreation, setDaysSinceCreation] = useState<number>(0);
+  const [tags, setTags] = useState<string[]>([]);
+  const [newTag, setNewTag] = useState<string>("");
+  const [showTagInput, setShowTagInput] = useState<boolean>(false);
 
   // Fetch profiles
   useEffect(() => {
@@ -103,47 +107,128 @@ export function LeadDetailsPanel({ isExpanded, onToggle }: LeadDetailsPanelProps
     }
   }, [isExpanded]);
 
-  // Fetch customer and lead data
+  // Fetch customer and lead data based on the selected conversation
   useEffect(() => {
     async function fetchData() {
       setIsLoading(true);
       try {
-        // For demo purposes, we'll mock a customer and lead
-        // In a real app, this would come from the actual conversation data
-        const mockCustomer: Customer = {
-          id: '123',
-          name: 'John Smith',
-          phone_number: '+60192698338',
-          email: 'john@example.com'
-        };
-        
-        const mockLead: Lead = {
-          id: '163674',
-          name: 'New Product Inquiry',
-          created_at: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(), // 7 days ago
-          customer_id: mockCustomer.id
-        };
-        
-        setCustomer(mockCustomer);
-        setLead(mockLead);
-        
-        // Calculate days since creation
-        const creationDate = new Date(mockLead.created_at);
-        const today = new Date();
-        const diffTime = Math.abs(today.getTime() - creationDate.getTime());
-        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-        setDaysSinceCreation(diffDays);
+        if (selectedConversation) {
+          // Find the customer in the conversation (sender or receiver based on type)
+          const customerId = selectedConversation.sender_type === 'customer' 
+            ? selectedConversation.sender_id 
+            : selectedConversation.receiver_type === 'customer' 
+              ? selectedConversation.receiver_id 
+              : null;
+          
+          if (customerId) {
+            // Fetch customer data
+            const { data: customerData, error: customerError } = await supabase
+              .from('customers')
+              .select('*')
+              .eq('id', customerId)
+              .maybeSingle();
+            
+            if (customerError) {
+              console.error('Error fetching customer:', customerError);
+            } else if (customerData) {
+              setCustomer(customerData);
+              
+              // Check if there's a lead associated with this customer
+              const { data: leadData, error: leadError } = await supabase
+                .from('leads')
+                .select('*')
+                .eq('customer_id', customerId)
+                .maybeSingle();
+              
+              if (leadError) {
+                console.error('Error fetching lead:', leadError);
+              } else if (leadData) {
+                setLead(leadData);
+                setTags(leadData.tags || []);
+                
+                // Calculate days since creation
+                const creationDate = new Date(leadData.created_at);
+                const today = new Date();
+                const diffTime = Math.abs(today.getTime() - creationDate.getTime());
+                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                setDaysSinceCreation(diffDays);
+                
+                // If lead has a stage_id, select it
+                if (leadData.stage_id && selectedPipeline?.stages) {
+                  const stage = selectedPipeline.stages.find(s => s.id === leadData.stage_id);
+                  if (stage) {
+                    setSelectedStage(stage);
+                  }
+                }
+              } else {
+                // If no lead exists, create a fake one for demo purposes
+                const fakeLead: Lead = {
+                  id: `LEAD-${selectedConversation.conversation_id.slice(0, 6)}`,
+                  name: 'New Product Inquiry',
+                  created_at: selectedConversation.created_at,
+                  customer_id: customerId,
+                  tags: []
+                };
+                
+                setLead(fakeLead);
+                setTags([]);
+                
+                // Calculate days since creation
+                const creationDate = new Date(fakeLead.created_at);
+                const today = new Date();
+                const diffTime = Math.abs(today.getTime() - creationDate.getTime());
+                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+                setDaysSinceCreation(diffDays);
+              }
+            }
+          } else {
+            // Fallback to mock data if no customer is found
+            createMockLeadAndCustomer();
+          }
+        } else {
+          // No conversation selected, show mock data
+          createMockLeadAndCustomer();
+        }
       } catch (error) {
         console.error('Error:', error);
+        createMockLeadAndCustomer();
       } finally {
         setIsLoading(false);
       }
     }
 
+    function createMockLeadAndCustomer() {
+      const mockCustomer: Customer = {
+        id: '123',
+        name: 'John Smith',
+        phone_number: '+60192698338',
+        email: 'john@example.com'
+      };
+      
+      const mockLead: Lead = {
+        id: '163674',
+        name: 'New Product Inquiry',
+        created_at: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(), // 7 days ago
+        customer_id: mockCustomer.id,
+        tags: ['lead', 'product']
+      };
+      
+      setCustomer(mockCustomer);
+      setLead(mockLead);
+      setTags(mockLead.tags || []);
+      
+      // Calculate days since creation
+      const creationDate = new Date(mockLead.created_at);
+      const today = new Date();
+      const diffTime = Math.abs(today.getTime() - creationDate.getTime());
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      setDaysSinceCreation(diffDays);
+    }
+
     if (isExpanded) {
       fetchData();
     }
-  }, [isExpanded]);
+  }, [isExpanded, selectedConversation, selectedPipeline]);
 
   const selectedProfile = profiles.find(profile => profile.id === selectedAssignee);
 
@@ -155,8 +240,77 @@ export function LeadDetailsPanel({ isExpanded, onToggle }: LeadDetailsPanelProps
     if (stage) {
       setSelectedStage(stage);
       
-      // In a real app, you would update the lead's stage in the database here
-      console.log(`Updating lead ${lead.id} to stage ${stage.name}`);
+      // Update the lead's stage in the database
+      if (lead.id) {
+        try {
+          const { error } = await supabase
+            .from('leads')
+            .update({ stage_id: stageId })
+            .eq('id', lead.id);
+          
+          if (error) {
+            console.error('Error updating lead stage:', error);
+          } else {
+            console.log(`Updated lead ${lead.id} to stage ${stage.name}`);
+          }
+        } catch (error) {
+          console.error('Error:', error);
+        }
+      }
+    }
+  };
+  
+  // Handle adding a new tag
+  const handleAddTag = async () => {
+    if (!newTag.trim() || !lead) return;
+    
+    const updatedTags = [...tags, newTag.trim()];
+    setTags(updatedTags);
+    setNewTag("");
+    setShowTagInput(false);
+    
+    // Update tags in the database if we have a lead ID
+    if (lead.id) {
+      try {
+        const { error } = await supabase
+          .from('leads')
+          .update({ tags: updatedTags })
+          .eq('id', lead.id);
+        
+        if (error) {
+          console.error('Error updating lead tags:', error);
+        } else {
+          console.log(`Updated tags for lead ${lead.id}`);
+        }
+      } catch (error) {
+        console.error('Error:', error);
+      }
+    }
+  };
+  
+  // Handle removing a tag
+  const handleRemoveTag = async (tagToRemove: string) => {
+    if (!lead) return;
+    
+    const updatedTags = tags.filter(tag => tag !== tagToRemove);
+    setTags(updatedTags);
+    
+    // Update tags in the database if we have a lead ID
+    if (lead.id) {
+      try {
+        const { error } = await supabase
+          .from('leads')
+          .update({ tags: updatedTags })
+          .eq('id', lead.id);
+        
+        if (error) {
+          console.error('Error updating lead tags:', error);
+        } else {
+          console.log(`Removed tag ${tagToRemove} from lead ${lead.id}`);
+        }
+      } catch (error) {
+        console.error('Error:', error);
+      }
     }
   };
 
@@ -179,10 +333,46 @@ export function LeadDetailsPanel({ isExpanded, onToggle }: LeadDetailsPanelProps
         <div className="flex-1 overflow-auto flex flex-col">
           <div className="p-4 space-y-4">
             {/* Tags */}
-            <Button variant="outline" size="sm" className="text-muted-foreground w-full justify-start">
-              <Tag className="h-3.5 w-3.5 mr-2" />
-              #ADD TAGS
-            </Button>
+            <div className="space-y-2">
+              <div className="flex flex-wrap gap-2">
+                {tags.map((tag, index) => (
+                  <div key={index} className="flex items-center gap-1 bg-muted rounded-md px-2 py-1 text-xs">
+                    <span>{tag}</span>
+                    <button 
+                      onClick={() => handleRemoveTag(tag)}
+                      className="text-muted-foreground hover:text-foreground"
+                    >
+                      &times;
+                    </button>
+                  </div>
+                ))}
+              </div>
+              
+              {showTagInput ? (
+                <div className="flex gap-2">
+                  <Input
+                    value={newTag}
+                    onChange={(e) => setNewTag(e.target.value)}
+                    placeholder="Enter tag name"
+                    className="h-8 text-sm"
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        handleAddTag();
+                      }
+                    }}
+                  />
+                  <Button size="sm" variant="outline" onClick={handleAddTag} className="h-8">Add</Button>
+                  <Button size="sm" variant="ghost" onClick={() => setShowTagInput(false)} className="h-8 px-2">
+                    &times;
+                  </Button>
+                </div>
+              ) : (
+                <Button variant="outline" size="sm" className="text-muted-foreground w-full justify-start" onClick={() => setShowTagInput(true)}>
+                  <Tag className="h-3.5 w-3.5 mr-2" />
+                  Add tag
+                </Button>
+              )}
+            </div>
 
             {/* Pipeline Section */}
             <div className="space-y-2">
