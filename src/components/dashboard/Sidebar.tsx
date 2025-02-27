@@ -32,7 +32,7 @@ const menuItems = [
   { title: "Mail", icon: Mail, path: "/dashboard/mail" },
   { title: "Stats", icon: BarChart2, path: "/dashboard/stats" },
   { title: "Settings", icon: Settings, path: "/dashboard/settings" },
-  { title: "Help Center", icon: HelpCircle, path: "/dashboard/help" },
+  { title: "Help", icon: HelpCircle, path: "/dashboard/help" },
 ];
 
 export function DashboardSidebar() {

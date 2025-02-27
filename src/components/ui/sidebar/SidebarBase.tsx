@@ -68,7 +68,7 @@ export const SidebarBase = React.forwardRef<HTMLDivElement, SidebarBaseProps>(
         data-side={side}
         style={
           {
-            "--sidebar-width": "11rem",
+            "--sidebar-width": "9rem",
             "--sidebar-width-icon": "11rem",
           } as React.CSSProperties
         }
