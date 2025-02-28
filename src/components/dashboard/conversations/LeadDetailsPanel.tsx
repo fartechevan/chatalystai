@@ -115,7 +115,7 @@ export function LeadDetailsPanel({ isExpanded, onToggle, selectedConversation }:
       try {
         if (selectedConversation) {
           // First try to get lead from the conversation.lead_id
-          let leadData = null;
+          let leadData: Lead | null = null;
           
           if (selectedConversation.lead_id) {
             // Directly fetch the lead
@@ -128,22 +128,21 @@ export function LeadDetailsPanel({ isExpanded, onToggle, selectedConversation }:
             if (error) {
               console.error('Error fetching lead:', error);
             } else if (data) {
-              // Create a new Lead object with explicit property assignments
-              // This avoids excessive type instantiation
+              // Safely create a Lead object from the data
               leadData = {
                 id: data.id,
                 name: data.name,
                 created_at: data.created_at,
                 updated_at: data.updated_at,
-                pipeline_stage_id: data.pipeline_stage_id,
-                customer_id: data.customer_id,
+                pipeline_stage_id: data.pipeline_stage_id || null,
+                customer_id: data.customer_id || null,
                 user_id: data.user_id,
-                value: data.value,
-                company_name: data.company_name,
-                company_address: data.company_address,
-                contact_email: data.contact_email,
-                contact_phone: data.contact_phone,
-                contact_first_name: data.contact_first_name
+                value: data.value || null,
+                company_name: data.company_name || null,
+                company_address: data.company_address || null,
+                contact_email: data.contact_email || null,
+                contact_phone: data.contact_phone || null,
+                contact_first_name: data.contact_first_name || null
               };
             }
           } else {
@@ -177,21 +176,21 @@ export function LeadDetailsPanel({ isExpanded, onToggle, selectedConversation }:
                 if (leadError) {
                   console.error('Error fetching lead:', leadError);
                 } else if (data) {
-                  // Create a new Lead object with explicit property assignments
+                  // Safely create a Lead object from the data
                   leadData = {
                     id: data.id,
                     name: data.name,
                     created_at: data.created_at,
                     updated_at: data.updated_at,
-                    pipeline_stage_id: data.pipeline_stage_id,
-                    customer_id: data.customer_id,
+                    pipeline_stage_id: data.pipeline_stage_id || null,
+                    customer_id: data.customer_id || null,
                     user_id: data.user_id,
-                    value: data.value,
-                    company_name: data.company_name,
-                    company_address: data.company_address,
-                    contact_email: data.contact_email,
-                    contact_phone: data.contact_phone,
-                    contact_first_name: data.contact_first_name
+                    value: data.value || null,
+                    company_name: data.company_name || null,
+                    company_address: data.company_address || null,
+                    contact_email: data.contact_email || null,
+                    contact_phone: data.contact_phone || null,
+                    contact_first_name: data.contact_first_name || null
                   };
                 }
               }
@@ -242,7 +241,7 @@ export function LeadDetailsPanel({ isExpanded, onToggle, selectedConversation }:
               name: 'New Product Inquiry',
               created_at: selectedConversation.created_at,
               updated_at: selectedConversation.updated_at,
-              customer_id: customer?.id,
+              customer_id: customer?.id || null,
               user_id: selectedConversation.sender_id // Just assign the sender as the user for now
             };
             
