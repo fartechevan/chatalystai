@@ -240,6 +240,7 @@ export type Database = {
           contact_first_name: string | null
           contact_phone: string | null
           created_at: string
+          customer_id: string | null
           id: string
           name: string
           pipeline_stage_id: string | null
@@ -254,6 +255,7 @@ export type Database = {
           contact_first_name?: string | null
           contact_phone?: string | null
           created_at?: string
+          customer_id?: string | null
           id?: string
           name: string
           pipeline_stage_id?: string | null
@@ -268,6 +270,7 @@ export type Database = {
           contact_first_name?: string | null
           contact_phone?: string | null
           created_at?: string
+          customer_id?: string | null
           id?: string
           name?: string
           pipeline_stage_id?: string | null
@@ -276,6 +279,13 @@ export type Database = {
           value?: number | null
         }
         Relationships: [
+          {
+            foreignKeyName: "leads_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "leads_pipeline_stage_id_fkey"
             columns: ["pipeline_stage_id"]

@@ -17,6 +17,7 @@ interface Lead {
   value: number;
   company_name: string | null;
   contact_first_name: string | null;
+  customer_id?: string | null;
 }
 
 interface StageLeads {
@@ -59,7 +60,8 @@ export function LeadsContent({ pipelineId }: LeadsContentProps) {
               name,
               value,
               company_name,
-              contact_first_name
+              contact_first_name,
+              customer_id
             )
           `)
           .eq('stage_id', stage.id)
