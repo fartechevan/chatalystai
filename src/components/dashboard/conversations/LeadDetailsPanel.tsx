@@ -128,15 +128,15 @@ export function LeadDetailsPanel({ isExpanded, onToggle, selectedConversation }:
             if (error) {
               console.error('Error fetching lead:', error);
             } else if (data) {
-              // Safely create a Lead object from the data
+              // Create a lead object with explicit properties to avoid TypeScript issues
               leadData = {
                 id: data.id,
                 name: data.name,
                 created_at: data.created_at,
                 updated_at: data.updated_at,
+                user_id: data.user_id,
                 pipeline_stage_id: data.pipeline_stage_id || null,
                 customer_id: data.customer_id || null,
-                user_id: data.user_id,
                 value: data.value || null,
                 company_name: data.company_name || null,
                 company_address: data.company_address || null,
@@ -176,15 +176,15 @@ export function LeadDetailsPanel({ isExpanded, onToggle, selectedConversation }:
                 if (leadError) {
                   console.error('Error fetching lead:', leadError);
                 } else if (data) {
-                  // Safely create a Lead object from the data
+                  // Create a lead object with explicit properties to avoid TypeScript issues
                   leadData = {
                     id: data.id,
                     name: data.name,
                     created_at: data.created_at,
                     updated_at: data.updated_at,
+                    user_id: data.user_id,
                     pipeline_stage_id: data.pipeline_stage_id || null,
                     customer_id: data.customer_id || null,
-                    user_id: data.user_id,
                     value: data.value || null,
                     company_name: data.company_name || null,
                     company_address: data.company_address || null,
