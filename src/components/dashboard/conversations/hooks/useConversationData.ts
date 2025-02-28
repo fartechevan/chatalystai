@@ -1,9 +1,9 @@
 
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import type { Conversation, Message } from "../types";
+import type { Conversation, Message, Lead } from "../types";
 import { toast } from "sonner";
-import { fetchConversationsWithParticipants, fetchMessages, fetchConversationSummary, sendMessage } from "../api/conversationsApi";
+import { fetchConversationsWithParticipants, fetchMessages, fetchConversationSummary, sendMessage, fetchLeadByConversation } from "../api/conversationsApi";
 import { transformConversationsData } from "../utils/conversationTransform";
 import { useConversationSummary } from "./useConversationSummary";
 import { supabase } from "@/integrations/supabase/client";
@@ -12,6 +12,7 @@ export function useConversationData(selectedConversation: Conversation | null) {
   const [newMessage, setNewMessage] = useState("");
   const [summary, setSummary] = useState<string | null>(null);
   const [summaryTimestamp, setSummaryTimestamp] = useState<string | null>(null);
+  const [leadData, setLeadData] = useState<Lead | null>(null);
   const queryClient = useQueryClient();
 
   const { data: conversations = [], isLoading } = useQuery({
@@ -45,6 +46,19 @@ export function useConversationData(selectedConversation: Conversation | null) {
     enabled: !!selectedConversation,
   });
 
+  // Fetch lead data when a conversation is selected
+  useQuery({
+    queryKey: ['lead', selectedConversation?.conversation_id],
+    queryFn: async () => {
+      if (!selectedConversation) return null;
+      
+      const lead = await fetchLeadByConversation(selectedConversation.conversation_id);
+      setLeadData(lead);
+      return lead;
+    },
+    enabled: !!selectedConversation,
+  });
+
   const sendMessageMutation = useMutation({
     mutationFn: async (content: string) => {
       const { data: userData } = await supabase.auth.getUser();
@@ -73,6 +87,7 @@ export function useConversationData(selectedConversation: Conversation | null) {
     setNewMessage,
     summary,
     summaryTimestamp,
+    leadData,
     sendMessageMutation,
     summarizeMutation
   };

@@ -42,6 +42,7 @@ export type Database = {
         Row: {
           conversation_id: string
           created_at: string
+          lead_id: string | null
           receiver_id: string
           receiver_type: string
           sender_id: string
@@ -51,6 +52,7 @@ export type Database = {
         Insert: {
           conversation_id?: string
           created_at?: string
+          lead_id?: string | null
           receiver_id: string
           receiver_type: string
           sender_id: string
@@ -60,13 +62,22 @@ export type Database = {
         Update: {
           conversation_id?: string
           created_at?: string
+          lead_id?: string | null
           receiver_id?: string
           receiver_type?: string
           sender_id?: string
           sender_type?: string
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "conversations_lead_id_fkey"
+            columns: ["lead_id"]
+            isOneToOne: false
+            referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       customers: {
         Row: {

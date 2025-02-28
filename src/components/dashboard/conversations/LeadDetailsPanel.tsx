@@ -5,13 +5,14 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { ChevronLeft, ChevronRight, Plus, Link as LinkIcon, Check, Trash2, Phone, Mail, Building, ChevronDown, Globe, MapPin, Tag, MoreHorizontal } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { Profile, Pipeline, PipelineStage, Customer, Lead, Conversation } from "./types";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Card } from "@/components/ui/card";
+import { fetchLeadByConversation } from "./api/conversationsApi";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface LeadDetailsPanelProps {
   isExpanded: boolean;
@@ -107,104 +108,139 @@ export function LeadDetailsPanel({ isExpanded, onToggle, selectedConversation }:
     }
   }, [isExpanded]);
 
-  // Fetch customer and lead data based on the selected conversation
+  // Fetch lead data based on the selected conversation
   useEffect(() => {
     async function fetchData() {
       setIsLoading(true);
       try {
         if (selectedConversation) {
-          // Find the customer in the conversation (sender or receiver based on type)
-          const customerId = selectedConversation.sender_type === 'customer' 
-            ? selectedConversation.sender_id 
-            : selectedConversation.receiver_type === 'customer' 
-              ? selectedConversation.receiver_id 
-              : null;
+          // First try to get lead from the conversation.lead_id
+          let leadData = null;
           
-          if (customerId) {
-            // Fetch customer data
-            const { data: customerData, error: customerError } = await supabase
-              .from('customers')
+          if (selectedConversation.lead_id) {
+            // Directly fetch the lead
+            const { data, error } = await supabase
+              .from('leads')
               .select('*')
-              .eq('id', customerId)
+              .eq('id', selectedConversation.lead_id)
               .maybeSingle();
-            
-            if (customerError) {
-              console.error('Error fetching customer:', customerError);
-            } else if (customerData) {
-              setCustomer(customerData);
               
-              // Check if there's a lead associated with this customer
-              const { data: leadData, error: leadError } = await supabase
-                .from('leads')
+            if (error) {
+              console.error('Error fetching lead:', error);
+            } else if (data) {
+              leadData = data;
+            }
+          } else {
+            // If there's no lead_id, try to find a customer in the conversation
+            const customerId = selectedConversation.sender_type === 'customer' 
+              ? selectedConversation.sender_id 
+              : selectedConversation.receiver_type === 'customer' 
+                ? selectedConversation.receiver_id 
+                : null;
+            
+            if (customerId) {
+              // Fetch customer data
+              const { data: customerData, error: customerError } = await supabase
+                .from('customers')
                 .select('*')
-                .eq('customer_id', customerId)
+                .eq('id', customerId)
                 .maybeSingle();
               
-              if (leadError) {
-                console.error('Error fetching lead:', leadError);
-              } else if (leadData) {
-                // Don't use spread operator here to avoid deep type instantiation
-                const typedLeadData: Lead = {
-                  id: leadData.id,
-                  name: leadData.name,
-                  created_at: leadData.created_at,
-                  updated_at: leadData.updated_at,
-                  pipeline_stage_id: leadData.pipeline_stage_id,
-                  customer_id: leadData.customer_id,
-                  user_id: leadData.user_id,
-                  value: leadData.value,
-                  company_name: leadData.company_name,
-                  company_address: leadData.company_address,
-                  contact_email: leadData.contact_email,
-                  contact_phone: leadData.contact_phone,
-                  contact_first_name: leadData.contact_first_name
-                };
+              if (customerError) {
+                console.error('Error fetching customer:', customerError);
+              } else if (customerData) {
+                setCustomer(customerData);
                 
-                setLead(typedLeadData);
+                // Check if there's a lead associated with this customer
+                const { data, error: leadError } = await supabase
+                  .from('leads')
+                  .select('*')
+                  .eq('customer_id', customerId)
+                  .maybeSingle();
                 
-                // For demo purposes, we'll use some mock tags
-                // In a real app, you'd store tags in a separate table or in metadata
-                setTags(['lead', 'follow-up']);
-                
-                // Calculate days since creation
-                const creationDate = new Date(typedLeadData.created_at);
-                const today = new Date();
-                const diffTime = Math.abs(today.getTime() - creationDate.getTime());
-                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-                setDaysSinceCreation(diffDays);
-                
-                // If lead has a pipeline_stage_id, select it
-                if (typedLeadData.pipeline_stage_id && selectedPipeline?.stages) {
-                  const stage = selectedPipeline.stages.find(s => s.id === typedLeadData.pipeline_stage_id);
-                  if (stage) {
-                    setSelectedStage(stage);
-                  }
+                if (leadError) {
+                  console.error('Error fetching lead:', leadError);
+                } else if (data) {
+                  leadData = data;
                 }
-              } else {
-                // If no lead exists, create a fake one for demo purposes
-                const fakeLead: Lead = {
-                  id: `LEAD-${selectedConversation.conversation_id.slice(0, 6)}`,
-                  name: 'New Product Inquiry',
-                  created_at: selectedConversation.created_at,
-                  updated_at: selectedConversation.updated_at,
-                  customer_id: customerId,
-                  user_id: selectedConversation.sender_id // Just assign the sender as the user for now
-                };
-                
-                setLead(fakeLead);
-                setTags(['new-lead']);
-                
-                // Calculate days since creation
-                const creationDate = new Date(fakeLead.created_at);
-                const today = new Date();
-                const diffTime = Math.abs(today.getTime() - creationDate.getTime());
-                const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-                setDaysSinceCreation(diffDays);
+              }
+            }
+          }
+          
+          // Process the lead data if found
+          if (leadData) {
+            // Don't use spread operator here to avoid deep type instantiation
+            const typedLeadData: Lead = {
+              id: leadData.id,
+              name: leadData.name,
+              created_at: leadData.created_at,
+              updated_at: leadData.updated_at,
+              pipeline_stage_id: leadData.pipeline_stage_id,
+              customer_id: leadData.customer_id,
+              user_id: leadData.user_id,
+              value: leadData.value,
+              company_name: leadData.company_name,
+              company_address: leadData.company_address,
+              contact_email: leadData.contact_email,
+              contact_phone: leadData.contact_phone,
+              contact_first_name: leadData.contact_first_name
+            };
+            
+            setLead(typedLeadData);
+            
+            // For demo purposes, we'll use some mock tags
+            // In a real app, you'd store tags in a separate table or in metadata
+            setTags(['lead', 'follow-up']);
+            
+            // Calculate days since creation
+            const creationDate = new Date(typedLeadData.created_at);
+            const today = new Date();
+            const diffTime = Math.abs(today.getTime() - creationDate.getTime());
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+            setDaysSinceCreation(diffDays);
+            
+            // If lead has a pipeline_stage_id, select it
+            if (typedLeadData.pipeline_stage_id && selectedPipeline?.stages) {
+              const stage = selectedPipeline.stages.find(s => s.id === typedLeadData.pipeline_stage_id);
+              if (stage) {
+                setSelectedStage(stage);
+              }
+            }
+            
+            // If lead has customer_id but we don't have customer data yet, fetch it
+            if (typedLeadData.customer_id && !customer) {
+              const { data: customerData, error: customerError } = await supabase
+                .from('customers')
+                .select('*')
+                .eq('id', typedLeadData.customer_id)
+                .maybeSingle();
+              
+              if (customerError) {
+                console.error('Error fetching customer:', customerError);
+              } else if (customerData) {
+                setCustomer(customerData);
               }
             }
           } else {
-            // Fallback to mock data if no customer is found
-            createMockLeadAndCustomer();
+            // If no lead exists, create a fake one for demo purposes
+            const fakeLead: Lead = {
+              id: `LEAD-${selectedConversation.conversation_id.slice(0, 6)}`,
+              name: 'New Product Inquiry',
+              created_at: selectedConversation.created_at,
+              updated_at: selectedConversation.updated_at,
+              customer_id: customer?.id,
+              user_id: selectedConversation.sender_id // Just assign the sender as the user for now
+            };
+            
+            setLead(fakeLead);
+            setTags(['new-lead']);
+            
+            // Calculate days since creation
+            const creationDate = new Date(fakeLead.created_at);
+            const today = new Date();
+            const diffTime = Math.abs(today.getTime() - creationDate.getTime());
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+            setDaysSinceCreation(diffDays);
           }
         } else {
           // No conversation selected, show mock data
@@ -250,7 +286,7 @@ export function LeadDetailsPanel({ isExpanded, onToggle, selectedConversation }:
     if (isExpanded) {
       fetchData();
     }
-  }, [isExpanded, selectedConversation, selectedPipeline]);
+  }, [isExpanded, selectedConversation, selectedPipeline, customer]);
 
   const selectedProfile = profiles.find(profile => profile.id === selectedAssignee);
 
@@ -294,28 +330,6 @@ export function LeadDetailsPanel({ isExpanded, onToggle, selectedConversation }:
     // For this demo we're just handling tags in local state
     // In a real app, you might store them in a dedicated tags table
     console.log(`Added tag ${newTag.trim()} to lead ${lead.id}`);
-    
-    // Example of how you might handle this with a lead_tags table:
-    /*
-    if (lead.id) {
-      try {
-        const { error } = await supabase
-          .from('lead_tags')
-          .insert({ 
-            lead_id: lead.id,
-            tag_name: newTag.trim() 
-          });
-        
-        if (error) {
-          console.error('Error adding tag:', error);
-        } else {
-          console.log(`Added tag ${newTag.trim()} to lead ${lead.id}`);
-        }
-      } catch (error) {
-        console.error('Error:', error);
-      }
-    }
-    */
   };
   
   // Handle removing a tag
@@ -328,27 +342,6 @@ export function LeadDetailsPanel({ isExpanded, onToggle, selectedConversation }:
     // For this demo we're just handling tags in local state
     // In a real app, you would delete from a dedicated tags table
     console.log(`Removed tag ${tagToRemove} from lead ${lead.id}`);
-    
-    // Example of how you might handle this with a lead_tags table:
-    /*
-    if (lead.id) {
-      try {
-        const { error } = await supabase
-          .from('lead_tags')
-          .delete()
-          .eq('lead_id', lead.id)
-          .eq('tag_name', tagToRemove);
-        
-        if (error) {
-          console.error('Error removing tag:', error);
-        } else {
-          console.log(`Removed tag ${tagToRemove} from lead ${lead.id}`);
-        }
-      } catch (error) {
-        console.error('Error:', error);
-      }
-    }
-    */
   };
 
   return (
@@ -358,8 +351,14 @@ export function LeadDetailsPanel({ isExpanded, onToggle, selectedConversation }:
     )}>
       <div className="flex items-center justify-between p-4 border-b">
         <h3 className={cn("font-medium text-sm truncate flex items-center gap-2", !isExpanded && "hidden")}>
-          Lead #{lead?.id?.slice(0, 6) || '163674'}
-          {isExpanded && <MoreHorizontal className="h-4 w-4 ml-auto text-muted-foreground" />}
+          {isLoading ? (
+            <Skeleton className="h-4 w-24" />
+          ) : (
+            <>
+              Lead #{lead?.id?.slice(0, 6) || '163674'}
+              <MoreHorizontal className="h-4 w-4 ml-auto text-muted-foreground" />
+            </>
+          )}
         </h3>
         <Button variant="ghost" size="icon" onClick={onToggle} className={isExpanded ? "ml-auto" : ""}>
           {isExpanded ? <ChevronLeft className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
@@ -369,6 +368,23 @@ export function LeadDetailsPanel({ isExpanded, onToggle, selectedConversation }:
       {isExpanded && (
         <div className="flex-1 overflow-auto flex flex-col">
           <div className="p-4 space-y-4">
+            {/* Lead ID with connection status */}
+            {lead && selectedConversation && (
+              <div className="text-xs text-muted-foreground">
+                {selectedConversation.lead_id === lead.id ? (
+                  <span className="flex items-center gap-1">
+                    <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+                    Connected to conversation
+                  </span>
+                ) : (
+                  <span className="flex items-center gap-1">
+                    <span className="w-2 h-2 bg-amber-500 rounded-full"></span>
+                    Not connected to current conversation
+                  </span>
+                )}
+              </div>
+            )}
+            
             {/* Tags */}
             <div className="space-y-2">
               <div className="flex flex-wrap gap-2">
@@ -500,7 +516,7 @@ export function LeadDetailsPanel({ isExpanded, onToggle, selectedConversation }:
                 {/* Sale Section */}
                 <div className="grid grid-cols-2 gap-2 items-center">
                   <label className="text-sm text-muted-foreground">Sale</label>
-                  <div className="text-sm">0 RM</div>
+                  <div className="text-sm">{lead?.value?.toLocaleString() || 0} RM</div>
                 </div>
 
                 {/* Contact Section */}
@@ -511,7 +527,7 @@ export function LeadDetailsPanel({ isExpanded, onToggle, selectedConversation }:
                       <AvatarFallback>{customer?.name?.charAt(0) || 'C'}</AvatarFallback>
                     </Avatar>
                     <div className="space-y-1">
-                      <div className="font-medium">{customer?.name || 'Contact'}</div>
+                      <div className="font-medium">{customer?.name || lead?.contact_first_name || 'Contact'}</div>
                       <Button variant="outline" size="sm" className="h-6 text-xs">
                         <Phone className="h-3 w-3 mr-1" />
                         WhatsApp Lite
@@ -540,22 +556,22 @@ export function LeadDetailsPanel({ isExpanded, onToggle, selectedConversation }:
                 <div className="space-y-4">
                   <div className="grid grid-cols-2 gap-2 items-center">
                     <label className="text-sm text-muted-foreground">Work phone</label>
-                    <div className="text-sm">{customer?.phone_number || '...'}</div>
+                    <div className="text-sm">{lead?.contact_phone || customer?.phone_number || '...'}</div>
                   </div>
                   
                   <div className="grid grid-cols-2 gap-2 items-center">
                     <label className="text-sm text-muted-foreground">Work email</label>
-                    <div className="text-sm">{customer?.email || '...'}</div>
+                    <div className="text-sm">{lead?.contact_email || customer?.email || '...'}</div>
                   </div>
                   
                   <div className="grid grid-cols-2 gap-2 items-center">
-                    <label className="text-sm text-muted-foreground">Web</label>
-                    <div className="text-sm text-muted-foreground">...</div>
+                    <label className="text-sm text-muted-foreground">Company</label>
+                    <div className="text-sm">{lead?.company_name || '...'}</div>
                   </div>
                   
                   <div className="grid grid-cols-2 gap-2 items-center">
                     <label className="text-sm text-muted-foreground">Address</label>
-                    <div className="text-sm text-muted-foreground">...</div>
+                    <div className="text-sm">{lead?.company_address || '...'}</div>
                   </div>
                 </div>
 

@@ -1,4 +1,6 @@
+
 import { supabase } from "@/integrations/supabase/client";
+import { Lead } from "../types";
 
 interface ParticipantData {
   id: string;
@@ -14,6 +16,7 @@ interface ConversationWithParticipants {
   receiver_type: string;
   created_at: string;
   updated_at: string;
+  lead_id: string | null;
   sender: ParticipantData | null;
   receiver: ParticipantData | null;
 }
@@ -24,7 +27,7 @@ export async function fetchConversationsWithParticipants() {
   // First, get all conversations
   const { data: conversations, error: conversationsError } = await supabase
     .from('conversations')
-    .select('*')
+    .select('*, lead:lead_id(*)')
     .order('updated_at', { ascending: false });
 
   if (conversationsError) {
@@ -44,10 +47,8 @@ export async function fetchConversationsWithParticipants() {
   });
 
   console.log('Fetched conversations:', conversations);
-
   console.log('Fetched customerIds:', customerIds);
   console.log('Fetched profileIds:', profileIds);
-
 
   // Fetch profiles and customers data
   const { data: profiles } = await supabase
@@ -111,15 +112,6 @@ export async function fetchConversationsWithParticipants() {
     const sender = getParticipant(conv.sender_id, conv.sender_type);
     const receiver = getParticipant(conv.receiver_id, conv.receiver_type);
 
-    console.log('Mapping conversation:', {
-      sender_type: conv.sender_type,
-      sender_id: conv.sender_id,
-      mapped_sender: sender,
-      receiver_type: conv.receiver_type,
-      receiver_id: conv.receiver_id,
-      mapped_receiver: receiver
-    });
-
     return {
       conversation_id: conv.conversation_id,
       sender_id: conv.sender_id,
@@ -128,8 +120,10 @@ export async function fetchConversationsWithParticipants() {
       receiver_type: conv.receiver_type,
       created_at: conv.created_at,
       updated_at: conv.updated_at,
+      lead_id: conv.lead_id,
       sender,
-      receiver
+      receiver,
+      lead: conv.lead
     };
   });
 
@@ -178,4 +172,30 @@ export async function sendMessage(conversationId: string, senderId: string, cont
 
   if (error) throw error;
   return data;
+}
+
+export async function fetchLeadByConversation(conversationId: string): Promise<Lead | null> {
+  const { data: conversation, error } = await supabase
+    .from('conversations')
+    .select('lead_id')
+    .eq('conversation_id', conversationId)
+    .maybeSingle();
+  
+  if (error || !conversation?.lead_id) {
+    console.log('No lead associated with this conversation:', conversationId);
+    return null;
+  }
+  
+  const { data: lead, error: leadError } = await supabase
+    .from('leads')
+    .select('*')
+    .eq('id', conversation.lead_id)
+    .maybeSingle();
+    
+  if (leadError) {
+    console.error('Error fetching lead:', leadError);
+    return null;
+  }
+  
+  return lead;
 }
