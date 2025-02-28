@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -13,7 +14,7 @@ import { Card } from "@/components/ui/card";
 import { fetchLeadById } from "./api/conversationsApi";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
-import { useQueryClient } from "react-query";
+import { useQueryClient } from "@tanstack/react-query";
 
 interface LeadDetailsPanelProps {
   isExpanded: boolean;
@@ -71,10 +72,10 @@ export function LeadDetailsPanel({ isExpanded, onToggle, selectedConversation }:
         },
         (payload) => {
           console.log('Lead pipeline change detected:', payload);
-          if (lead?.id && payload.new && payload.new.lead_id === lead.id) {
+          if (lead?.id && payload.new && typeof payload.new === 'object' && 'lead_id' in payload.new && payload.new.lead_id === lead.id) {
             console.log('Current lead pipeline was updated, refetching lead data');
             
-            const stageId = payload.new.stage_id;
+            const stageId = typeof payload.new === 'object' && 'stage_id' in payload.new ? payload.new.stage_id as string : '';
             findAndSelectStage(stageId);
             
             queryClient.invalidateQueries({ 
@@ -308,6 +309,147 @@ export function LeadDetailsPanel({ isExpanded, onToggle, selectedConversation }:
     }
   }, [findAndSelectStage, fetchCustomerById, selectedPipeline]);
 
+  // Helper functions for creating mock data
+  const createFakeLeadFromCustomer = useCallback((customerData: Customer) => {
+    if (!selectedConversation) return;
+    
+    const fakeLead: Lead = {
+      id: `${Date.now().toString().slice(-6)}`,
+      name: 'New Product Inquiry',
+      created_at: selectedConversation.created_at,
+      updated_at: selectedConversation.updated_at,
+      customer_id: customerData.id,
+      user_id: selectedConversation.sender_id
+    };
+    
+    setLead(fakeLead);
+    setTags(['new-lead']);
+    
+    // Calculate days since creation
+    const date = new Date(fakeLead.created_at);
+    const today = new Date();
+    const diffTime = Math.abs(today.getTime() - date.getTime());
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    setDaysSinceCreation(diffDays);
+  }, [selectedConversation]);
+
+  const createMockLeadFromConversation = useCallback(() => {
+    if (!selectedConversation) return;
+    
+    // Create a mock customer first
+    const mockCustomer: Customer = {
+      id: `CUST-${Date.now().toString().slice(-6)}`,
+      name: selectedConversation.sender_type === 'customer' 
+        ? selectedConversation.sender.name || 'Unknown Customer'
+        : selectedConversation.receiver_type === 'customer'
+          ? selectedConversation.receiver.name || 'Unknown Customer'
+          : 'John Smith',
+      phone_number: '+60192698338',
+      email: 'customer@example.com'
+    };
+    
+    setCustomer(mockCustomer);
+    
+    // Then create a mock lead
+    const mockLead: Lead = {
+      id: `${Date.now().toString().slice(-6)}`,
+      name: 'New Product Inquiry',
+      created_at: selectedConversation.created_at,
+      updated_at: selectedConversation.updated_at,
+      customer_id: mockCustomer.id,
+      user_id: selectedConversation.sender_type === 'profile' 
+        ? selectedConversation.sender_id 
+        : selectedConversation.receiver_type === 'profile'
+          ? selectedConversation.receiver_id
+          : 'mock-user-id'
+    };
+    
+    setLead(mockLead);
+    setTags(['mock', 'lead']);
+    
+    // Calculate days since creation
+    const date = new Date(mockLead.created_at);
+    const today = new Date();
+    const diffTime = Math.abs(today.getTime() - date.getTime());
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    setDaysSinceCreation(diffDays);
+  }, [selectedConversation]);
+
+  const createMockLeadAndCustomer = useCallback(() => {
+    const mockCustomer: Customer = {
+      id: '123',
+      name: 'John Smith',
+      phone_number: '+60192698338',
+      email: 'john@example.com'
+    };
+    
+    const mockLead: Lead = {
+      id: '163674',
+      name: 'New Product Inquiry',
+      created_at: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(), // 7 days ago
+      updated_at: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
+      customer_id: mockCustomer.id,
+      user_id: 'mock-user-id'
+    };
+    
+    setCustomer(mockCustomer);
+    setLead(mockLead);
+    setTags(['lead', 'product']);
+    
+    // Calculate days since creation
+    const date = new Date(mockLead.created_at);
+    const today = new Date();
+    const diffTime = Math.abs(today.getTime() - date.getTime());
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    setDaysSinceCreation(diffDays);
+    
+    // Set a default assignee
+    if (profiles.length > 0) {
+      setSelectedAssignee(profiles[0].id);
+    }
+  }, [profiles]);
+
+  // Function to handle customer ID lookup and lead association
+  const handleCustomerId = useCallback(async (customerId: string) => {
+    // Fetch customer data
+    const customerData = await fetchCustomerById(customerId);
+    
+    if (customerData) {
+      // Check if there's a lead associated with this customer
+      const { data, error: leadError } = await supabase
+        .from('leads')
+        .select('*')
+        .eq('customer_id', customerId)
+        .maybeSingle();
+      
+      if (leadError) {
+        console.error('Error fetching lead:', leadError);
+      } else if (data) {
+        const leadData: Lead = {
+          id: data.id,
+          name: data.name,
+          created_at: data.created_at,
+          updated_at: data.updated_at,
+          user_id: data.user_id,
+          pipeline_stage_id: data.pipeline_stage_id,
+          customer_id: data.customer_id,
+          value: data.value,
+          company_name: data.company_name,
+          company_address: data.company_address,
+          contact_email: data.contact_email,
+          contact_phone: data.contact_phone,
+          contact_first_name: data.contact_first_name
+        };
+        handleLeadData(leadData);
+      } else {
+        // No lead exists, create a fake one for demo purposes
+        createFakeLeadFromCustomer(customerData);
+      }
+    } else {
+      createMockLeadAndCustomer();
+    }
+  }, [fetchCustomerById, handleLeadData, createFakeLeadFromCustomer, createMockLeadAndCustomer]);
+
   useEffect(() => {
     async function fetchData() {
       setIsLoading(true);
@@ -351,7 +493,7 @@ export function LeadDetailsPanel({ isExpanded, onToggle, selectedConversation }:
     if (isExpanded) {
       fetchData();
     }
-  }, [isExpanded, selectedConversation, findAndSelectStage, fetchCustomerById, handleLeadData, profiles]);
+  }, [isExpanded, selectedConversation, handleLeadData, createMockLeadFromConversation, handleCustomerId, createMockLeadAndCustomer]);
 
   const selectedProfile = profiles.find(profile => profile.id === selectedAssignee);
 

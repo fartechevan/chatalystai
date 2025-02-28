@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import type { Conversation, Message, Lead } from "../types";
@@ -35,7 +36,7 @@ export function useConversationData(selectedConversation: Conversation | null) {
         (payload) => {
           console.log('Lead table change detected:', payload);
           // When any lead changes, check if it's the one we're viewing
-          if (leadData && payload.new && payload.new.id === leadData.id) {
+          if (leadData && payload.new && typeof payload.new === 'object' && 'id' in payload.new && payload.new.id === leadData.id) {
             console.log('Current lead was updated, refetching data');
             // Force refetch the lead data
             queryClient.invalidateQueries({ 
@@ -105,7 +106,7 @@ export function useConversationData(selectedConversation: Conversation | null) {
     },
     enabled: !!selectedConversation,
     staleTime: 0,
-    cacheTime: 0,
+    gcTime: 0, // gcTime is the new name for cacheTime in React Query v5
     refetchOnWindowFocus: true,
     refetchOnMount: true,
     refetchOnReconnect: true,
