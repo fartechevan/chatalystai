@@ -188,7 +188,22 @@ export function LeadDetailsPanel({ isExpanded, onToggle, selectedConversation }:
         if (leadError) {
           console.error('Error fetching lead:', leadError);
         } else if (data) {
-          handleLeadData(data as Lead);
+          const leadData: Lead = {
+            id: data.id,
+            name: data.name,
+            created_at: data.created_at,
+            updated_at: data.updated_at,
+            user_id: data.user_id,
+            pipeline_stage_id: data.pipeline_stage_id || null,
+            customer_id: data.customer_id || null,
+            value: data.value || null,
+            company_name: data.company_name || null,
+            company_address: data.company_address || null,
+            contact_email: data.contact_email || null,
+            contact_phone: data.contact_phone || null,
+            contact_first_name: data.contact_first_name || null
+          };
+          handleLeadData(leadData);
         } else {
           // No lead exists, create a fake one for demo purposes
           createFakeLeadFromCustomer();
