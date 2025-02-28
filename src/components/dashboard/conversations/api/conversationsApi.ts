@@ -175,6 +175,7 @@ export async function sendMessage(conversationId: string, senderId: string, cont
 }
 
 export async function fetchLeadByConversation(conversationId: string): Promise<Lead | null> {
+  // First get the conversation to find its lead_id
   const { data: conversation, error } = await supabase
     .from('conversations')
     .select('lead_id')
@@ -186,6 +187,7 @@ export async function fetchLeadByConversation(conversationId: string): Promise<L
     return null;
   }
   
+  // Fetch the lead directly using the lead_id
   const { data: lead, error: leadError } = await supabase
     .from('leads')
     .select('*')
