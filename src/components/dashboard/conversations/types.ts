@@ -39,11 +39,13 @@ export interface PipelineStage {
   id: string;
   name: string;
   position: number;
+  pipeline_id?: string;
 }
 
 export interface Pipeline {
   id: string;
   name: string;
+  is_default?: boolean;
   stages?: PipelineStage[];
 }
 
@@ -54,7 +56,6 @@ export interface Customer {
   email?: string;
 }
 
-// Define our custom Lead interface to match what we're storing in the database
 export interface Lead {
   id: string;
   name: string;

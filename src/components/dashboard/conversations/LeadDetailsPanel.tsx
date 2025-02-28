@@ -13,6 +13,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Card } from "@/components/ui/card";
 import { fetchLeadById } from "./api/conversationsApi";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useToast } from "@/hooks/use-toast";
 
 interface LeadDetailsPanelProps {
   isExpanded: boolean;
@@ -21,6 +22,7 @@ interface LeadDetailsPanelProps {
 }
 
 export function LeadDetailsPanel({ isExpanded, onToggle, selectedConversation }: LeadDetailsPanelProps) {
+  const { toast } = useToast();
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [selectedAssignee, setSelectedAssignee] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -33,6 +35,8 @@ export function LeadDetailsPanel({ isExpanded, onToggle, selectedConversation }:
   const [tags, setTags] = useState<string[]>([]);
   const [newTag, setNewTag] = useState<string>("");
   const [showTagInput, setShowTagInput] = useState<boolean>(false);
+  const [allPipelines, setAllPipelines] = useState<Pipeline[]>([]);
+  const [isChangingPipeline, setIsChangingPipeline] = useState(false);
 
   // Function to format the lead ID without any prefix
   const getFormattedLeadId = (id?: string | null) => {
@@ -40,6 +44,56 @@ export function LeadDetailsPanel({ isExpanded, onToggle, selectedConversation }:
     // Just return the ID or its first 6 characters if it's long
     return id.length > 6 ? id.slice(0, 6) : id;
   };
+
+  // Fetch all pipelines and their stages
+  useEffect(() => {
+    async function fetchAllPipelines() {
+      try {
+        const { data: pipelinesData, error: pipelinesError } = await supabase
+          .from('pipelines')
+          .select('*')
+          .order('name');
+        
+        if (pipelinesError) {
+          console.error('Error fetching all pipelines:', pipelinesError);
+          return;
+        }
+        
+        if (pipelinesData && pipelinesData.length > 0) {
+          // Fetch stages for each pipeline
+          const pipelinesWithStages = await Promise.all(
+            pipelinesData.map(async (pipeline) => {
+              const { data: stagesData, error: stagesError } = await supabase
+                .from('pipeline_stages')
+                .select('*')
+                .eq('pipeline_id', pipeline.id)
+                .order('position');
+              
+              if (stagesError) {
+                console.error(`Error fetching stages for pipeline ${pipeline.id}:`, stagesError);
+                return { ...pipeline, stages: [] };
+              }
+              
+              return { ...pipeline, stages: stagesData || [] };
+            })
+          );
+          
+          setAllPipelines(pipelinesWithStages);
+          
+          // Set default pipeline (the one marked as default or the first one)
+          const defaultPipeline = pipelinesWithStages.find(p => p.is_default) || pipelinesWithStages[0];
+          setPipelines(pipelinesWithStages);
+          setSelectedPipeline(defaultPipeline);
+        }
+      } catch (error) {
+        console.error('Error fetching pipelines:', error);
+      }
+    }
+    
+    if (isExpanded) {
+      fetchAllPipelines();
+    }
+  }, [isExpanded]);
 
   // Fetch profiles
   useEffect(() => {
@@ -61,48 +115,6 @@ export function LeadDetailsPanel({ isExpanded, onToggle, selectedConversation }:
 
     if (isExpanded) {
       fetchProfiles();
-    }
-  }, [isExpanded]);
-
-  // Fetch pipelines and stages
-  useEffect(() => {
-    async function fetchPipelines() {
-      try {
-        const { data: pipelinesData, error: pipelinesError } = await supabase
-          .from('pipelines')
-          .select('*')
-          .eq('is_default', true)
-          .maybeSingle();
-        
-        if (pipelinesError) {
-          console.error('Error fetching pipelines:', pipelinesError);
-        } else if (pipelinesData) {
-          // Get stages for the default pipeline
-          const { data: stagesData, error: stagesError } = await supabase
-            .from('pipeline_stages')
-            .select('*')
-            .eq('pipeline_id', pipelinesData.id)
-            .order('position');
-          
-          if (stagesError) {
-            console.error('Error fetching stages:', stagesError);
-          } else if (stagesData) {
-            const pipelineWithStages: Pipeline = {
-              ...pipelinesData,
-              stages: stagesData
-            };
-            
-            setPipelines([pipelineWithStages]);
-            setSelectedPipeline(pipelineWithStages);
-          }
-        }
-      } catch (error) {
-        console.error('Error:', error);
-      }
-    }
-
-    if (isExpanded) {
-      fetchPipelines();
     }
   }, [isExpanded]);
 
@@ -163,15 +175,8 @@ export function LeadDetailsPanel({ isExpanded, onToggle, selectedConversation }:
       }
       
       // If lead has a pipeline_stage_id, find and select the stage
-      if (leadData.pipeline_stage_id && selectedPipeline?.stages) {
-        const stage = selectedPipeline.stages.find(s => s.id === leadData.pipeline_stage_id);
-        if (stage) {
-          setSelectedStage(stage);
-        } else {
-          // If stage not found in current pipeline, it might be in another pipeline
-          // Let's fetch the stage and its pipeline
-          fetchStageAndPipeline(leadData.pipeline_stage_id);
-        }
+      if (leadData.pipeline_stage_id) {
+        findAndSelectStage(leadData.pipeline_stage_id);
       } else if (selectedPipeline?.stages && selectedPipeline.stages.length > 0) {
         // Default to first stage if no stage is selected
         setSelectedStage(selectedPipeline.stages[0]);
@@ -183,10 +188,22 @@ export function LeadDetailsPanel({ isExpanded, onToggle, selectedConversation }:
       }
     }
     
-    // Fetch the pipeline stage and its parent pipeline
-    async function fetchStageAndPipeline(stageId: string) {
+    // Find the stage across all pipelines and select it and its parent pipeline
+    async function findAndSelectStage(stageId: string) {
+      // If we already have all pipelines loaded, search through them
+      if (allPipelines.length > 0) {
+        for (const pipeline of allPipelines) {
+          const stage = pipeline.stages?.find(s => s.id === stageId);
+          if (stage) {
+            setSelectedPipeline(pipeline);
+            setSelectedStage(stage);
+            return;
+          }
+        }
+      }
+      
+      // If not found or pipelines not loaded yet, fetch directly
       try {
-        // First get the stage details
         const { data: stageData, error: stageError } = await supabase
           .from('pipeline_stages')
           .select('*, pipeline:pipeline_id(*)')
@@ -199,9 +216,10 @@ export function LeadDetailsPanel({ isExpanded, onToggle, selectedConversation }:
         }
         
         if (stageData) {
+          // Set the selected stage
           setSelectedStage(stageData);
           
-          // Now get all stages for this pipeline to build the complete pipeline object
+          // Now get all stages for this pipeline
           const { data: stagesData, error: stagesError } = await supabase
             .from('pipeline_stages')
             .select('*')
@@ -219,18 +237,19 @@ export function LeadDetailsPanel({ isExpanded, onToggle, selectedConversation }:
               stages: stagesData
             };
             
-            // Update the pipelines state to include this pipeline
-            setPipelines(prev => {
-              // Check if this pipeline is already in the list
+            // Update selected pipeline
+            setSelectedPipeline(pipelineWithStages);
+            
+            // Also update the allPipelines state if this pipeline isn't there
+            setAllPipelines(prev => {
               const exists = prev.some(p => p.id === pipelineWithStages.id);
               if (!exists) {
                 return [...prev, pipelineWithStages];
               }
-              return prev;
+              
+              // If it exists but doesn't have stages, update it
+              return prev.map(p => p.id === pipelineWithStages.id ? pipelineWithStages : p);
             });
-            
-            // Set as selected pipeline
-            setSelectedPipeline(pipelineWithStages);
           }
         }
       } catch (error) {
@@ -254,7 +273,7 @@ export function LeadDetailsPanel({ isExpanded, onToggle, selectedConversation }:
           console.error('Error fetching lead:', leadError);
         } else if (data) {
           // Create our leadData object from the database result
-          const leadData = {
+          const leadData: Lead = {
             id: data.id,
             name: data.name,
             created_at: data.created_at,
@@ -268,12 +287,12 @@ export function LeadDetailsPanel({ isExpanded, onToggle, selectedConversation }:
             contact_email: data.contact_email,
             contact_phone: data.contact_phone,
             contact_first_name: data.contact_first_name
-          } as Lead;
+          };
           
           handleLeadData(leadData);
         } else {
           // No lead exists, create a fake one for demo purposes
-          createFakeLeadFromCustomer();
+          createFakeLeadFromCustomer(customerData);
         }
       } else {
         createMockLeadAndCustomer();
@@ -302,15 +321,15 @@ export function LeadDetailsPanel({ isExpanded, onToggle, selectedConversation }:
       return null;
     }
     
-    function createFakeLeadFromCustomer() {
-      if (!customer || !selectedConversation) return;
+    function createFakeLeadFromCustomer(customerData: Customer) {
+      if (!selectedConversation) return;
       
       const fakeLead: Lead = {
         id: `${Date.now().toString().slice(-6)}`,
         name: 'New Product Inquiry',
         created_at: selectedConversation.created_at,
         updated_at: selectedConversation.updated_at,
-        customer_id: customer.id,
+        customer_id: customerData.id,
         user_id: selectedConversation.sender_id
       };
       
@@ -394,9 +413,28 @@ export function LeadDetailsPanel({ isExpanded, onToggle, selectedConversation }:
     if (isExpanded) {
       fetchData();
     }
-  }, [isExpanded, selectedConversation, selectedPipeline, profiles]);
+  }, [isExpanded, selectedConversation, allPipelines, selectedPipeline]);
 
   const selectedProfile = profiles.find(profile => profile.id === selectedAssignee);
+
+  // Handle changing pipeline
+  const handlePipelineChange = (pipelineId: string) => {
+    const pipeline = allPipelines.find(p => p.id === pipelineId);
+    if (!pipeline) return;
+    
+    setSelectedPipeline(pipeline);
+    
+    // Select first stage by default
+    if (pipeline.stages && pipeline.stages.length > 0) {
+      setSelectedStage(pipeline.stages[0]);
+      // If we have a lead, update its stage in the database
+      if (lead?.id) {
+        handleStageChange(pipeline.stages[0].id);
+      }
+    }
+    
+    setIsChangingPipeline(false);
+  };
 
   // Update pipeline stage
   const handleStageChange = async (stageId: string) => {
@@ -416,11 +454,34 @@ export function LeadDetailsPanel({ isExpanded, onToggle, selectedConversation }:
           
           if (error) {
             console.error('Error updating lead stage:', error);
+            toast({
+              title: "Error",
+              description: "Failed to update lead stage",
+              variant: "destructive"
+            });
           } else {
             console.log(`Updated lead ${lead.id} to stage ${stage.name}`);
+            // Update the lead object in state
+            setLead(prev => {
+              if (!prev) return null;
+              return {
+                ...prev,
+                pipeline_stage_id: stageId
+              };
+            });
+            
+            toast({
+              title: "Success",
+              description: `Lead moved to "${stage.name}" stage`,
+            });
           }
         } catch (error) {
           console.error('Error:', error);
+          toast({
+            title: "Error",
+            description: "Something went wrong",
+            variant: "destructive"
+          });
         }
       }
     }
@@ -440,6 +501,11 @@ export function LeadDetailsPanel({ isExpanded, onToggle, selectedConversation }:
       
       if (error) {
         console.error('Error updating lead assignee:', error);
+        toast({
+          title: "Error",
+          description: "Failed to update lead assignee",
+          variant: "destructive"
+        });
       } else {
         console.log(`Updated lead ${lead.id} assignee to ${userId}`);
         
@@ -451,9 +517,20 @@ export function LeadDetailsPanel({ isExpanded, onToggle, selectedConversation }:
             user_id: userId
           };
         });
+        
+        const profileName = profiles.find(p => p.id === userId)?.name || "Selected user";
+        toast({
+          title: "Success",
+          description: `Lead assigned to ${profileName}`,
+        });
       }
     } catch (error) {
       console.error('Error:', error);
+      toast({
+        title: "Error",
+        description: "Something went wrong",
+        variant: "destructive"
+      });
     }
   };
   
@@ -469,6 +546,11 @@ export function LeadDetailsPanel({ isExpanded, onToggle, selectedConversation }:
     // For this demo we're just handling tags in local state
     // In a real app, you might store them in a dedicated tags table
     console.log(`Added tag ${newTag.trim()} to lead ${lead.id}`);
+    
+    toast({
+      title: "Tag added",
+      description: `Added "${newTag.trim()}" tag to lead`,
+    });
   };
   
   // Handle removing a tag
@@ -481,6 +563,11 @@ export function LeadDetailsPanel({ isExpanded, onToggle, selectedConversation }:
     // For this demo we're just handling tags in local state
     // In a real app, you would delete from a dedicated tags table
     console.log(`Removed tag ${tagToRemove} from lead ${lead.id}`);
+    
+    toast({
+      title: "Tag removed",
+      description: `Removed "${tagToRemove}" tag from lead`,
+    });
   };
 
   return (
@@ -566,49 +653,87 @@ export function LeadDetailsPanel({ isExpanded, onToggle, selectedConversation }:
               )}
             </div>
 
-            {/* Pipeline Section */}
+            {/* Pipeline Selection */}
             <div className="space-y-2">
-              <label className="text-xs text-muted-foreground">Pipeline</label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button variant="outline" size="sm" className="w-full justify-between">
-                    <div className="flex items-center">
-                      <span className="font-medium">{selectedStage?.name || 'Incoming leads'}</span>
-                    </div>
-                    <div className="text-xs text-muted-foreground flex items-center">
-                      ({daysSinceCreation} days)
-                      <ChevronDown className="h-4 w-4 ml-1" />
-                    </div>
+              {isChangingPipeline ? (
+                <div className="space-y-2">
+                  <label className="text-xs text-muted-foreground">Select Pipeline</label>
+                  <div className="space-y-2 max-h-48 overflow-y-auto">
+                    {allPipelines.map((pipeline) => (
+                      <Card 
+                        key={pipeline.id} 
+                        className={cn(
+                          "p-2 cursor-pointer hover:bg-accent",
+                          pipeline.id === selectedPipeline?.id && "border-primary"
+                        )}
+                        onClick={() => handlePipelineChange(pipeline.id)}
+                      >
+                        <div className="text-sm font-medium">{pipeline.name}</div>
+                        <div className="text-xs text-muted-foreground">
+                          {pipeline.stages?.length || 0} stages
+                        </div>
+                      </Card>
+                    ))}
+                  </div>
+                  <Button variant="outline" size="sm" className="w-full" onClick={() => setIsChangingPipeline(false)}>
+                    Cancel
                   </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-72 p-2">
-                  {selectedPipeline?.stages?.map((stage) => (
-                    <Card 
-                      key={stage.id} 
-                      className={cn(
-                        "p-2 mb-2 cursor-pointer hover:bg-accent",
-                        stage.id === selectedStage?.id && "border-primary"
-                      )}
-                      onClick={() => handleStageChange(stage.id)}
+                </div>
+              ) : (
+                <>
+                  <div className="flex justify-between items-center">
+                    <label className="text-xs text-muted-foreground">Pipeline</label>
+                    <Button 
+                      variant="ghost" 
+                      size="sm" 
+                      className="h-6 px-2 text-xs text-muted-foreground"
+                      onClick={() => setIsChangingPipeline(true)}
                     >
-                      {stage.name}
-                    </Card>
-                  ))}
-                </PopoverContent>
-              </Popover>
-              <div className="h-2 bg-muted rounded-full overflow-hidden">
-                {selectedPipeline?.stages && selectedStage && (
-                  <div 
-                    className="bg-primary h-full rounded-full"
-                    style={{
-                      width: `${(
-                        ((selectedPipeline.stages.findIndex(s => s.id === selectedStage.id) + 1) / 
-                        selectedPipeline.stages.length) * 100
-                      )}%`
-                    }}
-                  ></div>
-                )}
-              </div>
+                      Change
+                    </Button>
+                  </div>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button variant="outline" size="sm" className="w-full justify-between">
+                        <div className="flex items-center">
+                          <span className="font-medium">{selectedStage?.name || 'Select a stage'}</span>
+                        </div>
+                        <div className="text-xs text-muted-foreground flex items-center">
+                          ({daysSinceCreation} days)
+                          <ChevronDown className="h-4 w-4 ml-1" />
+                        </div>
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-72 p-2">
+                      {selectedPipeline?.stages?.map((stage) => (
+                        <Card 
+                          key={stage.id} 
+                          className={cn(
+                            "p-2 mb-2 cursor-pointer hover:bg-accent",
+                            stage.id === selectedStage?.id && "border-primary"
+                          )}
+                          onClick={() => handleStageChange(stage.id)}
+                        >
+                          {stage.name}
+                        </Card>
+                      ))}
+                    </PopoverContent>
+                  </Popover>
+                  <div className="h-2 bg-muted rounded-full overflow-hidden">
+                    {selectedPipeline?.stages && selectedStage && (
+                      <div 
+                        className="bg-primary h-full rounded-full"
+                        style={{
+                          width: `${(
+                            ((selectedPipeline.stages.findIndex(s => s.id === selectedStage.id) + 1) / 
+                            selectedPipeline.stages.length) * 100
+                          )}%`
+                        }}
+                      ></div>
+                    )}
+                  </div>
+                </>
+              )}
             </div>
           </div>
           
