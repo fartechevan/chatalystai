@@ -52,11 +52,48 @@ export function useConversationData(selectedConversation: Conversation | null) {
     queryFn: async () => {
       if (!selectedConversation) return null;
       
+      console.log('Fetching lead data for conversation:', selectedConversation.conversation_id);
       const lead = await fetchLeadByConversation(selectedConversation.conversation_id);
+      
+      console.log('Lead data retrieved:', lead);
       setLeadData(lead);
+      
+      // Set up realtime subscription for this lead
+      if (lead?.id) {
+        const leadChannel = supabase
+          .channel(`lead-updates-${lead.id}`)
+          .on(
+            'postgres_changes',
+            {
+              event: '*',
+              schema: 'public',
+              table: 'leads',
+              filter: `id=eq.${lead.id}`
+            },
+            async (payload) => {
+              console.log('Lead data changed:', payload);
+              // When lead is updated, invalidate the query to refetch
+              queryClient.invalidateQueries({ queryKey: ['lead', selectedConversation.conversation_id] });
+              
+              // Also update conversations data which may include lead info
+              queryClient.invalidateQueries({ queryKey: ['conversations'] });
+            }
+          )
+          .subscribe();
+
+        // Return cleanup function
+        return () => {
+          supabase.removeChannel(leadChannel);
+        };
+      }
+      
       return lead;
     },
     enabled: !!selectedConversation,
+    // This will make sure lead data is refetched when conversation changes
+    staleTime: 0,
+    refetchOnWindowFocus: true,
+    refetchOnMount: true,
   });
 
   const sendMessageMutation = useMutation({
