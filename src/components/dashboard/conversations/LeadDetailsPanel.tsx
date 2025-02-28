@@ -26,7 +26,7 @@ export function LeadDetailsPanel({ isExpanded, onToggle, selectedConversation }:
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [selectedAssignee, setSelectedAssignee] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [pipelines, setPipelines] = useState<Pipeline[]>([]);
+  const [allPipelines, setAllPipelines] = useState<Pipeline[]>([]);
   const [selectedPipeline, setSelectedPipeline] = useState<Pipeline | null>(null);
   const [selectedStage, setSelectedStage] = useState<PipelineStage | null>(null);
   const [customer, setCustomer] = useState<Customer | null>(null);
@@ -35,8 +35,8 @@ export function LeadDetailsPanel({ isExpanded, onToggle, selectedConversation }:
   const [tags, setTags] = useState<string[]>([]);
   const [newTag, setNewTag] = useState<string>("");
   const [showTagInput, setShowTagInput] = useState<boolean>(false);
-  const [allPipelines, setAllPipelines] = useState<Pipeline[]>([]);
   const [isChangingPipeline, setIsChangingPipeline] = useState(false);
+  const [stagesPopoverOpen, setStagesPopoverOpen] = useState(false);
 
   // Function to format the lead ID without any prefix
   const getFormattedLeadId = (id?: string | null) => {
@@ -82,8 +82,14 @@ export function LeadDetailsPanel({ isExpanded, onToggle, selectedConversation }:
           
           // Set default pipeline (the one marked as default or the first one)
           const defaultPipeline = pipelinesWithStages.find(p => p.is_default) || pipelinesWithStages[0];
-          setPipelines(pipelinesWithStages);
-          setSelectedPipeline(defaultPipeline);
+          if (defaultPipeline) {
+            setSelectedPipeline(defaultPipeline);
+            
+            // Set first stage by default if one exists
+            if (defaultPipeline.stages && defaultPipeline.stages.length > 0) {
+              setSelectedStage(defaultPipeline.stages[0]);
+            }
+          }
         }
       } catch (error) {
         console.error('Error fetching pipelines:', error);
@@ -190,10 +196,14 @@ export function LeadDetailsPanel({ isExpanded, onToggle, selectedConversation }:
     
     // Find the stage across all pipelines and select it and its parent pipeline
     async function findAndSelectStage(stageId: string) {
+      if (!stageId) return;
+
       // If we already have all pipelines loaded, search through them
       if (allPipelines.length > 0) {
         for (const pipeline of allPipelines) {
-          const stage = pipeline.stages?.find(s => s.id === stageId);
+          if (!pipeline.stages) continue;
+          
+          const stage = pipeline.stages.find(s => s.id === stageId);
           if (stage) {
             setSelectedPipeline(pipeline);
             setSelectedStage(stage);
@@ -206,7 +216,7 @@ export function LeadDetailsPanel({ isExpanded, onToggle, selectedConversation }:
       try {
         const { data: stageData, error: stageError } = await supabase
           .from('pipeline_stages')
-          .select('*, pipeline:pipeline_id(*)')
+          .select('id, name, position, pipeline_id')
           .eq('id', stageId)
           .maybeSingle();
         
@@ -216,40 +226,59 @@ export function LeadDetailsPanel({ isExpanded, onToggle, selectedConversation }:
         }
         
         if (stageData) {
-          // Set the selected stage
-          setSelectedStage(stageData);
-          
-          // Now get all stages for this pipeline
-          const { data: stagesData, error: stagesError } = await supabase
-            .from('pipeline_stages')
+          // Now get the pipeline for this stage
+          const { data: pipelineData, error: pipelineError } = await supabase
+            .from('pipelines')
             .select('*')
-            .eq('pipeline_id', stageData.pipeline_id)
-            .order('position');
-          
-          if (stagesError) {
-            console.error('Error fetching pipeline stages:', stagesError);
+            .eq('id', stageData.pipeline_id)
+            .maybeSingle();
+            
+          if (pipelineError) {
+            console.error('Error fetching pipeline:', pipelineError);
             return;
           }
           
-          if (stageData.pipeline && stagesData) {
-            const pipelineWithStages: Pipeline = {
-              ...stageData.pipeline,
-              stages: stagesData
-            };
+          if (pipelineData) {
+            // Now get all stages for this pipeline
+            const { data: stagesData, error: stagesError } = await supabase
+              .from('pipeline_stages')
+              .select('*')
+              .eq('pipeline_id', stageData.pipeline_id)
+              .order('position');
             
-            // Update selected pipeline
-            setSelectedPipeline(pipelineWithStages);
+            if (stagesError) {
+              console.error('Error fetching pipeline stages:', stagesError);
+              return;
+            }
             
-            // Also update the allPipelines state if this pipeline isn't there
-            setAllPipelines(prev => {
-              const exists = prev.some(p => p.id === pipelineWithStages.id);
-              if (!exists) {
-                return [...prev, pipelineWithStages];
+            if (stagesData) {
+              const pipelineWithStages: Pipeline = {
+                ...pipelineData,
+                stages: stagesData
+              };
+              
+              // Set the selected stage
+              const stage = stagesData.find(s => s.id === stageId);
+              if (stage) {
+                setSelectedStage(stage);
               }
               
-              // If it exists but doesn't have stages, update it
-              return prev.map(p => p.id === pipelineWithStages.id ? pipelineWithStages : p);
-            });
+              // Update selected pipeline
+              setSelectedPipeline(pipelineWithStages);
+              
+              // Update allPipelines if this pipeline is not already there
+              setAllPipelines(prev => {
+                const exists = prev.some(p => p.id === pipelineWithStages.id);
+                if (!exists) {
+                  return [...prev, pipelineWithStages];
+                }
+                
+                // If it exists but doesn't have stages, update it
+                return prev.map(p => 
+                  p.id === pipelineWithStages.id ? pipelineWithStages : p
+                );
+              });
+            }
           }
         }
       } catch (error) {
@@ -272,7 +301,6 @@ export function LeadDetailsPanel({ isExpanded, onToggle, selectedConversation }:
         if (leadError) {
           console.error('Error fetching lead:', leadError);
         } else if (data) {
-          // Create our leadData object from the database result
           const leadData: Lead = {
             id: data.id,
             name: data.name,
@@ -288,7 +316,6 @@ export function LeadDetailsPanel({ isExpanded, onToggle, selectedConversation }:
             contact_phone: data.contact_phone,
             contact_first_name: data.contact_first_name
           };
-          
           handleLeadData(leadData);
         } else {
           // No lead exists, create a fake one for demo purposes
@@ -355,7 +382,7 @@ export function LeadDetailsPanel({ isExpanded, onToggle, selectedConversation }:
       
       setCustomer(mockCustomer);
       
-      // Then create a mock lead - without the LEAD- prefix
+      // Then create a mock lead
       const mockLead: Lead = {
         id: `${Date.now().toString().slice(-6)}`,
         name: 'New Product Inquiry',
@@ -413,7 +440,7 @@ export function LeadDetailsPanel({ isExpanded, onToggle, selectedConversation }:
     if (isExpanded) {
       fetchData();
     }
-  }, [isExpanded, selectedConversation, allPipelines, selectedPipeline]);
+  }, [isExpanded, selectedConversation]);
 
   const selectedProfile = profiles.find(profile => profile.id === selectedAssignee);
 
@@ -443,6 +470,7 @@ export function LeadDetailsPanel({ isExpanded, onToggle, selectedConversation }:
     const stage = selectedPipeline.stages?.find(s => s.id === stageId);
     if (stage) {
       setSelectedStage(stage);
+      setStagesPopoverOpen(false);
       
       // Update the lead's stage in the database
       if (lead.id) {
@@ -692,7 +720,7 @@ export function LeadDetailsPanel({ isExpanded, onToggle, selectedConversation }:
                       Change
                     </Button>
                   </div>
-                  <Popover>
+                  <Popover open={stagesPopoverOpen} onOpenChange={setStagesPopoverOpen}>
                     <PopoverTrigger asChild>
                       <Button variant="outline" size="sm" className="w-full justify-between">
                         <div className="flex items-center">
@@ -726,7 +754,7 @@ export function LeadDetailsPanel({ isExpanded, onToggle, selectedConversation }:
                         style={{
                           width: `${(
                             ((selectedPipeline.stages.findIndex(s => s.id === selectedStage.id) + 1) / 
-                            selectedPipeline.stages.length) * 100
+                            (selectedPipeline.stages.length || 1)) * 100
                           )}%`
                         }}
                       ></div>
