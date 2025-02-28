@@ -188,7 +188,7 @@ export function LeadDetailsPanel({ isExpanded, onToggle, selectedConversation }:
         if (leadError) {
           console.error('Error fetching lead:', leadError);
         } else if (data) {
-          const leadData: Lead = {
+          const fetchedLead: Lead = {
             id: data.id,
             name: data.name,
             created_at: data.created_at,
@@ -203,7 +203,7 @@ export function LeadDetailsPanel({ isExpanded, onToggle, selectedConversation }:
             contact_phone: data.contact_phone || null,
             contact_first_name: data.contact_first_name || null
           };
-          handleLeadData(leadData);
+          handleLeadData(fetchedLead);
         } else {
           // No lead exists, create a fake one for demo purposes
           createFakeLeadFromCustomer();
@@ -239,7 +239,7 @@ export function LeadDetailsPanel({ isExpanded, onToggle, selectedConversation }:
       if (!customer || !selectedConversation) return;
       
       const fakeLead: Lead = {
-        id: `LEAD-${Date.now().toString().slice(-6)}`,
+        id: `${Date.now().toString().slice(-6)}`,
         name: 'New Product Inquiry',
         created_at: selectedConversation.created_at,
         updated_at: selectedConversation.updated_at,
@@ -269,9 +269,9 @@ export function LeadDetailsPanel({ isExpanded, onToggle, selectedConversation }:
       
       setCustomer(mockCustomer);
       
-      // Then create a mock lead
+      // Then create a mock lead - without the LEAD- prefix
       const mockLead: Lead = {
-        id: `LEAD-${Date.now().toString().slice(-6)}`,
+        id: `${Date.now().toString().slice(-6)}`,
         name: 'New Product Inquiry',
         created_at: selectedConversation.created_at,
         updated_at: selectedConversation.updated_at,
@@ -325,6 +325,13 @@ export function LeadDetailsPanel({ isExpanded, onToggle, selectedConversation }:
   }, [isExpanded, selectedConversation, selectedPipeline]);
 
   const selectedProfile = profiles.find(profile => profile.id === selectedAssignee);
+
+  // Function to format the lead ID without any prefix
+  const getFormattedLeadId = (id?: string | null) => {
+    if (!id) return '163674';
+    // Just return the ID or its first 6 characters if it's long
+    return id.length > 6 ? id.slice(0, 6) : id;
+  };
 
   // Update pipeline stage
   const handleStageChange = async (stageId: string) => {
@@ -391,7 +398,7 @@ export function LeadDetailsPanel({ isExpanded, onToggle, selectedConversation }:
             <Skeleton className="h-4 w-24" />
           ) : (
             <>
-              Lead #{lead?.id?.slice(0, 6) || '163674'}
+              Lead #{getFormattedLeadId(lead?.id)}
               <MoreHorizontal className="h-4 w-4 ml-auto text-muted-foreground" />
             </>
           )}
