@@ -1,5 +1,4 @@
-
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import type { Conversation, Message, Lead } from "../types";
 import { toast } from "sonner";
@@ -14,6 +13,49 @@ export function useConversationData(selectedConversation: Conversation | null) {
   const [summaryTimestamp, setSummaryTimestamp] = useState<string | null>(null);
   const [leadData, setLeadData] = useState<Lead | null>(null);
   const queryClient = useQueryClient();
+
+  useEffect(() => {
+    if (selectedConversation?.conversation_id) {
+      console.log('Conversation changed, resetting state:', selectedConversation.conversation_id);
+      // We don't reset leadData here - it will be updated by the query
+    }
+  }, [selectedConversation?.conversation_id]);
+
+  useEffect(() => {
+    console.log('Setting up global leads realtime subscription');
+    const leadsChannel = supabase
+      .channel('leads-global-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'leads'
+        },
+        (payload) => {
+          console.log('Lead table change detected:', payload);
+          // When any lead changes, check if it's the one we're viewing
+          if (leadData && payload.new && payload.new.id === leadData.id) {
+            console.log('Current lead was updated, refetching data');
+            // Force refetch the lead data
+            queryClient.invalidateQueries({ 
+              queryKey: ['lead', selectedConversation?.conversation_id] 
+            });
+            
+            // Also update the conversations list which may include lead info
+            queryClient.invalidateQueries({ 
+              queryKey: ['conversations'] 
+            });
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      console.log('Cleaning up global leads subscription');
+      supabase.removeChannel(leadsChannel);
+    };
+  }, [queryClient, leadData, selectedConversation?.conversation_id]);
 
   const { data: conversations = [], isLoading } = useQuery({
     queryKey: ['conversations'],
@@ -46,8 +88,7 @@ export function useConversationData(selectedConversation: Conversation | null) {
     enabled: !!selectedConversation,
   });
 
-  // Fetch lead data when a conversation is selected
-  useQuery({
+  const { data: fetchedLeadData } = useQuery({
     queryKey: ['lead', selectedConversation?.conversation_id],
     queryFn: async () => {
       if (!selectedConversation) return null;
@@ -56,45 +97,26 @@ export function useConversationData(selectedConversation: Conversation | null) {
       const lead = await fetchLeadByConversation(selectedConversation.conversation_id);
       
       console.log('Lead data retrieved:', lead);
-      setLeadData(lead);
       
-      // Set up realtime subscription for this lead
-      if (lead?.id) {
-        const leadChannel = supabase
-          .channel(`lead-updates-${lead.id}`)
-          .on(
-            'postgres_changes',
-            {
-              event: '*',
-              schema: 'public',
-              table: 'leads',
-              filter: `id=eq.${lead.id}`
-            },
-            async (payload) => {
-              console.log('Lead data changed:', payload);
-              // When lead is updated, invalidate the query to refetch
-              queryClient.invalidateQueries({ queryKey: ['lead', selectedConversation.conversation_id] });
-              
-              // Also update conversations data which may include lead info
-              queryClient.invalidateQueries({ queryKey: ['conversations'] });
-            }
-          )
-          .subscribe();
-
-        // Return cleanup function
-        return () => {
-          supabase.removeChannel(leadChannel);
-        };
-      }
+      // Update our local state
+      setLeadData(lead);
       
       return lead;
     },
     enabled: !!selectedConversation,
-    // This will make sure lead data is refetched when conversation changes
     staleTime: 0,
+    cacheTime: 0,
     refetchOnWindowFocus: true,
     refetchOnMount: true,
+    refetchOnReconnect: true,
   });
+
+  useEffect(() => {
+    if (fetchedLeadData) {
+      console.log('Lead data updated from query:', fetchedLeadData);
+      setLeadData(fetchedLeadData);
+    }
+  }, [fetchedLeadData]);
 
   const sendMessageMutation = useMutation({
     mutationFn: async (content: string) => {

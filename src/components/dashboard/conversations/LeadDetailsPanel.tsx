@@ -13,6 +13,7 @@ import { Card } from "@/components/ui/card";
 import { fetchLeadById } from "./api/conversationsApi";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useToast } from "@/hooks/use-toast";
+import { useQueryClient } from "react-query";
 
 interface LeadDetailsPanelProps {
   isExpanded: boolean;
@@ -36,70 +37,65 @@ export function LeadDetailsPanel({ isExpanded, onToggle, selectedConversation }:
   const [showTagInput, setShowTagInput] = useState<boolean>(false);
   const [isChangingPipeline, setIsChangingPipeline] = useState(false);
   const [stagesPopoverOpen, setStagesPopoverOpen] = useState(false);
+  const queryClient = useQueryClient();
 
-  // Function to format the lead ID without any prefix
   const getFormattedLeadId = (id?: string | null) => {
     if (!id) return '163674';
-    // Just return the ID or its first 6 characters if it's long
     return id.length > 6 ? id.slice(0, 6) : id;
   };
 
-  // Reset state when conversation changes
   useEffect(() => {
     if (selectedConversation?.conversation_id) {
-      // Reset states when conversation changes
       setSelectedStage(null);
       setSelectedPipeline(null);
       setCustomer(null);
       setLead(null);
       setIsLoading(true);
+      console.log('Conversation changed in LeadDetailsPanel - resetting state',
+        selectedConversation.conversation_id);
     }
   }, [selectedConversation?.conversation_id]);
 
-  // Set up realtime subscription to the leads table for updates
   useEffect(() => {
-    if (!lead?.id) return;
+    if (!isExpanded) return;
 
-    const leadsChannel = supabase
-      .channel(`lead-updates-${lead.id}`)
+    console.log('Setting up global lead_pipeline realtime subscription');
+    const leadPipelineChannel = supabase
+      .channel('lead-pipeline-global-changes')
       .on(
         'postgres_changes',
         {
           event: '*',
           schema: 'public',
-          table: 'leads',
-          filter: `id=eq.${lead.id}`
+          table: 'lead_pipeline'
         },
-        async (payload) => {
-          console.log('Lead updated:', payload);
-          
-          // When a lead is updated, refresh its data
-          if (payload.eventType === 'UPDATE') {
-            const updatedLead = await fetchLeadById(lead.id);
-            if (updatedLead) {
-              setLead(updatedLead);
-              // If pipeline stage changed, find and update it
-              if (updatedLead.pipeline_stage_id && updatedLead.pipeline_stage_id !== lead.pipeline_stage_id) {
-                findAndSelectStage(updatedLead.pipeline_stage_id);
-              }
-            }
+        (payload) => {
+          console.log('Lead pipeline change detected:', payload);
+          if (lead?.id && payload.new && payload.new.lead_id === lead.id) {
+            console.log('Current lead pipeline was updated, refetching lead data');
+            
+            const stageId = payload.new.stage_id;
+            findAndSelectStage(stageId);
+            
+            queryClient.invalidateQueries({ 
+              queryKey: ['lead', selectedConversation?.conversation_id] 
+            });
           }
         }
       )
       .subscribe();
 
     return () => {
-      supabase.removeChannel(leadsChannel);
+      console.log('Cleaning up global lead_pipeline subscription');
+      supabase.removeChannel(leadPipelineChannel);
     };
-  }, [lead?.id]);
+  }, [isExpanded, lead?.id, selectedConversation?.conversation_id, queryClient]);
 
-  // Separated findAndSelectStage to break potential infinite recursion
   const findAndSelectStage = useCallback(async (stageId: string) => {
     if (!stageId) return;
     
     console.log("Finding stage:", stageId);
 
-    // If we already have all pipelines loaded, search through them
     if (allPipelines.length > 0) {
       for (const pipeline of allPipelines) {
         if (!pipeline.stages) continue;
@@ -115,7 +111,6 @@ export function LeadDetailsPanel({ isExpanded, onToggle, selectedConversation }:
     }
     
     try {
-      // If not found or pipelines not loaded yet, fetch directly
       const { data: stageData, error: stageError } = await supabase
         .from('pipeline_stages')
         .select('id, name, position, pipeline_id')
@@ -129,7 +124,6 @@ export function LeadDetailsPanel({ isExpanded, onToggle, selectedConversation }:
       
       if (stageData) {
         console.log("Fetched stage data:", stageData);
-        // Now get the pipeline for this stage
         const { data: pipelineData, error: pipelineError } = await supabase
           .from('pipelines')
           .select('*')
@@ -143,7 +137,6 @@ export function LeadDetailsPanel({ isExpanded, onToggle, selectedConversation }:
         
         if (pipelineData) {
           console.log("Fetched pipeline data:", pipelineData);
-          // Now get all stages for this pipeline
           const { data: stagesData, error: stagesError } = await supabase
             .from('pipeline_stages')
             .select('id, name, position, pipeline_id')
@@ -164,25 +157,21 @@ export function LeadDetailsPanel({ isExpanded, onToggle, selectedConversation }:
               stages: stagesData
             };
             
-            // Set the selected stage
             const stage = stagesData.find(s => s.id === stageId);
             if (stage) {
               console.log("Setting selected stage:", stage.name);
               setSelectedStage(stage);
             }
             
-            // Update selected pipeline
             console.log("Setting selected pipeline:", pipelineData.name);
             setSelectedPipeline(pipelineWithStages);
             
-            // Update allPipelines if this pipeline is not already there
             setAllPipelines(prev => {
               const exists = prev.some(p => p.id === pipelineWithStages.id);
               if (!exists) {
                 return [...prev, pipelineWithStages];
               }
               
-              // If it exists but doesn't have stages, update it
               return prev.map(p => 
                 p.id === pipelineWithStages.id ? pipelineWithStages : p
               );
@@ -195,7 +184,6 @@ export function LeadDetailsPanel({ isExpanded, onToggle, selectedConversation }:
     }
   }, [allPipelines]);
 
-  // Fetch all pipelines and their stages
   useEffect(() => {
     async function fetchAllPipelines() {
       try {
@@ -210,7 +198,6 @@ export function LeadDetailsPanel({ isExpanded, onToggle, selectedConversation }:
         }
         
         if (pipelinesData && pipelinesData.length > 0) {
-          // Fetch stages for each pipeline
           const pipelinesWithStages = await Promise.all(
             pipelinesData.map(async (pipeline) => {
               const { data: stagesData, error: stagesError } = await supabase
@@ -230,12 +217,10 @@ export function LeadDetailsPanel({ isExpanded, onToggle, selectedConversation }:
           
           setAllPipelines(pipelinesWithStages);
           
-          // Set default pipeline (the one marked as default or the first one)
           const defaultPipeline = pipelinesWithStages.find(p => p.is_default) || pipelinesWithStages[0];
           if (defaultPipeline) {
             setSelectedPipeline(defaultPipeline);
             
-            // Set first stage by default if one exists
             if (defaultPipeline.stages && defaultPipeline.stages.length > 0) {
               setSelectedStage(defaultPipeline.stages[0]);
             }
@@ -251,7 +236,6 @@ export function LeadDetailsPanel({ isExpanded, onToggle, selectedConversation }:
     }
   }, [isExpanded]);
 
-  // Fetch profiles
   useEffect(() => {
     async function fetchProfiles() {
       try {
@@ -301,188 +285,38 @@ export function LeadDetailsPanel({ isExpanded, onToggle, selectedConversation }:
     setLead(leadData);
     setTags(['lead', 'follow-up']);
     
-    // Calculate days since creation
     const date = new Date(leadData.created_at);
     const today = new Date();
     const diffTime = Math.abs(today.getTime() - date.getTime());
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
     setDaysSinceCreation(diffDays);
     
-    // Set the responsible user from the lead's user_id
     if (leadData.user_id) {
       setSelectedAssignee(leadData.user_id);
     }
     
-    // If lead has a pipeline_stage_id, find and select the stage
     if (leadData.pipeline_stage_id) {
       console.log("Lead has pipeline_stage_id:", leadData.pipeline_stage_id);
       findAndSelectStage(leadData.pipeline_stage_id);
     } else if (selectedPipeline?.stages && selectedPipeline.stages.length > 0) {
-      // Default to first stage if no stage is selected
       console.log("Setting default stage");
       setSelectedStage(selectedPipeline.stages[0]);
     }
     
-    // If lead has customer_id, fetch the customer data
     if (leadData.customer_id) {
       fetchCustomerById(leadData.customer_id);
     }
   }, [findAndSelectStage, fetchCustomerById, selectedPipeline]);
 
-  // Fetch lead data based on the selected conversation
   useEffect(() => {
-    async function handleCustomerId(customerId: string) {
-      // Fetch customer data
-      const customerData = await fetchCustomerById(customerId);
-      
-      if (customerData) {
-        // Check if there's a lead associated with this customer
-        const { data, error: leadError } = await supabase
-          .from('leads')
-          .select('*')
-          .eq('customer_id', customerId)
-          .maybeSingle();
-        
-        if (leadError) {
-          console.error('Error fetching lead:', leadError);
-        } else if (data) {
-          const leadData: Lead = {
-            id: data.id,
-            name: data.name,
-            created_at: data.created_at,
-            updated_at: data.updated_at,
-            user_id: data.user_id,
-            pipeline_stage_id: data.pipeline_stage_id,
-            customer_id: data.customer_id,
-            value: data.value,
-            company_name: data.company_name,
-            company_address: data.company_address,
-            contact_email: data.contact_email,
-            contact_phone: data.contact_phone,
-            contact_first_name: data.contact_first_name
-          };
-          handleLeadData(leadData);
-        } else {
-          // No lead exists, create a fake one for demo purposes
-          createFakeLeadFromCustomer(customerData);
-        }
-      } else {
-        createMockLeadAndCustomer();
-      }
-    }
-    
-    function createFakeLeadFromCustomer(customerData: Customer) {
-      if (!selectedConversation) return;
-      
-      const fakeLead: Lead = {
-        id: `${Date.now().toString().slice(-6)}`,
-        name: 'New Product Inquiry',
-        created_at: selectedConversation.created_at,
-        updated_at: selectedConversation.updated_at,
-        customer_id: customerData.id,
-        user_id: selectedConversation.sender_id
-      };
-      
-      setLead(fakeLead);
-      setTags(['new-lead']);
-      
-      // Calculate days since creation
-      const date = new Date(fakeLead.created_at);
-      const today = new Date();
-      const diffTime = Math.abs(today.getTime() - date.getTime());
-      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-      setDaysSinceCreation(diffDays);
-    }
-
-    function createMockLeadFromConversation() {
-      if (!selectedConversation) return;
-      
-      // Create a mock customer first
-      const mockCustomer: Customer = {
-        id: `CUST-${Date.now().toString().slice(-6)}`,
-        name: selectedConversation.sender_type === 'customer' 
-          ? selectedConversation.sender.name || 'Unknown Customer'
-          : selectedConversation.receiver_type === 'customer'
-            ? selectedConversation.receiver.name || 'Unknown Customer'
-            : 'John Smith',
-        phone_number: '+60192698338',
-        email: 'customer@example.com'
-      };
-      
-      setCustomer(mockCustomer);
-      
-      // Then create a mock lead
-      const mockLead: Lead = {
-        id: `${Date.now().toString().slice(-6)}`,
-        name: 'New Product Inquiry',
-        created_at: selectedConversation.created_at,
-        updated_at: selectedConversation.updated_at,
-        customer_id: mockCustomer.id,
-        user_id: selectedConversation.sender_type === 'profile' 
-          ? selectedConversation.sender_id 
-          : selectedConversation.receiver_type === 'profile'
-            ? selectedConversation.receiver_id
-            : 'mock-user-id'
-      };
-      
-      setLead(mockLead);
-      setTags(['mock', 'lead']);
-      
-      // Calculate days since creation
-      const date = new Date(mockLead.created_at);
-      const today = new Date();
-      const diffTime = Math.abs(today.getTime() - date.getTime());
-      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-      setDaysSinceCreation(diffDays);
-    }
-
-    function createMockLeadAndCustomer() {
-      const mockCustomer: Customer = {
-        id: '123',
-        name: 'John Smith',
-        phone_number: '+60192698338',
-        email: 'john@example.com'
-      };
-      
-      const mockLead: Lead = {
-        id: '163674',
-        name: 'New Product Inquiry',
-        created_at: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(), // 7 days ago
-        updated_at: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
-        customer_id: mockCustomer.id,
-        user_id: 'mock-user-id'
-      };
-      
-      setCustomer(mockCustomer);
-      setLead(mockLead);
-      setTags(['lead', 'product']);
-      
-      // Calculate days since creation
-      const date = new Date(mockLead.created_at);
-      const today = new Date();
-      const diffTime = Math.abs(today.getTime() - date.getTime());
-      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-      setDaysSinceCreation(diffDays);
-      
-      // Set a default assignee
-      if (profiles.length > 0) {
-        setSelectedAssignee(profiles[0].id);
-      }
-    }
-
     async function fetchData() {
       setIsLoading(true);
       try {
         if (selectedConversation) {
           console.log("Fetching data for conversation:", selectedConversation.conversation_id);
-          // Try to get the lead directly from the conversation
           if (selectedConversation.lead) {
-            // Lead is already included in the conversation
-            console.log("Using lead from conversation:", selectedConversation.lead);
             handleLeadData(selectedConversation.lead);
           } else if (selectedConversation.lead_id) {
-            // Fetch lead by its ID
-            console.log("Fetching lead by ID:", selectedConversation.lead_id);
             const leadData = await fetchLeadById(selectedConversation.lead_id);
             if (leadData) {
               handleLeadData(leadData);
@@ -490,7 +324,6 @@ export function LeadDetailsPanel({ isExpanded, onToggle, selectedConversation }:
               createMockLeadFromConversation();
             }
           } else {
-            // If there's no lead_id, try to find a customer in the conversation
             const customerId = selectedConversation.sender_type === 'customer' 
               ? selectedConversation.sender_id 
               : selectedConversation.receiver_type === 'customer' 
@@ -501,14 +334,10 @@ export function LeadDetailsPanel({ isExpanded, onToggle, selectedConversation }:
               console.log("Finding lead for customer:", customerId);
               await handleCustomerId(customerId);
             } else {
-              // If no customer or lead, create mock data
-              console.log("Creating mock data (no customer/lead found)");
               createMockLeadAndCustomer();
             }
           }
         } else {
-          // No conversation selected, show mock data
-          console.log("No conversation selected, showing mock data");
           createMockLeadAndCustomer();
         }
       } catch (error) {
@@ -518,7 +347,7 @@ export function LeadDetailsPanel({ isExpanded, onToggle, selectedConversation }:
         setIsLoading(false);
       }
     }
-
+    
     if (isExpanded) {
       fetchData();
     }
@@ -526,17 +355,14 @@ export function LeadDetailsPanel({ isExpanded, onToggle, selectedConversation }:
 
   const selectedProfile = profiles.find(profile => profile.id === selectedAssignee);
 
-  // Handle changing pipeline
   const handlePipelineChange = (pipelineId: string) => {
     const pipeline = allPipelines.find(p => p.id === pipelineId);
     if (!pipeline) return;
     
     setSelectedPipeline(pipeline);
     
-    // Select first stage by default
     if (pipeline.stages && pipeline.stages.length > 0) {
       setSelectedStage(pipeline.stages[0]);
-      // If we have a lead, update its stage in the database
       if (lead?.id) {
         handleStageChange(pipeline.stages[0].id);
       }
@@ -545,7 +371,6 @@ export function LeadDetailsPanel({ isExpanded, onToggle, selectedConversation }:
     setIsChangingPipeline(false);
   };
 
-  // Update pipeline stage
   const handleStageChange = async (stageId: string) => {
     if (!lead || !selectedPipeline) return;
     
@@ -553,11 +378,17 @@ export function LeadDetailsPanel({ isExpanded, onToggle, selectedConversation }:
     if (stage) {
       console.log(`Changing stage for lead ${lead.id} to ${stage.name} (${stageId})`);
       
-      // Update UI immediately
       setSelectedStage(stage);
       setStagesPopoverOpen(false);
       
-      // Update the lead's stage in the database
+      setLead(prev => {
+        if (!prev) return null;
+        return {
+          ...prev,
+          pipeline_stage_id: stageId
+        };
+      });
+      
       if (lead.id) {
         try {
           const { error } = await supabase
@@ -572,33 +403,38 @@ export function LeadDetailsPanel({ isExpanded, onToggle, selectedConversation }:
               description: "Failed to update lead stage",
               variant: "destructive"
             });
-          } else {
-            console.log(`Updated lead ${lead.id} to stage ${stage.name}`);
-            
-            // Update the lead object in state
-            setLead(prev => {
-              if (!prev) return null;
-              return {
-                ...prev,
-                pipeline_stage_id: stageId
-              };
-            });
-            
-            // Also update lead_pipeline table to keep things consistent
-            const { error: pipelineError } = await supabase
-              .from('lead_pipeline')
-              .update({ stage_id: stageId })
-              .eq('lead_id', lead.id);
-              
-            if (pipelineError) {
-              console.error('Error updating lead_pipeline:', pipelineError);
-            }
-            
-            toast({
-              title: "Success",
-              description: `Lead moved to "${stage.name}" stage`,
-            });
+            return;
           }
+          
+          console.log(`Updated lead ${lead.id} to stage ${stage.name}`);
+          
+          const { error: pipelineError } = await supabase
+            .from('lead_pipeline')
+            .update({ stage_id: stageId })
+            .eq('lead_id', lead.id);
+              
+          if (pipelineError) {
+            console.error('Error updating lead_pipeline:', pipelineError);
+            toast({
+              title: "Error",
+              description: "Failed to update pipeline stage",
+              variant: "destructive"
+            });
+            return;
+          }
+          
+          queryClient.invalidateQueries({ 
+            queryKey: ['lead', selectedConversation?.conversation_id] 
+          });
+          
+          queryClient.invalidateQueries({ 
+            queryKey: ['conversations'] 
+          });
+          
+          toast({
+            title: "Success",
+            description: `Lead moved to "${stage.name}" stage`,
+          });
         } catch (error) {
           console.error('Error:', error);
           toast({
@@ -610,8 +446,7 @@ export function LeadDetailsPanel({ isExpanded, onToggle, selectedConversation }:
       }
     }
   };
-  
-  // Handle updating responsible user
+
   const handleAssigneeChange = async (userId: string) => {
     setSelectedAssignee(userId);
     
@@ -633,7 +468,6 @@ export function LeadDetailsPanel({ isExpanded, onToggle, selectedConversation }:
       } else {
         console.log(`Updated lead ${lead.id} assignee to ${userId}`);
         
-        // Update the lead object in state
         setLead(prev => {
           if (!prev) return null;
           return {
@@ -657,8 +491,7 @@ export function LeadDetailsPanel({ isExpanded, onToggle, selectedConversation }:
       });
     }
   };
-  
-  // Handle adding a new tag
+
   const handleAddTag = async () => {
     if (!newTag.trim() || !lead) return;
     
@@ -667,8 +500,6 @@ export function LeadDetailsPanel({ isExpanded, onToggle, selectedConversation }:
     setNewTag("");
     setShowTagInput(false);
     
-    // For this demo we're just handling tags in local state
-    // In a real app, you might store them in a dedicated tags table
     console.log(`Added tag ${newTag.trim()} to lead ${lead.id}`);
     
     toast({
@@ -676,16 +507,13 @@ export function LeadDetailsPanel({ isExpanded, onToggle, selectedConversation }:
       description: `Added "${newTag.trim()}" tag to lead`,
     });
   };
-  
-  // Handle removing a tag
+
   const handleRemoveTag = async (tagToRemove: string) => {
     if (!lead) return;
     
     const updatedTags = tags.filter(tag => tag !== tagToRemove);
     setTags(updatedTags);
     
-    // For this demo we're just handling tags in local state
-    // In a real app, you would delete from a dedicated tags table
     console.log(`Removed tag ${tagToRemove} from lead ${lead.id}`);
     
     toast({
@@ -718,7 +546,6 @@ export function LeadDetailsPanel({ isExpanded, onToggle, selectedConversation }:
       {isExpanded && (
         <div className="flex-1 overflow-auto flex flex-col">
           <div className="p-4 space-y-4">
-            {/* Lead ID with connection status */}
             {lead && selectedConversation && (
               <div className="text-xs text-muted-foreground">
                 {selectedConversation.lead_id === lead.id ? (
@@ -735,7 +562,6 @@ export function LeadDetailsPanel({ isExpanded, onToggle, selectedConversation }:
               </div>
             )}
             
-            {/* Tags */}
             <div className="space-y-2">
               <div className="flex flex-wrap gap-2">
                 {tags.map((tag, index) => (
@@ -777,7 +603,6 @@ export function LeadDetailsPanel({ isExpanded, onToggle, selectedConversation }:
               )}
             </div>
 
-            {/* Pipeline Selection */}
             <div className="space-y-2">
               {isChangingPipeline ? (
                 <div className="space-y-2">
@@ -873,7 +698,6 @@ export function LeadDetailsPanel({ isExpanded, onToggle, selectedConversation }:
             
             <TabsContent value="main" className="flex-1 overflow-auto p-0 m-0">
               <div className="p-4 space-y-6">
-                {/* Responsible User Section */}
                 <div className="grid grid-cols-2 gap-2 items-center">
                   <label className="text-sm text-muted-foreground">Responsible user</label>
                   <div className="text-sm">
@@ -901,13 +725,11 @@ export function LeadDetailsPanel({ isExpanded, onToggle, selectedConversation }:
                   </div>
                 </div>
 
-                {/* Sale Section */}
                 <div className="grid grid-cols-2 gap-2 items-center">
                   <label className="text-sm text-muted-foreground">Sale</label>
                   <div className="text-sm">{lead?.value?.toLocaleString() || 0} RM</div>
                 </div>
 
-                {/* Contact Section */}
                 <div className="border-t border-b py-4 space-y-3">
                   <div className="flex items-center gap-3">
                     <Avatar className="h-12 w-12">
@@ -924,7 +746,6 @@ export function LeadDetailsPanel({ isExpanded, onToggle, selectedConversation }:
                   </div>
                 </div>
 
-                {/* Add Contact Button */}
                 <Button variant="ghost" className="w-full justify-start text-muted-foreground">
                   <div className="h-8 w-8 rounded-full border flex items-center justify-center mr-3">
                     <Plus className="h-4 w-4" />
@@ -932,7 +753,6 @@ export function LeadDetailsPanel({ isExpanded, onToggle, selectedConversation }:
                   Add contact
                 </Button>
 
-                {/* Add Company Button */}
                 <Button variant="ghost" className="w-full justify-start text-muted-foreground border-b pb-6">
                   <div className="h-8 w-8 rounded-full border flex items-center justify-center mr-3">
                     <Plus className="h-4 w-4" />
@@ -940,7 +760,6 @@ export function LeadDetailsPanel({ isExpanded, onToggle, selectedConversation }:
                   Add company
                 </Button>
 
-                {/* Contact Details */}
                 <div className="space-y-4">
                   <div className="grid grid-cols-2 gap-2 items-center">
                     <label className="text-sm text-muted-foreground">Work phone</label>
@@ -963,7 +782,6 @@ export function LeadDetailsPanel({ isExpanded, onToggle, selectedConversation }:
                   </div>
                 </div>
 
-                {/* Cancel Button */}
                 <Button variant="link" size="sm" className="text-muted-foreground px-0">
                   cancel
                 </Button>
@@ -989,7 +807,6 @@ export function LeadDetailsPanel({ isExpanded, onToggle, selectedConversation }:
             </TabsContent>
           </Tabs>
 
-          {/* Bottom Actions */}
           <div className="mt-auto border-t p-4">
             <div className="flex items-center justify-between gap-2">
               <Button variant="outline" size="sm" className="flex-1">
