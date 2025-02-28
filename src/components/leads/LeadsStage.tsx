@@ -5,6 +5,7 @@ import { useState } from "react";
 import { AddLeadDialog } from "./AddLeadDialog";
 import { cn } from "@/lib/utils";
 import { Draggable, Droppable } from "@hello-pangea/dnd";
+import { Building, User, DollarSign } from "lucide-react";
 
 interface Lead {
   id: string;
@@ -30,6 +31,16 @@ const stageColors = {
 
 export function LeadsStage({ name, id, index = 0, leads }: LeadsStageProps) {
   const [isAddLeadOpen, setIsAddLeadOpen] = useState(false);
+
+  const handleLeadAdded = () => {
+    // This will be handled by the realtime subscription in LeadsContent
+    setIsAddLeadOpen(false);
+  };
+
+  const formatCurrency = (value: number | null | undefined) => {
+    if (value === null || value === undefined) return '0 RM';
+    return `${value.toLocaleString()} RM`;
+  };
 
   return (
     <div className="flex-1 min-w-[250px]">
@@ -73,13 +84,32 @@ export function LeadsStage({ name, id, index = 0, leads }: LeadsStageProps) {
                       snapshot.isDragging && "opacity-50"
                     )}
                   >
-                    <Card className="p-3">
+                    <Card className="p-3 hover:shadow-md transition-shadow">
                       <div className="font-medium">{lead.name}</div>
-                      <div className="text-sm text-muted-foreground">
-                        {lead.company_name || lead.contact_first_name || 'No additional info'}
+                      
+                      <div className="mt-2 flex items-center text-xs text-muted-foreground">
+                        {lead.company_name ? (
+                          <div className="flex items-center mr-3">
+                            <Building className="h-3 w-3 mr-1" />
+                            <span>{lead.company_name}</span>
+                          </div>
+                        ) : null}
+                        
+                        {lead.contact_first_name ? (
+                          <div className="flex items-center">
+                            <User className="h-3 w-3 mr-1" />
+                            <span>{lead.contact_first_name}</span>
+                          </div>
+                        ) : null}
+                        
+                        {!lead.company_name && !lead.contact_first_name && (
+                          <span>No additional info</span>
+                        )}
                       </div>
-                      <div className="text-sm font-medium mt-1">
-                        {lead.value?.toLocaleString()} RM
+                      
+                      <div className="text-sm font-medium mt-2 flex items-center">
+                        <DollarSign className="h-3.5 w-3.5 mr-1" />
+                        {formatCurrency(lead.value)}
                       </div>
                     </Card>
                   </div>
@@ -103,7 +133,7 @@ export function LeadsStage({ name, id, index = 0, leads }: LeadsStageProps) {
         isOpen={isAddLeadOpen}
         onClose={() => setIsAddLeadOpen(false)}
         pipelineStageId={id}
-        onLeadAdded={() => {}}
+        onLeadAdded={handleLeadAdded}
       />
     </div>
   );

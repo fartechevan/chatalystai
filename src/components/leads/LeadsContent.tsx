@@ -42,7 +42,7 @@ export function LeadsContent({ pipelineId }: LeadsContentProps) {
       
       const leadsData: StageLeads = {};
       for (const stage of data) {
-        const { data: stageLeadsData } = await supabase
+        const { data: stageLeadsData, error: leadsError } = await supabase
           .from('lead_pipeline')
           .select(`
             lead:leads (
@@ -56,7 +56,12 @@ export function LeadsContent({ pipelineId }: LeadsContentProps) {
           .eq('stage_id', stage.id)
           .order('position');
 
-        leadsData[stage.id] = stageLeadsData?.map(item => item.lead) || [];
+        if (leadsError) {
+          console.error('Error fetching leads for stage', stage.id, leadsError);
+          leadsData[stage.id] = [];
+        } else {
+          leadsData[stage.id] = stageLeadsData?.map(item => item.lead) || [];
+        }
       }
       setStageLeads(leadsData);
     }
@@ -124,6 +129,17 @@ export function LeadsContent({ pipelineId }: LeadsContentProps) {
         .eq('lead_id', leadId);
 
       if (error) throw error;
+
+      const { error: leadUpdateError } = await supabase
+        .from('leads')
+        .update({
+          pipeline_stage_id: destinationStageId
+        })
+        .eq('id', leadId);
+
+      if (leadUpdateError) {
+        console.error('Error updating lead pipeline_stage_id:', leadUpdateError);
+      }
 
       toast({
         title: "Lead moved",
