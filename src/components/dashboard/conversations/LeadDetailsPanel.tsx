@@ -128,7 +128,23 @@ export function LeadDetailsPanel({ isExpanded, onToggle, selectedConversation }:
             if (error) {
               console.error('Error fetching lead:', error);
             } else if (data) {
-              leadData = data;
+              // Create a new Lead object with explicit property assignments
+              // This avoids excessive type instantiation
+              leadData = {
+                id: data.id,
+                name: data.name,
+                created_at: data.created_at,
+                updated_at: data.updated_at,
+                pipeline_stage_id: data.pipeline_stage_id,
+                customer_id: data.customer_id,
+                user_id: data.user_id,
+                value: data.value,
+                company_name: data.company_name,
+                company_address: data.company_address,
+                contact_email: data.contact_email,
+                contact_phone: data.contact_phone,
+                contact_first_name: data.contact_first_name
+              };
             }
           } else {
             // If there's no lead_id, try to find a customer in the conversation
@@ -161,7 +177,22 @@ export function LeadDetailsPanel({ isExpanded, onToggle, selectedConversation }:
                 if (leadError) {
                   console.error('Error fetching lead:', leadError);
                 } else if (data) {
-                  leadData = data;
+                  // Create a new Lead object with explicit property assignments
+                  leadData = {
+                    id: data.id,
+                    name: data.name,
+                    created_at: data.created_at,
+                    updated_at: data.updated_at,
+                    pipeline_stage_id: data.pipeline_stage_id,
+                    customer_id: data.customer_id,
+                    user_id: data.user_id,
+                    value: data.value,
+                    company_name: data.company_name,
+                    company_address: data.company_address,
+                    contact_email: data.contact_email,
+                    contact_phone: data.contact_phone,
+                    contact_first_name: data.contact_first_name
+                  };
                 }
               }
             }
@@ -169,50 +200,33 @@ export function LeadDetailsPanel({ isExpanded, onToggle, selectedConversation }:
           
           // Process the lead data if found
           if (leadData) {
-            // Don't use spread operator here to avoid deep type instantiation
-            const typedLeadData: Lead = {
-              id: leadData.id,
-              name: leadData.name,
-              created_at: leadData.created_at,
-              updated_at: leadData.updated_at,
-              pipeline_stage_id: leadData.pipeline_stage_id,
-              customer_id: leadData.customer_id,
-              user_id: leadData.user_id,
-              value: leadData.value,
-              company_name: leadData.company_name,
-              company_address: leadData.company_address,
-              contact_email: leadData.contact_email,
-              contact_phone: leadData.contact_phone,
-              contact_first_name: leadData.contact_first_name
-            };
-            
-            setLead(typedLeadData);
+            setLead(leadData);
             
             // For demo purposes, we'll use some mock tags
             // In a real app, you'd store tags in a separate table or in metadata
             setTags(['lead', 'follow-up']);
             
             // Calculate days since creation
-            const creationDate = new Date(typedLeadData.created_at);
+            const creationDate = new Date(leadData.created_at);
             const today = new Date();
             const diffTime = Math.abs(today.getTime() - creationDate.getTime());
             const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
             setDaysSinceCreation(diffDays);
             
             // If lead has a pipeline_stage_id, select it
-            if (typedLeadData.pipeline_stage_id && selectedPipeline?.stages) {
-              const stage = selectedPipeline.stages.find(s => s.id === typedLeadData.pipeline_stage_id);
+            if (leadData.pipeline_stage_id && selectedPipeline?.stages) {
+              const stage = selectedPipeline.stages.find(s => s.id === leadData.pipeline_stage_id);
               if (stage) {
                 setSelectedStage(stage);
               }
             }
             
             // If lead has customer_id but we don't have customer data yet, fetch it
-            if (typedLeadData.customer_id && !customer) {
+            if (leadData.customer_id && !customer) {
               const { data: customerData, error: customerError } = await supabase
                 .from('customers')
                 .select('*')
-                .eq('id', typedLeadData.customer_id)
+                .eq('id', leadData.customer_id)
                 .maybeSingle();
               
               if (customerError) {
