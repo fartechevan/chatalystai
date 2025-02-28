@@ -50,7 +50,7 @@ export function ConversationMainArea({
             </Button>
             <div>
               <h2 className="text-lg font-semibold flex items-center gap-2">
-                Lead #{selectedConversation.conversation_id.slice(0, 6)}
+                Lead #{selectedConversation.lead_id.slice(0, 6)}
               </h2>
             </div>
           </div>

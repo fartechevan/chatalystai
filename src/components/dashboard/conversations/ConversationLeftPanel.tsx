@@ -95,7 +95,7 @@ export function ConversationLeftPanel({
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between gap-2">
                     <p className="text-sm font-medium truncate">
-                      Lead #{conv.conversation_id.slice(0, 6)}
+                      Lead #{conv.lead_id.slice(0, 6)}
                     </p>
                     <span className="text-xs text-muted-foreground whitespace-nowrap">
                       {new Date(conv.updated_at).toLocaleDateString()}
