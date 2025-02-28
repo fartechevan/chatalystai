@@ -1,64 +1,197 @@
 
-import { Dialog, DialogContent, DialogTitle, DialogHeader } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Settings } from "lucide-react";
-import { LeadBasicInfo } from "./components/LeadBasicInfo";
-import { LeadContactInfo } from "./components/LeadContactInfo";
-import { LeadCompanyInfo } from "./components/LeadCompanyInfo";
-import { useLeadForm } from "./hooks/useLeadForm";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 
 interface AddLeadDialogProps {
   isOpen: boolean;
   onClose: () => void;
-  pipelineStageId: string | null;
+  pipelineStageId: string;
   onLeadAdded: () => void;
 }
 
-export function AddLeadDialog({
-  isOpen,
-  onClose,
-  pipelineStageId,
-  onLeadAdded
-}: AddLeadDialogProps) {
-  const { formData, handleChange, handleSubmit } = useLeadForm(pipelineStageId, () => {
-    onLeadAdded();
-    onClose();
-  });
+export function AddLeadDialog({ isOpen, onClose, pipelineStageId, onLeadAdded }: AddLeadDialogProps) {
+  const { toast } = useToast();
+  const [name, setName] = useState("");
+  const [value, setValue] = useState("");
+  const [companyName, setCompanyName] = useState("");
+  const [contactName, setContactName] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!name.trim()) {
+      toast({
+        title: "Name is required",
+        description: "Please enter a name for the lead",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setIsSubmitting(true);
+
+    try {
+      // 1. Insert the new lead into the leads table
+      const { data: leadData, error: leadError } = await supabase
+        .from('leads')
+        .insert([{
+          name: name.trim(),
+          value: parseFloat(value) || 0,
+          company_name: companyName.trim() || null,
+          contact_first_name: contactName.trim() || null,
+          pipeline_stage_id: pipelineStageId,
+          user_id: (await supabase.auth.getUser()).data.user?.id || 'unknown'
+        }])
+        .select();
+
+      if (leadError) {
+        throw leadError;
+      }
+
+      if (!leadData || leadData.length === 0) {
+        throw new Error("Failed to create lead");
+      }
+
+      const newLead = leadData[0];
+
+      // 2. Get the current position (max + 1) for the stage
+      const { data: positionData, error: positionError } = await supabase
+        .from('lead_pipeline')
+        .select('position')
+        .eq('stage_id', pipelineStageId)
+        .order('position', { ascending: false })
+        .limit(1);
+
+      if (positionError) {
+        throw positionError;
+      }
+
+      const position = positionData && positionData.length > 0 
+        ? positionData[0].position + 1 
+        : 0;
+
+      // 3. Insert the lead into the lead_pipeline table
+      const { error: pipelineError } = await supabase
+        .from('lead_pipeline')
+        .insert([{
+          lead_id: newLead.id,
+          stage_id: pipelineStageId,
+          position: position
+        }]);
+
+      if (pipelineError) {
+        throw pipelineError;
+      }
+
+      toast({
+        title: "Lead created",
+        description: `${name} has been added to the pipeline`,
+      });
+
+      // Reset form
+      setName("");
+      setValue("");
+      setCompanyName("");
+      setContactName("");
+      
+      // Notify parent
+      onLeadAdded();
+      onClose();
+    } catch (error) {
+      console.error('Error creating lead:', error);
+      toast({
+        title: "Error",
+        description: "Failed to create lead. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[425px]">
-        <DialogHeader>
-          <DialogTitle className="flex justify-between items-center">
-            Initial Contact
-            <Button variant="ghost" size="icon" className="h-8 w-8">
-              <Settings className="h-4 w-4" />
-            </Button>
-          </DialogTitle>
-        </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <LeadBasicInfo
-            name={formData.name}
-            value={formData.value}
-            onChange={handleChange}
-          />
-          <LeadContactInfo
-            contact_first_name={formData.contact_first_name}
-            contact_phone={formData.contact_phone}
-            contact_email={formData.contact_email}
-            onChange={handleChange}
-          />
-          <LeadCompanyInfo
-            company_name={formData.company_name}
-            company_address={formData.company_address}
-            onChange={handleChange}
-          />
-          <div className="flex justify-start gap-2 pt-4">
-            <Button type="submit">Add</Button>
+        <form onSubmit={handleSubmit}>
+          <DialogHeader>
+            <DialogTitle>Add New Lead</DialogTitle>
+            <DialogDescription>
+              Create a new lead in this pipeline stage.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="name" className="text-right">
+                Name
+              </Label>
+              <Input
+                id="name"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                className="col-span-3"
+                placeholder="Lead name or opportunity"
+                required
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="value" className="text-right">
+                Value (RM)
+              </Label>
+              <Input
+                id="value"
+                type="number"
+                value={value}
+                onChange={(e) => setValue(e.target.value)}
+                className="col-span-3"
+                placeholder="Estimated value"
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="company" className="text-right">
+                Company
+              </Label>
+              <Input
+                id="company"
+                value={companyName}
+                onChange={(e) => setCompanyName(e.target.value)}
+                className="col-span-3"
+                placeholder="Company name (optional)"
+              />
+            </div>
+            <div className="grid grid-cols-4 items-center gap-4">
+              <Label htmlFor="contact" className="text-right">
+                Contact
+              </Label>
+              <Input
+                id="contact"
+                value={contactName}
+                onChange={(e) => setContactName(e.target.value)}
+                className="col-span-3"
+                placeholder="Contact name (optional)"
+              />
+            </div>
+          </div>
+          <DialogFooter>
             <Button type="button" variant="outline" onClick={onClose}>
               Cancel
             </Button>
-          </div>
+            <Button type="submit" disabled={isSubmitting}>
+              {isSubmitting ? "Adding..." : "Add Lead"}
+            </Button>
+          </DialogFooter>
         </form>
       </DialogContent>
     </Dialog>

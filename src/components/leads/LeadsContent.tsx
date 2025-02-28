@@ -1,3 +1,4 @@
+
 import { Skeleton } from "@/components/ui/skeleton";
 import { LeadsHeader } from "./LeadsHeader";
 import { LeadsStage } from "./LeadsStage";
@@ -30,14 +31,22 @@ export function LeadsContent({ pipelineId }: LeadsContentProps) {
 
   const loadStages = async () => {
     if (!pipelineId) return;
-
+    console.log("Loading stages for pipeline:", pipelineId);
+    
     const { data, error } = await supabase
       .from('pipeline_stages')
       .select('id, name, position')
       .eq('pipeline_id', pipelineId)
       .order('position');
 
-    if (!error && data) {
+    if (error) {
+      console.error('Error fetching stages:', error);
+      setLoading(false);
+      return;
+    }
+    
+    if (data) {
+      console.log("Loaded stages:", data);
       setStages(data);
       
       const leadsData: StageLeads = {};
@@ -60,22 +69,26 @@ export function LeadsContent({ pipelineId }: LeadsContentProps) {
           console.error('Error fetching leads for stage', stage.id, leadsError);
           leadsData[stage.id] = [];
         } else {
-          leadsData[stage.id] = stageLeadsData?.map(item => item.lead) || [];
+          leadsData[stage.id] = stageLeadsData?.map(item => item.lead).filter(Boolean) || [];
         }
       }
+      console.log("Loaded leads data:", leadsData);
       setStageLeads(leadsData);
     }
     setLoading(false);
   };
 
   useEffect(() => {
+    setLoading(true);
     loadStages();
   }, [pipelineId]);
 
+  // Set up realtime subscription to both lead_pipeline and leads tables
   useEffect(() => {
     if (!pipelineId) return;
 
-    const channel = supabase
+    // Create a channel for lead_pipeline changes
+    const pipelineChannel = supabase
       .channel('lead-pipeline-changes')
       .on(
         'postgres_changes',
@@ -84,19 +97,39 @@ export function LeadsContent({ pipelineId }: LeadsContentProps) {
           schema: 'public',
           table: 'lead_pipeline'
         },
-        () => {
+        (payload) => {
+          console.log('Lead pipeline change detected:', payload);
+          loadStages();
+        }
+      )
+      .subscribe();
+      
+    // Create a channel for leads changes
+    const leadsChannel = supabase
+      .channel('leads-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'leads'
+        },
+        (payload) => {
+          console.log('Leads change detected:', payload);
           loadStages();
         }
       )
       .subscribe();
 
     return () => {
-      supabase.removeChannel(channel);
+      supabase.removeChannel(pipelineChannel);
+      supabase.removeChannel(leadsChannel);
     };
   }, [pipelineId]);
 
   const handleDragEnd = async (result: any) => {
     if (!result.destination) return;
+    console.log("Drag end:", result);
 
     const sourceStageId = result.source.droppableId;
     const destinationStageId = result.destination.droppableId;
@@ -115,11 +148,13 @@ export function LeadsContent({ pipelineId }: LeadsContentProps) {
     }
 
     try {
+      // Optimistically update the UI
       const newStageLeads = { ...stageLeads };
       const [movedLead] = newStageLeads[sourceStageId].splice(result.source.index, 1);
       newStageLeads[destinationStageId].splice(result.destination.index, 0, movedLead);
       setStageLeads(newStageLeads);
 
+      // Update lead_pipeline table
       const { error } = await supabase
         .from('lead_pipeline')
         .update({
@@ -130,6 +165,7 @@ export function LeadsContent({ pipelineId }: LeadsContentProps) {
 
       if (error) throw error;
 
+      // Also update the lead's pipeline_stage_id in the leads table
       const { error: leadUpdateError } = await supabase
         .from('leads')
         .update({
@@ -139,6 +175,7 @@ export function LeadsContent({ pipelineId }: LeadsContentProps) {
 
       if (leadUpdateError) {
         console.error('Error updating lead pipeline_stage_id:', leadUpdateError);
+        throw leadUpdateError;
       }
 
       toast({
@@ -147,6 +184,7 @@ export function LeadsContent({ pipelineId }: LeadsContentProps) {
       });
     } catch (error) {
       console.error('Error moving lead:', error);
+      // Revert our optimistic update by reloading the actual data
       loadStages();
       toast({
         title: "Error",
