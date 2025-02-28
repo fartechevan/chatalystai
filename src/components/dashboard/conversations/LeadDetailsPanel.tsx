@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -45,9 +44,60 @@ export function LeadDetailsPanel({ isExpanded, onToggle, selectedConversation }:
     return id.length > 6 ? id.slice(0, 6) : id;
   };
 
+  // Reset state when conversation changes
+  useEffect(() => {
+    if (selectedConversation?.conversation_id) {
+      // Reset states when conversation changes
+      setSelectedStage(null);
+      setSelectedPipeline(null);
+      setCustomer(null);
+      setLead(null);
+      setIsLoading(true);
+    }
+  }, [selectedConversation?.conversation_id]);
+
+  // Set up realtime subscription to the leads table for updates
+  useEffect(() => {
+    if (!lead?.id) return;
+
+    const leadsChannel = supabase
+      .channel(`lead-updates-${lead.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'leads',
+          filter: `id=eq.${lead.id}`
+        },
+        async (payload) => {
+          console.log('Lead updated:', payload);
+          
+          // When a lead is updated, refresh its data
+          if (payload.eventType === 'UPDATE') {
+            const updatedLead = await fetchLeadById(lead.id);
+            if (updatedLead) {
+              setLead(updatedLead);
+              // If pipeline stage changed, find and update it
+              if (updatedLead.pipeline_stage_id && updatedLead.pipeline_stage_id !== lead.pipeline_stage_id) {
+                findAndSelectStage(updatedLead.pipeline_stage_id);
+              }
+            }
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(leadsChannel);
+    };
+  }, [lead?.id]);
+
   // Separated findAndSelectStage to break potential infinite recursion
   const findAndSelectStage = useCallback(async (stageId: string) => {
     if (!stageId) return;
+    
+    console.log("Finding stage:", stageId);
 
     // If we already have all pipelines loaded, search through them
     if (allPipelines.length > 0) {
@@ -56,6 +106,7 @@ export function LeadDetailsPanel({ isExpanded, onToggle, selectedConversation }:
         
         const stage = pipeline.stages.find(s => s.id === stageId);
         if (stage) {
+          console.log("Found stage in existing pipelines:", stage.name);
           setSelectedPipeline(pipeline);
           setSelectedStage(stage);
           return;
@@ -77,6 +128,7 @@ export function LeadDetailsPanel({ isExpanded, onToggle, selectedConversation }:
       }
       
       if (stageData) {
+        console.log("Fetched stage data:", stageData);
         // Now get the pipeline for this stage
         const { data: pipelineData, error: pipelineError } = await supabase
           .from('pipelines')
@@ -90,6 +142,7 @@ export function LeadDetailsPanel({ isExpanded, onToggle, selectedConversation }:
         }
         
         if (pipelineData) {
+          console.log("Fetched pipeline data:", pipelineData);
           // Now get all stages for this pipeline
           const { data: stagesData, error: stagesError } = await supabase
             .from('pipeline_stages')
@@ -103,6 +156,7 @@ export function LeadDetailsPanel({ isExpanded, onToggle, selectedConversation }:
           }
           
           if (stagesData) {
+            console.log("Fetched pipeline stages:", stagesData);
             const pipelineWithStages: Pipeline = {
               id: pipelineData.id,
               name: pipelineData.name,
@@ -113,10 +167,12 @@ export function LeadDetailsPanel({ isExpanded, onToggle, selectedConversation }:
             // Set the selected stage
             const stage = stagesData.find(s => s.id === stageId);
             if (stage) {
+              console.log("Setting selected stage:", stage.name);
               setSelectedStage(stage);
             }
             
             // Update selected pipeline
+            console.log("Setting selected pipeline:", pipelineData.name);
             setSelectedPipeline(pipelineWithStages);
             
             // Update allPipelines if this pipeline is not already there
@@ -241,6 +297,7 @@ export function LeadDetailsPanel({ isExpanded, onToggle, selectedConversation }:
   }, []);
 
   const handleLeadData = useCallback((leadData: Lead) => {
+    console.log("Handling lead data:", leadData);
     setLead(leadData);
     setTags(['lead', 'follow-up']);
     
@@ -258,9 +315,11 @@ export function LeadDetailsPanel({ isExpanded, onToggle, selectedConversation }:
     
     // If lead has a pipeline_stage_id, find and select the stage
     if (leadData.pipeline_stage_id) {
+      console.log("Lead has pipeline_stage_id:", leadData.pipeline_stage_id);
       findAndSelectStage(leadData.pipeline_stage_id);
     } else if (selectedPipeline?.stages && selectedPipeline.stages.length > 0) {
       // Default to first stage if no stage is selected
+      console.log("Setting default stage");
       setSelectedStage(selectedPipeline.stages[0]);
     }
     
@@ -415,12 +474,15 @@ export function LeadDetailsPanel({ isExpanded, onToggle, selectedConversation }:
       setIsLoading(true);
       try {
         if (selectedConversation) {
+          console.log("Fetching data for conversation:", selectedConversation.conversation_id);
           // Try to get the lead directly from the conversation
           if (selectedConversation.lead) {
             // Lead is already included in the conversation
+            console.log("Using lead from conversation:", selectedConversation.lead);
             handleLeadData(selectedConversation.lead);
           } else if (selectedConversation.lead_id) {
             // Fetch lead by its ID
+            console.log("Fetching lead by ID:", selectedConversation.lead_id);
             const leadData = await fetchLeadById(selectedConversation.lead_id);
             if (leadData) {
               handleLeadData(leadData);
@@ -436,14 +498,17 @@ export function LeadDetailsPanel({ isExpanded, onToggle, selectedConversation }:
                 : null;
             
             if (customerId) {
+              console.log("Finding lead for customer:", customerId);
               await handleCustomerId(customerId);
             } else {
               // If no customer or lead, create mock data
+              console.log("Creating mock data (no customer/lead found)");
               createMockLeadAndCustomer();
             }
           }
         } else {
           // No conversation selected, show mock data
+          console.log("No conversation selected, showing mock data");
           createMockLeadAndCustomer();
         }
       } catch (error) {
@@ -486,6 +551,9 @@ export function LeadDetailsPanel({ isExpanded, onToggle, selectedConversation }:
     
     const stage = selectedPipeline.stages?.find(s => s.id === stageId);
     if (stage) {
+      console.log(`Changing stage for lead ${lead.id} to ${stage.name} (${stageId})`);
+      
+      // Update UI immediately
       setSelectedStage(stage);
       setStagesPopoverOpen(false);
       
@@ -506,6 +574,7 @@ export function LeadDetailsPanel({ isExpanded, onToggle, selectedConversation }:
             });
           } else {
             console.log(`Updated lead ${lead.id} to stage ${stage.name}`);
+            
             // Update the lead object in state
             setLead(prev => {
               if (!prev) return null;
@@ -514,6 +583,16 @@ export function LeadDetailsPanel({ isExpanded, onToggle, selectedConversation }:
                 pipeline_stage_id: stageId
               };
             });
+            
+            // Also update lead_pipeline table to keep things consistent
+            const { error: pipelineError } = await supabase
+              .from('lead_pipeline')
+              .update({ stage_id: stageId })
+              .eq('lead_id', lead.id);
+              
+            if (pipelineError) {
+              console.error('Error updating lead_pipeline:', pipelineError);
+            }
             
             toast({
               title: "Success",
