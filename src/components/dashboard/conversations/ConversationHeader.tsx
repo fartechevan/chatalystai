@@ -24,6 +24,13 @@ export function ConversationHeader({
   const [lead, setLead] = useState<Lead | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
+  // Function to format the lead ID without any prefix
+  const getFormattedLeadId = (id?: string | null) => {
+    if (!id) return '163674';
+    // Just return the ID or its first 6 characters if it's long
+    return id.length > 6 ? id.slice(0, 6) : id;
+  };
+
   useEffect(() => {
     async function loadLead() {
       // Reset lead when conversation changes
@@ -78,7 +85,7 @@ export function ConversationHeader({
           <div className="font-medium flex items-center gap-2">
             {lead ? (
               <>
-                {lead.name} 
+                Lead #{getFormattedLeadId(lead.id)}
                 <span className="text-sm text-muted-foreground">
                   (from {participant.name})
                 </span>

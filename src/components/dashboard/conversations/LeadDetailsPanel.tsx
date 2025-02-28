@@ -34,6 +34,13 @@ export function LeadDetailsPanel({ isExpanded, onToggle, selectedConversation }:
   const [newTag, setNewTag] = useState<string>("");
   const [showTagInput, setShowTagInput] = useState<boolean>(false);
 
+  // Function to format the lead ID without any prefix
+  const getFormattedLeadId = (id?: string | null) => {
+    if (!id) return '163674';
+    // Just return the ID or its first 6 characters if it's long
+    return id.length > 6 ? id.slice(0, 6) : id;
+  };
+
   // Fetch profiles
   useEffect(() => {
     async function fetchProfiles() {
@@ -188,7 +195,8 @@ export function LeadDetailsPanel({ isExpanded, onToggle, selectedConversation }:
         if (leadError) {
           console.error('Error fetching lead:', leadError);
         } else if (data) {
-          const fetchedLead: Lead = {
+          // Create our leadData object from the database result
+          const leadData: Lead = {
             id: data.id,
             name: data.name,
             created_at: data.created_at,
@@ -203,7 +211,7 @@ export function LeadDetailsPanel({ isExpanded, onToggle, selectedConversation }:
             contact_phone: data.contact_phone || null,
             contact_first_name: data.contact_first_name || null
           };
-          handleLeadData(fetchedLead);
+          handleLeadData(leadData);
         } else {
           // No lead exists, create a fake one for demo purposes
           createFakeLeadFromCustomer();
@@ -325,13 +333,6 @@ export function LeadDetailsPanel({ isExpanded, onToggle, selectedConversation }:
   }, [isExpanded, selectedConversation, selectedPipeline]);
 
   const selectedProfile = profiles.find(profile => profile.id === selectedAssignee);
-
-  // Function to format the lead ID without any prefix
-  const getFormattedLeadId = (id?: string | null) => {
-    if (!id) return '163674';
-    // Just return the ID or its first 6 characters if it's long
-    return id.length > 6 ? id.slice(0, 6) : id;
-  };
 
   // Update pipeline stage
   const handleStageChange = async (stageId: string) => {
