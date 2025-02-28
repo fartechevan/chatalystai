@@ -53,10 +53,6 @@ export function LeadDetailsPanel({ isExpanded, onToggle, selectedConversation }:
           console.error('Error fetching profiles:', error);
         } else if (data) {
           setProfiles(data);
-          // Set a default assignee if available
-          if (data.length > 0) {
-            setSelectedAssignee(data[0].id);
-          }
         }
       } catch (error) {
         console.error('Error:', error);
@@ -98,11 +94,6 @@ export function LeadDetailsPanel({ isExpanded, onToggle, selectedConversation }:
             
             setPipelines([pipelineWithStages]);
             setSelectedPipeline(pipelineWithStages);
-            
-            // Set first stage as default
-            if (stagesData.length > 0) {
-              setSelectedStage(stagesData[0]);
-            }
           }
         }
       } catch (error) {
@@ -166,17 +157,84 @@ export function LeadDetailsPanel({ isExpanded, onToggle, selectedConversation }:
       setTags(['lead', 'follow-up']);
       calculateDaysSinceCreation(leadData.created_at);
       
-      // If lead has a pipeline_stage_id, select it
+      // Set the responsible user from the lead's user_id
+      if (leadData.user_id) {
+        setSelectedAssignee(leadData.user_id);
+      }
+      
+      // If lead has a pipeline_stage_id, find and select the stage
       if (leadData.pipeline_stage_id && selectedPipeline?.stages) {
         const stage = selectedPipeline.stages.find(s => s.id === leadData.pipeline_stage_id);
         if (stage) {
           setSelectedStage(stage);
+        } else {
+          // If stage not found in current pipeline, it might be in another pipeline
+          // Let's fetch the stage and its pipeline
+          fetchStageAndPipeline(leadData.pipeline_stage_id);
         }
+      } else if (selectedPipeline?.stages && selectedPipeline.stages.length > 0) {
+        // Default to first stage if no stage is selected
+        setSelectedStage(selectedPipeline.stages[0]);
       }
       
       // If lead has customer_id, fetch the customer data
       if (leadData.customer_id) {
         fetchCustomerById(leadData.customer_id);
+      }
+    }
+    
+    // Fetch the pipeline stage and its parent pipeline
+    async function fetchStageAndPipeline(stageId: string) {
+      try {
+        // First get the stage details
+        const { data: stageData, error: stageError } = await supabase
+          .from('pipeline_stages')
+          .select('*, pipeline:pipeline_id(*)')
+          .eq('id', stageId)
+          .maybeSingle();
+        
+        if (stageError) {
+          console.error('Error fetching stage:', stageError);
+          return;
+        }
+        
+        if (stageData) {
+          setSelectedStage(stageData);
+          
+          // Now get all stages for this pipeline to build the complete pipeline object
+          const { data: stagesData, error: stagesError } = await supabase
+            .from('pipeline_stages')
+            .select('*')
+            .eq('pipeline_id', stageData.pipeline_id)
+            .order('position');
+          
+          if (stagesError) {
+            console.error('Error fetching pipeline stages:', stagesError);
+            return;
+          }
+          
+          if (stageData.pipeline && stagesData) {
+            const pipelineWithStages: Pipeline = {
+              ...stageData.pipeline,
+              stages: stagesData
+            };
+            
+            // Update the pipelines state to include this pipeline
+            setPipelines(prev => {
+              // Check if this pipeline is already in the list
+              const exists = prev.some(p => p.id === pipelineWithStages.id);
+              if (!exists) {
+                return [...prev, pipelineWithStages];
+              }
+              return prev;
+            });
+            
+            // Set as selected pipeline
+            setSelectedPipeline(pipelineWithStages);
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching stage and pipeline:', error);
       }
     }
     
@@ -196,21 +254,22 @@ export function LeadDetailsPanel({ isExpanded, onToggle, selectedConversation }:
           console.error('Error fetching lead:', leadError);
         } else if (data) {
           // Create our leadData object from the database result
-          const leadData: Lead = {
+          const leadData = {
             id: data.id,
             name: data.name,
             created_at: data.created_at,
             updated_at: data.updated_at,
             user_id: data.user_id,
-            pipeline_stage_id: data.pipeline_stage_id || null,
-            customer_id: data.customer_id || null,
-            value: data.value || null,
-            company_name: data.company_name || null,
-            company_address: data.company_address || null,
-            contact_email: data.contact_email || null,
-            contact_phone: data.contact_phone || null,
-            contact_first_name: data.contact_first_name || null
-          };
+            pipeline_stage_id: data.pipeline_stage_id,
+            customer_id: data.customer_id,
+            value: data.value,
+            company_name: data.company_name,
+            company_address: data.company_address,
+            contact_email: data.contact_email,
+            contact_phone: data.contact_phone,
+            contact_first_name: data.contact_first_name
+          } as Lead;
+          
           handleLeadData(leadData);
         } else {
           // No lead exists, create a fake one for demo purposes
@@ -317,6 +376,11 @@ export function LeadDetailsPanel({ isExpanded, onToggle, selectedConversation }:
       setLead(mockLead);
       setTags(['lead', 'product']);
       calculateDaysSinceCreation(mockLead.created_at);
+      
+      // Set a default assignee
+      if (profiles.length > 0) {
+        setSelectedAssignee(profiles[0].id);
+      }
     }
     
     function calculateDaysSinceCreation(creationDate: string) {
@@ -330,7 +394,7 @@ export function LeadDetailsPanel({ isExpanded, onToggle, selectedConversation }:
     if (isExpanded) {
       fetchData();
     }
-  }, [isExpanded, selectedConversation, selectedPipeline]);
+  }, [isExpanded, selectedConversation, selectedPipeline, profiles]);
 
   const selectedProfile = profiles.find(profile => profile.id === selectedAssignee);
 
@@ -359,6 +423,37 @@ export function LeadDetailsPanel({ isExpanded, onToggle, selectedConversation }:
           console.error('Error:', error);
         }
       }
+    }
+  };
+  
+  // Handle updating responsible user
+  const handleAssigneeChange = async (userId: string) => {
+    setSelectedAssignee(userId);
+    
+    if (!lead || !lead.id) return;
+    
+    try {
+      const { error } = await supabase
+        .from('leads')
+        .update({ user_id: userId })
+        .eq('id', lead.id);
+      
+      if (error) {
+        console.error('Error updating lead assignee:', error);
+      } else {
+        console.log(`Updated lead ${lead.id} assignee to ${userId}`);
+        
+        // Update the lead object in state
+        setLead(prev => {
+          if (!prev) return null;
+          return {
+            ...prev,
+            user_id: userId
+          };
+        });
+      }
+    } catch (error) {
+      console.error('Error:', error);
     }
   };
   
@@ -538,7 +633,7 @@ export function LeadDetailsPanel({ isExpanded, onToggle, selectedConversation }:
                     ) : (
                       <Select 
                         value={selectedAssignee || undefined} 
-                        onValueChange={setSelectedAssignee}
+                        onValueChange={handleAssigneeChange}
                       >
                         <SelectTrigger className="h-auto py-1 px-2 text-sm border-none shadow-none">
                           <SelectValue placeholder="Select user">
