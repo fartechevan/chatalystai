@@ -4,7 +4,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { MoreHorizontal, Phone, Video, PanelRightClose, PanelLeftClose, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { fetchLeadById } from "./api/conversationsApi";
 
 interface ConversationHeaderProps {
   conversation: Conversation | null;
@@ -25,30 +25,35 @@ export function ConversationHeader({
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
-    async function fetchLead() {
-      if (!conversation?.lead_id) return;
+    async function loadLead() {
+      // Reset lead when conversation changes
+      setLead(null);
       
-      setIsLoading(true);
-      try {
-        const { data, error } = await supabase
-          .from('leads')
-          .select('*')
-          .eq('id', conversation.lead_id)
-          .maybeSingle();
-          
-        if (error) {
-          console.error('Error fetching lead:', error);
-        } else if (data) {
-          setLead(data as Lead);
+      if (!conversation) return;
+      
+      // If conversation has a lead already loaded, use it
+      if (conversation.lead) {
+        setLead(conversation.lead);
+        return;
+      }
+      
+      // If conversation has a lead_id, fetch the lead
+      if (conversation.lead_id) {
+        setIsLoading(true);
+        try {
+          const leadData = await fetchLeadById(conversation.lead_id);
+          if (leadData) {
+            setLead(leadData);
+          }
+        } catch (error) {
+          console.error('Error loading lead:', error);
+        } finally {
+          setIsLoading(false);
         }
-      } catch (error) {
-        console.error('Error:', error);
-      } finally {
-        setIsLoading(false);
       }
     }
 
-    fetchLead();
+    loadLead();
   }, [conversation]);
 
   if (!conversation) {
@@ -79,11 +84,14 @@ export function ConversationHeader({
                 </span>
               </>
             ) : (
-              participant.name
+              isLoading ? 'Loading lead...' : participant.name
             )}
           </div>
           <div className="text-xs text-muted-foreground">
-            {lead ? lead.company_name || 'No company' : 'Customer'}
+            {lead 
+              ? lead.company_name || 'No company' 
+              : participant.email || 'Customer'
+            }
           </div>
         </div>
       </div>

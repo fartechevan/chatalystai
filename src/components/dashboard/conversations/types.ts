@@ -25,6 +25,7 @@ export interface Conversation {
   lead_id: string | null;
   sender: Profile;
   receiver: Profile;
+  lead?: Lead | null;
 }
 
 export interface ConversationSummary {

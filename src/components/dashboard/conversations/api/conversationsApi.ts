@@ -19,12 +19,13 @@ interface ConversationWithParticipants {
   lead_id: string | null;
   sender: ParticipantData | null;
   receiver: ParticipantData | null;
+  lead: Lead | null;
 }
 
 export async function fetchConversationsWithParticipants() {
   console.log('Fetching conversations with participants...');
 
-  // First, get all conversations
+  // First, get all conversations with their associated leads
   const { data: conversations, error: conversationsError } = await supabase
     .from('conversations')
     .select('*, lead:lead_id(*)')
@@ -187,17 +188,39 @@ export async function fetchLeadByConversation(conversationId: string): Promise<L
     return null;
   }
   
-  // Fetch the lead directly using the lead_id
-  const { data: lead, error: leadError } = await supabase
+  return fetchLeadById(conversation.lead_id);
+}
+
+export async function fetchLeadById(leadId: string): Promise<Lead | null> {
+  if (!leadId) return null;
+  
+  const { data, error } = await supabase
     .from('leads')
     .select('*')
-    .eq('id', conversation.lead_id)
+    .eq('id', leadId)
     .maybeSingle();
-    
-  if (leadError) {
-    console.error('Error fetching lead:', leadError);
+  
+  if (error) {
+    console.error('Error fetching lead:', error);
     return null;
   }
   
-  return lead;
+  if (!data) return null;
+  
+  // Explicitly create a Lead object with all the optional properties
+  return {
+    id: data.id,
+    name: data.name,
+    created_at: data.created_at,
+    updated_at: data.updated_at,
+    user_id: data.user_id,
+    pipeline_stage_id: data.pipeline_stage_id || null,
+    customer_id: data.customer_id || null,
+    value: data.value || null,
+    company_name: data.company_name || null,
+    company_address: data.company_address || null,
+    contact_email: data.contact_email || null,
+    contact_phone: data.contact_phone || null,
+    contact_first_name: data.contact_first_name || null
+  };
 }
