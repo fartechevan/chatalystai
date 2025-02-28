@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -45,6 +45,100 @@ export function LeadDetailsPanel({ isExpanded, onToggle, selectedConversation }:
     return id.length > 6 ? id.slice(0, 6) : id;
   };
 
+  // Separated findAndSelectStage to break potential infinite recursion
+  const findAndSelectStage = useCallback(async (stageId: string) => {
+    if (!stageId) return;
+
+    // If we already have all pipelines loaded, search through them
+    if (allPipelines.length > 0) {
+      for (const pipeline of allPipelines) {
+        if (!pipeline.stages) continue;
+        
+        const stage = pipeline.stages.find(s => s.id === stageId);
+        if (stage) {
+          setSelectedPipeline(pipeline);
+          setSelectedStage(stage);
+          return;
+        }
+      }
+    }
+    
+    try {
+      // If not found or pipelines not loaded yet, fetch directly
+      const { data: stageData, error: stageError } = await supabase
+        .from('pipeline_stages')
+        .select('id, name, position, pipeline_id')
+        .eq('id', stageId)
+        .maybeSingle();
+      
+      if (stageError) {
+        console.error('Error fetching stage:', stageError);
+        return;
+      }
+      
+      if (stageData) {
+        // Now get the pipeline for this stage
+        const { data: pipelineData, error: pipelineError } = await supabase
+          .from('pipelines')
+          .select('*')
+          .eq('id', stageData.pipeline_id)
+          .maybeSingle();
+          
+        if (pipelineError) {
+          console.error('Error fetching pipeline:', pipelineError);
+          return;
+        }
+        
+        if (pipelineData) {
+          // Now get all stages for this pipeline
+          const { data: stagesData, error: stagesError } = await supabase
+            .from('pipeline_stages')
+            .select('id, name, position, pipeline_id')
+            .eq('pipeline_id', stageData.pipeline_id)
+            .order('position');
+          
+          if (stagesError) {
+            console.error('Error fetching pipeline stages:', stagesError);
+            return;
+          }
+          
+          if (stagesData) {
+            const pipelineWithStages: Pipeline = {
+              id: pipelineData.id,
+              name: pipelineData.name,
+              is_default: pipelineData.is_default,
+              stages: stagesData
+            };
+            
+            // Set the selected stage
+            const stage = stagesData.find(s => s.id === stageId);
+            if (stage) {
+              setSelectedStage(stage);
+            }
+            
+            // Update selected pipeline
+            setSelectedPipeline(pipelineWithStages);
+            
+            // Update allPipelines if this pipeline is not already there
+            setAllPipelines(prev => {
+              const exists = prev.some(p => p.id === pipelineWithStages.id);
+              if (!exists) {
+                return [...prev, pipelineWithStages];
+              }
+              
+              // If it exists but doesn't have stages, update it
+              return prev.map(p => 
+                p.id === pipelineWithStages.id ? pipelineWithStages : p
+              );
+            });
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching stage and pipeline:', error);
+    }
+  }, [allPipelines]);
+
   // Fetch all pipelines and their stages
   useEffect(() => {
     async function fetchAllPipelines() {
@@ -65,7 +159,7 @@ export function LeadDetailsPanel({ isExpanded, onToggle, selectedConversation }:
             pipelinesData.map(async (pipeline) => {
               const { data: stagesData, error: stagesError } = await supabase
                 .from('pipeline_stages')
-                .select('*')
+                .select('id, name, position, pipeline_id')
                 .eq('pipeline_id', pipeline.id)
                 .order('position');
               
@@ -124,8 +218,199 @@ export function LeadDetailsPanel({ isExpanded, onToggle, selectedConversation }:
     }
   }, [isExpanded]);
 
+  const fetchCustomerById = useCallback(async (customerId: string): Promise<Customer | null> => {
+    if (!customerId) return null;
+    
+    const { data: customerData, error: customerError } = await supabase
+      .from('customers')
+      .select('*')
+      .eq('id', customerId)
+      .maybeSingle();
+    
+    if (customerError) {
+      console.error('Error fetching customer:', customerError);
+      return null;
+    } 
+    
+    if (customerData) {
+      setCustomer(customerData);
+      return customerData;
+    }
+    
+    return null;
+  }, []);
+
+  const handleLeadData = useCallback((leadData: Lead) => {
+    setLead(leadData);
+    setTags(['lead', 'follow-up']);
+    
+    // Calculate days since creation
+    const date = new Date(leadData.created_at);
+    const today = new Date();
+    const diffTime = Math.abs(today.getTime() - date.getTime());
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+    setDaysSinceCreation(diffDays);
+    
+    // Set the responsible user from the lead's user_id
+    if (leadData.user_id) {
+      setSelectedAssignee(leadData.user_id);
+    }
+    
+    // If lead has a pipeline_stage_id, find and select the stage
+    if (leadData.pipeline_stage_id) {
+      findAndSelectStage(leadData.pipeline_stage_id);
+    } else if (selectedPipeline?.stages && selectedPipeline.stages.length > 0) {
+      // Default to first stage if no stage is selected
+      setSelectedStage(selectedPipeline.stages[0]);
+    }
+    
+    // If lead has customer_id, fetch the customer data
+    if (leadData.customer_id) {
+      fetchCustomerById(leadData.customer_id);
+    }
+  }, [findAndSelectStage, fetchCustomerById, selectedPipeline]);
+
   // Fetch lead data based on the selected conversation
   useEffect(() => {
+    async function handleCustomerId(customerId: string) {
+      // Fetch customer data
+      const customerData = await fetchCustomerById(customerId);
+      
+      if (customerData) {
+        // Check if there's a lead associated with this customer
+        const { data, error: leadError } = await supabase
+          .from('leads')
+          .select('*')
+          .eq('customer_id', customerId)
+          .maybeSingle();
+        
+        if (leadError) {
+          console.error('Error fetching lead:', leadError);
+        } else if (data) {
+          const leadData: Lead = {
+            id: data.id,
+            name: data.name,
+            created_at: data.created_at,
+            updated_at: data.updated_at,
+            user_id: data.user_id,
+            pipeline_stage_id: data.pipeline_stage_id,
+            customer_id: data.customer_id,
+            value: data.value,
+            company_name: data.company_name,
+            company_address: data.company_address,
+            contact_email: data.contact_email,
+            contact_phone: data.contact_phone,
+            contact_first_name: data.contact_first_name
+          };
+          handleLeadData(leadData);
+        } else {
+          // No lead exists, create a fake one for demo purposes
+          createFakeLeadFromCustomer(customerData);
+        }
+      } else {
+        createMockLeadAndCustomer();
+      }
+    }
+    
+    function createFakeLeadFromCustomer(customerData: Customer) {
+      if (!selectedConversation) return;
+      
+      const fakeLead: Lead = {
+        id: `${Date.now().toString().slice(-6)}`,
+        name: 'New Product Inquiry',
+        created_at: selectedConversation.created_at,
+        updated_at: selectedConversation.updated_at,
+        customer_id: customerData.id,
+        user_id: selectedConversation.sender_id
+      };
+      
+      setLead(fakeLead);
+      setTags(['new-lead']);
+      
+      // Calculate days since creation
+      const date = new Date(fakeLead.created_at);
+      const today = new Date();
+      const diffTime = Math.abs(today.getTime() - date.getTime());
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      setDaysSinceCreation(diffDays);
+    }
+
+    function createMockLeadFromConversation() {
+      if (!selectedConversation) return;
+      
+      // Create a mock customer first
+      const mockCustomer: Customer = {
+        id: `CUST-${Date.now().toString().slice(-6)}`,
+        name: selectedConversation.sender_type === 'customer' 
+          ? selectedConversation.sender.name || 'Unknown Customer'
+          : selectedConversation.receiver_type === 'customer'
+            ? selectedConversation.receiver.name || 'Unknown Customer'
+            : 'John Smith',
+        phone_number: '+60192698338',
+        email: 'customer@example.com'
+      };
+      
+      setCustomer(mockCustomer);
+      
+      // Then create a mock lead
+      const mockLead: Lead = {
+        id: `${Date.now().toString().slice(-6)}`,
+        name: 'New Product Inquiry',
+        created_at: selectedConversation.created_at,
+        updated_at: selectedConversation.updated_at,
+        customer_id: mockCustomer.id,
+        user_id: selectedConversation.sender_type === 'profile' 
+          ? selectedConversation.sender_id 
+          : selectedConversation.receiver_type === 'profile'
+            ? selectedConversation.receiver_id
+            : 'mock-user-id'
+      };
+      
+      setLead(mockLead);
+      setTags(['mock', 'lead']);
+      
+      // Calculate days since creation
+      const date = new Date(mockLead.created_at);
+      const today = new Date();
+      const diffTime = Math.abs(today.getTime() - date.getTime());
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      setDaysSinceCreation(diffDays);
+    }
+
+    function createMockLeadAndCustomer() {
+      const mockCustomer: Customer = {
+        id: '123',
+        name: 'John Smith',
+        phone_number: '+60192698338',
+        email: 'john@example.com'
+      };
+      
+      const mockLead: Lead = {
+        id: '163674',
+        name: 'New Product Inquiry',
+        created_at: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(), // 7 days ago
+        updated_at: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
+        customer_id: mockCustomer.id,
+        user_id: 'mock-user-id'
+      };
+      
+      setCustomer(mockCustomer);
+      setLead(mockLead);
+      setTags(['lead', 'product']);
+      
+      // Calculate days since creation
+      const date = new Date(mockLead.created_at);
+      const today = new Date();
+      const diffTime = Math.abs(today.getTime() - date.getTime());
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      setDaysSinceCreation(diffDays);
+      
+      // Set a default assignee
+      if (profiles.length > 0) {
+        setSelectedAssignee(profiles[0].id);
+      }
+    }
+
     async function fetchData() {
       setIsLoading(true);
       try {
@@ -169,278 +454,10 @@ export function LeadDetailsPanel({ isExpanded, onToggle, selectedConversation }:
       }
     }
 
-    // Process lead data after it's fetched
-    function handleLeadData(leadData: Lead) {
-      setLead(leadData);
-      setTags(['lead', 'follow-up']);
-      calculateDaysSinceCreation(leadData.created_at);
-      
-      // Set the responsible user from the lead's user_id
-      if (leadData.user_id) {
-        setSelectedAssignee(leadData.user_id);
-      }
-      
-      // If lead has a pipeline_stage_id, find and select the stage
-      if (leadData.pipeline_stage_id) {
-        findAndSelectStage(leadData.pipeline_stage_id);
-      } else if (selectedPipeline?.stages && selectedPipeline.stages.length > 0) {
-        // Default to first stage if no stage is selected
-        setSelectedStage(selectedPipeline.stages[0]);
-      }
-      
-      // If lead has customer_id, fetch the customer data
-      if (leadData.customer_id) {
-        fetchCustomerById(leadData.customer_id);
-      }
-    }
-    
-    // Find the stage across all pipelines and select it and its parent pipeline
-    async function findAndSelectStage(stageId: string) {
-      if (!stageId) return;
-
-      // If we already have all pipelines loaded, search through them
-      if (allPipelines.length > 0) {
-        for (const pipeline of allPipelines) {
-          if (!pipeline.stages) continue;
-          
-          const stage = pipeline.stages.find(s => s.id === stageId);
-          if (stage) {
-            setSelectedPipeline(pipeline);
-            setSelectedStage(stage);
-            return;
-          }
-        }
-      }
-      
-      // If not found or pipelines not loaded yet, fetch directly
-      try {
-        const { data: stageData, error: stageError } = await supabase
-          .from('pipeline_stages')
-          .select('id, name, position, pipeline_id')
-          .eq('id', stageId)
-          .maybeSingle();
-        
-        if (stageError) {
-          console.error('Error fetching stage:', stageError);
-          return;
-        }
-        
-        if (stageData) {
-          // Now get the pipeline for this stage
-          const { data: pipelineData, error: pipelineError } = await supabase
-            .from('pipelines')
-            .select('*')
-            .eq('id', stageData.pipeline_id)
-            .maybeSingle();
-            
-          if (pipelineError) {
-            console.error('Error fetching pipeline:', pipelineError);
-            return;
-          }
-          
-          if (pipelineData) {
-            // Now get all stages for this pipeline
-            const { data: stagesData, error: stagesError } = await supabase
-              .from('pipeline_stages')
-              .select('*')
-              .eq('pipeline_id', stageData.pipeline_id)
-              .order('position');
-            
-            if (stagesError) {
-              console.error('Error fetching pipeline stages:', stagesError);
-              return;
-            }
-            
-            if (stagesData) {
-              const pipelineWithStages: Pipeline = {
-                ...pipelineData,
-                stages: stagesData
-              };
-              
-              // Set the selected stage
-              const stage = stagesData.find(s => s.id === stageId);
-              if (stage) {
-                setSelectedStage(stage);
-              }
-              
-              // Update selected pipeline
-              setSelectedPipeline(pipelineWithStages);
-              
-              // Update allPipelines if this pipeline is not already there
-              setAllPipelines(prev => {
-                const exists = prev.some(p => p.id === pipelineWithStages.id);
-                if (!exists) {
-                  return [...prev, pipelineWithStages];
-                }
-                
-                // If it exists but doesn't have stages, update it
-                return prev.map(p => 
-                  p.id === pipelineWithStages.id ? pipelineWithStages : p
-                );
-              });
-            }
-          }
-        }
-      } catch (error) {
-        console.error('Error fetching stage and pipeline:', error);
-      }
-    }
-    
-    async function handleCustomerId(customerId: string) {
-      // Fetch customer data
-      const customerData = await fetchCustomerById(customerId);
-      
-      if (customerData) {
-        // Check if there's a lead associated with this customer
-        const { data, error: leadError } = await supabase
-          .from('leads')
-          .select('*')
-          .eq('customer_id', customerId)
-          .maybeSingle();
-        
-        if (leadError) {
-          console.error('Error fetching lead:', leadError);
-        } else if (data) {
-          const leadData: Lead = {
-            id: data.id,
-            name: data.name,
-            created_at: data.created_at,
-            updated_at: data.updated_at,
-            user_id: data.user_id,
-            pipeline_stage_id: data.pipeline_stage_id,
-            customer_id: data.customer_id,
-            value: data.value,
-            company_name: data.company_name,
-            company_address: data.company_address,
-            contact_email: data.contact_email,
-            contact_phone: data.contact_phone,
-            contact_first_name: data.contact_first_name
-          };
-          handleLeadData(leadData);
-        } else {
-          // No lead exists, create a fake one for demo purposes
-          createFakeLeadFromCustomer(customerData);
-        }
-      } else {
-        createMockLeadAndCustomer();
-      }
-    }
-    
-    async function fetchCustomerById(customerId: string): Promise<Customer | null> {
-      if (!customerId) return null;
-      
-      const { data: customerData, error: customerError } = await supabase
-        .from('customers')
-        .select('*')
-        .eq('id', customerId)
-        .maybeSingle();
-      
-      if (customerError) {
-        console.error('Error fetching customer:', customerError);
-        return null;
-      } 
-      
-      if (customerData) {
-        setCustomer(customerData);
-        return customerData;
-      }
-      
-      return null;
-    }
-    
-    function createFakeLeadFromCustomer(customerData: Customer) {
-      if (!selectedConversation) return;
-      
-      const fakeLead: Lead = {
-        id: `${Date.now().toString().slice(-6)}`,
-        name: 'New Product Inquiry',
-        created_at: selectedConversation.created_at,
-        updated_at: selectedConversation.updated_at,
-        customer_id: customerData.id,
-        user_id: selectedConversation.sender_id
-      };
-      
-      setLead(fakeLead);
-      setTags(['new-lead']);
-      calculateDaysSinceCreation(fakeLead.created_at);
-    }
-
-    function createMockLeadFromConversation() {
-      if (!selectedConversation) return;
-      
-      // Create a mock customer first
-      const mockCustomer: Customer = {
-        id: `CUST-${Date.now().toString().slice(-6)}`,
-        name: selectedConversation.sender_type === 'customer' 
-          ? selectedConversation.sender.name || 'Unknown Customer'
-          : selectedConversation.receiver_type === 'customer'
-            ? selectedConversation.receiver.name || 'Unknown Customer'
-            : 'John Smith',
-        phone_number: '+60192698338',
-        email: 'customer@example.com'
-      };
-      
-      setCustomer(mockCustomer);
-      
-      // Then create a mock lead
-      const mockLead: Lead = {
-        id: `${Date.now().toString().slice(-6)}`,
-        name: 'New Product Inquiry',
-        created_at: selectedConversation.created_at,
-        updated_at: selectedConversation.updated_at,
-        customer_id: mockCustomer.id,
-        user_id: selectedConversation.sender_type === 'profile' 
-          ? selectedConversation.sender_id 
-          : selectedConversation.receiver_type === 'profile'
-            ? selectedConversation.receiver_id
-            : 'mock-user-id'
-      };
-      
-      setLead(mockLead);
-      setTags(['mock', 'lead']);
-      calculateDaysSinceCreation(mockLead.created_at);
-    }
-
-    function createMockLeadAndCustomer() {
-      const mockCustomer: Customer = {
-        id: '123',
-        name: 'John Smith',
-        phone_number: '+60192698338',
-        email: 'john@example.com'
-      };
-      
-      const mockLead: Lead = {
-        id: '163674',
-        name: 'New Product Inquiry',
-        created_at: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(), // 7 days ago
-        updated_at: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
-        customer_id: mockCustomer.id,
-        user_id: 'mock-user-id'
-      };
-      
-      setCustomer(mockCustomer);
-      setLead(mockLead);
-      setTags(['lead', 'product']);
-      calculateDaysSinceCreation(mockLead.created_at);
-      
-      // Set a default assignee
-      if (profiles.length > 0) {
-        setSelectedAssignee(profiles[0].id);
-      }
-    }
-    
-    function calculateDaysSinceCreation(creationDate: string) {
-      const date = new Date(creationDate);
-      const today = new Date();
-      const diffTime = Math.abs(today.getTime() - date.getTime());
-      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-      setDaysSinceCreation(diffDays);
-    }
-
     if (isExpanded) {
       fetchData();
     }
-  }, [isExpanded, selectedConversation]);
+  }, [isExpanded, selectedConversation, findAndSelectStage, fetchCustomerById, handleLeadData, profiles]);
 
   const selectedProfile = profiles.find(profile => profile.id === selectedAssignee);
 

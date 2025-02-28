@@ -10,7 +10,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
@@ -28,6 +28,28 @@ export function AddLeadDialog({ isOpen, onClose, pipelineStageId, onLeadAdded }:
   const [companyName, setCompanyName] = useState("");
   const [contactName, setContactName] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [pipelineId, setPipelineId] = useState<string | null>(null);
+
+  useEffect(() => {
+    // Get the pipeline_id for the given stage_id
+    async function getPipelineId() {
+      if (!pipelineStageId) return;
+      
+      const { data, error } = await supabase
+        .from('pipeline_stages')
+        .select('pipeline_id')
+        .eq('id', pipelineStageId)
+        .single();
+      
+      if (error) {
+        console.error('Error fetching pipeline_id:', error);
+      } else if (data) {
+        setPipelineId(data.pipeline_id);
+      }
+    }
+    
+    getPipelineId();
+  }, [pipelineStageId]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -36,6 +58,15 @@ export function AddLeadDialog({ isOpen, onClose, pipelineStageId, onLeadAdded }:
       toast({
         title: "Name is required",
         description: "Please enter a name for the lead",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!pipelineId) {
+      toast({
+        title: "Pipeline not found",
+        description: "Could not determine the pipeline for this stage",
         variant: "destructive",
       });
       return;
@@ -86,11 +117,12 @@ export function AddLeadDialog({ isOpen, onClose, pipelineStageId, onLeadAdded }:
       // 3. Insert the lead into the lead_pipeline table
       const { error: pipelineError } = await supabase
         .from('lead_pipeline')
-        .insert([{
+        .insert({
           lead_id: newLead.id,
           stage_id: pipelineStageId,
+          pipeline_id: pipelineId,
           position: position
-        }]);
+        });
 
       if (pipelineError) {
         throw pipelineError;

@@ -207,21 +207,21 @@ export async function fetchLeadById(leadId: string): Promise<Lead | null> {
   
   if (!data) return null;
   
-  // Create a properly typed Lead object
+  // Create a properly typed Lead object with all properties explicitly cast
   const lead: Lead = {
     id: data.id,
     name: data.name,
     created_at: data.created_at,
-    updated_at: data.updated_at,
+    updated_at: data.updated_at || undefined,
     user_id: data.user_id,
-    pipeline_stage_id: data.pipeline_stage_id,
-    customer_id: data.customer_id,
-    value: data.value,
-    company_name: data.company_name,
-    company_address: data.company_address,
-    contact_email: data.contact_email,
-    contact_phone: data.contact_phone,
-    contact_first_name: data.contact_first_name
+    pipeline_stage_id: data.pipeline_stage_id || null,
+    customer_id: data.customer_id || null,
+    value: data.value || null,
+    company_name: data.company_name || null,
+    company_address: data.company_address || null,
+    contact_email: data.contact_email || null,
+    contact_phone: data.contact_phone || null,
+    contact_first_name: data.contact_first_name || null
   };
   
   return lead;
