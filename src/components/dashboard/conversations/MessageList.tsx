@@ -1,5 +1,5 @@
 
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import type { Message, Conversation } from "./types";
 
@@ -22,20 +22,6 @@ export function MessageList({ messages, selectedConversation }: MessageListProps
 
   return (
     <div className="space-y-4">
-      {selectedConversation.lead_id && (
-        <div className="mb-4 pb-2 border-b">
-          <Badge variant="outline" className="text-xs">
-            Lead ID: {selectedConversation.lead_id.substring(0, 8)}
-          </Badge>
-          {selectedConversation.lead && (
-            <div className="mt-1 text-xs text-muted-foreground">
-              Lead: {selectedConversation.lead.name}
-              {selectedConversation.lead.value ? ` - Value: ${selectedConversation.lead.value} RM` : ''}
-            </div>
-          )}
-        </div>
-      )}
-    
       {messages.map((message) => {
         // Determine if this is from the sender or receiver based on participant information
         const isCurrentSender = message.sender_participant_id === (selectedConversation.sender_id || '');
