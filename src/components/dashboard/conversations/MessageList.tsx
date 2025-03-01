@@ -1,6 +1,5 @@
 
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import type { Message, Conversation } from "./types";
 
 interface MessageListProps {
@@ -23,12 +22,9 @@ export function MessageList({ messages, selectedConversation }: MessageListProps
   return (
     <div className="space-y-4">
       {messages.map((message) => {
-        // Determine if this is from the sender or receiver based on participant information
-        const isCurrentSender = message.sender_participant_id === (selectedConversation.sender_id || '');
+        const isCurrentSender = message.sender_id === selectedConversation.sender_id;
         const participant = isCurrentSender ? selectedConversation.sender : selectedConversation.receiver;
-        const participantType = isCurrentSender 
-          ? selectedConversation.sender_type || 'unknown'
-          : selectedConversation.receiver_type || 'unknown';
+        const participantType = isCurrentSender ? selectedConversation.sender_type : selectedConversation.receiver_type;
 
         return (
           <div
