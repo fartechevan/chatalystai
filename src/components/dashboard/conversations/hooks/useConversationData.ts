@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import type { Conversation, Message, Lead } from "../types";
@@ -26,7 +25,6 @@ export function useConversationData(selectedConversation: Conversation | null) {
     }
   }, [selectedConversation?.conversation_id]);
 
-  // Set up global leads subscription for real-time updates
   useEffect(() => {
     console.log('Setting up global leads and pipeline subscriptions');
     
@@ -93,7 +91,6 @@ export function useConversationData(selectedConversation: Conversation | null) {
     };
   }, [queryClient, selectedConversation]);
 
-  // Fetch all conversations
   const { data: conversations = [], isLoading } = useQuery({
     queryKey: ['conversations'],
     queryFn: async () => {
@@ -102,7 +99,6 @@ export function useConversationData(selectedConversation: Conversation | null) {
     },
   });
 
-  // Fetch messages for the selected conversation
   const { data: messages = [], refetch: refetchMessages } = useQuery({
     queryKey: ['messages', selectedConversation?.conversation_id],
     queryFn: async () => {
@@ -126,7 +122,6 @@ export function useConversationData(selectedConversation: Conversation | null) {
     enabled: !!selectedConversation,
   });
 
-  // Send a new message
   const sendMessageMutation = useMutation({
     mutationFn: async (content: string) => {
       const { data: userData } = await supabase.auth.getUser();
@@ -149,7 +144,6 @@ export function useConversationData(selectedConversation: Conversation | null) {
     }
   });
 
-  // Helper function to get participant ID
   const getParticipantId = async (conversationId: string, userId: string): Promise<string | null> => {
     try {
       const { data, error } = await supabase
@@ -167,7 +161,6 @@ export function useConversationData(selectedConversation: Conversation | null) {
     }
   };
 
-  // Use the conversation summary hook
   const summarizeMutation = useConversationSummary(selectedConversation, messages, setSummary, setSummaryTimestamp);
 
   return {

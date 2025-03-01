@@ -22,6 +22,7 @@ export function MessageList({ messages, selectedConversation }: MessageListProps
   return (
     <div className="space-y-4">
       {messages.map((message) => {
+        // Determine if this is from the sender or receiver based on participant information
         const isCurrentSender = message.sender_participant_id === (selectedConversation.sender_id || '');
         const participant = isCurrentSender ? selectedConversation.sender : selectedConversation.receiver;
         const participantType = isCurrentSender 

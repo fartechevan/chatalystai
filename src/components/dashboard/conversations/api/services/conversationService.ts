@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { Conversation, Message } from "../../types";
 
@@ -141,7 +140,15 @@ export async function fetchConversationsWithParticipants() {
 export async function fetchMessages(conversationId: string): Promise<Message[]> {
   const { data: messagesData, error: messagesError } = await supabase
     .from('messages')
-    .select('*')
+    .select(`
+      *,
+      sender_participant:conversation_participants!messages_sender_participant_id_fkey (
+        id,
+        user_id,
+        external_user_identifier,
+        role
+      )
+    `)
     .eq('conversation_id', conversationId)
     .order('created_at', { ascending: true });
 
@@ -150,7 +157,19 @@ export async function fetchMessages(conversationId: string): Promise<Message[]> 
     throw messagesError;
   }
 
-  return messagesData;
+  // Transform the data to include participant info based on role
+  return messagesData.map(msg => ({
+    message_id: msg.message_id,
+    conversation_id: msg.conversation_id,
+    sender_participant_id: msg.sender_participant_id,
+    content: msg.content,
+    is_read: msg.is_read,
+    created_at: msg.created_at,
+    // Add sender_id based on the participant's role
+    sender_id: msg.sender_participant?.role === 'member' 
+      ? msg.sender_participant.user_id 
+      : msg.sender_participant?.external_user_identifier || null
+  }));
 }
 
 export async function fetchConversationSummary(conversationId: string) {
@@ -176,4 +195,21 @@ export async function sendMessage(conversationId: string, senderParticipantId: s
 
   if (error) throw error;
   return data;
+}
+
+export async function getParticipantId(conversationId: string, userId: string): Promise<string | null> {
+  try {
+    const { data, error } = await supabase
+      .from('conversation_participants')
+      .select('id')
+      .eq('conversation_id', conversationId)
+      .eq('user_id', userId)
+      .maybeSingle();
+    
+    if (error) throw error;
+    return data?.id || null;
+  } catch (error) {
+    console.error('Error getting participant ID:', error);
+    return null;
+  }
 }
