@@ -8,7 +8,7 @@ export interface Profile {
 export interface Message {
   message_id: string;
   conversation_id: string;
-  sender_id: string;
+  sender_participant_id: string;
   content: string;
   is_read: boolean;
   created_at: string;
@@ -16,15 +16,11 @@ export interface Message {
 
 export interface Conversation {
   conversation_id: string;
-  sender_id: string;
-  receiver_id: string;
-  sender_type: string;
-  receiver_type: string;
   created_at: string;
   updated_at: string;
   lead_id: string | null;
-  sender: Profile;
-  receiver: Profile;
+  sender?: Profile;
+  receiver?: Profile;
   lead?: Lead | null;
 }
 
@@ -70,4 +66,5 @@ export interface Lead {
   contact_email?: string | null;
   contact_phone?: string | null;
   contact_first_name?: string | null;
+  customer?: Customer | null;
 }

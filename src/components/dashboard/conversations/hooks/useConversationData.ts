@@ -12,18 +12,18 @@ export function useConversationData(selectedConversation: Conversation | null) {
   const [newMessage, setNewMessage] = useState("");
   const [summary, setSummary] = useState<string | null>(null);
   const [summaryTimestamp, setSummaryTimestamp] = useState<string | null>(null);
-  const [leadData, setLeadData] = useState<Lead | null>(null);
   const queryClient = useQueryClient();
 
   useEffect(() => {
     if (selectedConversation?.conversation_id) {
       console.log('Conversation changed, resetting state:', selectedConversation.conversation_id);
-      // We don't reset leadData here - it will be updated by the query
     }
   }, [selectedConversation?.conversation_id]);
 
+  // Set up global leads subscription for real-time updates
   useEffect(() => {
-    console.log('Setting up global leads realtime subscription');
+    console.log('Setting up global leads and pipeline subscriptions');
+    
     const leadsChannel = supabase
       .channel('leads-global-changes')
       .on(
@@ -35,15 +35,15 @@ export function useConversationData(selectedConversation: Conversation | null) {
         },
         (payload) => {
           console.log('Lead table change detected:', payload);
-          // When any lead changes, check if it's the one we're viewing
-          if (leadData && payload.new && typeof payload.new === 'object' && 'id' in payload.new && payload.new.id === leadData.id) {
+          if (selectedConversation?.lead_id && 
+              payload.new && typeof payload.new === 'object' && 
+              'id' in payload.new && payload.new.id === selectedConversation.lead_id) {
+            
             console.log('Current lead was updated, refetching data');
-            // Force refetch the lead data
             queryClient.invalidateQueries({ 
-              queryKey: ['lead', selectedConversation?.conversation_id] 
+              queryKey: ['lead', selectedConversation.conversation_id] 
             });
             
-            // Also update the conversations list which may include lead info
             queryClient.invalidateQueries({ 
               queryKey: ['conversations'] 
             });
@@ -52,7 +52,6 @@ export function useConversationData(selectedConversation: Conversation | null) {
       )
       .subscribe();
 
-    // Also subscribe to lead_pipeline changes
     const leadPipelineChannel = supabase
       .channel('lead-pipeline-global-changes')
       .on(
@@ -64,10 +63,13 @@ export function useConversationData(selectedConversation: Conversation | null) {
         },
         (payload) => {
           console.log('Lead pipeline change detected:', payload);
-          if (leadData && payload.new && typeof payload.new === 'object' && 'lead_id' in payload.new && payload.new.lead_id === leadData.id) {
+          if (selectedConversation?.lead_id && 
+              payload.new && typeof payload.new === 'object' && 
+              'lead_id' in payload.new && payload.new.lead_id === selectedConversation.lead_id) {
+            
             console.log('Current lead pipeline was updated, refetching data');
             queryClient.invalidateQueries({ 
-              queryKey: ['lead', selectedConversation?.conversation_id] 
+              queryKey: ['lead', selectedConversation.conversation_id] 
             });
             
             queryClient.invalidateQueries({ 
@@ -79,12 +81,13 @@ export function useConversationData(selectedConversation: Conversation | null) {
       .subscribe();
 
     return () => {
-      console.log('Cleaning up global leads subscription');
+      console.log('Cleaning up global subscriptions');
       supabase.removeChannel(leadsChannel);
       supabase.removeChannel(leadPipelineChannel);
     };
-  }, [queryClient, leadData, selectedConversation?.conversation_id]);
+  }, [queryClient, selectedConversation]);
 
+  // Fetch all conversations
   const { data: conversations = [], isLoading } = useQuery({
     queryKey: ['conversations'],
     queryFn: async () => {
@@ -93,6 +96,7 @@ export function useConversationData(selectedConversation: Conversation | null) {
     },
   });
 
+  // Fetch messages for the selected conversation
   const { data: messages = [], refetch: refetchMessages } = useQuery({
     queryKey: ['messages', selectedConversation?.conversation_id],
     queryFn: async () => {
@@ -116,41 +120,16 @@ export function useConversationData(selectedConversation: Conversation | null) {
     enabled: !!selectedConversation,
   });
 
-  const { data: fetchedLeadData } = useQuery({
-    queryKey: ['lead', selectedConversation?.conversation_id],
-    queryFn: async () => {
-      if (!selectedConversation) return null;
-      
-      console.log('Fetching lead data for conversation:', selectedConversation.conversation_id);
-      const lead = await fetchLeadByConversation(selectedConversation.conversation_id);
-      
-      console.log('Lead data retrieved:', lead);
-      
-      // Update our local state
-      setLeadData(lead);
-      
-      return lead;
-    },
-    enabled: !!selectedConversation,
-    staleTime: 0,
-    gcTime: 0, // gcTime is the new name for cacheTime in React Query v5
-    refetchOnWindowFocus: true,
-    refetchOnMount: true,
-    refetchOnReconnect: true,
-  });
-
-  useEffect(() => {
-    if (fetchedLeadData) {
-      console.log('Lead data updated from query:', fetchedLeadData);
-      setLeadData(fetchedLeadData);
-    }
-  }, [fetchedLeadData]);
-
+  // Send a new message
   const sendMessageMutation = useMutation({
     mutationFn: async (content: string) => {
       const { data: userData } = await supabase.auth.getUser();
       if (!userData.user || !selectedConversation) throw new Error('Not authenticated or no conversation selected');
-      return sendMessage(selectedConversation.conversation_id, userData.user.id, content);
+      
+      const participantId = await getParticipantId(selectedConversation.conversation_id, userData.user.id);
+      if (!participantId) throw new Error('Participant not found');
+      
+      return sendMessage(selectedConversation.conversation_id, participantId, content);
     },
     onSuccess: async () => {
       setNewMessage("");
@@ -164,6 +143,25 @@ export function useConversationData(selectedConversation: Conversation | null) {
     }
   });
 
+  // Helper function to get participant ID
+  const getParticipantId = async (conversationId: string, userId: string): Promise<string | null> => {
+    try {
+      const { data, error } = await supabase
+        .from('conversation_participants')
+        .select('id')
+        .eq('conversation_id', conversationId)
+        .eq('user_id', userId)
+        .single();
+      
+      if (error) throw error;
+      return data.id;
+    } catch (error) {
+      console.error('Error getting participant ID:', error);
+      return null;
+    }
+  };
+
+  // Use the conversation summary hook
   const summarizeMutation = useConversationSummary(selectedConversation, messages, setSummary, setSummaryTimestamp);
 
   return {
@@ -174,7 +172,6 @@ export function useConversationData(selectedConversation: Conversation | null) {
     setNewMessage,
     summary,
     summaryTimestamp,
-    leadData,
     sendMessageMutation,
     summarizeMutation
   };

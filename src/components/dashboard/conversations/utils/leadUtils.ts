@@ -9,13 +9,6 @@ export async function createMockLeadFromConversation(conversation: Conversation)
     const { data: userData } = await supabase.auth.getUser();
     if (!userData.user) throw new Error('Not authenticated');
 
-    const customerData = conversation.receiver?.email && conversation.receiver.name 
-      ? {
-          email: conversation.receiver.email,
-          name: conversation.receiver.name,
-        }
-      : null;
-
     // Create a new lead based on conversation data
     const { data: newLead, error } = await supabase
       .from('leads')
@@ -77,7 +70,7 @@ export async function createMockLeadAndCustomer(
       .insert([{
         name: customerName,
         email: customerEmail,
-        phone_number: customerPhone || conversation.receiver?.id || 'Unknown',
+        phone_number: customerPhone || 'Unknown',
       }])
       .select()
       .single();
