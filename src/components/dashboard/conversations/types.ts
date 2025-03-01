@@ -12,19 +12,26 @@ export interface Message {
   content: string;
   is_read: boolean;
   created_at: string;
+  participant_info?: string;
+  sender_participant_id?: string;
+}
+
+export interface ConversationParticipant {
+  id: string;
+  conversation_id: string;
+  user_id?: string | null;
+  external_user_identifier?: string | null;
+  role?: string;
+  joined_at?: string;
 }
 
 export interface Conversation {
   conversation_id: string;
-  sender_id: string;
-  receiver_id: string;
-  sender_type: string;
-  receiver_type: string;
   created_at: string;
   updated_at: string;
   lead_id: string | null;
-  sender: Profile;
-  receiver: Profile;
+  participants?: ConversationParticipant[];
+  customer_name?: string;
   lead?: Lead | null;
 }
 

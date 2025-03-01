@@ -61,8 +61,8 @@ export function useConversationData(selectedConversation: Conversation | null) {
   const { data: conversations = [], isLoading } = useQuery({
     queryKey: ['conversations'],
     queryFn: async () => {
-      const { conversations, profiles, customers } = await fetchConversationsWithParticipants();
-      return transformConversationsData(conversations, profiles, customers);
+      const data = await fetchConversationsWithParticipants();
+      return transformConversationsData(data);
     },
   });
 
@@ -123,7 +123,29 @@ export function useConversationData(selectedConversation: Conversation | null) {
     mutationFn: async (content: string) => {
       const { data: userData } = await supabase.auth.getUser();
       if (!userData.user || !selectedConversation) throw new Error('Not authenticated or no conversation selected');
-      return sendMessage(selectedConversation.conversation_id, userData.user.id, content);
+
+      // Get the participant ID for the current user in this conversation
+      let participantId;
+      try {
+        const { data, error } = await supabase
+          .from('conversation_participants')
+          .select('id')
+          .eq('conversation_id', selectedConversation.conversation_id)
+          .eq('user_id', userData.user.id)
+          .single();
+        
+        if (error || !data) {
+          throw new Error('Could not find participant ID for current user');
+        }
+        
+        participantId = data.id;
+      } catch (err) {
+        console.error('Error getting participant ID:', err);
+        throw new Error('Could not find participant ID for current user');
+      }
+
+      // Send the message with the participant ID
+      return sendMessage(selectedConversation.conversation_id, participantId);
     },
     onSuccess: async () => {
       setNewMessage("");

@@ -17,7 +17,6 @@ interface ConversationLeftPanelProps {
   setSelectedConversation: (conversation: Conversation) => void;
 }
 
-
 export function ConversationLeftPanel({
   leftPanelOpen,
   setLeftPanelOpen,
@@ -27,20 +26,11 @@ export function ConversationLeftPanel({
   selectedConversation,
   setSelectedConversation,
 }: ConversationLeftPanelProps) {
-  const getCustomerFromConversation = (conversation: Conversation) => {
-    return conversation.sender_type === 'customer' ? conversation.sender : conversation.receiver;
-  };
-
-  const getDisplayName = (conversation: Conversation) => {
-    const customer = getCustomerFromConversation(conversation);
-    return customer.name || customer.email || `Customer ${customer.id.slice(0, 8)}`;
-  };
-
   const getAvatarInitial = (conversation: Conversation) => {
-    const customer = getCustomerFromConversation(conversation);
-    if (customer.name) return customer.name[0].toUpperCase();
-    if (customer.email) return customer.email[0].toUpperCase();
-    return 'C';
+    if (conversation.customer_name && conversation.customer_name.length > 0) {
+      return conversation.customer_name[0].toUpperCase();
+    }
+    return 'U';
   };
 
   return (
@@ -73,7 +63,7 @@ export function ConversationLeftPanel({
           </div>
           <Button variant="secondary" className="w-full justify-start" size="sm">
             Open conversations
-            <Badge variant="secondary" className="ml-2">1</Badge>
+            <Badge variant="secondary" className="ml-2">{filteredConversations.length || 0}</Badge>
           </Button>
         </div>
 
@@ -95,14 +85,14 @@ export function ConversationLeftPanel({
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between gap-2">
                     <p className="text-sm font-medium truncate">
-                      Lead #{conv.lead_id.slice(0, 6)}
+                      {conv.lead_id ? `Lead #${conv.lead_id.slice(0, 6)}` : 'Unknown Lead'}
                     </p>
                     <span className="text-xs text-muted-foreground whitespace-nowrap">
                       {new Date(conv.updated_at).toLocaleDateString()}
                     </span>
                   </div>
                   <p className="text-xs text-muted-foreground truncate mt-1">
-                    {getDisplayName(conv)}
+                    {conv.customer_name || 'Unknown undefined'}
                   </p>
                 </div>
               </button>
