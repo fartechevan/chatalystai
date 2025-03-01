@@ -2,6 +2,7 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import type { Conversation, Lead } from "../types";
+import { fetchLeadById } from "../api/services/leadService";
 
 export function useLeadData(selectedConversation: Conversation | null) {
   const [leadData, setLeadData] = useState<Lead | null>(null);
@@ -36,20 +37,25 @@ export function useLeadData(selectedConversation: Conversation | null) {
         return;
       }
 
-      // 2. Fetch the lead data with all necessary details
-      const { data: lead, error: leadError } = await supabase
-        .from('leads')
-        .select(`
-          *,
-          customer:customers(*)
-        `)
-        .eq('id', conversationData.lead_id)
-        .single();
-
-      if (leadError) {
-        console.error('Error fetching lead details:', leadError);
+      // 2. Fetch the lead data with all necessary details using our new service
+      const lead = await fetchLeadById(conversationData.lead_id);
+      
+      if (!lead) {
         setLeadData(null);
         return;
+      }
+
+      // Also fetch customer data if there's a customer_id
+      if (lead.customer_id) {
+        const { data: customer, error: customerError } = await supabase
+          .from('customers')
+          .select('*')
+          .eq('id', lead.customer_id)
+          .single();
+          
+        if (!customerError && customer) {
+          lead.customer = customer;
+        }
       }
 
       setLeadData(lead);

@@ -1,6 +1,7 @@
 
 import { supabase } from "@/integrations/supabase/client";
 import type { Conversation, Lead } from "../types";
+import { fetchLeadById } from "../api/services/leadService";
 
 export async function createMockLeadFromConversation(conversation: Conversation): Promise<Lead | null> {
   if (!conversation) return null;
