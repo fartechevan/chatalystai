@@ -15,6 +15,8 @@ import { ConversationView } from "./components/dashboard/conversations/Conversat
 import { ListsView } from "./components/lists/ListsView";
 import { TaskBoard } from "./components/lists/TaskBoard";
 import Leads from "./pages/Leads";
+import ComingSoon from "@/pages/ComingSoon"; // Import the new ComingSoon page
+
 
 const App = () => {
   const queryClient = new QueryClient({
@@ -52,6 +54,10 @@ const App = () => {
                     <Route path="leads" element={<Leads />} />
                     <Route path="calendar" element={<TaskBoard />} />
                     <Route path="conversations" element={<ConversationView />} />
+                    <Route path="stats" element={<ComingSoon />} /> {/* Route for the "Stats" path */}
+                    <Route path="help" element={<ComingSoon />} /> {/* Route for the "Stats" path */}
+                    <Route path="mail" element={<ComingSoon />} /> {/* Route for the "Stats" path */}
+
                   </Route>
                 </Routes>
               </BrowserRouter>
