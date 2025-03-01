@@ -52,9 +52,36 @@ export function useConversationData(selectedConversation: Conversation | null) {
       )
       .subscribe();
 
+    // Also subscribe to lead_pipeline changes
+    const leadPipelineChannel = supabase
+      .channel('lead-pipeline-global-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'lead_pipeline'
+        },
+        (payload) => {
+          console.log('Lead pipeline change detected:', payload);
+          if (leadData && payload.new && typeof payload.new === 'object' && 'lead_id' in payload.new && payload.new.lead_id === leadData.id) {
+            console.log('Current lead pipeline was updated, refetching data');
+            queryClient.invalidateQueries({ 
+              queryKey: ['lead', selectedConversation?.conversation_id] 
+            });
+            
+            queryClient.invalidateQueries({ 
+              queryKey: ['conversations'] 
+            });
+          }
+        }
+      )
+      .subscribe();
+
     return () => {
       console.log('Cleaning up global leads subscription');
       supabase.removeChannel(leadsChannel);
+      supabase.removeChannel(leadPipelineChannel);
     };
   }, [queryClient, leadData, selectedConversation?.conversation_id]);
 

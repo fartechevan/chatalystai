@@ -9,6 +9,61 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      conversation_participants: {
+        Row: {
+          conversation_id: string
+          external_user_identifier: string | null
+          id: string
+          integration_id: string | null
+          joined_at: string | null
+          left_at: string | null
+          role: Database["public"]["Enums"]["role_enum"] | null
+          user_id: string | null
+        }
+        Insert: {
+          conversation_id: string
+          external_user_identifier?: string | null
+          id?: string
+          integration_id?: string | null
+          joined_at?: string | null
+          left_at?: string | null
+          role?: Database["public"]["Enums"]["role_enum"] | null
+          user_id?: string | null
+        }
+        Update: {
+          conversation_id?: string
+          external_user_identifier?: string | null
+          id?: string
+          integration_id?: string | null
+          joined_at?: string | null
+          left_at?: string | null
+          role?: Database["public"]["Enums"]["role_enum"] | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "conversation_participants_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["conversation_id"]
+          },
+          {
+            foreignKeyName: "conversation_participants_integration_id_fkey"
+            columns: ["integration_id"]
+            isOneToOne: false
+            referencedRelation: "integrations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "conversation_participants_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       conversation_summaries: {
         Row: {
           conversation_id: string
@@ -43,30 +98,18 @@ export type Database = {
           conversation_id: string
           created_at: string
           lead_id: string | null
-          receiver_id: string
-          receiver_type: string
-          sender_id: string
-          sender_type: string
           updated_at: string
         }
         Insert: {
           conversation_id?: string
           created_at?: string
           lead_id?: string | null
-          receiver_id: string
-          receiver_type: string
-          sender_id: string
-          sender_type: string
           updated_at?: string
         }
         Update: {
           conversation_id?: string
           created_at?: string
           lead_id?: string | null
-          receiver_id?: string
-          receiver_type?: string
-          sender_id?: string
-          sender_type?: string
           updated_at?: string
         }
         Relationships: [
@@ -151,6 +194,7 @@ export type Database = {
           instance_id: string | null
           integration_id: string
           updated_at: string
+          user_reference_id: string | null
         }
         Insert: {
           api_key?: string | null
@@ -160,6 +204,7 @@ export type Database = {
           instance_id?: string | null
           integration_id: string
           updated_at?: string
+          user_reference_id?: string | null
         }
         Update: {
           api_key?: string | null
@@ -169,6 +214,7 @@ export type Database = {
           instance_id?: string | null
           integration_id?: string
           updated_at?: string
+          user_reference_id?: string | null
         }
         Relationships: [
           {
@@ -302,7 +348,7 @@ export type Database = {
           created_at: string
           is_read: boolean
           message_id: string
-          sender_id: string
+          sender_participant_id: string
         }
         Insert: {
           content: string
@@ -310,7 +356,7 @@ export type Database = {
           created_at?: string
           is_read?: boolean
           message_id?: string
-          sender_id: string
+          sender_participant_id: string
         }
         Update: {
           content?: string
@@ -318,7 +364,7 @@ export type Database = {
           created_at?: string
           is_read?: boolean
           message_id?: string
-          sender_id?: string
+          sender_participant_id?: string
         }
         Relationships: [
           {
@@ -327,6 +373,13 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "conversations"
             referencedColumns: ["conversation_id"]
+          },
+          {
+            foreignKeyName: "messages_sender_participant_id_fkey"
+            columns: ["sender_participant_id"]
+            isOneToOne: false
+            referencedRelation: "conversation_participants"
+            referencedColumns: ["id"]
           },
         ]
       }
@@ -583,6 +636,7 @@ export type Database = {
       app_role: "admin" | "user" | "customer"
       integration_status: "available" | "coming_soon"
       new_app_role: "user" | "admin"
+      role_enum: "admin" | "member"
       sentiment_level: "bad" | "moderate" | "good"
       sentiment_type: "bad" | "moderate" | "good"
       sync_status: "pending" | "completed" | "failed"
