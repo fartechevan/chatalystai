@@ -9,6 +9,7 @@ export interface Message {
   message_id: string;
   conversation_id: string;
   sender_participant_id: string;
+  sender_id?: string; // Added for compatibility
   content: string;
   is_read: boolean;
   created_at: string;
@@ -22,6 +23,11 @@ export interface Conversation {
   sender?: Profile;
   receiver?: Profile;
   lead?: Lead | null;
+  // Added properties to handle incoming data format
+  sender_id?: string;
+  receiver_id?: string;
+  sender_type?: string;
+  receiver_type?: string;
 }
 
 export interface ConversationSummary {

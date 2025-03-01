@@ -22,9 +22,11 @@ export function MessageList({ messages, selectedConversation }: MessageListProps
   return (
     <div className="space-y-4">
       {messages.map((message) => {
-        const isCurrentSender = message.sender_id === selectedConversation.sender_id;
+        const isCurrentSender = message.sender_participant_id === (selectedConversation.sender_id || '');
         const participant = isCurrentSender ? selectedConversation.sender : selectedConversation.receiver;
-        const participantType = isCurrentSender ? selectedConversation.sender_type : selectedConversation.receiver_type;
+        const participantType = isCurrentSender 
+          ? selectedConversation.sender_type || 'unknown'
+          : selectedConversation.receiver_type || 'unknown';
 
         return (
           <div

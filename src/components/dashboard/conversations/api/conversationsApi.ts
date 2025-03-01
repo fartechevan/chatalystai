@@ -1,6 +1,6 @@
 
 import { supabase } from "@/integrations/supabase/client";
-import { Lead } from "../types";
+import { Conversation, Lead, Message } from "../types";
 
 interface ParticipantData {
   id: string;
@@ -26,7 +26,7 @@ export async function fetchConversationsWithParticipants() {
   console.log('Fetching conversations with participants...');
 
   // First, get all conversations with their associated leads
-  const { data: conversations, error: conversationsError } = await supabase
+  const { data: conversationsData, error: conversationsError } = await supabase
     .from('conversations')
     .select('*, lead:lead_id(*)')
     .order('updated_at', { ascending: false });
@@ -35,6 +35,9 @@ export async function fetchConversationsWithParticipants() {
     console.error('Error fetching conversations:', conversationsError);
     throw conversationsError;
   }
+
+  // Add type assertion to handle the database structure
+  const conversations = conversationsData as unknown as (ConversationWithParticipants[]);
 
   // Fetch all unique profile IDs and customer IDs
   const profileIds = new Set<string>();
@@ -125,7 +128,7 @@ export async function fetchConversationsWithParticipants() {
       sender,
       receiver,
       lead: conv.lead
-    };
+    } as Conversation;
   });
 
   return {
@@ -135,7 +138,7 @@ export async function fetchConversationsWithParticipants() {
   };
 }
 
-export async function fetchMessages(conversationId: string) {
+export async function fetchMessages(conversationId: string): Promise<Message[]> {
   const { data: messagesData, error: messagesError } = await supabase
     .from('messages')
     .select('*')
@@ -160,14 +163,14 @@ export async function fetchConversationSummary(conversationId: string) {
   return summaryData;
 }
 
-export async function sendMessage(conversationId: string, senderId: string, content: string) {
+export async function sendMessage(conversationId: string, senderParticipantId: string, content: string) {
   const { data, error } = await supabase
     .from('messages')
-    .insert([{
+    .insert({
       conversation_id: conversationId,
-      sender_id: senderId,
+      sender_participant_id: senderParticipantId,
       content
-    }])
+    })
     .select()
     .single();
 
