@@ -2,14 +2,18 @@
 import type { Conversation } from "../types";
 import { supabase } from "@/integrations/supabase/client";
 
-export async function transformConversationsData(conversationsData: any[]) {
+export async function transformConversationsData(data: any) {
   const transformedConversations: Conversation[] = [];
   
-  for (const conversation of conversationsData) {
+  if (!data || !data.conversations) {
+    return transformedConversations;
+  }
+  
+  for (const conversation of data.conversations) {
     // Fetch participants for this conversation
     const { data: participants, error: participantsError } = await supabase
       .from('conversation_participants')
-      .select('*, profiles(name, email)')
+      .select('*, profiles:user_id(*)')
       .eq('conversation_id', conversation.conversation_id);
     
     if (participantsError) {
@@ -18,7 +22,7 @@ export async function transformConversationsData(conversationsData: any[]) {
     }
     
     // Find customer participant (non-admin)
-    let customerName = 'Unknown undefined';
+    let customerName = 'Unknown Customer';
     const customerParticipant = participants?.find(p => p.role !== 'admin') || null;
     
     // If we found a customer, try to get their name

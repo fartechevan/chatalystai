@@ -85,14 +85,14 @@ export function ConversationLeftPanel({
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between gap-2">
                     <p className="text-sm font-medium truncate">
-                      {conv.lead_id ? `Lead #${conv.lead_id.slice(0, 6)}` : 'Unknown Lead'}
+                      {conv.lead?.name || conv.lead_id ? `Lead #${conv.lead_id?.slice(0, 6) || '?'}` : 'Unknown Lead'}
                     </p>
                     <span className="text-xs text-muted-foreground whitespace-nowrap">
                       {new Date(conv.updated_at).toLocaleDateString()}
                     </span>
                   </div>
                   <p className="text-xs text-muted-foreground truncate mt-1">
-                    {conv.customer_name || 'Unknown undefined'}
+                    {conv.customer_name || 'Unknown Customer'}
                   </p>
                 </div>
               </button>

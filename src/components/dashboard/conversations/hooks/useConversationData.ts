@@ -58,12 +58,17 @@ export function useConversationData(selectedConversation: Conversation | null) {
     };
   }, [queryClient, leadData, selectedConversation?.conversation_id]);
 
-  const { data: conversations = [], isLoading } = useQuery({
+  const { data: conversationsData = [], isLoading } = useQuery({
     queryKey: ['conversations'],
+    queryFn: fetchConversationsWithParticipants,
+  });
+
+  const { data: conversations = [], isLoadingConversations } = useQuery({
+    queryKey: ['transformedConversations'],
     queryFn: async () => {
-      const data = await fetchConversationsWithParticipants();
-      return transformConversationsData(data);
+      return transformConversationsData(conversationsData);
     },
+    enabled: !!conversationsData,
   });
 
   const { data: messages = [], refetch: refetchMessages } = useQuery({
@@ -145,7 +150,7 @@ export function useConversationData(selectedConversation: Conversation | null) {
       }
 
       // Send the message with the participant ID
-      return sendMessage(selectedConversation.conversation_id, participantId);
+      return sendMessage(selectedConversation.conversation_id, participantId, content);
     },
     onSuccess: async () => {
       setNewMessage("");
@@ -164,7 +169,7 @@ export function useConversationData(selectedConversation: Conversation | null) {
   return {
     conversations,
     messages,
-    isLoading,
+    isLoading: isLoading || isLoadingConversations,
     newMessage,
     setNewMessage,
     summary,

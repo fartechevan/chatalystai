@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
@@ -309,7 +308,6 @@ export function LeadDetailsPanel({ isExpanded, onToggle, selectedConversation }:
     }
   }, [findAndSelectStage, fetchCustomerById, selectedPipeline]);
 
-  // Helper functions for creating mock data
   const createFakeLeadFromCustomer = useCallback((customerData: Customer) => {
     if (!selectedConversation) return;
     
@@ -319,61 +317,49 @@ export function LeadDetailsPanel({ isExpanded, onToggle, selectedConversation }:
       created_at: selectedConversation.created_at,
       updated_at: selectedConversation.updated_at,
       customer_id: customerData.id,
-      user_id: selectedConversation.sender_id
+      user_id: profiles[0]?.id || 'no-user'
     };
     
     setLead(fakeLead);
     setTags(['new-lead']);
     
-    // Calculate days since creation
     const date = new Date(fakeLead.created_at);
     const today = new Date();
     const diffTime = Math.abs(today.getTime() - date.getTime());
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
     setDaysSinceCreation(diffDays);
-  }, [selectedConversation]);
+  }, [selectedConversation, profiles]);
 
   const createMockLeadFromConversation = useCallback(() => {
     if (!selectedConversation) return;
     
-    // Create a mock customer first
     const mockCustomer: Customer = {
       id: `CUST-${Date.now().toString().slice(-6)}`,
-      name: selectedConversation.sender_type === 'customer' 
-        ? selectedConversation.sender.name || 'Unknown Customer'
-        : selectedConversation.receiver_type === 'customer'
-          ? selectedConversation.receiver.name || 'Unknown Customer'
-          : 'John Smith',
+      name: selectedConversation.customer_name || 'Unknown Customer',
       phone_number: '+60192698338',
       email: 'customer@example.com'
     };
     
     setCustomer(mockCustomer);
     
-    // Then create a mock lead
     const mockLead: Lead = {
       id: `${Date.now().toString().slice(-6)}`,
       name: 'New Product Inquiry',
       created_at: selectedConversation.created_at,
       updated_at: selectedConversation.updated_at,
       customer_id: mockCustomer.id,
-      user_id: selectedConversation.sender_type === 'profile' 
-        ? selectedConversation.sender_id 
-        : selectedConversation.receiver_type === 'profile'
-          ? selectedConversation.receiver_id
-          : 'mock-user-id'
+      user_id: profiles[0]?.id || 'mock-user-id'
     };
     
     setLead(mockLead);
     setTags(['mock', 'lead']);
     
-    // Calculate days since creation
     const date = new Date(mockLead.created_at);
     const today = new Date();
     const diffTime = Math.abs(today.getTime() - date.getTime());
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
     setDaysSinceCreation(diffDays);
-  }, [selectedConversation]);
+  }, [selectedConversation, profiles]);
 
   const createMockLeadAndCustomer = useCallback(() => {
     const mockCustomer: Customer = {
@@ -389,33 +375,28 @@ export function LeadDetailsPanel({ isExpanded, onToggle, selectedConversation }:
       created_at: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(), // 7 days ago
       updated_at: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
       customer_id: mockCustomer.id,
-      user_id: 'mock-user-id'
+      user_id: profiles[0]?.id || 'mock-user-id'
     };
     
     setCustomer(mockCustomer);
     setLead(mockLead);
     setTags(['lead', 'product']);
     
-    // Calculate days since creation
     const date = new Date(mockLead.created_at);
     const today = new Date();
     const diffTime = Math.abs(today.getTime() - date.getTime());
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
     setDaysSinceCreation(diffDays);
     
-    // Set a default assignee
     if (profiles.length > 0) {
       setSelectedAssignee(profiles[0].id);
     }
   }, [profiles]);
 
-  // Function to handle customer ID lookup and lead association
   const handleCustomerId = useCallback(async (customerId: string) => {
-    // Fetch customer data
     const customerData = await fetchCustomerById(customerId);
     
     if (customerData) {
-      // Check if there's a lead associated with this customer
       const { data, error: leadError } = await supabase
         .from('leads')
         .select('*')
@@ -442,7 +423,6 @@ export function LeadDetailsPanel({ isExpanded, onToggle, selectedConversation }:
         };
         handleLeadData(leadData);
       } else {
-        // No lead exists, create a fake one for demo purposes
         createFakeLeadFromCustomer(customerData);
       }
     } else {
@@ -466,15 +446,17 @@ export function LeadDetailsPanel({ isExpanded, onToggle, selectedConversation }:
               createMockLeadFromConversation();
             }
           } else {
-            const customerId = selectedConversation.sender_type === 'customer' 
-              ? selectedConversation.sender_id 
-              : selectedConversation.receiver_type === 'customer' 
-                ? selectedConversation.receiver_id 
-                : null;
-            
-            if (customerId) {
-              console.log("Finding lead for customer:", customerId);
-              await handleCustomerId(customerId);
+            if (selectedConversation.participants && selectedConversation.participants.length > 0) {
+              const customerParticipant = selectedConversation.participants.find(p => 
+                p.role !== 'admin' && p.external_user_identifier
+              );
+              
+              if (customerParticipant && customerParticipant.external_user_identifier) {
+                console.log("Finding lead for customer:", customerParticipant.external_user_identifier);
+                await handleCustomerId(customerParticipant.external_user_identifier);
+              } else {
+                createMockLeadFromConversation();
+              }
             } else {
               createMockLeadAndCustomer();
             }

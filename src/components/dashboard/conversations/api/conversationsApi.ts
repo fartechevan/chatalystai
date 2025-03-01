@@ -2,26 +2,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import { Lead } from "../types";
 
-interface ParticipantData {
-  id: string;
-  name: string | null;
-  email: string;
-}
-
-interface ConversationWithParticipants {
-  conversation_id: string;
-  sender_id: string;
-  receiver_id: string;
-  sender_type: string;
-  receiver_type: string;
-  created_at: string;
-  updated_at: string;
-  lead_id: string | null;
-  sender: ParticipantData | null;
-  receiver: ParticipantData | null;
-  lead: Lead | null;
-}
-
 export async function fetchConversationsWithParticipants() {
   console.log('Fetching conversations with participants...');
 
@@ -36,102 +16,23 @@ export async function fetchConversationsWithParticipants() {
     throw conversationsError;
   }
 
-  // Fetch all unique profile IDs and customer IDs
-  const profileIds = new Set<string>();
-  const customerIds = new Set<string>();
-
-  conversations.forEach(conv => {
-    if (conv.sender_type === 'profile') profileIds.add(conv.sender_id);
-    if (conv.receiver_type === 'profile') profileIds.add(conv.receiver_id);
-    if (conv.sender_type === 'customer') customerIds.add(conv.sender_id);
-    if (conv.receiver_type === 'customer') customerIds.add(conv.receiver_id);
-  });
-
   console.log('Fetched conversations:', conversations);
-  console.log('Fetched customerIds:', customerIds);
-  console.log('Fetched profileIds:', profileIds);
-
-  // Fetch profiles and customers data
-  const { data: profiles } = await supabase
-    .from('profiles')
-    .select('id, name, email')
-    .in('id', Array.from(profileIds));
-
-  const { data: customers } = await supabase
-    .from('customers')
-    .select('id, name, email')
-    .in('id', Array.from(customerIds));
-
-  console.log('Fetched profiles:', profiles);
-  console.log('Fetched customers:', customers);
-
-  // Create lookup maps for profiles and customers
-  const profilesMap = new Map<string, ParticipantData>();
-  const customersMap = new Map<string, ParticipantData>();
-
-  // Populate profiles map
-  profiles?.forEach(profile => {
-    profilesMap.set(profile.id, {
-      id: profile.id,
-      name: profile.name || `Unknown Profile`,
-      email: profile.email
-    });
-  });
-
-  // Populate customers map
-  customers?.forEach(customer => {
-    customersMap.set(customer.id, {
-      id: customer.id,
-      name: customer.name || `Unknown Customer`,
-      email: customer.email || ''
-    });
-  });
 
   // Transform the data
   const transformedData = conversations.map(conv => {
-    const getParticipant = (id: string, type: string): ParticipantData => {
-      if (type === 'profile') {
-        return profilesMap.get(id) || {
-          id,
-          name: `Unknown Profile`,
-          email: ''
-        };
-      } else if (type === 'customer') {
-        return customersMap.get(id) || {
-          id,
-          name: `Unknown Customer`,
-          email: ''
-        };
-      }
-      return {
-        id,
-        name: `Unknown ${type}`,
-        email: ''
-      };
-    };
-
-    const sender = getParticipant(conv.sender_id, conv.sender_type);
-    const receiver = getParticipant(conv.receiver_id, conv.receiver_type);
-
     return {
       conversation_id: conv.conversation_id,
-      sender_id: conv.sender_id,
-      receiver_id: conv.receiver_id,
-      sender_type: conv.sender_type,
-      receiver_type: conv.receiver_type,
       created_at: conv.created_at,
       updated_at: conv.updated_at,
       lead_id: conv.lead_id,
-      sender,
-      receiver,
       lead: conv.lead
     };
   });
 
   return {
     conversations: transformedData,
-    profiles: profiles || [],
-    customers: customers || []
+    profiles: [],
+    customers: []
   };
 }
 
@@ -160,12 +61,12 @@ export async function fetchConversationSummary(conversationId: string) {
   return summaryData;
 }
 
-export async function sendMessage(conversationId: string, senderId: string, content: string) {
+export async function sendMessage(conversationId: string, participantId: string, content: string) {
   const { data, error } = await supabase
     .from('messages')
     .insert([{
       conversation_id: conversationId,
-      sender_id: senderId,
+      sender_participant_id: participantId,
       content
     }])
     .select()
