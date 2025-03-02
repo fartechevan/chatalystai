@@ -2,10 +2,21 @@
 import { supabase } from "@/integrations/supabase/client";
 
 /**
+ * Validates if a string is a valid UUID
+ */
+function isValidUUID(uuid: string): boolean {
+  const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  return uuidRegex.test(uuid);
+}
+
+/**
  * Fetches all tags for a lead
  */
 export async function fetchLeadTags(leadId: string): Promise<string[]> {
-  if (!leadId) return [];
+  if (!leadId || !isValidUUID(leadId)) {
+    console.error('Invalid or missing lead ID in fetchLeadTags:', leadId);
+    return [];
+  }
   
   try {
     console.log('Fetching tags for lead:', leadId);
@@ -30,8 +41,13 @@ export async function fetchLeadTags(leadId: string): Promise<string[]> {
  * Adds a tag to a lead
  */
 export async function addTagToLead(leadId: string, tagName: string): Promise<boolean> {
-  if (!leadId || !tagName) {
-    console.error('Missing leadId or tagName in addTagToLead:', { leadId, tagName });
+  if (!tagName.trim()) {
+    console.error('Tag name is empty');
+    return false;
+  }
+  
+  if (!leadId || !isValidUUID(leadId)) {
+    console.error('Invalid lead ID format in addTagToLead:', leadId);
     return false;
   }
   
@@ -102,8 +118,13 @@ export async function addTagToLead(leadId: string, tagName: string): Promise<boo
  * Removes a tag from a lead
  */
 export async function removeTagFromLead(leadId: string, tagName: string): Promise<boolean> {
-  if (!leadId || !tagName) {
-    console.error('Missing leadId or tagName in removeTagFromLead:', { leadId, tagName });
+  if (!tagName.trim()) {
+    console.error('Tag name is empty');
+    return false;
+  }
+  
+  if (!leadId || !isValidUUID(leadId)) {
+    console.error('Invalid lead ID format in removeTagFromLead:', leadId);
     return false;
   }
   

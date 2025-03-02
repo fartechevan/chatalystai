@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Lead } from "../../types";
 import { supabase } from "@/integrations/supabase/client";
