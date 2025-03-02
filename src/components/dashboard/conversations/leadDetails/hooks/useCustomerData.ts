@@ -26,7 +26,7 @@ export function useCustomerData(setLead: React.Dispatch<React.SetStateAction<Lea
       if (leadError) {
         console.error('Error fetching lead:', leadError);
       } else if (data) {
-        // Create a properly typed Lead object
+        // Create a properly typed Lead object with data from both lead and customer
         const leadData: Lead = {
           id: data.id,
           created_at: data.created_at,
@@ -36,13 +36,13 @@ export function useCustomerData(setLead: React.Dispatch<React.SetStateAction<Lea
           customer_id: data.customer_id || null,
           value: data.value || null,
           
-          // Optional properties that may not exist in the database
-          name: data.name || null,
-          company_name: data.company_name || null,
-          company_address: data.company_address || null,
-          contact_email: data.contact_email || null,
-          contact_phone: data.contact_phone || null,
-          contact_first_name: data.contact_first_name || null
+          // Virtual properties derived from customer data
+          name: customerData.name || null,
+          company_name: customerData.company_name || null,
+          company_address: customerData.company_address || null,
+          contact_email: customerData.email || null,
+          contact_phone: customerData.phone_number || null,
+          contact_first_name: customerData.name || null // Using customer name as first name
         };
         
         console.log("Handling lead data:", leadData);

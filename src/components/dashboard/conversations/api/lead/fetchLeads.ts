@@ -9,9 +9,19 @@ export async function fetchLeadById(leadId: string): Promise<Lead | null> {
   if (!leadId) return null;
   
   try {
+    // Fetch lead with joined customer data
     const { data, error } = await supabase
       .from('leads')
-      .select('*')
+      .select(`
+        *,
+        customer:customers(
+          name,
+          company_name,
+          company_address,
+          email,
+          phone_number
+        )
+      `)
       .eq('id', leadId)
       .maybeSingle();
     
@@ -32,13 +42,13 @@ export async function fetchLeadById(leadId: string): Promise<Lead | null> {
       customer_id: data.customer_id || null,
       value: data.value || null,
       
-      // Optional properties that may not exist in the database
-      name: data.name || null,
-      company_name: data.company_name || null,
-      company_address: data.company_address || null,
-      contact_email: data.contact_email || null,
-      contact_phone: data.contact_phone || null,
-      contact_first_name: data.contact_first_name || null
+      // Optional properties derived from customer data if available
+      name: data.customer?.name || null,
+      company_name: data.customer?.company_name || null,
+      company_address: data.customer?.company_address || null,
+      contact_email: data.customer?.email || null,
+      contact_phone: data.customer?.phone_number || null,
+      contact_first_name: data.customer?.name || null // Using customer name as first name for now
     };
     
     return lead;

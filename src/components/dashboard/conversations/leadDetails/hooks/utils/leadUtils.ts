@@ -17,18 +17,20 @@ export function calculateDaysSinceCreation(createdAt: string): number {
 export function createFakeLeadFromCustomer(customer: Customer, createdAt: string, userId: string): Lead {
   return {
     id: `${Date.now().toString().slice(-6)}`,
-    name: 'New Product Inquiry',
     created_at: createdAt,
     updated_at: createdAt,
     customer_id: customer.id,
     user_id: userId,
-    company_name: null,
-    company_address: null,
-    contact_email: null,
-    contact_phone: null,
-    contact_first_name: null,
     value: null,
-    pipeline_stage_id: null
+    pipeline_stage_id: null,
+    
+    // Virtual properties derived from customer
+    name: 'New Product Inquiry',
+    company_name: customer.company_name,
+    company_address: customer.company_address,
+    contact_email: customer.email,
+    contact_phone: customer.phone_number,
+    contact_first_name: customer.name
   };
 }
 
@@ -44,25 +46,29 @@ export function createMockLeadAndCustomer(userId: string): {
     id: '123',
     name: 'John Smith',
     phone_number: '+60192698338',
-    email: 'john@example.com'
+    email: 'john@example.com',
+    company_name: 'ACME Corp',
+    company_address: '123 Business St'
   };
   
   const createdAt = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(); // 7 days ago
   
   const mockLead: Lead = {
     id: '163674',
-    name: 'New Product Inquiry',
     created_at: createdAt,
     updated_at: createdAt,
     customer_id: mockCustomer.id,
     user_id: userId,
-    company_name: null,
-    company_address: null,
-    contact_email: null,
-    contact_phone: null,
-    contact_first_name: null,
     value: null,
-    pipeline_stage_id: null
+    pipeline_stage_id: null,
+    
+    // Virtual properties derived from mock customer
+    name: 'New Product Inquiry',
+    company_name: mockCustomer.company_name,
+    company_address: mockCustomer.company_address,
+    contact_email: mockCustomer.email,
+    contact_phone: mockCustomer.phone_number,
+    contact_first_name: mockCustomer.name
   };
   
   const daysSinceCreation = calculateDaysSinceCreation(mockLead.created_at);
@@ -93,23 +99,27 @@ export function createMockLeadFromConversation(
     id: `CUST-${Date.now().toString().slice(-6)}`,
     name: conversationData.customer_name || 'Unknown Customer',
     phone_number: '+60192698338',
-    email: 'customer@example.com'
+    email: 'customer@example.com',
+    company_name: 'Unknown Company',
+    company_address: null
   };
   
   const mockLead: Lead = {
     id: `${Date.now().toString().slice(-6)}`,
-    name: 'New Product Inquiry',
     created_at: conversationData.created_at,
     updated_at: conversationData.updated_at,
     customer_id: mockCustomer.id,
     user_id: userId,
-    company_name: null,
-    company_address: null,
-    contact_email: null,
-    contact_phone: null,
-    contact_first_name: null,
     value: null,
-    pipeline_stage_id: null
+    pipeline_stage_id: null,
+    
+    // Virtual properties derived from mock customer
+    name: 'New Product Inquiry',
+    company_name: mockCustomer.company_name,
+    company_address: mockCustomer.company_address,
+    contact_email: mockCustomer.email,
+    contact_phone: mockCustomer.phone_number,
+    contact_first_name: mockCustomer.name
   };
   
   const daysSinceCreation = calculateDaysSinceCreation(mockLead.created_at);

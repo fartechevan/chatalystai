@@ -51,13 +51,16 @@ export function usePipelineData(pipelineId: string | null) {
           .select(`
             lead:leads (
               id,
-              name,
               value,
-              company_name,
-              contact_first_name,
               customer_id,
               created_at,
-              user_id
+              user_id,
+              customers:customers (
+                name,
+                company_name,
+                phone_number,
+                email
+              )
             )
           `)
           .eq('stage_id', stage.id)
@@ -72,17 +75,22 @@ export function usePipelineData(pipelineId: string | null) {
             ?.filter(item => item.lead !== null)
             .map(item => {
               if (item.lead) {
+                const lead = item.lead;
                 return {
-                  id: item.lead.id,
-                  created_at: item.lead.created_at,
-                  user_id: item.lead.user_id,
+                  id: lead.id,
+                  created_at: lead.created_at,
+                  user_id: lead.user_id,
                   // Optional properties
-                  name: item.lead.name || null,
-                  value: item.lead.value || null,
-                  company_name: item.lead.company_name || null,
-                  contact_first_name: item.lead.contact_first_name || null,
-                  customer_id: item.lead.customer_id || null,
-                  pipeline_stage_id: stage.id
+                  value: lead.value || null,
+                  customer_id: lead.customer_id || null,
+                  pipeline_stage_id: stage.id,
+                  
+                  // Virtual properties from customer data
+                  name: lead.customers?.name || null,
+                  company_name: lead.customers?.company_name || null,
+                  contact_first_name: lead.customers?.name || null,
+                  contact_email: lead.customers?.email || null,
+                  contact_phone: lead.customers?.phone_number || null
                 } as Lead;
               }
               return null;
