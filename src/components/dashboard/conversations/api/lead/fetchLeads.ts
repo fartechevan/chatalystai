@@ -18,14 +18,16 @@ export async function fetchLeadById(leadId: string): Promise<Lead | null> {
     if (error) {
       console.error('Error fetching lead:', error);
       return null;
-    }
+    } 
     
     if (!data) return null;
     
     // Create a properly typed Lead object with all properties explicitly cast
     const lead: Lead = {
       id: data.id,
-      name: data.name,
+      // The name field might not exist in the database table
+      // but we need it for the Lead interface
+      name: data.name || null, 
       created_at: data.created_at,
       updated_at: data.updated_at || undefined,
       user_id: data.user_id,
