@@ -1,4 +1,3 @@
-
 import { Skeleton } from "@/components/ui/skeleton";
 import { LeadsHeader } from "./LeadsHeader";
 import { LeadsStage } from "./LeadsStage";
@@ -6,18 +5,10 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { DragDropContext } from "@hello-pangea/dnd";
 import { useToast } from "@/hooks/use-toast";
+import type { Lead } from "@/components/dashboard/conversations/types";
 
 interface LeadsContentProps {
   pipelineId: string | null;
-}
-
-interface Lead {
-  id: string;
-  name?: string | null;
-  value?: number | null;
-  company_name?: string | null;
-  contact_first_name?: string | null;
-  customer_id?: string | null;
 }
 
 interface StageLeads {
@@ -85,11 +76,9 @@ export function LeadsContent({ pipelineId }: LeadsContentProps) {
     loadStages();
   }, [pipelineId]);
 
-  // Set up realtime subscription to both lead_pipeline and leads tables
   useEffect(() => {
     if (!pipelineId) return;
 
-    // Create a channel for lead_pipeline changes
     const pipelineChannel = supabase
       .channel('lead-pipeline-changes')
       .on(
@@ -106,7 +95,6 @@ export function LeadsContent({ pipelineId }: LeadsContentProps) {
       )
       .subscribe();
       
-    // Create a channel for leads changes
     const leadsChannel = supabase
       .channel('leads-changes')
       .on(
@@ -150,13 +138,11 @@ export function LeadsContent({ pipelineId }: LeadsContentProps) {
     }
 
     try {
-      // Optimistically update the UI
       const newStageLeads = { ...stageLeads };
       const [movedLead] = newStageLeads[sourceStageId].splice(result.source.index, 1);
       newStageLeads[destinationStageId].splice(result.destination.index, 0, movedLead);
       setStageLeads(newStageLeads);
 
-      // Update lead_pipeline table
       const { error } = await supabase
         .from('lead_pipeline')
         .update({
@@ -167,7 +153,6 @@ export function LeadsContent({ pipelineId }: LeadsContentProps) {
 
       if (error) throw error;
 
-      // Also update the lead's pipeline_stage_id in the leads table
       const { error: leadUpdateError } = await supabase
         .from('leads')
         .update({
@@ -186,7 +171,6 @@ export function LeadsContent({ pipelineId }: LeadsContentProps) {
       });
     } catch (error) {
       console.error('Error moving lead:', error);
-      // Revert our optimistic update by reloading the actual data
       loadStages();
       toast({
         title: "Error",

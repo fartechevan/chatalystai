@@ -3,7 +3,7 @@ export interface Lead {
   id: string;
   name?: string | null; // Make name optional as it may not exist in the database
   created_at: string;
-  updated_at?: string;
+  updated_at?: string | undefined;
   pipeline_stage_id?: string | null;
   customer_id?: string | null;
   user_id: string;

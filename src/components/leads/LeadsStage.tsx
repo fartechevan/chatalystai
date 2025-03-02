@@ -6,14 +6,7 @@ import { AddLeadDialog } from "./AddLeadDialog";
 import { cn } from "@/lib/utils";
 import { Draggable, Droppable } from "@hello-pangea/dnd";
 import { Building, User, DollarSign } from "lucide-react";
-
-interface Lead {
-  id: string;
-  name: string;
-  value: number;
-  company_name: string | null;
-  contact_first_name: string | null;
-}
+import type { Lead } from "@/components/dashboard/conversations/types";
 
 interface LeadsStageProps {
   name: string;
@@ -85,7 +78,7 @@ export function LeadsStage({ name, id, index = 0, leads }: LeadsStageProps) {
                     )}
                   >
                     <Card className="p-3 hover:shadow-md transition-shadow">
-                      <div className="font-medium">{lead.name}</div>
+                      <div className="font-medium">{lead.name || 'Unnamed Lead'}</div>
                       
                       <div className="mt-2 flex items-center text-xs text-muted-foreground">
                         {lead.company_name ? (
