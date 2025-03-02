@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback } from "react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
@@ -5,7 +6,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { Profile, Pipeline, PipelineStage, Customer, Lead, Conversation } from "./types";
 import { useToast } from "@/hooks/use-toast";
 import { useQueryClient } from "@tanstack/react-query";
-import { fetchLeadById } from "./api";
+import { fetchLeadById, fetchLeadTags, addTagToLead, removeTagFromLead } from "./api/leadQueries";
 
 import {
   LeadHeader,
@@ -34,6 +35,7 @@ export function LeadDetailsPanel({ isExpanded, onToggle, selectedConversation }:
   const [daysSinceCreation, setDaysSinceCreation] = useState<number>(0);
   const [tags, setTags] = useState<string[]>([]);
   const [activeTab, setActiveTab] = useState("main");
+  const [isTagsLoading, setIsTagsLoading] = useState(false);
   const queryClient = useQueryClient();
 
   useEffect(() => {
@@ -77,11 +79,51 @@ export function LeadDetailsPanel({ isExpanded, onToggle, selectedConversation }:
       )
       .subscribe();
 
+    const leadTagsChannel = supabase
+      .channel('lead-tags-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'lead_tags'
+        },
+        (payload) => {
+          console.log('Lead tags change detected:', payload);
+          // Only refresh if it's our current lead
+          if (lead?.id && payload.new && typeof payload.new === 'object' && 'lead_id' in payload.new && payload.new.lead_id === lead.id) {
+            loadLeadTags(lead.id);
+          }
+        }
+      )
+      .subscribe();
+
     return () => {
-      console.log('Cleaning up global lead_pipeline subscription');
+      console.log('Cleaning up global lead_pipeline and lead_tags subscriptions');
       supabase.removeChannel(leadPipelineChannel);
+      supabase.removeChannel(leadTagsChannel);
     };
   }, [isExpanded, lead?.id, selectedConversation?.conversation_id, queryClient]);
+
+  const loadLeadTags = async (leadId: string) => {
+    if (!leadId) return;
+    
+    setIsTagsLoading(true);
+    try {
+      const tagNames = await fetchLeadTags(leadId);
+      setTags(tagNames);
+    } catch (error) {
+      console.error('Error loading tags:', error);
+    } finally {
+      setIsTagsLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    if (lead?.id) {
+      loadLeadTags(lead.id);
+    }
+  }, [lead?.id]);
 
   const findAndSelectStage = useCallback(async (stageId: string) => {
     if (!stageId) return;
@@ -213,7 +255,6 @@ export function LeadDetailsPanel({ isExpanded, onToggle, selectedConversation }:
   const handleLeadData = useCallback((leadData: Lead) => {
     console.log("Handling lead data:", leadData);
     setLead(leadData);
-    setTags(['lead', 'follow-up']);
     
     const date = new Date(leadData.created_at);
     const today = new Date();
@@ -546,29 +587,67 @@ export function LeadDetailsPanel({ isExpanded, onToggle, selectedConversation }:
   const handleAddTag = async (tag: string) => {
     if (!tag.trim() || !lead) return;
     
-    const updatedTags = [...tags, tag.trim()];
-    setTags(updatedTags);
-    
-    console.log(`Added tag ${tag.trim()} to lead ${lead.id}`);
-    
-    toast({
-      title: "Tag added",
-      description: `Added "${tag.trim()}" tag to lead`,
-    });
+    try {
+      const success = await addTagToLead(lead.id, tag.trim());
+      
+      if (success) {
+        // Optimistically update the UI
+        setTags(prev => [...prev, tag.trim()]);
+        
+        console.log(`Added tag ${tag.trim()} to lead ${lead.id}`);
+        
+        toast({
+          title: "Tag added",
+          description: `Added "${tag.trim()}" tag to lead`,
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: "Failed to add tag",
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      console.error('Error adding tag:', error);
+      toast({
+        title: "Error",
+        description: "Something went wrong",
+        variant: "destructive"
+      });
+    }
   };
 
   const handleRemoveTag = async (tagToRemove: string) => {
     if (!lead) return;
     
-    const updatedTags = tags.filter(tag => tag !== tagToRemove);
-    setTags(updatedTags);
-    
-    console.log(`Removed tag ${tagToRemove} from lead ${lead.id}`);
-    
-    toast({
-      title: "Tag removed",
-      description: `Removed "${tagToRemove}" tag from lead`,
-    });
+    try {
+      const success = await removeTagFromLead(lead.id, tagToRemove);
+      
+      if (success) {
+        // Optimistically update the UI
+        setTags(prev => prev.filter(tag => tag !== tagToRemove));
+        
+        console.log(`Removed tag ${tagToRemove} from lead ${lead.id}`);
+        
+        toast({
+          title: "Tag removed",
+          description: `Removed "${tagToRemove}" tag from lead`,
+        });
+      } else {
+        toast({
+          title: "Error",
+          description: "Failed to remove tag",
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      console.error('Error removing tag:', error);
+      toast({
+        title: "Error",
+        description: "Something went wrong",
+        variant: "destructive"
+      });
+    }
   };
 
   const fetchAllPipelines = useCallback(async () => {
@@ -668,7 +747,8 @@ export function LeadDetailsPanel({ isExpanded, onToggle, selectedConversation }:
               tags={tags} 
               setTags={setTags} 
               onAddTag={handleAddTag} 
-              onRemoveTag={handleRemoveTag} 
+              onRemoveTag={handleRemoveTag}
+              isLoading={isTagsLoading}
             />
 
             <PipelineSelector 
