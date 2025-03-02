@@ -40,6 +40,11 @@ export async function fetchConversationsWithParticipants() {
 }
 
 /**
+ * For backwards compatibility
+ */
+export const fetchConversations = fetchConversationsWithParticipants;
+
+/**
  * Fetches a conversation summary
  */
 export async function fetchConversationSummary(conversationId: string) {
