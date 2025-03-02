@@ -147,7 +147,7 @@ export function useLeadData(
         // Create a properly typed Lead object
         const leadData: Lead = {
           id: data.id,
-          name: data.name || null,
+          name: data.name || null, // These fields might not exist in the database
           created_at: data.created_at,
           updated_at: data.updated_at || undefined,
           user_id: data.user_id,
