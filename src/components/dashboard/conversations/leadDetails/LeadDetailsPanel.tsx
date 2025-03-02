@@ -1,20 +1,21 @@
+
 import { useState, useEffect } from "react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
-import { Conversation } from "./types";
+import { Conversation } from "../types";
 import { 
   LeadHeader,
   LeadTags,
   PipelineSelector,
   LeadContactInfo,
   LeadTabContent
-} from "./leadDetails";
+} from ".";
 import { 
   useLeadData, 
   useLeadPipeline, 
   useLeadTags, 
   useAssignee 
-} from "./leadDetails/hooks";
+} from "./hooks";
 
 interface LeadDetailsPanelProps {
   isExpanded: boolean;
