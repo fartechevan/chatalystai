@@ -32,11 +32,10 @@ export function ConversationView() {
   const filteredConversations = conversations.filter(conv => {
     const searchLower = searchQuery.toLowerCase();
     return (
-      // Safely handle potentially undefined or null values
-      (conv.lead?.name?.toLowerCase().includes(searchLower) || 
-       conv.lead?.contact_first_name?.toLowerCase().includes(searchLower) || 
-       conv.lead_id?.toLowerCase().includes(searchLower) || 
-       false)
+      // Safely handle potentially undefined or null values with optional chaining
+      (conv.lead?.name?.toLowerCase().includes(searchLower) || false) ||
+      (conv.lead?.contact_first_name?.toLowerCase().includes(searchLower) || false) ||
+      (conv.lead_id?.toLowerCase().includes(searchLower) || false)
     );
   });
 

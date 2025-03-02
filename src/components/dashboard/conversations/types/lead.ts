@@ -8,7 +8,7 @@ export interface Lead {
   user_id: string;
   value?: number | null;
   
-  // These fields will be populated from joined data or UI purposes
+  // These fields will be populated from joined customer data or for UI purposes
   // but are not present in the database table itself
   name?: string | null; // Virtual property for display
   company_name?: string | null; // From customer table
