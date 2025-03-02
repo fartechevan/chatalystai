@@ -1,121 +1,133 @@
-import { Conversation, Lead } from "./types";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"; 
-import { MoreHorizontal, Phone, Video, PanelRightClose, PanelLeftClose, Users } from "lucide-react";
+
 import { Button } from "@/components/ui/button";
-import { useEffect, useState } from "react";
-import { fetchLeadById } from "./api";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Input } from "@/components/ui/input";
+import {
+  MoreVertical,
+  Search,
+  PhoneCall,
+  Video,
+  Eye,
+  Star,
+  Flag,
+  Clock,
+  Tag,
+  User,
+  X,
+} from "lucide-react";
+import { useState } from "react";
+import type { Conversation } from "./types";
 
 interface ConversationHeaderProps {
   conversation: Conversation | null;
-  isDetailsOpen: boolean;
-  onToggleDetails: () => void;
-  isParticipantsOpen: boolean;
-  onToggleParticipants: () => void;
 }
 
-export function ConversationHeader({
-  conversation,
-  isDetailsOpen,
-  onToggleDetails,
-  isParticipantsOpen,
-  onToggleParticipants
-}: ConversationHeaderProps) {
-  const [lead, setLead] = useState<Lead | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-
-  const getFormattedLeadId = (id?: string | null) => {
-    if (!id) return '163674';
-    return id.length > 6 ? id.slice(0, 6) : id;
-  };
-
-  useEffect(() => {
-    async function loadLead() {
-      setLead(null);
-      
-      if (!conversation) return;
-      
-      if (conversation.lead) {
-        setLead(conversation.lead);
-        return;
-      }
-      
-      if (conversation.lead_id) {
-        setIsLoading(true);
-        try {
-          const leadData = await fetchLeadById(conversation.lead_id);
-          if (leadData) {
-            setLead(leadData);
-          }
-        } catch (error) {
-          console.error('Error loading lead:', error);
-        } finally {
-          setIsLoading(false);
-        }
-      }
-    }
-
-    loadLead();
-  }, [conversation]);
+export function ConversationHeader({ conversation }: ConversationHeaderProps) {
+  const [isSearchExpanded, setIsSearchExpanded] = useState(false);
 
   if (!conversation) {
     return (
-      <div className="h-16 border-b flex items-center px-4">
-        <div className="font-medium">Select a conversation</div>
+      <div className="flex items-center justify-between p-3 border-b">
+        <h2 className="text-lg font-semibold">Please select a conversation</h2>
       </div>
     );
   }
 
-  const participant = conversation.sender_type === 'customer' 
-    ? conversation.sender 
-    : conversation.receiver;
-
   return (
-    <div className="h-16 border-b flex items-center justify-between px-4">
-      <div className="flex items-center gap-3">
-        <Avatar>
-          <AvatarFallback>{participant.name?.charAt(0) || 'U'}</AvatarFallback>
-        </Avatar>
-        <div>
-          <div className="font-medium flex items-center gap-2">
-            {lead ? (
-              <>
-                Lead #{getFormattedLeadId(lead.id)}
-                <span className="text-sm text-muted-foreground">
-                  (from {participant.name})
-                </span>
-              </>
+    <div className="flex items-center justify-between p-3 border-b">
+      <div className="flex items-center space-x-3">
+        <div className="relative">
+          <div className="w-10 h-10 overflow-hidden rounded-full bg-gray-200 flex items-center justify-center">
+            {conversation.lead?.contact_first_name ? (
+              <span className="text-lg font-medium text-gray-700">
+                {conversation.lead.contact_first_name.charAt(0)}
+              </span>
             ) : (
-              isLoading ? 'Loading lead...' : participant.name
+              <User className="w-6 h-6 text-gray-500" />
             )}
           </div>
-          <div className="text-xs text-muted-foreground">
-            {lead 
-              ? lead.company_name || 'No company' 
-              : participant.email || 'Customer'
-            }
-          </div>
+          <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-white"></div>
+        </div>
+        <div>
+          <h2 className="font-semibold">
+            {conversation.lead?.contact_first_name || "Unknown Contact"}
+          </h2>
+          <p className="text-xs text-gray-500">
+            {conversation.lead?.company_name || "Unknown Company"}
+          </p>
         </div>
       </div>
-      <div className="flex items-center gap-1">
+
+      <div className="flex items-center space-x-2">
+        {isSearchExpanded ? (
+          <div className="flex items-center rounded-md bg-gray-100 px-2">
+            <Search className="h-4 w-4 text-gray-400" />
+            <Input
+              className="h-8 w-40 border-0 bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0"
+              placeholder="Search conversation..."
+              autoFocus
+              onBlur={() => setIsSearchExpanded(false)}
+            />
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8"
+              onClick={() => setIsSearchExpanded(false)}
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
+        ) : (
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setIsSearchExpanded(true)}
+          >
+            <Search className="h-5 w-5" />
+          </Button>
+        )}
         <Button variant="ghost" size="icon">
-          <Phone className="h-4 w-4" />
+          <PhoneCall className="h-5 w-5" />
         </Button>
         <Button variant="ghost" size="icon">
-          <Video className="h-4 w-4" />
+          <Video className="h-5 w-5" />
         </Button>
-        <Button variant="ghost" size="icon" onClick={onToggleParticipants}>
-          <Users className="h-4 w-4" />
-        </Button>
-        <Button variant="ghost" size="icon" onClick={onToggleDetails}>
-          {isDetailsOpen ? (
-            <PanelRightClose className="h-4 w-4" />
-          ) : (
-            <PanelLeftClose className="h-4 w-4" />
-          )}
-        </Button>
-        <Button variant="ghost" size="icon">
-          <MoreHorizontal className="h-4 w-4" />
-        </Button>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="ghost" size="icon">
+              <MoreVertical className="h-5 w-5" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-56">
+            <DropdownMenuItem>
+              <Eye className="mr-2 h-4 w-4" />
+              <span>Mark as unread</span>
+            </DropdownMenuItem>
+            <DropdownMenuItem>
+              <Star className="mr-2 h-4 w-4" />
+              <span>Mark as important</span>
+            </DropdownMenuItem>
+            <DropdownMenuItem>
+              <Flag className="mr-2 h-4 w-4" />
+              <span>Flag conversation</span>
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem>
+              <Clock className="mr-2 h-4 w-4" />
+              <span>Snooze notifications</span>
+            </DropdownMenuItem>
+            <DropdownMenuItem>
+              <Tag className="mr-2 h-4 w-4" />
+              <span>Add tags</span>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
       </div>
     </div>
   );

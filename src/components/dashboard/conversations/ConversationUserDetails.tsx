@@ -1,114 +1,152 @@
 
-import { useEffect, useState } from "react";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Button } from "@/components/ui/button";
+import {
+  Calendar,
+  Clock,
+  Mail,
+  MapPin,
+  Phone,
+  User,
+  Building,
+} from "lucide-react";
 import { Separator } from "@/components/ui/separator";
-import { Trash2, UserPlus, Mail, PhoneCall } from "lucide-react";
-import type { Conversation, Customer } from "./types";
-import { getCustomerName, getCustomerEmail } from "./utils/participantUtils";
-import { supabase } from "@/integrations/supabase/client";
+import type { Conversation } from "./types";
 
 interface ConversationUserDetailsProps {
   conversation: Conversation | null;
 }
 
-export function ConversationUserDetails({ conversation }: ConversationUserDetailsProps) {
-  const [customer, setCustomer] = useState<Customer | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-
-  useEffect(() => {
-    const getCustomerData = async () => {
-      if (!conversation || !conversation.lead?.customer_id) return;
-
-      setIsLoading(true);
-      try {
-        // Fetch the customer data
-        const { data, error } = await supabase
-          .from('customers')
-          .select('*')
-          .eq('id', conversation.lead.customer_id)
-          .single();
-
-        if (error) throw error;
-        setCustomer(data);
-      } catch (error) {
-        console.error('Error fetching customer:', error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    getCustomerData();
-  }, [conversation]);
-
-  if (!conversation) {
+export function ConversationUserDetails({
+  conversation,
+}: ConversationUserDetailsProps) {
+  if (!conversation || !conversation.lead) {
     return (
-      <div className="p-4">
-        <p className="text-sm text-muted-foreground">No conversation selected</p>
+      <div className="flex flex-col items-center justify-center h-full p-4 text-center">
+        <User className="h-16 w-16 text-gray-300 mb-4" />
+        <h3 className="text-lg font-medium">No User Selected</h3>
+        <p className="text-sm text-gray-500 max-w-xs mt-2">
+          Select a conversation to view customer details
+        </p>
       </div>
     );
   }
 
-  const name = getCustomerName(conversation);
-  const email = getCustomerEmail(conversation);
-  const phone = customer?.phone_number || 'Unknown';
+  const lead = conversation.lead;
+
+  // Format date strings
+  const formattedDate = (dateString: string) => {
+    if (!dateString) return "N/A";
+    try {
+      const date = new Date(dateString);
+      return new Intl.DateTimeFormat("en-US", {
+        month: "short",
+        day: "numeric",
+        year: "numeric",
+      }).format(date);
+    } catch (e) {
+      return "Invalid date";
+    }
+  };
+
+  // Format time strings
+  const formattedTime = (dateString: string) => {
+    if (!dateString) return "";
+    try {
+      const date = new Date(dateString);
+      return new Intl.DateTimeFormat("en-US", {
+        hour: "numeric",
+        minute: "numeric",
+        hour12: true,
+      }).format(date);
+    } catch (e) {
+      return "";
+    }
+  };
 
   return (
-    <div className="p-4 space-y-6">
-      <div className="flex flex-col items-center text-center gap-3">
-        <Avatar className="h-16 w-16">
-          <AvatarFallback>{name.charAt(0)}</AvatarFallback>
-        </Avatar>
-        <div>
-          <h3 className="font-medium text-lg">{name}</h3>
-          <p className="text-sm text-muted-foreground">{customer ? 'Customer' : 'Unknown Contact'}</p>
-        </div>
-      </div>
-
-      <div className="flex gap-2 justify-center">
-        <Button variant="outline" size="sm">
-          <UserPlus className="h-4 w-4 mr-1" />
-          Add contact
-        </Button>
-        <Button variant="outline" size="sm" className="text-destructive">
-          <Trash2 className="h-4 w-4 mr-1" />
-          Delete
-        </Button>
-      </div>
-
-      <Separator />
-
-      <div className="space-y-3">
-        <h4 className="text-sm font-medium">Contact Information</h4>
-        
-        <div className="space-y-2">
-          <div className="flex items-center gap-2 text-sm">
-            <Mail className="h-4 w-4 text-muted-foreground" />
-            <span>{email || 'No email'}</span>
+    <div className="space-y-6">
+      <div>
+        <h3 className="text-lg font-semibold mb-2">Contact Information</h3>
+        <div className="space-y-3">
+          <div className="flex items-start">
+            <User className="h-5 w-5 text-gray-500 mr-3 mt-0.5" />
+            <div>
+              <p className="font-medium">
+                {lead.contact_first_name || "Unknown"}
+              </p>
+              <p className="text-sm text-gray-500">Contact name</p>
+            </div>
           </div>
-          <div className="flex items-center gap-2 text-sm">
-            <PhoneCall className="h-4 w-4 text-muted-foreground" />
-            <span>{phone}</span>
-          </div>
+          {lead.contact_email && (
+            <div className="flex items-start">
+              <Mail className="h-5 w-5 text-gray-500 mr-3 mt-0.5" />
+              <div>
+                <p className="font-medium">{lead.contact_email}</p>
+                <p className="text-sm text-gray-500">Email address</p>
+              </div>
+            </div>
+          )}
+          {lead.contact_phone && (
+            <div className="flex items-start">
+              <Phone className="h-5 w-5 text-gray-500 mr-3 mt-0.5" />
+              <div>
+                <p className="font-medium">{lead.contact_phone}</p>
+                <p className="text-sm text-gray-500">Phone number</p>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
       <Separator />
 
-      {isLoading ? (
-        <p className="text-sm text-center">Loading customer information...</p>
-      ) : (
-        customer && (
-          <div className="space-y-3">
-            <h4 className="text-sm font-medium">Additional Info</h4>
-            <p className="text-sm">
-              {customer.name} has been a customer since {
-                new Date(customer.created_at).toLocaleDateString()
-              }.
-            </p>
+      <div>
+        <h3 className="text-lg font-semibold mb-2">Company Information</h3>
+        <div className="space-y-3">
+          {lead.company_name && (
+            <div className="flex items-start">
+              <Building className="h-5 w-5 text-gray-500 mr-3 mt-0.5" />
+              <div>
+                <p className="font-medium">{lead.company_name}</p>
+                <p className="text-sm text-gray-500">Company name</p>
+              </div>
+            </div>
+          )}
+          {lead.company_address && (
+            <div className="flex items-start">
+              <MapPin className="h-5 w-5 text-gray-500 mr-3 mt-0.5" />
+              <div>
+                <p className="font-medium">{lead.company_address}</p>
+                <p className="text-sm text-gray-500">Company address</p>
+              </div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <Separator />
+
+      <div>
+        <h3 className="text-lg font-semibold mb-2">Lead Timeline</h3>
+        <div className="space-y-3">
+          <div className="flex items-start">
+            <Calendar className="h-5 w-5 text-gray-500 mr-3 mt-0.5" />
+            <div>
+              <p className="font-medium">{formattedDate(lead.created_at)}</p>
+              <p className="text-sm text-gray-500">Lead created</p>
+            </div>
           </div>
-        )
-      )}
+          <div className="flex items-start">
+            <Clock className="h-5 w-5 text-gray-500 mr-3 mt-0.5" />
+            <div>
+              <p className="font-medium">
+                {formattedDate(conversation.created_at)}{" "}
+                {formattedTime(conversation.created_at)}
+              </p>
+              <p className="text-sm text-gray-500">Conversation started</p>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

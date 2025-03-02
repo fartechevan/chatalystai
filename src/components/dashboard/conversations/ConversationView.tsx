@@ -32,10 +32,10 @@ export function ConversationView() {
   const filteredConversations = conversations.filter(conv => {
     const searchLower = searchQuery.toLowerCase();
     return (
-      conv.customer_name?.toLowerCase().includes(searchLower) ||
-      conv.lead?.name?.toLowerCase().includes(searchLower) ||
+      (conv.lead?.name?.toLowerCase().includes(searchLower) ||
+      conv.lead?.contact_first_name?.toLowerCase().includes(searchLower) ||
       conv.lead_id?.toLowerCase().includes(searchLower) ||
-      false
+      false)
     );
   });
 
