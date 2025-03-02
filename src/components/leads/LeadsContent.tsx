@@ -13,10 +13,10 @@ interface LeadsContentProps {
 
 interface Lead {
   id: string;
-  name: string;
-  value: number;
-  company_name: string | null;
-  contact_first_name: string | null;
+  name?: string | null;
+  value?: number | null;
+  company_name?: string | null;
+  contact_first_name?: string | null;
   customer_id?: string | null;
 }
 
