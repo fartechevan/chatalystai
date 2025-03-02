@@ -1,9 +1,8 @@
-
 import { useState, useEffect } from "react";
 import { Lead } from "../../types";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { fetchLeadTags, addTagToLead, removeTagFromLead } from "../../api/leadQueries";
+import { fetchLeadTags, addTagToLead, removeTagFromLead } from "../../api/lead/leadTags";
 
 export function useLeadTags(lead: Lead | null) {
   const [tags, setTags] = useState<string[]>([]);

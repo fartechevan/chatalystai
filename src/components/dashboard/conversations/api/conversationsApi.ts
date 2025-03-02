@@ -3,4 +3,4 @@
 // Import and re-export all query functions from the new structure
 export * from './conversationQueries';
 export * from './messageQueries';
-export * from './leadQueries';
+export * from './lead';
