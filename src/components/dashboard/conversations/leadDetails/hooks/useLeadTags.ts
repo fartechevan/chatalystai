@@ -25,7 +25,7 @@ export function useLeadTags(lead: Lead | null) {
   };
 
   const handleAddTag = async (tag: string) => {
-    if (!tag.trim() || !lead) return;
+    if (!tag.trim() || !lead?.id) return;
     
     try {
       const success = await addTagToLead(lead.id, tag.trim());
@@ -58,7 +58,7 @@ export function useLeadTags(lead: Lead | null) {
   };
 
   const handleRemoveTag = async (tagToRemove: string) => {
-    if (!lead) return;
+    if (!lead?.id) return;
     
     try {
       const success = await removeTagFromLead(lead.id, tagToRemove);

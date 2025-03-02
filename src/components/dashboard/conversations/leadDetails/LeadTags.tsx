@@ -8,8 +8,8 @@ import { cn } from "@/lib/utils";
 interface LeadTagsProps {
   tags: string[];
   setTags: (tags: string[]) => void;
-  onAddTag: (tag: string) => void;
-  onRemoveTag: (tag: string) => void;
+  onAddTag: (tag: string) => Promise<void>;
+  onRemoveTag: (tag: string) => Promise<void>;
   isLoading?: boolean;
 }
 
