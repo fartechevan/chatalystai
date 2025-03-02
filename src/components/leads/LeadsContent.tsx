@@ -1,4 +1,3 @@
-
 import { Skeleton } from "@/components/ui/skeleton";
 import { LeadsHeader } from "./LeadsHeader";
 import { LeadsStage } from "./LeadsStage";
@@ -67,26 +66,25 @@ export function LeadsContent({ pipelineId }: LeadsContentProps) {
         } else {
           // Filter out any null leads and ensure they match our interface
           const validLeads = stageLeadsData
-            ?.map(item => {
-              // Ensure each lead has the required properties
-              if (item.lead && typeof item.lead === 'object') {
+            ?.filter(item => item.lead !== null)
+            .map(item => {
+              if (item.lead) {
                 return {
-                  ...item.lead,
-                  // Ensure required properties have default values if missing
-                  id: item.lead.id || '',
-                  created_at: item.lead.created_at || new Date().toISOString(),
-                  user_id: item.lead.user_id || '',
-                  // Optional properties can be undefined
+                  id: item.lead.id,
+                  created_at: item.lead.created_at,
+                  user_id: item.lead.user_id,
+                  // Optional properties
                   name: item.lead.name || null,
                   value: item.lead.value || null,
                   company_name: item.lead.company_name || null,
                   contact_first_name: item.lead.contact_first_name || null,
-                  customer_id: item.lead.customer_id || null
+                  customer_id: item.lead.customer_id || null,
+                  pipeline_stage_id: stage.id
                 } as Lead;
               }
               return null;
             })
-            .filter(Boolean) as Lead[];
+            .filter((lead): lead is Lead => lead !== null);
           
           leadsData[stage.id] = validLeads || [];
         }
