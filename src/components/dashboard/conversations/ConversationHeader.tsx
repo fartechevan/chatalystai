@@ -1,10 +1,9 @@
-
 import { Conversation, Lead } from "./types";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"; 
 import { MoreHorizontal, Phone, Video, PanelRightClose, PanelLeftClose, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useEffect, useState } from "react";
-import { fetchLeadById } from "./api/conversationsApi";
+import { fetchLeadById } from "./api";
 
 interface ConversationHeaderProps {
   conversation: Conversation | null;
@@ -24,27 +23,22 @@ export function ConversationHeader({
   const [lead, setLead] = useState<Lead | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
-  // Function to format the lead ID without any prefix
   const getFormattedLeadId = (id?: string | null) => {
     if (!id) return '163674';
-    // Just return the ID or its first 6 characters if it's long
     return id.length > 6 ? id.slice(0, 6) : id;
   };
 
   useEffect(() => {
     async function loadLead() {
-      // Reset lead when conversation changes
       setLead(null);
       
       if (!conversation) return;
       
-      // If conversation has a lead already loaded, use it
       if (conversation.lead) {
         setLead(conversation.lead);
         return;
       }
       
-      // If conversation has a lead_id, fetch the lead
       if (conversation.lead_id) {
         setIsLoading(true);
         try {
