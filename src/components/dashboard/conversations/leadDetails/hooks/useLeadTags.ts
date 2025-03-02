@@ -28,6 +28,7 @@ export function useLeadTags(lead: Lead | null) {
     if (!tag.trim() || !lead?.id) return;
     
     try {
+      console.log('Adding tag to lead:', lead.id, tag.trim());
       const success = await addTagToLead(lead.id, tag.trim());
       
       if (success) {
@@ -61,6 +62,7 @@ export function useLeadTags(lead: Lead | null) {
     if (!lead?.id) return;
     
     try {
+      console.log('Removing tag from lead:', lead.id, tagToRemove);
       const success = await removeTagFromLead(lead.id, tagToRemove);
       
       if (success) {
@@ -92,14 +94,18 @@ export function useLeadTags(lead: Lead | null) {
 
   useEffect(() => {
     if (lead?.id) {
+      console.log('Loading tags for lead:', lead.id);
       loadLeadTags(lead.id);
+    } else {
+      console.log('No lead ID available, clearing tags');
+      setTags([]);
     }
   }, [lead?.id]);
 
   useEffect(() => {
     if (!lead?.id) return;
 
-    console.log('Setting up lead_tags realtime subscription');
+    console.log('Setting up lead_tags realtime subscription for lead:', lead.id);
     const leadTagsChannel = supabase
       .channel('lead-tags-changes')
       .on(

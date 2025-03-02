@@ -26,13 +26,19 @@ export function LeadTags({ tags, setTags, onAddTag, onRemoveTag, isLoading = fal
       await onAddTag(newTag.trim());
       setNewTag("");
       setShowTagInput(false);
+    } catch (error) {
+      console.error("Error adding tag:", error);
     } finally {
       setIsSubmitting(false);
     }
   };
 
   const handleRemoveTag = async (tag: string) => {
-    await onRemoveTag(tag);
+    try {
+      await onRemoveTag(tag);
+    } catch (error) {
+      console.error("Error removing tag:", error);
+    }
   };
 
   if (isLoading) {
