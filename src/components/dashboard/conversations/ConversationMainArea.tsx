@@ -1,4 +1,3 @@
-
 import { MessageList } from "./MessageList";
 import { MessageInput } from "./MessageInput";
 import { Button } from "@/components/ui/button";
@@ -40,6 +39,27 @@ export function ConversationMainArea({
     );
   }
 
+  const getConversationName = () => {
+    if (selectedConversation.lead) {
+      if (selectedConversation.lead.contact_first_name) {
+        return selectedConversation.lead.contact_first_name;
+      }
+      if (selectedConversation.lead.name) {
+        return selectedConversation.lead.name;
+      }
+    }
+    
+    if (selectedConversation.customer_name) {
+      return selectedConversation.customer_name;
+    }
+    
+    if (selectedConversation.lead_id) {
+      return `Lead #${selectedConversation.lead_id.slice(0, 6)}`;
+    }
+    
+    return 'Unknown Customer';
+  };
+
   return (
     <div className="flex-1 flex flex-col bg-background">
       <div className="border-b p-4">
@@ -50,8 +70,13 @@ export function ConversationMainArea({
             </Button>
             <div>
               <h2 className="text-lg font-semibold flex items-center gap-2">
-                Lead #{selectedConversation.lead_id.slice(0, 6)}
+                {getConversationName()}
               </h2>
+              {selectedConversation.lead_id && (
+                <p className="text-xs text-muted-foreground">
+                  Lead #{selectedConversation.lead_id.slice(0, 6)}
+                </p>
+              )}
             </div>
           </div>
           <div className="flex items-center">

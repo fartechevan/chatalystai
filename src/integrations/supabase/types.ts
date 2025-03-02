@@ -124,6 +124,8 @@ export type Database = {
       }
       customers: {
         Row: {
+          company_address: string | null
+          company_name: string | null
           created_at: string
           email: string | null
           id: string
@@ -133,6 +135,8 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          company_address?: string | null
+          company_name?: string | null
           created_at?: string
           email?: string | null
           id?: string
@@ -142,6 +146,8 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          company_address?: string | null
+          company_name?: string | null
           created_at?: string
           email?: string | null
           id?: string
@@ -316,45 +322,27 @@ export type Database = {
       }
       leads: {
         Row: {
-          company_address: string | null
-          company_name: string | null
-          contact_email: string | null
-          contact_first_name: string | null
-          contact_phone: string | null
           created_at: string
           customer_id: string | null
           id: string
-          name: string
           pipeline_stage_id: string | null
           updated_at: string
           user_id: string
           value: number | null
         }
         Insert: {
-          company_address?: string | null
-          company_name?: string | null
-          contact_email?: string | null
-          contact_first_name?: string | null
-          contact_phone?: string | null
           created_at?: string
           customer_id?: string | null
           id?: string
-          name: string
           pipeline_stage_id?: string | null
           updated_at?: string
           user_id: string
           value?: number | null
         }
         Update: {
-          company_address?: string | null
-          company_name?: string | null
-          contact_email?: string | null
-          contact_first_name?: string | null
-          contact_phone?: string | null
           created_at?: string
           customer_id?: string | null
           id?: string
-          name?: string
           pipeline_stage_id?: string | null
           updated_at?: string
           user_id?: string

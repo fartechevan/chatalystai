@@ -1,4 +1,3 @@
-
 import { X, Menu, Search, Settings } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -27,10 +26,39 @@ export function ConversationLeftPanel({
   setSelectedConversation,
 }: ConversationLeftPanelProps) {
   const getAvatarInitial = (conversation: Conversation) => {
+    if (conversation.lead?.contact_first_name) {
+      return conversation.lead.contact_first_name[0].toUpperCase();
+    }
     if (conversation.customer_name && conversation.customer_name.length > 0) {
       return conversation.customer_name[0].toUpperCase();
     }
     return 'U';
+  };
+
+  const getConversationName = (conversation: Conversation) => {
+    // First try to get name from lead
+    if (conversation.lead) {
+      // Prefer contact_first_name if available
+      if (conversation.lead.contact_first_name) {
+        return conversation.lead.contact_first_name;
+      }
+      // Otherwise use lead name
+      if (conversation.lead.name) {
+        return conversation.lead.name;
+      }
+    }
+    
+    // Fallback to customer_name from conversation
+    if (conversation.customer_name) {
+      return conversation.customer_name;
+    }
+    
+    // Last resort: use lead_id
+    if (conversation.lead_id) {
+      return `Lead #${conversation.lead_id.slice(0, 6)}`;
+    }
+    
+    return 'Unknown Customer';
   };
 
   return (
@@ -85,14 +113,14 @@ export function ConversationLeftPanel({
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between gap-2">
                     <p className="text-sm font-medium truncate">
-                      {conv.lead?.name || conv.lead_id ? `Lead #${conv.lead_id?.slice(0, 6) || '?'}` : 'Unknown Lead'}
+                      {getConversationName(conv)}
                     </p>
                     <span className="text-xs text-muted-foreground whitespace-nowrap">
                       {new Date(conv.updated_at).toLocaleDateString()}
                     </span>
                   </div>
                   <p className="text-xs text-muted-foreground truncate mt-1">
-                    {conv.customer_name || 'Unknown Customer'}
+                    {conv.lead?.company_name || 'No company'}
                   </p>
                 </div>
               </button>
