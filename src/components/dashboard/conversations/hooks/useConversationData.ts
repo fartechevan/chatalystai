@@ -3,7 +3,13 @@ import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import type { Conversation, Message, Lead } from "../types";
 import { toast } from "sonner";
-import { fetchConversationsWithParticipants, fetchMessages, fetchConversationSummary, sendMessage, fetchLeadByConversation } from "../api/conversationsApi";
+import { 
+  fetchConversationsWithParticipants, 
+  fetchMessages, 
+  fetchConversationSummary, 
+  sendMessage, 
+  fetchLeadByConversation 
+} from "../api";
 import { transformConversationsData } from "../utils/conversationTransform";
 import { useConversationSummary } from "./useConversationSummary";
 import { supabase } from "@/integrations/supabase/client";
