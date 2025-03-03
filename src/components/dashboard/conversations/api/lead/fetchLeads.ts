@@ -17,9 +17,8 @@ export async function fetchLeadById(leadId: string): Promise<Lead | null> {
         customer:customers(
           name,
           company_name,
-          company_address,
-          email,
-          phone_number
+          phone_number,
+          email
         )
       `)
       .eq('id', leadId)
@@ -36,19 +35,16 @@ export async function fetchLeadById(leadId: string): Promise<Lead | null> {
     const lead: Lead = {
       id: data.id,
       created_at: data.created_at,
-      updated_at: data.updated_at || undefined,
+      updated_at: data.updated_at || data.created_at,
       user_id: data.user_id,
-      pipeline_stage_id: data.pipeline_stage_id || null,
-      customer_id: data.customer_id || null,
-      value: data.value || null,
+      pipeline_stage_id: data.pipeline_stage_id || '',
+      customer_id: data.customer_id || '',
+      value: data.value || 0,
       
       // Optional properties derived from customer data if available
-      name: data.customer?.name || null,
-      company_name: data.customer?.company_name || null,
-      company_address: data.customer?.company_address || null,
-      contact_email: data.customer?.email || null,
-      contact_phone: data.customer?.phone_number || null,
-      contact_first_name: data.customer?.name || null // Using customer name as first name
+      name: data.customer?.name || undefined,
+      company_name: data.customer?.company_name || undefined,
+      contact_first_name: data.customer?.name || undefined, // Using customer name as contact_first_name
     };
     
     return lead;

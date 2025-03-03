@@ -17,12 +17,11 @@ export function LeadContactInfo({ customer, lead }: LeadContactInfoProps) {
   const { toast } = useToast();
   const [isEditing, setIsEditing] = useState(false);
   const [companyName, setCompanyName] = useState(lead?.company_name || customer?.company_name || "");
-  const [companyAddress, setCompanyAddress] = useState(lead?.company_address || customer?.company_address || "");
   
   // Get the most appropriate name to display
   const displayName = lead?.contact_first_name || customer?.name || lead?.name || 'Contact';
-  const displayEmail = customer?.email || lead?.contact_email || '';
-  const displayPhone = customer?.phone_number || lead?.contact_phone || '';
+  const displayEmail = customer?.email || '';
+  const displayPhone = customer?.phone_number || '';
   
   // Get initial for avatar
   const getInitial = () => {
@@ -48,28 +47,11 @@ export function LeadContactInfo({ customer, lead }: LeadContactInfoProps) {
         const { error } = await supabase
           .from('customers')
           .update({
-            company_name: companyName,
-            company_address: companyAddress
+            company_name: companyName
           })
           .eq('id', customer.id);
 
         if (error) throw error;
-      }
-
-      if (lead?.id) {
-        // If we have both a lead and customer, no need to update lead with duplicate info
-        if (!customer?.id) {
-          // Update lead without a related customer
-          const { error } = await supabase
-            .from('leads')
-            .update({
-              // These fields don't actually exist in the database table,
-              // but including them for completeness
-            })
-            .eq('id', lead.id);
-
-          if (error) throw error;
-        }
       }
 
       toast({
@@ -132,16 +114,6 @@ export function LeadContactInfo({ customer, lead }: LeadContactInfoProps) {
               />
             </div>
             
-            <div className="space-y-2">
-              <Label htmlFor="company-address">Company Address</Label>
-              <Input 
-                id="company-address"
-                value={companyAddress}
-                onChange={(e) => setCompanyAddress(e.target.value)}
-                placeholder="Enter company address"
-              />
-            </div>
-            
             <div className="flex gap-2">
               <Button 
                 variant="default" 
@@ -164,11 +136,6 @@ export function LeadContactInfo({ customer, lead }: LeadContactInfoProps) {
             <div className="space-y-1">
               <span className="text-sm text-muted-foreground">Company:</span>
               <p className="text-sm">{companyName || "Not specified"}</p>
-            </div>
-            
-            <div className="space-y-1">
-              <span className="text-sm text-muted-foreground">Address:</span>
-              <p className="text-sm">{companyAddress || "Not specified"}</p>
             </div>
             
             <Button 

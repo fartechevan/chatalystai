@@ -30,19 +30,16 @@ export function useCustomerData(setLead: React.Dispatch<React.SetStateAction<Lea
         const leadData: Lead = {
           id: data.id,
           created_at: data.created_at,
-          updated_at: data.updated_at || undefined,
+          updated_at: data.updated_at || data.created_at,
           user_id: data.user_id,
-          pipeline_stage_id: data.pipeline_stage_id || null,
-          customer_id: data.customer_id || null,
-          value: data.value || null,
+          pipeline_stage_id: data.pipeline_stage_id || '',
+          customer_id: data.customer_id || '',
+          value: data.value || 0,
           
           // Virtual properties derived from customer data
-          name: customerData.name || null,
-          company_name: customerData.company_name || null,
-          company_address: customerData.company_address || null,
-          contact_email: customerData.email || null,
-          contact_phone: customerData.phone_number || null,
-          contact_first_name: customerData.name || null // Using customer name as first name
+          name: customerData.name,
+          company_name: customerData.company_name || undefined,
+          contact_first_name: customerData.name
         };
         
         console.log("Handling lead data:", leadData);

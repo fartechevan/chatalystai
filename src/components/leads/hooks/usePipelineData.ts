@@ -54,6 +54,7 @@ export function usePipelineData(pipelineId: string | null) {
               value,
               customer_id,
               created_at,
+              updated_at,
               user_id,
               customers:customers (
                 name,
@@ -76,22 +77,21 @@ export function usePipelineData(pipelineId: string | null) {
             .map(item => {
               if (item.lead) {
                 const lead = item.lead;
-                return {
+                const typedLead: Lead = {
                   id: lead.id,
                   created_at: lead.created_at,
+                  updated_at: lead.updated_at || lead.created_at,
                   user_id: lead.user_id,
-                  // Optional properties
-                  value: lead.value || null,
-                  customer_id: lead.customer_id || null,
+                  value: lead.value || 0,
+                  customer_id: lead.customer_id || '',
                   pipeline_stage_id: stage.id,
                   
                   // Virtual properties from customer data
-                  name: lead.customers?.name || null,
-                  company_name: lead.customers?.company_name || null,
-                  contact_first_name: lead.customers?.name || null,
-                  contact_email: lead.customers?.email || null,
-                  contact_phone: lead.customers?.phone_number || null
-                } as Lead;
+                  name: lead.customers?.name,
+                  company_name: lead.customers?.company_name,
+                  contact_first_name: lead.customers?.name
+                };
+                return typedLead;
               }
               return null;
             })
