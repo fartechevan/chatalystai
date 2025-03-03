@@ -1,36 +1,31 @@
 
 import { Customer, Lead } from "../../../types";
 
-/**
- * Calculate the number of days since a date string
- */
-export function calculateDaysSinceCreation(createdAt: string): number {
-  const created = new Date(createdAt);
+export function calculateDaysSinceCreation(createdAtStr: string): number {
+  const createdAt = new Date(createdAtStr);
   const now = new Date();
-  const diffTime = Math.abs(now.getTime() - created.getTime());
-  const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)); 
-  return diffDays;
+  
+  // Calculate time difference in milliseconds
+  const timeDiff = now.getTime() - createdAt.getTime();
+  
+  // Convert to days
+  return Math.floor(timeDiff / (1000 * 3600 * 24));
 }
 
-/**
- * Creates a fake lead object from customer data for display purposes
- */
 export function createFakeLeadFromCustomer(
   customer: Customer,
   createdAt: string,
   userId: string
 ): Lead {
   return {
-    id: `fake-${customer.id}`,
+    id: `fake-lead-${customer.id}`,
     created_at: createdAt,
     updated_at: createdAt,
     customer_id: customer.id,
-    user_id: userId,
-    pipeline_stage_id: '',
     value: 0,
-    name: customer.name,
-    contact_first_name: customer.name,
-    company_name: customer.company_name,
+    pipeline_stage_id: '',
+    user_id: userId,
+    company_name: customer.company_name || undefined,
     contact_email: customer.email,
     contact_phone: customer.phone_number,
     company_address: customer.company_address

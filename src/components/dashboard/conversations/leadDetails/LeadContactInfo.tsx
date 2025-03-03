@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
@@ -19,15 +18,13 @@ export function LeadContactInfo({ customer, lead }: LeadContactInfoProps) {
   const [companyName, setCompanyName] = useState(lead?.company_name || customer?.company_name || "");
   
   // Get the most appropriate name to display
-  const displayName = lead?.contact_first_name || customer?.name || lead?.name || 'Contact';
+  const displayName = customer?.name || 'Contact';
   const displayEmail = customer?.email || '';
   const displayPhone = customer?.phone_number || '';
   
   // Get initial for avatar
   const getInitial = () => {
-    if (lead?.contact_first_name) return lead.contact_first_name[0].toUpperCase();
     if (customer?.name) return customer.name[0].toUpperCase();
-    if (lead?.name) return lead.name[0].toUpperCase();
     return 'C';
   };
 

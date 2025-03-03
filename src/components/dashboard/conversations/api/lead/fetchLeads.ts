@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import type { Lead } from "../../types";
 
@@ -43,9 +42,7 @@ export async function fetchLeadById(leadId: string): Promise<Lead | null> {
       value: data.value || 0,
       
       // Virtual properties derived from customer data if available
-      name: data.customer?.name || undefined,
       company_name: data.customer?.company_name || undefined,
-      contact_first_name: data.customer?.name || undefined,
       
       // Additional properties for ConversationUserDetails
       contact_email: data.customer?.email || undefined,

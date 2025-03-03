@@ -15,6 +15,7 @@ export function ConversationView() {
   const [leftPanelOpen, setLeftPanelOpen] = useState(true);
   const [leadDetailsExpanded, setLeadDetailsExpanded] = useState(true);
   const [participantsData, setParticipantsData] = useState<Record<string, any>>({});
+  const [customersData, setCustomersData] = useState<Record<string, any>>({});
   const queryClient = useQueryClient();
 
   const {
@@ -62,6 +63,34 @@ export function ConversationView() {
     loadParticipantsData();
   }, []);
 
+  // Fetch customer data for all leads with customer_id
+  useEffect(() => {
+    const loadCustomersData = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('customers')
+          .select('*');
+        
+        if (error) {
+          console.error('Error loading customers:', error);
+          return;
+        }
+
+        // Create a mapping of customer id to customer data
+        const customersMap: Record<string, any> = {};
+        for (const customer of data || []) {
+          customersMap[customer.id] = customer;
+        }
+
+        setCustomersData(customersMap);
+      } catch (err) {
+        console.error('Error in customer data processing:', err);
+      }
+    };
+
+    loadCustomersData();
+  }, []);
+
   // Process conversations to add customer_name from participants
   const processedConversations = conversations.map(conv => {
     const conversationParticipants = participantsData[conv.conversation_id] || [];
@@ -80,12 +109,9 @@ export function ConversationView() {
     // Set customer_name if member participant exists
     if (memberParticipant && memberParticipant.external_user_identifier) {
       processedConv.customer_name = memberParticipant.external_user_identifier;
-    } else if (conv.lead?.name) {
-      // Use lead name as fallback
-      processedConv.customer_name = conv.lead.name;
-    } else if (conv.lead?.contact_first_name) {
-      // Use contact_first_name as another fallback
-      processedConv.customer_name = conv.lead.contact_first_name;
+    } else if (conv.lead?.customer_id && customersData[conv.lead.customer_id]) {
+      // Use customer name from customers data
+      processedConv.customer_name = customersData[conv.lead.customer_id].name;
     }
     
     return processedConv;
@@ -94,17 +120,12 @@ export function ConversationView() {
   const filteredConversations = processedConversations.filter(conv => {
     const searchLower = searchQuery.toLowerCase();
     
-    // Search in lead data if it exists
-    if (conv.lead) {
-      if (conv.lead.contact_first_name && 
-          typeof conv.lead.contact_first_name === 'string' && 
-          conv.lead.contact_first_name.toLowerCase().includes(searchLower)) {
-        return true;
-      }
-      
-      if (conv.lead.name && 
-          typeof conv.lead.name === 'string' && 
-          conv.lead.name.toLowerCase().includes(searchLower)) {
+    // Search in customer data if lead has customer_id
+    if (conv.lead?.customer_id && customersData[conv.lead.customer_id]) {
+      const customer = customersData[conv.lead.customer_id];
+      if (customer.name && 
+          typeof customer.name === 'string' && 
+          customer.name.toLowerCase().includes(searchLower)) {
         return true;
       }
     }

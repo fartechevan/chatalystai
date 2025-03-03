@@ -37,9 +37,7 @@ export function useCustomerData(setLead: React.Dispatch<React.SetStateAction<Lea
           value: data.value || 0,
           
           // Virtual properties derived from customer data
-          name: customerData.name,
-          company_name: customerData.company_name || undefined,
-          contact_first_name: customerData.name
+          company_name: customerData.company_name || undefined
         };
         
         console.log("Handling lead data:", leadData);

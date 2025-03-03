@@ -87,9 +87,7 @@ export function usePipelineData(pipelineId: string | null) {
                   pipeline_stage_id: stage.id,
                   
                   // Virtual properties from customer data
-                  name: lead.customers?.name,
-                  company_name: lead.customers?.company_name,
-                  contact_first_name: lead.customers?.name
+                  company_name: lead.customers?.company_name
                 };
                 return typedLead;
               }
