@@ -48,7 +48,7 @@ export async function fetchLeadById(leadId: string): Promise<Lead | null> {
       company_address: data.customer?.company_address || null,
       contact_email: data.customer?.email || null,
       contact_phone: data.customer?.phone_number || null,
-      contact_first_name: data.customer?.name || null // Using customer name as first name for now
+      contact_first_name: data.customer?.name || null // Using customer name as first name
     };
     
     return lead;

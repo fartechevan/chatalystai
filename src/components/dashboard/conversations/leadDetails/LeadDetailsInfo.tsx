@@ -1,6 +1,7 @@
 
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Profile, Customer, Lead } from "../types";
+import { Button } from "@/components/ui/button";
 
 interface LeadDetailsInfoProps {
   profiles: Profile[];
@@ -55,39 +56,9 @@ export function LeadDetailsInfo({
         <div className="text-sm">{lead?.value?.toLocaleString() || 0} RM</div>
       </div>
 
-      <LeadContactDetails customer={customer} lead={lead} />
-
       <Button variant="link" size="sm" className="text-muted-foreground px-0">
         cancel
       </Button>
     </div>
   );
 }
-
-function LeadContactDetails({ customer, lead }: { customer: Customer | null, lead: Lead | null }) {
-  return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-2 items-center">
-        <label className="text-sm text-muted-foreground">Work phone</label>
-        <div className="text-sm">{lead?.contact_phone || customer?.phone_number || '...'}</div>
-      </div>
-      
-      <div className="grid grid-cols-2 gap-2 items-center">
-        <label className="text-sm text-muted-foreground">Work email</label>
-        <div className="text-sm">{lead?.contact_email || customer?.email || '...'}</div>
-      </div>
-      
-      <div className="grid grid-cols-2 gap-2 items-center">
-        <label className="text-sm text-muted-foreground">Company</label>
-        <div className="text-sm">{lead?.company_name || '...'}</div>
-      </div>
-      
-      <div className="grid grid-cols-2 gap-2 items-center">
-        <label className="text-sm text-muted-foreground">Address</label>
-        <div className="text-sm">{lead?.company_address || '...'}</div>
-      </div>
-    </div>
-  );
-}
-
-import { Button } from "@/components/ui/button";

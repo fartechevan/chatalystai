@@ -4,11 +4,7 @@ import { Lead, Conversation, Profile } from "../../types";
 import { fetchLeadById } from "../../api/leadQueries";
 import { useCustomerData } from "./useCustomerData";
 import { useRealTimeUpdates } from "./useRealTimeUpdates";
-import { 
-  createMockLeadAndCustomer, 
-  createMockLeadFromConversation,
-  calculateDaysSinceCreation
-} from "./utils/leadUtils";
+import { calculateDaysSinceCreation } from "./utils/leadUtils";
 
 export function useLeadData(
   isExpanded: boolean,
@@ -61,11 +57,8 @@ export function useLeadData(
             if (leadData) {
               handleLeadData(leadData);
             } else {
-              const { mockLead, mockCustomer, daysSinceCreation } = 
-                createMockLeadFromConversation(selectedConversation, profiles[0]?.id || 'mock-user-id');
-              setLead(mockLead);
-              setCustomer(mockCustomer);
-              setDaysSinceCreation(daysSinceCreation);
+              setLead(null);
+              setCustomer(null);
             }
           } else {
             if (selectedConversation.participants && selectedConversation.participants.length > 0) {
@@ -77,34 +70,22 @@ export function useLeadData(
                 console.log("Finding lead for customer:", customerParticipant.external_user_identifier);
                 await handleCustomerFetch(customerParticipant.external_user_identifier, profiles);
               } else {
-                const { mockLead, mockCustomer, daysSinceCreation } = 
-                  createMockLeadFromConversation(selectedConversation, profiles[0]?.id || 'mock-user-id');
-                setLead(mockLead);
-                setCustomer(mockCustomer);
-                setDaysSinceCreation(daysSinceCreation);
+                setLead(null);
+                setCustomer(null);
               }
             } else {
-              const { mockLead, mockCustomer, daysSinceCreation } = 
-                createMockLeadAndCustomer(profiles[0]?.id || 'mock-user-id');
-              setLead(mockLead);
-              setCustomer(mockCustomer);
-              setDaysSinceCreation(daysSinceCreation);
+              setLead(null);
+              setCustomer(null);
             }
           }
         } else {
-          const { mockLead, mockCustomer, daysSinceCreation } = 
-            createMockLeadAndCustomer(profiles[0]?.id || 'mock-user-id');
-          setLead(mockLead);
-          setCustomer(mockCustomer);
-          setDaysSinceCreation(daysSinceCreation);
+          setLead(null);
+          setCustomer(null);
         }
       } catch (error) {
         console.error('Error:', error);
-        const { mockLead, mockCustomer, daysSinceCreation } = 
-          createMockLeadAndCustomer(profiles[0]?.id || 'mock-user-id');
-        setLead(mockLead);
-        setCustomer(mockCustomer);
-        setDaysSinceCreation(daysSinceCreation);
+        setLead(null);
+        setCustomer(null);
       } finally {
         setIsLoading(false);
       }
@@ -113,7 +94,7 @@ export function useLeadData(
     if (isExpanded) {
       fetchData();
     }
-  }, [isExpanded, selectedConversation, handleLeadData, handleCustomerFetch, profiles]);
+  }, [isExpanded, selectedConversation, handleLeadData, handleCustomerFetch, profiles, setCustomer]);
 
   return {
     isLoading,
