@@ -1,3 +1,4 @@
+
 import { X, Menu, Search, Settings } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -96,36 +97,42 @@ export function ConversationLeftPanel({
         </div>
 
         <ScrollArea className="flex-1">
-          <div className="space-y-1">
-            {filteredConversations.map((conv) => (
-              <button
-                key={conv.conversation_id}
-                className={`w-full flex items-start gap-3 p-4 hover:bg-muted text-left ${
-                  selectedConversation?.conversation_id === conv.conversation_id ? 'bg-muted' : ''
-                }`}
-                onClick={() => setSelectedConversation(conv)}
-              >
-                <Avatar className="h-10 w-10">
-                  <AvatarFallback>
-                    {getAvatarInitial(conv)}
-                  </AvatarFallback>
-                </Avatar>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between gap-2">
-                    <p className="text-sm font-medium truncate">
-                      {getConversationName(conv)}
+          {filteredConversations.length === 0 ? (
+            <div className="p-4 text-center text-muted-foreground">
+              <p>No conversations found</p>
+            </div>
+          ) : (
+            <div className="space-y-1">
+              {filteredConversations.map((conv) => (
+                <button
+                  key={conv.conversation_id}
+                  className={`w-full flex items-start gap-3 p-4 hover:bg-muted text-left ${
+                    selectedConversation?.conversation_id === conv.conversation_id ? 'bg-muted' : ''
+                  }`}
+                  onClick={() => setSelectedConversation(conv)}
+                >
+                  <Avatar className="h-10 w-10">
+                    <AvatarFallback>
+                      {getAvatarInitial(conv)}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-sm font-medium truncate">
+                        {getConversationName(conv)}
+                      </p>
+                      <span className="text-xs text-muted-foreground whitespace-nowrap">
+                        {new Date(conv.updated_at).toLocaleDateString()}
+                      </span>
+                    </div>
+                    <p className="text-xs text-muted-foreground truncate mt-1">
+                      {conv.lead_id ? `Lead #${conv.lead_id.slice(0, 6)}` : 'No lead'}
                     </p>
-                    <span className="text-xs text-muted-foreground whitespace-nowrap">
-                      {new Date(conv.updated_at).toLocaleDateString()}
-                    </span>
                   </div>
-                  <p className="text-xs text-muted-foreground truncate mt-1">
-                    {conv.lead?.company_name || 'No company'}
-                  </p>
-                </div>
-              </button>
-            ))}
-          </div>
+                </button>
+              ))}
+            </div>
+          )}
         </ScrollArea>
       </div>
     </div>

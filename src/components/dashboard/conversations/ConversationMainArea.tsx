@@ -1,8 +1,9 @@
+
 import { MessageList } from "./MessageList";
 import { MessageInput } from "./MessageInput";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { MoreHorizontal, ChevronLeft } from "lucide-react";
+import { MoreHorizontal, ChevronLeft, MessageSquare } from "lucide-react";
 import type { Conversation, Message } from "./types";
 import type { UseMutationResult } from "@tanstack/react-query";
 
@@ -33,7 +34,8 @@ export function ConversationMainArea({
 }: ConversationMainAreaProps) {
   if (!selectedConversation) {
     return (
-      <div className="flex-1 flex items-center justify-center">
+      <div className="flex-1 flex flex-col items-center justify-center bg-muted/10">
+        <MessageSquare className="h-12 w-12 text-muted-foreground mb-4" />
         <p className="text-muted-foreground">Select a conversation to start chatting</p>
       </div>
     );
@@ -91,6 +93,12 @@ export function ConversationMainArea({
         {isLoading ? (
           <div className="flex items-center justify-center h-full">
             <p>Loading messages...</p>
+          </div>
+        ) : messages.length === 0 ? (
+          <div className="flex flex-col items-center justify-center h-full text-center">
+            <MessageSquare className="h-10 w-10 text-muted-foreground mb-2" />
+            <p className="text-muted-foreground">No messages in this conversation</p>
+            <p className="text-xs text-muted-foreground mt-1">Start typing below to send a message</p>
           </div>
         ) : (
           <MessageList
