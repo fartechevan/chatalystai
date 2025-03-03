@@ -7,7 +7,7 @@ export const findAdminParticipant = (conversation: Conversation): ConversationPa
     return undefined;
   }
   
-  return conversation.participants.find(p => p.role === 'admin');
+  return conversation.participants.find(p => p.role === 'admin') as ConversationParticipant | undefined;
 };
 
 export const findMemberParticipant = (conversation: Conversation): ConversationParticipant | undefined => {
@@ -15,5 +15,5 @@ export const findMemberParticipant = (conversation: Conversation): ConversationP
     return undefined;
   }
   
-  return conversation.participants.find(p => p.role === 'member');
+  return conversation.participants.find(p => p.role === 'member') as ConversationParticipant | undefined;
 };

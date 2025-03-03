@@ -2,7 +2,8 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
-import type { Conversation, ConversationParticipant } from "./types";
+import type { Conversation } from "./types";
+import type { ConversationParticipant } from "./types/conversation";
 
 interface ConversationParticipantsProps {
   conversation: Conversation | null;
