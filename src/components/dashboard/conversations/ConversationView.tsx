@@ -80,10 +80,10 @@ export function ConversationView() {
     // Set customer_name if member participant exists
     if (memberParticipant && memberParticipant.external_user_identifier) {
       processedConv.customer_name = memberParticipant.external_user_identifier;
-    } else if (conv.lead && typeof conv.lead.name === 'string') {
+    } else if (conv.lead && conv.lead.name) {
       // Use lead name as fallback
       processedConv.customer_name = conv.lead.name;
-    } else if (conv.lead && typeof conv.lead.contact_first_name === 'string') {
+    } else if (conv.lead && conv.lead.contact_first_name) {
       // Use contact_first_name as another fallback
       processedConv.customer_name = conv.lead.contact_first_name;
     }
