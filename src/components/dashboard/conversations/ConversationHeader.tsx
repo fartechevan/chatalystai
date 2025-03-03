@@ -44,10 +44,14 @@ export function ConversationHeader({ conversation }: ConversationHeaderProps) {
       <div className="flex items-center space-x-3">
         <div className="relative">
           <div className="w-10 h-10 overflow-hidden rounded-full bg-gray-200 flex items-center justify-center">
-            {conversation.lead?.contact_first_name ? (
+            {conversation.customer_name ? (
               <span className="text-lg font-medium text-gray-700">
-                {conversation.lead.contact_first_name.charAt(0)}
+                {conversation.customer_name.charAt(0)}
               </span>
+            ) : conversation.lead?.name ? (
+              <span className="text-lg font-medium text-gray-700">
+                {conversation.lead.name.charAt(0)}
+              </span>  
             ) : (
               <User className="w-6 h-6 text-gray-500" />
             )}
@@ -56,7 +60,7 @@ export function ConversationHeader({ conversation }: ConversationHeaderProps) {
         </div>
         <div>
           <h2 className="font-semibold">
-            {conversation.lead?.contact_first_name || "Unknown Contact"}
+            {conversation.customer_name || conversation.lead?.name || "Unknown Contact"}
           </h2>
           <p className="text-xs text-gray-500">
             {conversation.lead?.company_name || "Unknown Company"}

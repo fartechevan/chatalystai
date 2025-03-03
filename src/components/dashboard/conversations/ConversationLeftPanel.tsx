@@ -1,4 +1,3 @@
-
 import { X, Menu, Search, Settings } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -27,34 +26,28 @@ export function ConversationLeftPanel({
   setSelectedConversation,
 }: ConversationLeftPanelProps) {
   const getAvatarInitial = (conversation: Conversation) => {
-    if (conversation.lead?.contact_first_name) {
-      return conversation.lead.contact_first_name[0].toUpperCase();
-    }
     if (conversation.customer_name && conversation.customer_name.length > 0) {
       return conversation.customer_name[0].toUpperCase();
     }
+    
     return 'U';
   };
 
   const getConversationName = (conversation: Conversation) => {
-    // First try to get name from lead
-    if (conversation.lead) {
-      // Prefer contact_first_name if available
-      if (conversation.lead.contact_first_name) {
-        return conversation.lead.contact_first_name;
-      }
-      // Otherwise use lead name
-      if (conversation.lead.name) {
-        return conversation.lead.name;
-      }
-    }
-    
-    // Fallback to customer_name from conversation
     if (conversation.customer_name) {
       return conversation.customer_name;
     }
     
-    // Last resort: use lead_id
+    if (conversation.lead) {
+      if (conversation.lead.name) {
+        return conversation.lead.name;
+      }
+      
+      if (conversation.lead.company_name) {
+        return conversation.lead.company_name;
+      }
+    }
+    
     if (conversation.lead_id) {
       return `Lead #${conversation.lead_id.slice(0, 6)}`;
     }

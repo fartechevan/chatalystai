@@ -15,4 +15,7 @@ export interface Lead {
   contact_email?: string;
   contact_phone?: string;
   company_address?: string;
+  
+  // Names from customer for backwards compatibility
+  name?: string; // Customer name from the customers table
 }

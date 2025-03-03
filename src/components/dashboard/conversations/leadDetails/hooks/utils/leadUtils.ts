@@ -28,6 +28,7 @@ export function createFakeLeadFromCustomer(
     company_name: customer.company_name || undefined,
     contact_email: customer.email,
     contact_phone: customer.phone_number,
-    company_address: customer.company_address
+    company_address: customer.company_address,
+    name: customer.name
   };
 }

@@ -81,21 +81,22 @@ export function ConversationMainArea({
       return memberParticipant.external_user_identifier;
     }
     
-    // Then try to get name from lead
+    // Then try to get name from customer_name in conversation
+    if (selectedConversation.customer_name) {
+      return selectedConversation.customer_name;
+    }
+    
+    // Try to get name from lead
     if (selectedConversation.lead) {
-      // Prefer contact_first_name if available
-      if (selectedConversation.lead.contact_first_name) {
-        return selectedConversation.lead.contact_first_name;
-      }
-      // Otherwise use lead name
+      // Use name from lead (which comes from customer)
       if (selectedConversation.lead.name) {
         return selectedConversation.lead.name;
       }
-    }
-    
-    // Fallback to customer_name from conversation
-    if (selectedConversation.customer_name) {
-      return selectedConversation.customer_name;
+      
+      // Use company name as fallback from lead
+      if (selectedConversation.lead.company_name) {
+        return selectedConversation.lead.company_name;
+      }
     }
     
     // Last resort: use lead_id

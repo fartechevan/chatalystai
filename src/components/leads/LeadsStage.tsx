@@ -88,14 +88,14 @@ export function LeadsStage({ name, id, index = 0, leads }: LeadsStageProps) {
                           </div>
                         ) : null}
                         
-                        {lead.contact_first_name ? (
+                        {lead.name ? (
                           <div className="flex items-center">
                             <User className="h-3 w-3 mr-1" />
-                            <span>{lead.contact_first_name}</span>
+                            <span>{lead.name}</span>
                           </div>
                         ) : null}
                         
-                        {!lead.company_name && !lead.contact_first_name && (
+                        {!lead.company_name && !lead.name && (
                           <span>No additional info</span>
                         )}
                       </div>
