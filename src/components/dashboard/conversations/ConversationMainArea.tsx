@@ -1,3 +1,4 @@
+
 import { MessageList } from "./MessageList";
 import { MessageInput } from "./MessageInput";
 import { Button } from "@/components/ui/button";
@@ -5,6 +6,8 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { MoreHorizontal, ChevronLeft, MessageSquare } from "lucide-react";
 import type { Conversation, Message } from "./types";
 import type { UseMutationResult } from "@tanstack/react-query";
+import { useState, useEffect } from "react";
+import { supabase } from "@/integrations/supabase/client";
 
 interface ConversationMainAreaProps {
   selectedConversation: Conversation | null;
@@ -31,6 +34,34 @@ export function ConversationMainArea({
   summary,
   summaryTimestamp
 }: ConversationMainAreaProps) {
+  const [participantInfo, setParticipantInfo] = useState<Record<string, any>>({});
+
+  useEffect(() => {
+    const loadParticipantInfo = async () => {
+      if (!selectedConversation?.conversation_id) return;
+
+      try {
+        const { data, error } = await supabase
+          .from('conversation_participants')
+          .select('id, user_id, external_user_identifier, role')
+          .eq('conversation_id', selectedConversation.conversation_id);
+
+        if (error) throw error;
+
+        const participantMap: Record<string, any> = {};
+        for (const participant of data || []) {
+          participantMap[participant.id] = participant;
+        }
+
+        setParticipantInfo(participantMap);
+      } catch (err) {
+        console.error('Error loading participant info:', err);
+      }
+    };
+
+    loadParticipantInfo();
+  }, [selectedConversation?.conversation_id]);
+
   if (!selectedConversation) {
     return (
       <div className="flex-1 flex flex-col items-center justify-center bg-muted/10">
@@ -41,7 +72,16 @@ export function ConversationMainArea({
   }
 
   const getConversationName = () => {
-    // First try to get name from lead
+    // First check participant info for a member role
+    const memberParticipant = Object.values(participantInfo).find(
+      (p) => p.role === 'member'
+    );
+    
+    if (memberParticipant && memberParticipant.external_user_identifier) {
+      return memberParticipant.external_user_identifier;
+    }
+    
+    // Then try to get name from lead
     if (selectedConversation.lead) {
       // Prefer contact_first_name if available
       if (selectedConversation.lead.contact_first_name) {
