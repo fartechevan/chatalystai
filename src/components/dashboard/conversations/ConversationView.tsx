@@ -34,21 +34,23 @@ export function ConversationView() {
     
     // Search in lead data
     if (conv.lead) {
-      if (conv.lead.contact_first_name?.toLowerCase().includes(searchLower)) {
+      // Only access contact_first_name if it exists in the lead object
+      if (conv.lead.contact_first_name && conv.lead.contact_first_name.toLowerCase().includes(searchLower)) {
         return true;
       }
-      if (conv.lead.name?.toLowerCase().includes(searchLower)) {
+      // Only access name if it exists in the lead object
+      if (conv.lead.name && conv.lead.name.toLowerCase().includes(searchLower)) {
         return true;
       }
     }
     
-    // Search in customer_name
-    if (conv.customer_name?.toLowerCase().includes(searchLower)) {
+    // Search in customer_name if it exists
+    if (conv.customer_name && conv.customer_name.toLowerCase().includes(searchLower)) {
       return true;
     }
     
     // Search in lead_id
-    if (conv.lead_id?.toLowerCase().includes(searchLower)) {
+    if (conv.lead_id && conv.lead_id.toLowerCase().includes(searchLower)) {
       return true;
     }
     
