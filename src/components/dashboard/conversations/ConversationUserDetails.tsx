@@ -1,150 +1,165 @@
 
-import {
-  Calendar,
-  Clock,
-  Mail,
-  MapPin,
-  Phone,
-  User,
-  Building,
-} from "lucide-react";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import type { Conversation } from "./types";
+import { Phone, Mail, Building, MapPin, User, X } from "lucide-react";
+import { useState } from "react";
+import type { Lead, Customer } from "./types";
 
 interface ConversationUserDetailsProps {
-  conversation: Conversation | null;
+  isOpen: boolean;
+  onClose: () => void;
+  lead: Lead | null;
+  customer: Customer | null;
 }
 
 export function ConversationUserDetails({
-  conversation,
+  isOpen,
+  onClose,
+  lead,
+  customer
 }: ConversationUserDetailsProps) {
-  if (!conversation || !conversation.lead) {
-    return (
-      <div className="flex flex-col items-center justify-center h-full p-4 text-center">
-        <User className="h-16 w-16 text-gray-300 mb-4" />
-        <h3 className="text-lg font-medium">No User Selected</h3>
-        <p className="text-sm text-gray-500 max-w-xs mt-2">
-          Select a conversation to view customer details
-        </p>
-      </div>
-    );
-  }
-
-  const lead = conversation.lead;
-
-  // Format date strings
-  const formattedDate = (dateString: string) => {
-    if (!dateString) return "N/A";
-    try {
-      const date = new Date(dateString);
-      return new Intl.DateTimeFormat("en-US", {
-        month: "short",
-        day: "numeric",
-        year: "numeric",
-      }).format(date);
-    } catch (e) {
-      return "Invalid date";
+  const [activeTab, setActiveTab] = useState<'details' | 'activity'>('details');
+  
+  if (!isOpen) return null;
+  
+  // Get customer name from lead or customer object
+  const customerName = customer?.name || lead?.name || 'Unknown Customer';
+  
+  // Get avatar initials
+  const getInitials = () => {
+    if (customerName && customerName.length > 0) {
+      return customerName.charAt(0).toUpperCase();
     }
-  };
-
-  // Format time strings
-  const formattedTime = (dateString: string) => {
-    if (!dateString) return "";
-    try {
-      const date = new Date(dateString);
-      return new Intl.DateTimeFormat("en-US", {
-        hour: "numeric",
-        minute: "numeric",
-        hour12: true,
-      }).format(date);
-    } catch (e) {
-      return "";
-    }
+    return 'U';
   };
 
   return (
-    <div className="space-y-6">
-      <div>
-        <h3 className="text-lg font-semibold mb-2">Contact Information</h3>
-        <div className="space-y-3">
-          <div className="flex items-start">
-            <User className="h-5 w-5 text-gray-500 mr-3 mt-0.5" />
-            <div>
-              <p className="font-medium">
-                {lead.name || "Unknown"}
-              </p>
-              <p className="text-sm text-gray-500">Contact name</p>
-            </div>
-          </div>
-          {lead.contact_email && (
-            <div className="flex items-start">
-              <Mail className="h-5 w-5 text-gray-500 mr-3 mt-0.5" />
-              <div>
-                <p className="font-medium">{lead.contact_email}</p>
-                <p className="text-sm text-gray-500">Email address</p>
-              </div>
-            </div>
-          )}
-          {lead.contact_phone && (
-            <div className="flex items-start">
-              <Phone className="h-5 w-5 text-gray-500 mr-3 mt-0.5" />
-              <div>
-                <p className="font-medium">{lead.contact_phone}</p>
-                <p className="text-sm text-gray-500">Phone number</p>
-              </div>
-            </div>
-          )}
+    <div className="fixed inset-0 bg-background/80 backdrop-blur-sm z-50 flex justify-end">
+      <div className="bg-background h-full w-full max-w-md overflow-auto border-l shadow-lg animate-in slide-in-from-right">
+        <div className="flex items-center justify-between p-4 border-b">
+          <h2 className="text-lg font-semibold">Customer Details</h2>
+          <Button variant="ghost" size="icon" onClick={onClose}>
+            <X className="h-4 w-4" />
+          </Button>
         </div>
-      </div>
-
-      <Separator />
-
-      <div>
-        <h3 className="text-lg font-semibold mb-2">Company Information</h3>
-        <div className="space-y-3">
-          {lead.company_name && (
-            <div className="flex items-start">
-              <Building className="h-5 w-5 text-gray-500 mr-3 mt-0.5" />
-              <div>
-                <p className="font-medium">{lead.company_name}</p>
-                <p className="text-sm text-gray-500">Company name</p>
-              </div>
-            </div>
-          )}
-          {lead.company_address && (
-            <div className="flex items-start">
-              <MapPin className="h-5 w-5 text-gray-500 mr-3 mt-0.5" />
-              <div>
-                <p className="font-medium">{lead.company_address}</p>
-                <p className="text-sm text-gray-500">Company address</p>
-              </div>
-            </div>
-          )}
-        </div>
-      </div>
-
-      <Separator />
-
-      <div>
-        <h3 className="text-lg font-semibold mb-2">Lead Timeline</h3>
-        <div className="space-y-3">
-          <div className="flex items-start">
-            <Calendar className="h-5 w-5 text-gray-500 mr-3 mt-0.5" />
+        
+        <div className="p-4">
+          <div className="flex items-center gap-3 mb-6">
+            <Avatar className="h-16 w-16">
+              <AvatarImage alt={customerName} />
+              <AvatarFallback>{getInitials()}</AvatarFallback>
+            </Avatar>
             <div>
-              <p className="font-medium">{formattedDate(lead.created_at)}</p>
-              <p className="text-sm text-gray-500">Lead created</p>
+              <h3 className="text-xl font-medium">{customerName}</h3>
+              {lead?.company_name && (
+                <p className="text-sm text-muted-foreground">{lead.company_name}</p>
+              )}
             </div>
           </div>
-          <div className="flex items-start">
-            <Clock className="h-5 w-5 text-gray-500 mr-3 mt-0.5" />
-            <div>
-              <p className="font-medium">
-                {formattedDate(conversation.created_at)}{" "}
-                {formattedTime(conversation.created_at)}
-              </p>
-              <p className="text-sm text-gray-500">Conversation started</p>
-            </div>
+          
+          <div className="flex space-x-4 mb-6">
+            <Button 
+              variant={activeTab === 'details' ? 'default' : 'ghost'} 
+              onClick={() => setActiveTab('details')}
+              className="flex-1"
+            >
+              Details
+            </Button>
+            <Button 
+              variant={activeTab === 'activity' ? 'default' : 'ghost'} 
+              onClick={() => setActiveTab('activity')}
+              className="flex-1"
+            >
+              Activity
+            </Button>
           </div>
+          
+          {activeTab === 'details' ? (
+            <div className="space-y-6">
+              <div>
+                <h4 className="text-sm font-medium mb-2 flex items-center">
+                  <User className="h-4 w-4 mr-2" />
+                  Contact Information
+                </h4>
+                <div className="space-y-2 text-sm">
+                  {lead?.contact_phone && (
+                    <div className="flex items-start">
+                      <Phone className="h-4 w-4 mr-2 mt-0.5 text-muted-foreground" />
+                      <div>
+                        <p className="text-muted-foreground">Phone</p>
+                        <p>{lead.contact_phone}</p>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {lead?.contact_email && (
+                    <div className="flex items-start">
+                      <Mail className="h-4 w-4 mr-2 mt-0.5 text-muted-foreground" />
+                      <div>
+                        <p className="text-muted-foreground">Email</p>
+                        <p>{lead.contact_email}</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+              
+              <Separator />
+              
+              <div>
+                <h4 className="text-sm font-medium mb-2 flex items-center">
+                  <Building className="h-4 w-4 mr-2" />
+                  Company Information
+                </h4>
+                <div className="space-y-2 text-sm">
+                  {lead?.company_name && (
+                    <div className="flex items-start">
+                      <Building className="h-4 w-4 mr-2 mt-0.5 text-muted-foreground" />
+                      <div>
+                        <p className="text-muted-foreground">Company Name</p>
+                        <p>{lead.company_name}</p>
+                      </div>
+                    </div>
+                  )}
+                  
+                  {lead?.company_address && (
+                    <div className="flex items-start">
+                      <MapPin className="h-4 w-4 mr-2 mt-0.5 text-muted-foreground" />
+                      <div>
+                        <p className="text-muted-foreground">Address</p>
+                        <p>{lead.company_address}</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+              
+              <Separator />
+              
+              <div>
+                <h4 className="text-sm font-medium mb-2">Lead Information</h4>
+                <div className="grid grid-cols-2 gap-2 text-sm">
+                  <div>
+                    <p className="text-muted-foreground">Lead ID</p>
+                    <p className="truncate">{lead?.id.slice(0, 8) || 'N/A'}</p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground">Value</p>
+                    <p>${lead?.value || 0}</p>
+                  </div>
+                  <div>
+                    <p className="text-muted-foreground">Created</p>
+                    <p>{lead?.created_at ? new Date(lead.created_at).toLocaleDateString() : 'N/A'}</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="py-8 text-center">
+              <p className="text-muted-foreground">No activity records available.</p>
+            </div>
+          )}
         </div>
       </div>
     </div>
