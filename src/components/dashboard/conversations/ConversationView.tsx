@@ -71,19 +71,18 @@ export function ConversationView() {
       (p: any) => p.role === 'member'
     );
     
-    // Set customer_name if member participant exists
-    if (memberParticipant && memberParticipant.external_user_identifier) {
-      return {
-        ...conv,
-        customer_name: memberParticipant.external_user_identifier,
-        participants: conversationParticipants
-      };
-    }
-    
-    return {
+    // Initialize the conversation object with existing properties
+    let processedConv: Conversation = {
       ...conv,
       participants: conversationParticipants
     };
+    
+    // Set customer_name if member participant exists
+    if (memberParticipant && memberParticipant.external_user_identifier) {
+      processedConv.customer_name = memberParticipant.external_user_identifier;
+    }
+    
+    return processedConv;
   });
 
   const filteredConversations = processedConversations.filter(conv => {
