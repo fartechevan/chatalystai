@@ -6,6 +6,9 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import type { Conversation } from "./types";
+import { useEffect, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import type { Customer } from "./types/customer";
 
 interface ConversationLeftPanelProps {
   leftPanelOpen: boolean;
@@ -26,7 +29,46 @@ export function ConversationLeftPanel({
   selectedConversation,
   setSelectedConversation,
 }: ConversationLeftPanelProps) {
+  const [customersData, setCustomersData] = useState<Record<string, Customer>>({});
+
+  // Fetch customer data for all leads with customer_id
+  useEffect(() => {
+    const loadCustomersData = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('customers')
+          .select('*');
+        
+        if (error) {
+          console.error('Error loading customers:', error);
+          return;
+        }
+
+        // Create a mapping of customer id to customer data
+        const customersMap: Record<string, Customer> = {};
+        for (const customer of data || []) {
+          customersMap[customer.id] = customer;
+        }
+
+        setCustomersData(customersMap);
+      } catch (err) {
+        console.error('Error in customer data processing:', err);
+      }
+    };
+
+    loadCustomersData();
+  }, []);
+
   const getAvatarInitial = (conversation: Conversation) => {
+    // First, check if lead has customer_id and there's a customer with that id
+    if (conversation.lead?.customer_id && customersData[conversation.lead.customer_id]) {
+      const customerName = customersData[conversation.lead.customer_id].name;
+      if (customerName && customerName.length > 0) {
+        return customerName[0].toUpperCase();
+      }
+    }
+    
+    // Fall back to existing logic
     if (conversation.customer_name && conversation.customer_name.length > 0) {
       return conversation.customer_name[0].toUpperCase();
     }
@@ -35,6 +77,12 @@ export function ConversationLeftPanel({
   };
 
   const getConversationName = (conversation: Conversation) => {
+    // First priority: use name from customers table if lead has customer_id
+    if (conversation.lead?.customer_id && customersData[conversation.lead.customer_id]) {
+      return customersData[conversation.lead.customer_id].name;
+    }
+    
+    // Fall back to existing logic
     if (conversation.customer_name) {
       return conversation.customer_name;
     }

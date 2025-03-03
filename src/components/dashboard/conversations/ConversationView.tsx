@@ -91,27 +91,29 @@ export function ConversationView() {
     loadCustomersData();
   }, []);
 
-  // Process conversations to add customer_name from participants
+  // Process conversations to add customer_name from customers table
   const processedConversations = conversations.map(conv => {
-    const conversationParticipants = participantsData[conv.conversation_id] || [];
-    
-    // Find member participant (customer)
-    const memberParticipant = conversationParticipants.find(
-      (p: any) => p.role === 'member'
-    );
-    
     // Initialize the conversation object with existing properties
     let processedConv: Conversation = {
       ...conv,
-      participants: conversationParticipants
+      participants: participantsData[conv.conversation_id] || []
     };
     
-    // Set customer_name if member participant exists
-    if (memberParticipant && memberParticipant.external_user_identifier) {
-      processedConv.customer_name = memberParticipant.external_user_identifier;
-    } else if (conv.lead?.customer_id && customersData[conv.lead.customer_id]) {
-      // Use customer name from customers data
+    // First priority: Set customer_name from leads.customer_id -> customers.name
+    if (conv.lead?.customer_id && customersData[conv.lead.customer_id]) {
       processedConv.customer_name = customersData[conv.lead.customer_id].name;
+    } 
+    // Only fall back to participant data if we don't have customer name from the customers table
+    else {
+      const conversationParticipants = participantsData[conv.conversation_id] || [];
+      // Find member participant (customer)
+      const memberParticipant = conversationParticipants.find(
+        (p: any) => p.role === 'member'
+      );
+      
+      if (memberParticipant && memberParticipant.external_user_identifier) {
+        processedConv.customer_name = memberParticipant.external_user_identifier;
+      }
     }
     
     return processedConv;
