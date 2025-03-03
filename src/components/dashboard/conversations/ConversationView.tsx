@@ -75,11 +75,15 @@ export function ConversationView() {
     if (memberParticipant && memberParticipant.external_user_identifier) {
       return {
         ...conv,
-        customer_name: memberParticipant.external_user_identifier
+        customer_name: memberParticipant.external_user_identifier,
+        participants: conversationParticipants
       };
     }
     
-    return conv;
+    return {
+      ...conv,
+      participants: conversationParticipants
+    };
   });
 
   const filteredConversations = processedConversations.filter(conv => {
@@ -87,14 +91,12 @@ export function ConversationView() {
     
     // Search in lead data if it exists
     if (conv.lead) {
-      // Check for contact_first_name
       if (conv.lead.contact_first_name && 
           typeof conv.lead.contact_first_name === 'string' && 
           conv.lead.contact_first_name.toLowerCase().includes(searchLower)) {
         return true;
       }
       
-      // Check for name
       if (conv.lead.name && 
           typeof conv.lead.name === 'string' && 
           conv.lead.name.toLowerCase().includes(searchLower)) {

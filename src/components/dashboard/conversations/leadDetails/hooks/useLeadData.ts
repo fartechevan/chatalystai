@@ -1,4 +1,3 @@
-
 import { useState, useCallback, useEffect } from "react";
 import { Lead, Conversation, Profile } from "../../types";
 import { fetchLeadById } from "../../api/leadQueries";
@@ -15,10 +14,8 @@ export function useLeadData(
   const [lead, setLead] = useState<Lead | null>(null);
   const [daysSinceCreation, setDaysSinceCreation] = useState<number>(0);
   
-  // Use custom hooks
   const { customer, setCustomer, handleCustomerFetch } = useCustomerData(setLead);
   
-  // Set up real-time updates
   useRealTimeUpdates(isExpanded, lead, selectedConversation?.conversation_id);
 
   const handleLeadData = useCallback((leadData: Lead) => {
@@ -33,7 +30,6 @@ export function useLeadData(
     }
   }, [handleCustomerFetch, profiles]);
 
-  // Set up a useEffect to reset state when conversation changes
   useEffect(() => {
     if (selectedConversation?.conversation_id) {
       setCustomer(null);

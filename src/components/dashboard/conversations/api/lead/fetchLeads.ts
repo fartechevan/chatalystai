@@ -18,7 +18,8 @@ export async function fetchLeadById(leadId: string): Promise<Lead | null> {
           name,
           company_name,
           phone_number,
-          email
+          email,
+          company_address
         )
       `)
       .eq('id', leadId)
@@ -41,10 +42,15 @@ export async function fetchLeadById(leadId: string): Promise<Lead | null> {
       customer_id: data.customer_id || '',
       value: data.value || 0,
       
-      // Optional properties derived from customer data if available
+      // Virtual properties derived from customer data if available
       name: data.customer?.name || undefined,
       company_name: data.customer?.company_name || undefined,
-      contact_first_name: data.customer?.name || undefined, // Using customer name as contact_first_name
+      contact_first_name: data.customer?.name || undefined,
+      
+      // Additional properties for ConversationUserDetails
+      contact_email: data.customer?.email || undefined,
+      contact_phone: data.customer?.phone_number || undefined,
+      company_address: data.customer?.company_address || undefined
     };
     
     return lead;

@@ -1,42 +1,19 @@
 
-import { Conversation, ConversationParticipant } from "../types";
+import type { Conversation } from "../types";
+import type { ConversationParticipant } from "../types/conversation";
 
-export function getMainParticipant(conversation: Conversation | null) {
-  if (!conversation || !conversation.participants || conversation.participants.length === 0) {
-    return null;
+export const findAdminParticipant = (conversation: Conversation): ConversationParticipant | undefined => {
+  if (!conversation.participants || conversation.participants.length === 0) {
+    return undefined;
   }
   
-  // Find the participant that is not an admin (likely the customer)
-  return conversation.participants.find(p => p.role !== 'admin') || conversation.participants[0];
-}
+  return conversation.participants.find(p => p.role === 'admin');
+};
 
-export function getCustomerName(conversation: Conversation | null) {
-  if (!conversation) return 'Unknown';
-  
-  if (conversation.customer_name) {
-    return conversation.customer_name;
+export const findMemberParticipant = (conversation: Conversation): ConversationParticipant | undefined => {
+  if (!conversation.participants || conversation.participants.length === 0) {
+    return undefined;
   }
   
-  const mainParticipant = getMainParticipant(conversation);
-  if (mainParticipant?.profiles?.name) {
-    return mainParticipant.profiles.name;
-  }
-  
-  return 'Unknown Customer';
-}
-
-export function getCustomerEmail(conversation: Conversation | null) {
-  if (!conversation) return '';
-  
-  const mainParticipant = getMainParticipant(conversation);
-  if (mainParticipant?.profiles?.email) {
-    return mainParticipant.profiles.email;
-  }
-  
-  return '';
-}
-
-export function getFirstInitial(conversation: Conversation | null) {
-  const name = getCustomerName(conversation);
-  return name.charAt(0) || 'U';
-}
+  return conversation.participants.find(p => p.role === 'member');
+};

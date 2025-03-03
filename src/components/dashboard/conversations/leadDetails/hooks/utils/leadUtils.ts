@@ -30,6 +30,9 @@ export function createFakeLeadFromCustomer(
     value: 0,
     name: customer.name,
     contact_first_name: customer.name,
-    company_name: customer.company_name
+    company_name: customer.company_name,
+    contact_email: customer.email,
+    contact_phone: customer.phone_number,
+    company_address: customer.company_address
   };
 }
