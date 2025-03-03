@@ -85,16 +85,16 @@ export function ConversationView() {
   const filteredConversations = processedConversations.filter(conv => {
     const searchLower = searchQuery.toLowerCase();
     
-    // Search in lead data
+    // Search in lead data if it exists
     if (conv.lead) {
-      // Check if lead has contact_first_name property and it includes the search term
+      // Check for contact_first_name
       if (conv.lead.contact_first_name && 
           typeof conv.lead.contact_first_name === 'string' && 
           conv.lead.contact_first_name.toLowerCase().includes(searchLower)) {
         return true;
       }
       
-      // Check if lead has name property and it includes the search term
+      // Check for name
       if (conv.lead.name && 
           typeof conv.lead.name === 'string' && 
           conv.lead.name.toLowerCase().includes(searchLower)) {
