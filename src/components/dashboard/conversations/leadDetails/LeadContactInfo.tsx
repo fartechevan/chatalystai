@@ -21,6 +21,8 @@ export function LeadContactInfo({ customer, lead }: LeadContactInfoProps) {
   
   // Get the most appropriate name to display
   const displayName = lead?.contact_first_name || customer?.name || lead?.name || 'Contact';
+  const displayEmail = customer?.email || lead?.contact_email || '';
+  const displayPhone = customer?.phone_number || lead?.contact_phone || '';
   
   // Get initial for avatar
   const getInitial = () => {
@@ -97,66 +99,88 @@ export function LeadContactInfo({ customer, lead }: LeadContactInfoProps) {
         </div>
       </div>
       
-      {isEditing ? (
-        <div className="space-y-4 mt-4">
+      <div className="pl-12 space-y-3">
+        {/* Contact Information */}
+        {(displayEmail || displayPhone) && (
           <div className="space-y-2">
-            <Label htmlFor="company-name">Company Name</Label>
-            <Input 
-              id="company-name"
-              value={companyName}
-              onChange={(e) => setCompanyName(e.target.value)}
-              placeholder="Enter company name"
-            />
+            {displayPhone && (
+              <div className="space-y-1">
+                <span className="text-sm text-muted-foreground">Phone:</span>
+                <p className="text-sm">{displayPhone}</p>
+              </div>
+            )}
+            
+            {displayEmail && (
+              <div className="space-y-1">
+                <span className="text-sm text-muted-foreground">Email:</span>
+                <p className="text-sm">{displayEmail}</p>
+              </div>
+            )}
           </div>
-          
-          <div className="space-y-2">
-            <Label htmlFor="company-address">Company Address</Label>
-            <Input 
-              id="company-address"
-              value={companyAddress}
-              onChange={(e) => setCompanyAddress(e.target.value)}
-              placeholder="Enter company address"
-            />
+        )}
+        
+        {/* Company Information - Editable */}
+        {isEditing ? (
+          <div className="space-y-4 mt-4">
+            <div className="space-y-2">
+              <Label htmlFor="company-name">Company Name</Label>
+              <Input 
+                id="company-name"
+                value={companyName}
+                onChange={(e) => setCompanyName(e.target.value)}
+                placeholder="Enter company name"
+              />
+            </div>
+            
+            <div className="space-y-2">
+              <Label htmlFor="company-address">Company Address</Label>
+              <Input 
+                id="company-address"
+                value={companyAddress}
+                onChange={(e) => setCompanyAddress(e.target.value)}
+                placeholder="Enter company address"
+              />
+            </div>
+            
+            <div className="flex gap-2">
+              <Button 
+                variant="default" 
+                size="sm" 
+                onClick={handleSave}
+              >
+                Save
+              </Button>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => setIsEditing(false)}
+              >
+                Cancel
+              </Button>
+            </div>
           </div>
-          
-          <div className="flex gap-2">
-            <Button 
-              variant="default" 
-              size="sm" 
-              onClick={handleSave}
-            >
-              Save
-            </Button>
+        ) : (
+          <div className="space-y-3">
+            <div className="space-y-1">
+              <span className="text-sm text-muted-foreground">Company:</span>
+              <p className="text-sm">{companyName || "Not specified"}</p>
+            </div>
+            
+            <div className="space-y-1">
+              <span className="text-sm text-muted-foreground">Address:</span>
+              <p className="text-sm">{companyAddress || "Not specified"}</p>
+            </div>
+            
             <Button 
               variant="outline" 
               size="sm" 
-              onClick={() => setIsEditing(false)}
+              onClick={() => setIsEditing(true)}
             >
-              Cancel
+              Edit Company Info
             </Button>
           </div>
-        </div>
-      ) : (
-        <div className="pl-12 space-y-3">
-          <div className="space-y-1">
-            <span className="text-sm text-muted-foreground">Company:</span>
-            <p className="text-sm">{companyName || "Not specified"}</p>
-          </div>
-          
-          <div className="space-y-1">
-            <span className="text-sm text-muted-foreground">Address:</span>
-            <p className="text-sm">{companyAddress || "Not specified"}</p>
-          </div>
-          
-          <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={() => setIsEditing(true)}
-          >
-            Edit Company Info
-          </Button>
-        </div>
-      )}
+        )}
+      </div>
     </div>
   );
 }
