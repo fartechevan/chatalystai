@@ -100,7 +100,7 @@ function MessageList({ messages, isLoading, conversation }: MessageListProps) {
       <ScrollArea className="h-full">
         <div className="flex flex-col gap-4 p-4">
           {messages.map((message) => (
-            <MessageItem key={message.message_id} message={message} />
+            <MessageItem key={message.message_id} message={message} conversation={conversation} />
           ))}
           {isLoading && <Loader2 className="h-4 w-4 animate-spin" />}
           <div ref={bottomRef} />
@@ -110,9 +110,13 @@ function MessageList({ messages, isLoading, conversation }: MessageListProps) {
   );
 }
 
-// Simple Message component implementation to replace the imported one
-function MessageItem({ message }: { message: MessageType }) {
-  const isAdmin = message.is_from_admin;
+// Modified Message component to determine admin status from conversation participant role
+function MessageItem({ message, conversation }: { message: MessageType; conversation: Conversation | null }) {
+  // Determine if this message is from an admin based on the sender_participant_id
+  // We need to check if the sender's participant ID corresponds to an admin role in the conversation
+  const isAdmin = conversation?.participants?.some(
+    participant => participant.id === message.sender_participant_id && participant.role === 'admin'
+  ) || false;
   
   return (
     <div
@@ -203,4 +207,3 @@ function MessageInput({
     </div>
   );
 }
-
