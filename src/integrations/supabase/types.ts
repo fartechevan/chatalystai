@@ -630,6 +630,30 @@ export type Database = {
           },
         ]
       }
+      whatsapp_conversations: {
+        Row: {
+          created_at: string | null
+          id: string
+          last_message_at: string
+          participant_id: string
+          participant_phone: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          last_message_at: string
+          participant_id: string
+          participant_phone: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          last_message_at?: string
+          participant_id?: string
+          participant_phone?: string
+        }
+        Relationships: []
+      }
       whatsapp_events: {
         Row: {
           created_at: string | null
@@ -656,6 +680,41 @@ export type Database = {
           updated_at?: string | null
         }
         Relationships: []
+      }
+      whatsapp_messages: {
+        Row: {
+          content: Json
+          conversation_id: string
+          created_at: string | null
+          direction: string
+          id: string
+          timestamp: string
+        }
+        Insert: {
+          content: Json
+          conversation_id: string
+          created_at?: string | null
+          direction: string
+          id?: string
+          timestamp: string
+        }
+        Update: {
+          content?: Json
+          conversation_id?: string
+          created_at?: string | null
+          direction?: string
+          id?: string
+          timestamp?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "whatsapp_messages_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "whatsapp_conversations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
     }
     Views: {

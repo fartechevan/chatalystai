@@ -1,15 +1,6 @@
 
 import type { Lead } from "./lead";
-
-export interface ConversationParticipant {
-  id: string;
-  conversation_id: string;
-  role: 'admin' | 'member';
-  external_user_identifier?: string;
-  profiles?: {
-    email?: string;
-  };
-}
+import type { Message } from "./message";
 
 export interface Conversation {
   conversation_id: string;
@@ -17,6 +8,7 @@ export interface Conversation {
   updated_at: string;
   lead_id?: string;
   lead?: Lead;
-  customer_name?: string;
-  participants?: ConversationParticipant[];
+  participants?: any[]; // Conversation participants
+  customer_name?: string; // Added for display purposes
+  messages?: Message[];
 }
