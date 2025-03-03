@@ -1,19 +1,13 @@
+
 import { useState, useRef, useEffect } from "react";
-import { useMutation } from "@tanstack/react-query";
-import { Send, Loader2 } from "lucide-react";
+import { Loader2, Send } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Avatar } from "@/components/ui/avatar";
 import { useToast } from "@/components/ui/use-toast";
-import { useUser } from "@/hooks/useUser";
-import { summarizeConversation } from "./api/conversationActions";
-import { createMessage, sendMessage } from "./api/messageActions";
-import { Message } from "./Message";
-import type { Conversation, Message as MessageType } from "./types";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { format } from "date-fns";
-import { useSettings } from "@/hooks/useSettings";
+import type { Conversation, Message as MessageType } from "./types";
 import { ConversationHeader } from "./ConversationHeader";
 
 interface ConversationMainAreaProps {
@@ -106,12 +100,57 @@ function MessageList({ messages, isLoading, conversation }: MessageListProps) {
       <ScrollArea className="h-full">
         <div className="flex flex-col gap-4 p-4">
           {messages.map((message) => (
-            <Message key={message.message_id} message={message} />
+            <MessageItem key={message.message_id} message={message} />
           ))}
           {isLoading && <Loader2 className="h-4 w-4 animate-spin" />}
           <div ref={bottomRef} />
         </div>
       </ScrollArea>
+    </div>
+  );
+}
+
+// Simple Message component implementation to replace the imported one
+function MessageItem({ message }: { message: MessageType }) {
+  const isAdmin = message.is_from_admin;
+  
+  return (
+    <div
+      className={`flex ${isAdmin ? "justify-end" : "justify-start"}`}
+    >
+      <div
+        className={`flex max-w-[70%] items-start gap-2 ${
+          isAdmin ? "flex-row-reverse" : "flex-row"
+        }`}
+      >
+        <Avatar className="h-8 w-8">
+          <div className="h-full w-full bg-primary/10 flex items-center justify-center text-primary font-medium">
+            {isAdmin ? 'A' : 'U'}
+          </div>
+        </Avatar>
+        <div>
+          <div className="flex items-center gap-2 mb-1">
+            <span className="text-sm font-medium">
+              {isAdmin ? 'Admin' : 'User'}
+            </span>
+            <span className="text-xs text-muted-foreground">
+              {new Date(message.created_at).toLocaleTimeString([], {
+                hour: "numeric",
+                minute: "2-digit",
+              })}
+            </span>
+          </div>
+          <div
+            className={`rounded-lg p-3 ${
+              isAdmin
+                ? "bg-primary text-primary-foreground"
+                : "bg-muted"
+            }`}
+          >
+            <p className="text-sm">{message.content}</p>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
@@ -130,28 +169,10 @@ function MessageInput({
   sendMessageMutation,
 }: MessageInputProps) {
   const { toast } = useToast();
-  const { user } = useUser();
-  const { settings } = useSettings();
 
-  const onSubmit = async (event: any) => {
+  const onSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!newMessage.trim()) return;
-
-    if (!user?.email) {
-      toast({
-        title: "Please sign in",
-        description: "You must be signed in to send messages.",
-      });
-      return;
-    }
-
-    if (!settings?.agent_name) {
-      toast({
-        title: "Please set your agent name",
-        description: "You must set your agent name in the settings to send messages.",
-      });
-      return;
-    }
 
     handleSendMessage();
   };
@@ -170,12 +191,16 @@ function MessageInput({
         <Button
           type="submit"
           className="absolute right-2 rounded-full"
-          isLoading={sendMessageMutation.isPending}
-          disabled={sendMessageMutation.isPending}
+          disabled={sendMessageMutation.isPending || !newMessage.trim()}
         >
-          <Send className="h-4 w-4" />
+          {sendMessageMutation.isPending ? (
+            <Loader2 className="h-4 w-4 animate-spin" />
+          ) : (
+            <Send className="h-4 w-4" />
+          )}
         </Button>
       </form>
     </div>
   );
 }
+
