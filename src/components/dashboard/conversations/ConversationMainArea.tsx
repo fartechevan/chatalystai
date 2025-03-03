@@ -1,4 +1,3 @@
-
 import { MessageList } from "./MessageList";
 import { MessageInput } from "./MessageInput";
 import { Button } from "@/components/ui/button";
@@ -42,19 +41,24 @@ export function ConversationMainArea({
   }
 
   const getConversationName = () => {
+    // First try to get name from lead
     if (selectedConversation.lead) {
+      // Prefer contact_first_name if available
       if (selectedConversation.lead.contact_first_name) {
         return selectedConversation.lead.contact_first_name;
       }
+      // Otherwise use lead name
       if (selectedConversation.lead.name) {
         return selectedConversation.lead.name;
       }
     }
     
+    // Fallback to customer_name from conversation
     if (selectedConversation.customer_name) {
       return selectedConversation.customer_name;
     }
     
+    // Last resort: use lead_id
     if (selectedConversation.lead_id) {
       return `Lead #${selectedConversation.lead_id.slice(0, 6)}`;
     }

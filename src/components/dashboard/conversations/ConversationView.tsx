@@ -31,10 +31,28 @@ export function ConversationView() {
 
   const filteredConversations = conversations.filter(conv => {
     const searchLower = searchQuery.toLowerCase();
-    return (
-      // Safely handle potentially undefined or null values with optional chaining
-      (conv.lead_id?.toLowerCase().includes(searchLower) || false)
-    );
+    
+    // Search in lead data
+    if (conv.lead) {
+      if (conv.lead.contact_first_name?.toLowerCase().includes(searchLower)) {
+        return true;
+      }
+      if (conv.lead.name?.toLowerCase().includes(searchLower)) {
+        return true;
+      }
+    }
+    
+    // Search in customer_name
+    if (conv.customer_name?.toLowerCase().includes(searchLower)) {
+      return true;
+    }
+    
+    // Search in lead_id
+    if (conv.lead_id?.toLowerCase().includes(searchLower)) {
+      return true;
+    }
+    
+    return false;
   });
 
   const handleSendMessage = () => {
