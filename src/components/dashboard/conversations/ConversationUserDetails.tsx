@@ -71,7 +71,7 @@ export function ConversationUserDetails({
             <User className="h-5 w-5 text-gray-500 mr-3 mt-0.5" />
             <div>
               <p className="font-medium">
-                {lead.contact_first_name || "Unknown"}
+                {lead.name || "Unknown"}
               </p>
               <p className="text-sm text-gray-500">Contact name</p>
             </div>
