@@ -9,12 +9,12 @@ export interface Lead {
   user_id: string;
   
   // Virtual properties derived from customer data
-  name?: string;
-  contact_first_name?: string;
-  company_name?: string;
+  name?: string | undefined;
+  contact_first_name?: string | undefined;
+  company_name?: string | undefined;
   
   // Additional properties used in ConversationUserDetails
-  contact_email?: string;
-  contact_phone?: string;
-  company_address?: string;
+  contact_email?: string | undefined;
+  contact_phone?: string | undefined;
+  company_address?: string | undefined;
 }
