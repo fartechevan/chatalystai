@@ -21,8 +21,10 @@ import {
   User,
   X,
 } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import type { Conversation } from "./types";
+import type { Customer } from "./types/customer";
+import { supabase } from "@/integrations/supabase/client";
 
 interface ConversationHeaderProps {
   conversation: Conversation | null;
@@ -30,6 +32,35 @@ interface ConversationHeaderProps {
 
 export function ConversationHeader({ conversation }: ConversationHeaderProps) {
   const [isSearchExpanded, setIsSearchExpanded] = useState(false);
+  const [customerData, setCustomerData] = useState<Customer | null>(null);
+  
+  // Fetch customer data when conversation changes
+  useEffect(() => {
+    const fetchCustomerData = async () => {
+      if (!conversation?.lead?.customer_id) return;
+      
+      try {
+        const { data, error } = await supabase
+          .from('customers')
+          .select('*')
+          .eq('id', conversation.lead.customer_id)
+          .maybeSingle();
+        
+        if (error) {
+          console.error('Error fetching customer data:', error);
+          return;
+        }
+        
+        if (data) {
+          setCustomerData(data);
+        }
+      } catch (err) {
+        console.error('Error processing customer data:', err);
+      }
+    };
+    
+    fetchCustomerData();
+  }, [conversation]);
 
   if (!conversation) {
     return (
@@ -39,19 +70,28 @@ export function ConversationHeader({ conversation }: ConversationHeaderProps) {
     );
   }
 
+  // Determine the contact name to display, prioritizing customer data
+  const contactName = customerData?.name || 
+                      conversation.customer_name || 
+                      "Unknown Contact";
+  
+  // Get the first letter for the avatar
+  const avatarInitial = contactName.charAt(0);
+  
+  // Get company name
+  const companyName = customerData?.company_name || 
+                      conversation.lead?.company_name || 
+                      "Unknown Company";
+
   return (
     <div className="flex items-center justify-between p-3 border-b">
       <div className="flex items-center space-x-3">
         <div className="relative">
           <div className="w-10 h-10 overflow-hidden rounded-full bg-gray-200 flex items-center justify-center">
-            {conversation.customer_name ? (
+            {avatarInitial ? (
               <span className="text-lg font-medium text-gray-700">
-                {conversation.customer_name.charAt(0)}
+                {avatarInitial.toUpperCase()}
               </span>
-            ) : conversation.lead?.name ? (
-              <span className="text-lg font-medium text-gray-700">
-                {conversation.lead.name.charAt(0)}
-              </span>  
             ) : (
               <User className="w-6 h-6 text-gray-500" />
             )}
@@ -59,12 +99,8 @@ export function ConversationHeader({ conversation }: ConversationHeaderProps) {
           <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-white"></div>
         </div>
         <div>
-          <h2 className="font-semibold">
-            {conversation.customer_name || conversation.lead?.name || "Unknown Contact"}
-          </h2>
-          <p className="text-xs text-gray-500">
-            {conversation.lead?.company_name || "Unknown Company"}
-          </p>
+          <h2 className="font-semibold">{contactName}</h2>
+          <p className="text-xs text-gray-500">{companyName}</p>
         </div>
       </div>
 
