@@ -34,11 +34,11 @@ serve(async (req) => {
         Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
       )
 
-      // First store the entire webhook payload in evolution_webhook_events table
+      // Store the entire webhook payload in evolution_webhook_events table
       const { error: webhookError } = await supabaseClient
         .from('evolution_webhook_events')
         .insert({
-          source_identifier: instanceId,
+          source_identifier: instanceId, // This is now optional
           event_type: event,
           payload: body, // Store the entire payload
           processing_status: 'pending'
@@ -47,20 +47,6 @@ serve(async (req) => {
       if (webhookError) {
         console.error('Error storing webhook event:', webhookError)
         throw webhookError
-      }
-
-      // Also store the specific WhatsApp event in the whatsapp_events table for backward compatibility
-      const { error } = await supabaseClient
-        .from('whatsapp_events')
-        .insert({
-          instance_id: instanceId,
-          event_type: event,
-          event_data: data,
-        })
-
-      if (error) {
-        console.error('Error storing whatsapp event:', error)
-        throw error
       }
 
       // Return success response

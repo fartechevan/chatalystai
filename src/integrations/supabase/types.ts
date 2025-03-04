@@ -165,7 +165,7 @@ export type Database = {
           id: string
           payload: Json
           processing_status: string
-          source_identifier: string
+          source_identifier: string | null
         }
         Insert: {
           created_at?: string | null
@@ -173,7 +173,7 @@ export type Database = {
           id?: string
           payload: Json
           processing_status: string
-          source_identifier: string
+          source_identifier?: string | null
         }
         Update: {
           created_at?: string | null
@@ -181,7 +181,7 @@ export type Database = {
           id?: string
           payload?: Json
           processing_status?: string
-          source_identifier?: string
+          source_identifier?: string | null
         }
         Relationships: []
       }
