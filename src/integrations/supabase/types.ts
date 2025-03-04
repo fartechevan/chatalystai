@@ -14,7 +14,6 @@ export type Database = {
           conversation_id: string
           external_user_identifier: string | null
           id: string
-          integration_id: string | null
           joined_at: string | null
           left_at: string | null
           role: Database["public"]["Enums"]["role_enum"] | null
@@ -24,7 +23,6 @@ export type Database = {
           conversation_id: string
           external_user_identifier?: string | null
           id?: string
-          integration_id?: string | null
           joined_at?: string | null
           left_at?: string | null
           role?: Database["public"]["Enums"]["role_enum"] | null
@@ -34,7 +32,6 @@ export type Database = {
           conversation_id?: string
           external_user_identifier?: string | null
           id?: string
-          integration_id?: string | null
           joined_at?: string | null
           left_at?: string | null
           role?: Database["public"]["Enums"]["role_enum"] | null
@@ -47,13 +44,6 @@ export type Database = {
             isOneToOne: false
             referencedRelation: "conversations"
             referencedColumns: ["conversation_id"]
-          },
-          {
-            foreignKeyName: "conversation_participants_integration_id_fkey"
-            columns: ["integration_id"]
-            isOneToOne: false
-            referencedRelation: "integrations"
-            referencedColumns: ["id"]
           },
           {
             foreignKeyName: "conversation_participants_user_id_fkey"
@@ -97,22 +87,32 @@ export type Database = {
         Row: {
           conversation_id: string
           created_at: string
+          integrations_config_id: string | null
           lead_id: string | null
           updated_at: string
         }
         Insert: {
           conversation_id?: string
           created_at?: string
+          integrations_config_id?: string | null
           lead_id?: string | null
           updated_at?: string
         }
         Update: {
           conversation_id?: string
           created_at?: string
+          integrations_config_id?: string | null
           lead_id?: string | null
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "conversations_integrations_config_id_fkey"
+            columns: ["integrations_config_id"]
+            isOneToOne: false
+            referencedRelation: "integrations_config"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "conversations_lead_id_fkey"
             columns: ["lead_id"]
