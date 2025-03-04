@@ -34,10 +34,10 @@ serve(async (req) => {
       const { error: webhookError } = await supabaseClient
         .from('evolution_webhook_events')
         .insert({
-          source_identifier: instanceId, // This is now optional
           event_type: event,
           payload: body, // Store the entire payload
-          processing_status: 'pending'
+          processing_status: 'pending',
+          source_identifier: instanceId // Now optional
         })
 
       if (webhookError) {
@@ -50,10 +50,34 @@ serve(async (req) => {
         const remoteJid = data.key.remoteJid
         const fromMe = data.key.fromMe || false
         
-        // Try to find existing WhatsApp conversation by remoteJid
+        // First, check if integration config exists for this instance
+        // This lookup is done first to avoid unnecessary operations if the instance doesn't exist
+        const { data: config, error: configError } = await supabaseClient
+          .from('integrations_config')
+          .select('id, user_reference_id')
+          .eq('instance_id', instanceId)
+          .maybeSingle()
+        
+        if (configError) {
+          console.error('Error fetching integration config:', configError)
+          throw configError
+        }
+        
+        if (!config) {
+          console.error('No integration config found for instance:', instanceId)
+          return new Response(
+            JSON.stringify({ success: false, error: 'Integration config not found' }),
+            { 
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+              status: 404
+            }
+          )
+        }
+        
+        // Try to find existing WhatsApp conversation by remoteJid and instanceId
         const { data: existingConversation, error: conversationError } = await supabaseClient
           .from('evolution_whatsapp_conversations')
-          .select('id, instance_id')
+          .select('id')
           .eq('remote_jid', remoteJid)
           .eq('instance_id', instanceId)
           .maybeSingle()
@@ -64,12 +88,14 @@ serve(async (req) => {
         }
         
         let whatsappConversationId
+        let appConversationId
         
         // If no conversation exists, create one
         if (!existingConversation) {
           // Get contact name if available
           const contactName = data.pushName || remoteJid.split('@')[0]
           
+          // Transaction to create WhatsApp conversation and link to app conversation
           const { data: newConversation, error: createError } = await supabaseClient
             .from('evolution_whatsapp_conversations')
             .insert({
@@ -89,60 +115,48 @@ serve(async (req) => {
           
           whatsappConversationId = newConversation.id
           
-          // Find config for this instance to get user reference
-          const { data: config, error: configError } = await supabaseClient
-            .from('integrations_config')
-            .select('id, user_reference_id')
-            .eq('instance_id', instanceId)
-            .maybeSingle()
+          // Create a new app conversation linked to the config
+          const { data: appConversation, error: appConversationError } = await supabaseClient
+            .from('conversations')
+            .insert({
+              integrations_config_id: config.id
+            })
+            .select()
+            .single()
           
-          if (configError) {
-            console.error('Error fetching integration config:', configError)
-            throw configError
+          if (appConversationError) {
+            console.error('Error creating app conversation:', appConversationError)
+            throw appConversationError
           }
           
-          if (config) {
-            // Create a new app conversation if we have a config
-            const { data: appConversation, error: appConversationError } = await supabaseClient
-              .from('conversations')
-              .insert({
-                integrations_config_id: config.id
-              })
-              .select()
-              .single()
-            
-            if (appConversationError) {
-              console.error('Error creating app conversation:', appConversationError)
-              throw appConversationError
-            }
-            
-            // Create admin participant (the owner of the WhatsApp)
-            if (config.user_reference_id) {
-              const { error: adminParticipantError } = await supabaseClient
-                .from('conversation_participants')
-                .insert({
-                  conversation_id: appConversation.conversation_id,
-                  role: 'admin',
-                  user_id: config.user_reference_id
-                })
-              
-              if (adminParticipantError) {
-                console.error('Error creating admin participant:', adminParticipantError)
-              }
-            }
-            
-            // Create member participant (the WhatsApp contact)
-            const { error: memberParticipantError } = await supabaseClient
+          appConversationId = appConversation.conversation_id
+          
+          // Create admin participant (the owner of the WhatsApp)
+          if (config.user_reference_id) {
+            const { error: adminParticipantError } = await supabaseClient
               .from('conversation_participants')
               .insert({
-                conversation_id: appConversation.conversation_id,
-                role: 'member',
-                external_user_identifier: remoteJid
+                conversation_id: appConversationId,
+                role: 'admin',
+                user_id: config.user_reference_id
               })
             
-            if (memberParticipantError) {
-              console.error('Error creating member participant:', memberParticipantError)
+            if (adminParticipantError) {
+              console.error('Error creating admin participant:', adminParticipantError)
             }
+          }
+          
+          // Create member participant (the WhatsApp contact)
+          const { error: memberParticipantError } = await supabaseClient
+            .from('conversation_participants')
+            .insert({
+              conversation_id: appConversationId,
+              role: 'member',
+              external_user_identifier: remoteJid
+            })
+          
+          if (memberParticipantError) {
+            console.error('Error creating member participant:', memberParticipantError)
           }
         } else {
           whatsappConversationId = existingConversation.id
@@ -156,6 +170,19 @@ serve(async (req) => {
               updated_at: new Date().toISOString()
             })
             .eq('id', whatsappConversationId)
+            
+          // Lookup app conversation ID via participant with this remote_jid
+          const { data: participant, error: participantError } = await supabaseClient
+            .from('conversation_participants')
+            .select('conversation_id')
+            .eq('external_user_identifier', remoteJid)
+            .maybeSingle()
+            
+          if (participantError) {
+            console.error('Error finding participant:', participantError)
+          } else if (participant) {
+            appConversationId = participant.conversation_id
+          }
         }
         
         // Store the message
@@ -174,6 +201,39 @@ serve(async (req) => {
           
           if (messageError) {
             console.error('Error storing WhatsApp message:', messageError)
+          }
+          
+          // If this is an incoming message (not from me) and we have an app conversation ID,
+          // create a message in the app conversation too
+          if (!fromMe && appConversationId) {
+            const messageText = data.message?.conversation || 
+                               data.message?.extendedTextMessage?.text || 
+                               'Media message';
+            
+            // Find the member participant ID
+            const { data: participant, error: participantError } = await supabaseClient
+              .from('conversation_participants')
+              .select('id')
+              .eq('conversation_id', appConversationId)
+              .eq('external_user_identifier', remoteJid)
+              .maybeSingle()
+            
+            if (participantError) {
+              console.error('Error finding member participant:', participantError)
+            } else if (participant) {
+              // Insert message into the app's messages table
+              const { error: appMessageError } = await supabaseClient
+                .from('messages')
+                .insert({
+                  conversation_id: appConversationId,
+                  content: messageText,
+                  sender_participant_id: participant.id
+                })
+              
+              if (appMessageError) {
+                console.error('Error creating app message:', appMessageError)
+              }
+            }
           }
         }
       }

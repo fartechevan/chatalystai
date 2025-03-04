@@ -7,4 +7,5 @@ export interface Message {
   created_at: string;
   sender_participant_id: string;
   participant_info?: string;
+  whatsapp_id?: string; // Optional ID linking to WhatsApp message
 }
