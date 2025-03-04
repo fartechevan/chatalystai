@@ -1,4 +1,3 @@
-
 import { X, Menu, Search, Settings } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -31,7 +30,6 @@ export function ConversationLeftPanel({
 }: ConversationLeftPanelProps) {
   const [customersData, setCustomersData] = useState<Record<string, Customer>>({});
 
-  // Fetch customer data for all leads with customer_id
   useEffect(() => {
     const loadCustomersData = async () => {
       try {
@@ -44,7 +42,6 @@ export function ConversationLeftPanel({
           return;
         }
 
-        // Create a mapping of customer id to customer data
         const customersMap: Record<string, Customer> = {};
         for (const customer of data || []) {
           customersMap[customer.id] = customer;
@@ -60,7 +57,6 @@ export function ConversationLeftPanel({
   }, []);
 
   const getAvatarInitial = (conversation: Conversation) => {
-    // First, check if lead has customer_id and there's a customer with that id
     if (conversation.lead?.customer_id && customersData[conversation.lead.customer_id]) {
       const customerName = customersData[conversation.lead.customer_id].name;
       if (customerName && customerName.length > 0) {
@@ -68,7 +64,6 @@ export function ConversationLeftPanel({
       }
     }
     
-    // Fall back to existing logic
     if (conversation.customer_name && conversation.customer_name.length > 0) {
       return conversation.customer_name[0].toUpperCase();
     }
@@ -77,12 +72,10 @@ export function ConversationLeftPanel({
   };
 
   const getConversationName = (conversation: Conversation) => {
-    // First priority: use name from customers table if lead has customer_id
     if (conversation.lead?.customer_id && customersData[conversation.lead.customer_id]) {
       return customersData[conversation.lead.customer_id].name;
     }
     
-    // Fall back to existing logic
     if (conversation.customer_name) {
       return conversation.customer_name;
     }
@@ -132,10 +125,6 @@ export function ConversationLeftPanel({
               className="w-full pl-8"
             />
           </div>
-          <Button variant="secondary" className="w-full justify-start" size="sm">
-            Open conversations
-            <Badge variant="secondary" className="ml-2">{filteredConversations.length || 0}</Badge>
-          </Button>
         </div>
 
         <ScrollArea className="flex-1">
