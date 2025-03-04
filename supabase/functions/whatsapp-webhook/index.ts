@@ -12,13 +12,13 @@ serve(async (req) => {
   try {
     if (req.method === 'POST') {
       const body = await req.json()
-      console.log('Received webhook payload:', body)
+      console.log('Received webhook payload:', JSON.stringify(body, null, 2))
 
       // Extract relevant data from the webhook
       const { event, data, instanceId } = body
 
       // Log the webhook event details
-      console.log(`Received ${event} event from instance ${instanceId}:`, data)
+      console.log(`Received ${event} event from instance ${instanceId}:`, JSON.stringify(data, null, 2))
 
       // Create Supabase client
       const supabaseClient = createClient(
@@ -78,6 +78,42 @@ serve(async (req) => {
         // Extract phone number from remoteJid
         const phoneNumber = remoteJid.split('@')[0]
         console.log(`Extracted phone number: ${phoneNumber}`)
+        
+        // Check if customer exists or create a new one
+        let customerId = null
+        const { data: existingCustomer, error: customerError } = await supabaseClient
+          .from('customers')
+          .select('id')
+          .eq('phone_number', phoneNumber)
+          .maybeSingle()
+        
+        if (customerError) {
+          console.error('Error finding existing customer:', customerError)
+          throw customerError
+        }
+        
+        if (existingCustomer) {
+          customerId = existingCustomer.id
+          console.log(`Found existing customer with ID: ${customerId}`)
+        } else {
+          console.log(`Creating new customer with phone: ${phoneNumber}, name: ${contactName}`)
+          const { data: newCustomer, error: createCustomerError } = await supabaseClient
+            .from('customers')
+            .insert({
+              phone_number: phoneNumber,
+              name: contactName || phoneNumber, // Use pushName if available, otherwise phone number
+            })
+            .select()
+            .single()
+          
+          if (createCustomerError) {
+            console.error('Error creating new customer:', createCustomerError)
+            throw createCustomerError
+          }
+          
+          customerId = newCustomer.id
+          console.log(`Created new customer with ID: ${customerId}`)
+        }
         
         // Find existing conversation via participants table
         let appConversationId = null
@@ -145,9 +181,9 @@ serve(async (req) => {
             
             if (adminParticipantError) {
               console.error('Error creating admin participant:', adminParticipantError)
+            } else {
+              console.log(`Created admin participant for conversation ${appConversationId}`)
             }
-
-            console.log(`Created admin participant for conversation ${appConversationId}`)
           }
           
           // 3. Create member participant (the WhatsApp contact)
@@ -189,8 +225,27 @@ serve(async (req) => {
           
           if (adminParticipant) {
             participantId = adminParticipant.id
+            console.log(`Using admin participant ID: ${participantId} for fromMe message`)
           } else {
             console.error('Admin participant not found for conversation:', appConversationId)
+          }
+        } else {
+          // Message from customer - find member participant with matching remoteJid
+          const { data: memberParticipant, error: memberParticipantError } = await supabaseClient
+            .from('conversation_participants')
+            .select('id')
+            .eq('conversation_id', appConversationId)
+            .eq('external_user_identifier', remoteJid)
+            .maybeSingle()
+          
+          if (memberParticipantError) {
+            console.error('Error finding member participant:', memberParticipantError)
+            throw memberParticipantError
+          }
+          
+          if (memberParticipant) {
+            participantId = memberParticipant.id
+            console.log(`Using member participant ID: ${participantId} for customer message`)
           }
         }
         
