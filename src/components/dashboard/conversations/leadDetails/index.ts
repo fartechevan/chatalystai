@@ -6,3 +6,4 @@ export * from './PipelineSelector';
 export * from './LeadContactInfo';
 export * from './LeadDetailsInfo';
 export * from './LeadTabContent';
+export * from './EmptyLeadState';
