@@ -21,4 +21,5 @@ export interface Conversation {
   participants?: ConversationParticipant[] | any[]; // Conversation participants
   customer_name?: string; // Added for display purposes
   messages?: Message[];
+  integrations_config_id?: string; // Added for WhatsApp integration
 }
