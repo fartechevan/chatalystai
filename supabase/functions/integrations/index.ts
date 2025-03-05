@@ -1,7 +1,5 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-
 const EVO_API_URL = "https://api.evoapicloud.com/message/sendText/";
 const API_KEY = "29ec34d7-43d1-4657-9810-f5e60b527e60";
 
