@@ -1,3 +1,4 @@
+import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { fetchConversationsWithParticipants, fetchConversationSummary } from "../api/conversationQueries";
 import { 
@@ -52,24 +53,25 @@ export function useConversationData(selectedConversation?: Conversation | null) 
       if (selectedConversation.integrations_config_id) {
         try {
           console.log("Sending WhatsApp message for conversation with config ID:", selectedConversation.integrations_config_id);
-          
-          // Find member participant to get their WhatsApp number
-          const memberParticipant = selectedConversation.participants?.find(
-            p => p.role === 'member'
-          );
-          
-          if (!memberParticipant?.external_user_identifier) {
-            console.error("Member participant not found or missing external identifier");
-            throw new Error("Could not find recipient's WhatsApp number");
+          // Get customer data from customers table
+          const { data: customerData, error: customerError } = await supabase
+            .from('customers')
+            .select('phone_number')
+            .eq('id', selectedConversation.lead?.customer_id)
+            .single();
+
+          if (customerError || !customerData?.phone_number) {
+            console.error("Customer not found or missing phone number");
+            throw new Error("Could not find recipient's phone number");
           }
-          
+
           // Send the message via WhatsApp
           const whatsappResult = await sendWhatsAppMessage(
             selectedConversation.integrations_config_id,
-            memberParticipant.external_user_identifier,
+            customerData.phone_number,
             content
           );
-          
+
           // If WhatsApp message fails, show error and don't save to database
           if (!whatsappResult.success) {
             console.error('Failed to send WhatsApp message:', whatsappResult.error);
@@ -80,7 +82,7 @@ export function useConversationData(selectedConversation?: Conversation | null) 
             });
             return null;
           }
-          
+
           console.log("WhatsApp message sent successfully:", whatsappResult);
           toast({
             title: "Message sent",
@@ -96,7 +98,7 @@ export function useConversationData(selectedConversation?: Conversation | null) 
           return null;
         }
       }
-      
+
       // If WhatsApp message was successful or not a WhatsApp conversation,
       // save the message to our database
       const result = await sendMessage(
@@ -104,7 +106,7 @@ export function useConversationData(selectedConversation?: Conversation | null) 
         adminParticipantId,
         content
       );
-      
+
       setNewMessage("");
       return result;
     },
