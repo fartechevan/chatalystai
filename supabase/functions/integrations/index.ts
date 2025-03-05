@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 const EVO_API_URL = "https://api.evoapicloud.com/message/sendText/";
 const API_KEY = "29ec34d7-43d1-4657-9810-f5e60b527e60";
@@ -38,10 +37,10 @@ serve(async (req) => {
     console.log(`[${requestId}] Parsed request body:`, JSON.stringify(body, null, 2));
 
     // Extract data from the request body
-    const { number, text, configId } = body;
+    const { number, text, instanceId } = body;
 
-    if (!number || !text || !configId) {
-      console.log(`[${requestId}] Missing required parameters. number: ${!!number}, text: ${!!text}, configId: ${!!configId}`);
+    if (!number || !text || !instanceId) {
+      console.log(`[${requestId}] Missing required parameters. number: ${!!number}, text: ${!!text}, instanceId: ${!!instanceId}`);
       return new Response(
         JSON.stringify({ error: "Missing required parameters" }),
         {
@@ -50,34 +49,6 @@ serve(async (req) => {
         },
       );
     }
-
-    // Create Supabase client to query for instanceId
-    const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
-    const supabaseKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
-    const supabase = createClient(supabaseUrl, supabaseKey);
-    
-    console.log(`[${requestId}] Fetching instance_id for config: ${configId}`);
-    
-    // Get the instanceId from integrations_config
-    const { data: configData, error: configError } = await supabase
-      .from('integrations_config')
-      .select('instance_id')
-      .eq('id', configId)
-      .single();
-      
-    if (configError || !configData?.instance_id) {
-      console.error(`[${requestId}] Error fetching instance_id: ${configError?.message || "No instance_id found"}`);
-      return new Response(
-        JSON.stringify({ error: "Failed to retrieve instance ID" }),
-        {
-          status: 500,
-          headers: corsHeaders,
-        },
-      );
-    }
-    
-    const instanceId = configData.instance_id;
-    console.log(`[${requestId}] Retrieved instance_id: ${instanceId}`);
 
     const apiUrl = EVO_API_URL + instanceId;
     console.log(`[${requestId}] Sending message to: ${apiUrl}`);
