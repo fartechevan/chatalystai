@@ -48,11 +48,25 @@ export function useConversationData(selectedConversation?: Conversation | null) 
       if (!adminParticipantId) {
         throw new Error("Could not find admin participant ID");
       }
-      
+      console.error("GGG",selectedConversation.integrations_config_id);
+
       // If this conversation is linked to a WhatsApp integration, first send via WhatsApp
       if (selectedConversation.integrations_config_id) {
         try {
           console.log("Sending WhatsApp message for conversation with config ID:", selectedConversation.integrations_config_id);
+
+          // Get instance_id from integrations_config table
+          const { data: integrationConfigData, error: integrationConfigError } = await supabase
+            .from('integrations_config')
+            .select('instance_id')
+            .eq('id', selectedConversation.integrations_config_id)
+            .single();
+
+          if (integrationConfigError || !integrationConfigData?.instance_id) {
+            console.error("Integration config not found or missing instance_id");
+            throw new Error("Could not find instance_id");
+          }
+
           // Get customer data from customers table
           const { data: customerData, error: customerError } = await supabase
             .from('customers')
@@ -65,12 +79,16 @@ export function useConversationData(selectedConversation?: Conversation | null) 
             throw new Error("Could not find recipient's phone number");
           }
 
+          console.log('Before sendWhatsAppMessage - instance_id:', integrationConfigData.instance_id, 'phone_number:', customerData.phone_number);
+
           // Send the message via WhatsApp
           const whatsappResult = await sendWhatsAppMessage(
-            selectedConversation.integrations_config_id,
+            integrationConfigData.instance_id,
             customerData.phone_number,
             content
           );
+
+          console.log('After sendWhatsAppMessage - whatsappResult:', whatsappResult);
 
           // If WhatsApp message fails, show error and don't save to database
           if (!whatsappResult.success) {
@@ -98,6 +116,8 @@ export function useConversationData(selectedConversation?: Conversation | null) 
           return null;
         }
       }
+
+      console.log('Before sendMessage - conversation_id:', selectedConversation.conversation_id, 'adminParticipantId:', adminParticipantId);
 
       // If WhatsApp message was successful or not a WhatsApp conversation,
       // save the message to our database

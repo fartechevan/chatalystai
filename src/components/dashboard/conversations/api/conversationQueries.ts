@@ -11,7 +11,7 @@ export async function fetchConversationsWithParticipants() {
   // First, get all conversations with their associated leads
   const { data: conversations, error: conversationsError } = await supabase
     .from('conversations')
-    .select('*, lead:lead_id(*)')
+    .select('*, lead:lead_id(*), integrations_config_id')
     .order('updated_at', { ascending: false });
 
   if (conversationsError) {
@@ -23,12 +23,14 @@ export async function fetchConversationsWithParticipants() {
 
   // Transform the data
   const transformedData = conversations.map(conv => {
+    console.log('Raw conversation object:', conv);
     return {
       conversation_id: conv.conversation_id,
       created_at: conv.created_at,
       updated_at: conv.updated_at,
       lead_id: conv.lead_id,
-      lead: conv.lead
+      lead: conv.lead,
+      integrations_config_id: conv.integrations_config_id
     };
   });
 
