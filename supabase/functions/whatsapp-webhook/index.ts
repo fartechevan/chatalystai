@@ -20,6 +20,7 @@ function createErrorResponse(error, status = 500) {
 }
 
 async function handleMessageEvent(supabaseClient, data, instanceId) {
+
   console.log('Processing message event with data:', JSON.stringify(data, null, 2));
   
   if (!data || !data.key || !data.key.remoteJid) {
@@ -78,9 +79,7 @@ async function handleMessageEvent(supabaseClient, data, instanceId) {
     .insert({
       conversation_id: appConversationId,
       content: messageText,
-      sender_participant_id: participantId,
-      whatsapp_id: data.key.id // Store WhatsApp message ID for reference
-    })
+      sender_participant_id: participantId    })
     .select();
   
   if (messageError) {
@@ -274,8 +273,8 @@ serve(async (req) => {
       console.log(`[${requestId}] Parsed webhook payload:`, JSON.stringify(body, null, 2));
 
       // Extract relevant data from the webhook
-      const { event, data, instanceId } = body;
-      console.log(`[${requestId}] Received ${event} event from instance ${instanceId}`);
+      const { event, data, instance } = body;
+      console.log(`[${requestId}] Received ${event} event from instance ${instance}`);
 
       // Create Supabase client
       const supabaseClient = createClient(
@@ -290,7 +289,7 @@ serve(async (req) => {
           event_type: event,
           payload: body,
           processing_status: 'pending',
-          source_identifier: instanceId // Now optional
+          source_identifier: instance // Now optional
         });
 
       if (webhookError) {
@@ -301,7 +300,7 @@ serve(async (req) => {
       // If this is a message event, handle conversation linking
       let processingResult = false;
       if (event === 'messages.upsert' && data) {
-        processingResult = await handleMessageEvent(supabaseClient, data, instanceId);
+        processingResult = await handleMessageEvent(supabaseClient, data, instance);
       }
 
       // Return success response
