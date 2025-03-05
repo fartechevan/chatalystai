@@ -1,7 +1,7 @@
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { fetchConversationsWithParticipants, fetchConversationSummary } from "../api/conversationQueries";
-import { fetchMessages, sendMessage } from "../api/messageQueries";
+import { fetchMessages, sendMessage, sendWhatsAppMessage } from "../api/messageQueries";
 import { useState } from "react";
 import type { Conversation, Message } from "../types";
 
@@ -43,11 +43,33 @@ export function useConversationData(selectedConversation?: Conversation | null) 
         throw new Error("Could not find admin participant ID");
       }
       
+      // First, send message to our database
       const result = await sendMessage(
         selectedConversation.conversation_id,
         adminParticipantId,
         content
       );
+      
+      // If this conversation is linked to a WhatsApp integration, also send via WhatsApp
+      if (selectedConversation.integrations_config_id) {
+        try {
+          // Find member participant to get their WhatsApp number
+          const memberParticipant = selectedConversation.participants?.find(
+            p => p.role === 'member'
+          );
+          
+          if (memberParticipant?.external_user_identifier) {
+            await sendWhatsAppMessage(
+              selectedConversation.integrations_config_id,
+              memberParticipant.external_user_identifier,
+              content
+            );
+          }
+        } catch (err) {
+          console.error('Failed to send WhatsApp message:', err);
+          // We don't throw here - the message was already saved to our database
+        }
+      }
       
       setNewMessage("");
       return result;

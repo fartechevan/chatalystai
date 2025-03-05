@@ -43,6 +43,9 @@ export function ConversationMainArea({
     bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
+  // Determine if this conversation is a WhatsApp conversation
+  const isWhatsAppConversation = selectedConversation?.integrations_config_id ? true : false;
+
   return (
     <div className={`flex-1 flex flex-col min-h-0 border-r border-l relative ${!selectedConversation ? 'items-center justify-center' : ''}`}>
       {selectedConversation ? (
@@ -60,6 +63,7 @@ export function ConversationMainArea({
             setNewMessage={setNewMessage}
             handleSendMessage={handleSendMessage}
             sendMessageMutation={sendMessageMutation}
+            isWhatsAppConversation={isWhatsAppConversation}
           />
           
           {summarizeMutation.isPending && (
@@ -164,6 +168,7 @@ interface MessageInputProps {
   setNewMessage: (message: string) => void;
   handleSendMessage: () => void;
   sendMessageMutation: any;
+  isWhatsAppConversation?: boolean;
 }
 
 function MessageInput({
@@ -171,6 +176,7 @@ function MessageInput({
   setNewMessage,
   handleSendMessage,
   sendMessageMutation,
+  isWhatsAppConversation = false
 }: MessageInputProps) {
   const { toast } = useToast();
 
@@ -186,7 +192,7 @@ function MessageInput({
       <form onSubmit={onSubmit} className="relative flex items-center">
         <Input
           type="text"
-          placeholder="Type your message here..."
+          placeholder={isWhatsAppConversation ? "Type your WhatsApp message here..." : "Type your message here..."}
           value={newMessage}
           onChange={(e) => setNewMessage(e.target.value)}
           className="rounded-full py-2 pr-12"
@@ -194,7 +200,7 @@ function MessageInput({
         />
         <Button
           type="submit"
-          className="absolute right-2 rounded-full"
+          className={`absolute right-2 rounded-full ${isWhatsAppConversation ? 'bg-green-600 hover:bg-green-700' : ''}`}
           disabled={sendMessageMutation.isPending || !newMessage.trim()}
         >
           {sendMessageMutation.isPending ? (
@@ -203,6 +209,11 @@ function MessageInput({
             <Send className="h-4 w-4" />
           )}
         </Button>
+        {isWhatsAppConversation && (
+          <div className="absolute -bottom-6 right-2 text-xs text-green-600">
+            WhatsApp conversation
+          </div>
+        )}
       </form>
     </div>
   );

@@ -36,3 +36,31 @@ export async function sendMessage(conversationId: string, participantId: string,
   if (error) throw error;
   return data;
 }
+
+/**
+ * Sends a WhatsApp message through the integrations edge function
+ */
+export async function sendWhatsAppMessage(configId: string, recipient: string, message: string) {
+  try {
+    const response = await supabase.functions.invoke('integrations', {
+      body: {
+        action: 'send_message',
+        configId,
+        data: {
+          recipient,
+          message
+        }
+      }
+    });
+
+    if (response.error) {
+      console.error('Error sending WhatsApp message:', response.error);
+      throw new Error(response.error.message || 'Failed to send WhatsApp message');
+    }
+
+    return response.data;
+  } catch (error) {
+    console.error('Error invoking edge function:', error);
+    throw error;
+  }
+}
