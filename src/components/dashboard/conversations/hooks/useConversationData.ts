@@ -1,7 +1,11 @@
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { fetchConversationsWithParticipants, fetchConversationSummary } from "../api/conversationQueries";
-import { fetchMessages, sendMessage, sendWhatsAppMessage } from "../api/messageQueries";
+import { 
+  fetchMessages, 
+  sendMessage, 
+  sendWhatsAppMessage 
+} from "../api/messageQueries";
 import { useState } from "react";
 import type { Conversation, Message } from "../types";
 
