@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 const EVO_API_URL = "https://api.evoapicloud.com/message/sendText/";
 const API_KEY = "29ec34d7-43d1-4657-9810-f5e60b527e60";
@@ -90,7 +91,7 @@ serve(async (req) => {
       headers: corsHeaders,
     });
   } catch (error) {
-    console.error(`Error in integrations function:`, error);
+    console.error(`[${requestId}] Error in integrations function:`, error);
     return new Response(JSON.stringify({ error: error.message }), {
       status: 500,
       headers: corsHeaders,

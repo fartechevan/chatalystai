@@ -6,18 +6,23 @@ import type { WhatsAppMessageRequest, WhatsAppMessageResponse } from "./types";
  * Sends a WhatsApp message through the integrations edge function
  */
 export async function sendWhatsAppMessage(
-  configId: string, 
+  instanceId: string,
   recipient: string, 
   message: string
 ): Promise<WhatsAppMessageResponse> {
   try {
-    console.log(`Sending WhatsApp message via edge function. ConfigId: ${configId}, Recipient: ${recipient}`);
+    console.log(`Sending WhatsApp message via edge function. InstanceId: ${instanceId}, Recipient: ${recipient}`);
+    
+    // Extract phone number without the @c.us suffix if present
+    const phoneNumber = recipient.includes('@') ? recipient.split('@')[0] : recipient;
     
     const payload: WhatsAppMessageRequest = {
-      configId,
-      number: recipient.split('@')[0], // Extract phone number from recipient (e.g., "1234567890@c.us")
-      text: message
+      number: phoneNumber,
+      text: message,
+      instanceId: instanceId
     };
+    
+    console.log('WhatsApp API request payload:', payload);
     
     const response = await supabase.functions.invoke('integrations', {
       body: payload
@@ -32,7 +37,7 @@ export async function sendWhatsAppMessage(
 
     return {
       success: true,
-      ...response.data
+      data: response.data
     };
   } catch (error) {
     console.error('Error invoking edge function:', error);

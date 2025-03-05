@@ -1,4 +1,3 @@
-
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { fetchConversationsWithParticipants, fetchConversationSummary } from "../api/conversationQueries";
 import { 
@@ -8,10 +7,12 @@ import {
 } from "../api/messageQueries";
 import { useState } from "react";
 import type { Conversation, Message } from "../types";
+import { useToast } from "@/components/ui/use-toast";
 
 export function useConversationData(selectedConversation?: Conversation | null) {
   const queryClient = useQueryClient();
   const [newMessage, setNewMessage] = useState("");
+  const { toast } = useToast();
   
   // Fetch conversations list
   const conversationsQuery = useQuery({
@@ -47,14 +48,7 @@ export function useConversationData(selectedConversation?: Conversation | null) 
         throw new Error("Could not find admin participant ID");
       }
       
-      // First, send message to our database
-      const result = await sendMessage(
-        selectedConversation.conversation_id,
-        adminParticipantId,
-        content
-      );
-      
-      // If this conversation is linked to a WhatsApp integration, also send via WhatsApp
+      // If this conversation is linked to a WhatsApp integration, first send via WhatsApp
       if (selectedConversation.integrations_config_id) {
         try {
           console.log("Sending WhatsApp message for conversation with config ID:", selectedConversation.integrations_config_id);
@@ -64,28 +58,61 @@ export function useConversationData(selectedConversation?: Conversation | null) 
             p => p.role === 'member'
           );
           
-          if (memberParticipant?.external_user_identifier) {
-            await sendWhatsAppMessage(
-              selectedConversation.integrations_config_id,
-              memberParticipant.external_user_identifier,
-              content
-            );
-            console.log("WhatsApp message sent successfully");
-          } else {
+          if (!memberParticipant?.external_user_identifier) {
             console.error("Member participant not found or missing external identifier");
+            throw new Error("Could not find recipient's WhatsApp number");
           }
+          
+          // Send the message via WhatsApp
+          const whatsappResult = await sendWhatsAppMessage(
+            selectedConversation.integrations_config_id,
+            memberParticipant.external_user_identifier,
+            content
+          );
+          
+          // If WhatsApp message fails, show error and don't save to database
+          if (!whatsappResult.success) {
+            console.error('Failed to send WhatsApp message:', whatsappResult.error);
+            toast({
+              title: "WhatsApp message failed",
+              description: whatsappResult.error || "Could not send WhatsApp message",
+              variant: "destructive"
+            });
+            return null;
+          }
+          
+          console.log("WhatsApp message sent successfully:", whatsappResult);
+          toast({
+            title: "Message sent",
+            description: "Your message was successfully sent via WhatsApp",
+          });
         } catch (err) {
           console.error('Failed to send WhatsApp message:', err);
-          // We don't throw here - the message was already saved to our database
+          toast({
+            title: "WhatsApp message failed",
+            description: err.message || "An error occurred sending the WhatsApp message",
+            variant: "destructive"
+          });
+          return null;
         }
       }
+      
+      // If WhatsApp message was successful or not a WhatsApp conversation,
+      // save the message to our database
+      const result = await sendMessage(
+        selectedConversation.conversation_id,
+        adminParticipantId,
+        content
+      );
       
       setNewMessage("");
       return result;
     },
-    onSuccess: () => {
-      // Invalidate the messages query to refetch messages
-      queryClient.invalidateQueries({ queryKey: ['messages', selectedConversation?.conversation_id] });
+    onSuccess: (data) => {
+      if (data) {
+        // Invalidate the messages query to refetch messages
+        queryClient.invalidateQueries({ queryKey: ['messages', selectedConversation?.conversation_id] });
+      }
     }
   });
 
