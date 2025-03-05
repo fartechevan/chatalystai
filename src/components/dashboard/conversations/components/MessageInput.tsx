@@ -26,7 +26,15 @@ export function MessageInput({
     event.preventDefault();
     if (!newMessage.trim()) return;
 
-    handleSendMessage();
+    try {
+      handleSendMessage();
+    } catch (error) {
+      toast({
+        variant: "destructive",
+        title: "Failed to send message",
+        description: error.message || "An error occurred while sending the message"
+      });
+    }
   };
 
   return (

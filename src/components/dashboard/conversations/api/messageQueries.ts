@@ -42,16 +42,17 @@ export async function sendMessage(conversationId: string, participantId: string,
  */
 export async function sendWhatsAppMessage(configId: string, recipient: string, message: string) {
   try {
+    console.log(`Sending WhatsApp message via edge function. ConfigId: ${configId}, Recipient: ${recipient}`);
+    
     const response = await supabase.functions.invoke('integrations', {
       body: {
-        action: 'send_message',
         configId,
-        data: {
-          recipient,
-          message
-        }
+        number: recipient.split('@')[0], // Extract phone number from recipient (e.g., "1234567890@c.us")
+        text: message
       }
     });
+
+    console.log('WhatsApp API response:', response);
 
     if (response.error) {
       console.error('Error sending WhatsApp message:', response.error);

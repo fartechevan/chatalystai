@@ -53,6 +53,8 @@ export function useConversationData(selectedConversation?: Conversation | null) 
       // If this conversation is linked to a WhatsApp integration, also send via WhatsApp
       if (selectedConversation.integrations_config_id) {
         try {
+          console.log("Sending WhatsApp message for conversation with config ID:", selectedConversation.integrations_config_id);
+          
           // Find member participant to get their WhatsApp number
           const memberParticipant = selectedConversation.participants?.find(
             p => p.role === 'member'
@@ -64,6 +66,9 @@ export function useConversationData(selectedConversation?: Conversation | null) 
               memberParticipant.external_user_identifier,
               content
             );
+            console.log("WhatsApp message sent successfully");
+          } else {
+            console.error("Member participant not found or missing external identifier");
           }
         } catch (err) {
           console.error('Failed to send WhatsApp message:', err);
