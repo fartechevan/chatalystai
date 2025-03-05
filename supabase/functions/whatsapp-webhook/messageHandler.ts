@@ -22,59 +22,70 @@ export async function handleMessageEvent(supabaseClient: SupabaseClient, data: a
   
   console.log(`Processing message from ${fromMe ? 'owner' : 'customer'} ${contactName} (${remoteJid}): ${messageText}`);
   
-  // Check if integration config exists for this instance
+  // Hardcode the integration config ID
+  const integrationsConfigId = 'bda44db7-4e9a-4733-a9c7-c4f5d7198905';
+
+  // Fetch the integration config
   const { data: config, error: configError } = await supabaseClient
     .from('integrations_config')
     .select('id, user_reference_id')
-    .eq('instance_id', instanceId)
+    .eq('id', integrationsConfigId)
     .maybeSingle();
-  
+
   if (configError) {
     console.error('Error fetching integration config:', configError);
     return false;
   }
-  
+
   if (!config) {
-    console.error('No integration config found for instance:', instanceId);
+    console.error('No integration config found for id:', integrationsConfigId);
     return false;
   }
 
   // Extract phone number from remoteJid
   const phoneNumber = remoteJid.split('@')[0];
   console.log(`Extracted phone number: ${phoneNumber}`);
-  
+
   // Customer handling
-  const customerId = await findOrCreateCustomer(supabaseClient, phoneNumber, contactName);
-  if (!customerId) return false;
+  let customerId: string | null = null;
+  if (!fromMe) {
+    customerId = await findOrCreateCustomer(supabaseClient, phoneNumber, contactName);
+    if (!customerId) return false;
+  }
   
   // Conversation handling
   const { appConversationId, participantId } = await findOrCreateConversation(
-    supabaseClient, 
-    remoteJid, 
+    supabaseClient,
+    remoteJid,
     config,
-    fromMe
+    fromMe,
+    customerId // Pass customerId to findOrCreateConversation
   );
   
   if (!appConversationId || !participantId) {
     console.error('Failed to find or create conversation/participant');
     return false;
   }
-  
   // Create message in app
-  const { data: newMessage, error: messageError } = await supabaseClient
-    .from('messages')
-    .insert({
-      conversation_id: appConversationId,
-      content: messageText,
-      sender_participant_id: participantId
-    })
-    .select();
-  
-  if (messageError) {
-    console.error('Error creating message:', messageError);
+  if (appConversationId && participantId) {
+    const { data: newMessage, error: messageError } = await supabaseClient
+      .from('messages')
+      .insert({
+        conversation_id: appConversationId,
+        content: messageText,
+        sender_participant_id: participantId,
+      })
+      .select();
+
+    if (messageError) {
+      console.error('Error creating message:', messageError);
+      return false;
+    }
+
+    console.log(`Created new message in conversation ${appConversationId} from participant ${participantId}`);
+    return true;
+  } else {
+    console.error('appConversationId or participantId is null');
     return false;
   }
-  
-  console.log(`Created new message in conversation ${appConversationId} from participant ${participantId}`);
-  return true;
 }
