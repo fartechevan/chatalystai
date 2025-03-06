@@ -53,6 +53,13 @@ export function ConversationLeftPanel({
       }
     }
 
+    if (conversation.participants && conversation.participants.length > 0) {
+      const firstMember = conversation.participants[0];
+      if (firstMember.profiles?.email) {
+        return firstMember.profiles.email;
+      }
+    }
+
     return 'Unknown Customer';
   };
 
@@ -115,9 +122,11 @@ export function ConversationLeftPanel({
                         {new Date(conv.updated_at).toLocaleDateString()}
                       </span>
                     </div>
-                    <p className="text-xs text-muted-foreground truncate mt-1">
-                      {conv.lead_id ? `Lead #${conv.lead_id.slice(0, 6)}` : 'No lead'}
-                    </p>
+                    {conv.lead_id && (
+                      <p className="text-xs text-muted-foreground truncate mt-1">
+                        {`Lead #${conv.lead_id.slice(0, 6)}`}
+                      </p>
+                    )}
                   </div>
                 </button>
               ))}

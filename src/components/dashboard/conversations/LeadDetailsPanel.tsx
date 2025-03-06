@@ -1,8 +1,7 @@
-
 import { useState, useEffect } from "react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
-import { Conversation } from "./types";
+import type { Conversation } from "./types";
 import { 
   LeadHeader,
   LeadTags,
@@ -11,21 +10,32 @@ import {
   LeadTabContent
 } from "./leadDetails";
 import { EmptyLeadState } from "./leadDetails/EmptyLeadState";
-import { 
-  useLeadData, 
-  useLeadPipeline, 
-  useLeadTags, 
-  useAssignee 
+import {
+  useLeadData,
+  useLeadPipeline,
+  useLeadTags,
+  useAssignee
 } from "./leadDetails/hooks";
+import { useToast } from "@/components/ui/use-toast";
+import { useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 
 interface LeadDetailsPanelProps {
   isExpanded: boolean;
   onToggle: () => void;
   selectedConversation: Conversation | null;
+  setSelectedConversation: (conversation: Conversation | null) => void;
+  queryClient: any;
 }
 
-export function LeadDetailsPanel({ isExpanded, onToggle, selectedConversation }: LeadDetailsPanelProps) {
-  const [profiles, setProfiles] = useState([]);
+export function LeadDetailsPanel({
+  isExpanded,
+  onToggle,
+  selectedConversation,
+  setSelectedConversation,
+  queryClient,
+}: LeadDetailsPanelProps) {
+  const [profiles, setProfiles] = useState<any[]>([]);
   const [activeTab, setActiveTab] = useState("main");
   
   // Custom hooks for managing different aspects of the lead details panel
@@ -194,7 +204,53 @@ export function LeadDetailsPanel({ isExpanded, onToggle, selectedConversation }:
               </Tabs>
             </>
           ) : (
-            <EmptyLeadState />
+            <EmptyLeadState 
+              conversationId={selectedConversation?.conversation_id}
+              onLeadCreated={async (leadId) => {
+                console.log("Lead created:", leadId);
+                // Invalidate the conversations query to refetch conversations
+                await queryClient.invalidateQueries({ queryKey: ['conversations'] });
+
+                // Fetch the updated conversation data
+                const { data: updatedConversation, error } = await supabase
+                  .from('conversations')
+                  .select('*')
+                  .eq('conversation_id', selectedConversation.conversation_id)
+                  .single();
+
+                if (error) {
+                  console.error("Error fetching updated conversation:", error);
+                  return;
+                }
+
+                // Update the selected conversation state
+                setSelectedConversation(updatedConversation as Conversation);
+              }}
+            />
+          )}
+            <EmptyLeadState 
+              conversationId={selectedConversation?.conversation_id}
+              onLeadCreated={async (leadId) => {
+                console.log("Lead created:", leadId);
+                // Invalidate the conversations query to refetch conversations
+                await queryClient.invalidateQueries({ queryKey: ['conversations'] });
+
+                // Fetch the updated conversation data
+                const { data: updatedConversation, error } = await supabase
+                  .from('conversations')
+                  .select('*')
+                  .eq('conversation_id', selectedConversation.conversation_id)
+                  .single();
+
+                if (error) {
+                  console.error("Error fetching updated conversation:", error);
+                  return;
+                }
+
+                // Update the selected conversation state
+                setSelectedConversation(updatedConversation as Conversation);
+              }}
+            />
           )}
         </div>
       )}

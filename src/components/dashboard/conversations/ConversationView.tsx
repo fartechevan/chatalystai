@@ -171,14 +171,15 @@ export function ConversationView() {
           isExpanded={leadDetailsExpanded}
           onToggle={() => setLeadDetailsExpanded(!leadDetailsExpanded)}
           selectedConversation={selectedConversation}
+          setSelectedConversation={setSelectedConversation}
+          queryClient={queryClient}
         />
 
         <ConversationMainArea
           selectedConversation={selectedConversation}
           isLoading={isLoading}
           messages={messages}
-          newMessage={newMessage}
-          setNewMessage={setNewMessage}
+          newMessage={setNewMessage}
           handleSendMessage={handleSendMessage}
           sendMessageMutation={sendMessageMutation}
           summarizeMutation={summarizeMutation}

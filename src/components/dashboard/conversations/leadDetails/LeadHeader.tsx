@@ -15,7 +15,7 @@ interface LeadHeaderProps {
 
 export function LeadHeader({ isExpanded, onToggle, lead, isLoading }: LeadHeaderProps) {
   const getFormattedLeadId = (id?: string | null) => {
-    if (!id) return '163674';
+    if (!id) return '';
     return id.length > 6 ? id.slice(0, 6) : id;
   };
 
