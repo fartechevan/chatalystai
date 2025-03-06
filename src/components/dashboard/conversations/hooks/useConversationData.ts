@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { fetchConversationsWithParticipants, fetchConversationSummary } from "../api/conversationQueries";
@@ -48,7 +49,6 @@ export function useConversationData(selectedConversation?: Conversation | null) 
       if (!adminParticipantId) {
         throw new Error("Could not find admin participant ID");
       }
-      console.error("GGG",selectedConversation.integrations_config_id);
 
       // If this conversation is linked to a WhatsApp integration, first send via WhatsApp
       if (selectedConversation.integrations_config_id) {
@@ -63,9 +63,12 @@ export function useConversationData(selectedConversation?: Conversation | null) 
             .single();
 
           if (integrationConfigError || !integrationConfigData?.instance_id) {
-            console.error("Integration config not found or missing instance_id");
+            console.error("Integration config not found or missing instance_id:", integrationConfigError);
             throw new Error("Could not find instance_id");
           }
+
+          const instanceId = integrationConfigData.instance_id;
+          console.log("Found instance_id:", instanceId);
 
           // Log customer_id before fetching customer data
           console.log("Fetching customer data for customer_id:", selectedConversation.lead?.customer_id);
@@ -81,7 +84,7 @@ export function useConversationData(selectedConversation?: Conversation | null) 
               .single();
 
             if (customerError || !customerData?.phone_number) {
-              console.error("Customer not found or missing phone number");
+              console.error("Customer not found or missing phone number:", customerError);
               throw new Error("Could not find recipient's phone number");
             }
 
@@ -102,11 +105,11 @@ export function useConversationData(selectedConversation?: Conversation | null) 
             throw new Error("Could not find recipient's phone number");
           }
 
-          console.log('Before sendWhatsAppMessage - instance_id:', integrationConfigData.instance_id, 'phone_number:', customerPhoneNumber);
+          console.log('Before sendWhatsAppMessage - instance_id:', instanceId, 'phone_number:', customerPhoneNumber);
 
           // Send the message via WhatsApp
           const whatsappResult = await sendWhatsAppMessage(
-            integrationConfigData.instance_id,
+            instanceId,
             customerPhoneNumber,
             content,
             selectedConversation.integrations_config_id

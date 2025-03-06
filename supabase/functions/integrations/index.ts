@@ -43,10 +43,10 @@ serve(async (req) => {
     console.log(`[${requestId}] Parsed request body:`, JSON.stringify(body, null, 2));
 
     // Extract data from the request body
-    const { number, text, instanceId, integrationsConfigId } = body;
+    const { number, text, instanceId } = body;
 
-    if (!number || !text || !instanceId || !integrationsConfigId) {
-      console.log(`[${requestId}] Missing required parameters. number: ${!!number}, text: ${!!text}, instanceId: ${!!instanceId}, integrationsConfigId: ${!!integrationsConfigId}`);
+    if (!number || !text || !instanceId) {
+      console.log(`[${requestId}] Missing required parameters. number: ${!!number}, text: ${!!text}, instanceId: ${!!instanceId}`);
       return new Response(
         JSON.stringify({ error: "Missing required parameters" }),
         {
@@ -57,10 +57,11 @@ serve(async (req) => {
     }
 
     // Fetch API key from integrations_config table
+    console.log(`[${requestId}] Fetching API key for instance ID: ${instanceId}`);
     const { data: integrationConfig, error: integrationConfigError } = await supabase
       .from('integrations_config')
       .select('api_key')
-      .eq('id', integrationsConfigId)
+      .eq('instance_id', instanceId)
       .single();
 
     if (integrationConfigError || !integrationConfig?.api_key) {
@@ -75,6 +76,7 @@ serve(async (req) => {
     }
 
     const apiKey = integrationConfig.api_key;
+    console.log(`[${requestId}] Found API key for instance: ${instanceId}`);
 
     const apiUrl = EVO_API_URL + instanceId;
     console.log(`[${requestId}] Sending message to: ${apiUrl}`);
