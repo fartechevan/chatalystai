@@ -27,7 +27,7 @@ const menuItems = [
   { title: "Dashboard", icon: Home, path: "/dashboard" },
   { title: "Leads", icon: Target, path: "/dashboard/leads" },
   { title: "Chat", icon: MessageSquare, path: "/dashboard/conversations", badge: 2 },
-  { title: "Calendar", icon: Calendar, path: "/dashboard/calendar", badge: 1 },
+  { title: "Calendar", icon: Calendar, path: "/dashboard/calendar" },
   { title: "Lists", icon: List, path: "/dashboard/lists" },
   { title: "Mail", icon: Mail, path: "/dashboard/mail" },
   { title: "Stats", icon: BarChart2, path: "/dashboard/stats" },
