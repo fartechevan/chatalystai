@@ -1,5 +1,4 @@
-
-import { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2"
+import { SupabaseClient, createClient } from "https://esm.sh/@supabase/supabase-js@2"
 import { findOrCreateCustomer } from "./customerHandler.ts";
 
 /**
@@ -31,7 +30,7 @@ export async function findOrCreateConversation(
       conversation_participants (
         id,
         role,
-        user_id,
+        customer_id,
         external_user_identifier
       ),
       lead_id
@@ -137,8 +136,8 @@ export async function findOrCreateConversation(
     .insert({
       conversation_id: appConversationId,
       role: 'member',
-      external_user_identifier: phoneNumber, // Use phoneNumber here
-      user_id: customerId ? customerId : null, // Reference the customerId, set to null if customerId is null
+      external_user_identifier: phoneNumber,
+      customer_id: customerId ? customerId : null,
     })
     .select()
     .single();

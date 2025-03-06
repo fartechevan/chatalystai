@@ -11,7 +11,7 @@ export async function fetchConversationsWithParticipants() {
   // First, get all conversations with their associated leads
   const { data: conversations, error: conversationsError } = await supabase
     .from('conversations')
-    .select('*, lead:lead_id(*), integrations_config_id')
+    .select('*, lead:lead_id(*), integrations_config_id, participants:conversation_participants(*, profiles(*))')
     .order('updated_at', { ascending: false });
 
   if (conversationsError) {
@@ -30,7 +30,8 @@ export async function fetchConversationsWithParticipants() {
       updated_at: conv.updated_at,
       lead_id: conv.lead_id,
       lead: conv.lead,
-      integrations_config_id: conv.integrations_config_id
+      integrations_config_id: conv.integrations_config_id,
+      participants: conv.participants
     };
   });
 
@@ -41,20 +42,20 @@ export async function fetchConversationsWithParticipants() {
   };
 }
 
-/**
- * For backwards compatibility
- */
-export const fetchConversations = fetchConversationsWithParticipants;
+  /**
+   * For backwards compatibility
+   */
+  export const fetchConversations = fetchConversationsWithParticipants;
 
-/**
- * Fetches a conversation summary
- */
-export async function fetchConversationSummary(conversationId: string) {
-  const { data: summaryData } = await supabase
-    .from('conversation_summaries')
-    .select('summary, created_at')
-    .eq('conversation_id', conversationId)
-    .maybeSingle();
+  /**
+   * Fetches a conversation summary
+   */
+  export async function fetchConversationSummary(conversationId: string) {
+    const { data: summaryData } = await supabase
+      .from('conversation_summaries')
+      .select('summary, created_at')
+      .eq('conversation_id', conversationId)
+      .maybeSingle();
 
   return summaryData;
 }

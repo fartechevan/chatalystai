@@ -28,42 +28,8 @@ export function ConversationLeftPanel({
   selectedConversation,
   setSelectedConversation,
 }: ConversationLeftPanelProps) {
-  const [customersData, setCustomersData] = useState<Record<string, Customer>>({});
-
-  useEffect(() => {
-    const loadCustomersData = async () => {
-      try {
-        const { data, error } = await supabase
-          .from('customers')
-          .select('*');
-        
-        if (error) {
-          console.error('Error loading customers:', error);
-          return;
-        }
-
-        const customersMap: Record<string, Customer> = {};
-        for (const customer of data || []) {
-          customersMap[customer.id] = customer;
-        }
-
-        setCustomersData(customersMap);
-      } catch (err) {
-        console.error('Error in customer data processing:', err);
-      }
-    };
-
-    loadCustomersData();
-  }, []);
 
   const getAvatarInitial = (conversation: Conversation) => {
-    if (conversation.lead?.customer_id && customersData[conversation.lead.customer_id]) {
-      const customerName = customersData[conversation.lead.customer_id].name;
-      if (customerName && customerName.length > 0) {
-        return customerName[0].toUpperCase();
-      }
-    }
-    
     if (conversation.customer_name && conversation.customer_name.length > 0) {
       return conversation.customer_name[0].toUpperCase();
     }
@@ -72,28 +38,21 @@ export function ConversationLeftPanel({
   };
 
   const getConversationName = (conversation: Conversation) => {
-    if (conversation.lead?.customer_id && customersData[conversation.lead.customer_id]) {
-      return customersData[conversation.lead.customer_id].name;
-    }
-    
     if (conversation.customer_name) {
       return conversation.customer_name;
     }
-    
+
     if (conversation.lead) {
-      if (conversation.lead.name) {
-        return conversation.lead.name;
-      }
-      
-      if (conversation.lead.company_name) {
-        return conversation.lead.company_name;
-      }
+      return conversation.lead.name || conversation.lead.company_name || `Lead #${conversation.lead_id?.slice(0, 6)}`;
     }
     
-    if (conversation.lead_id) {
-      return `Lead #${conversation.lead_id.slice(0, 6)}`;
+    if (conversation.participants && conversation.participants.length > 0) {
+      const firstMember = conversation.participants[0];
+      if (firstMember.profiles?.email) {
+        return firstMember.profiles.email;
+      }
     }
-    
+
     return 'Unknown Customer';
   };
 

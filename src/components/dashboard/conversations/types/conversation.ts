@@ -18,7 +18,7 @@ export interface Conversation {
   updated_at: string;
   lead_id?: string;
   lead?: Lead;
-  participants?: ConversationParticipant[] | any[]; // Conversation participants
+  participants?: ConversationParticipant[]; // Conversation participants
   customer_name?: string; // Added for display purposes
   messages?: Message[];
   integrations_config_id?: string; // Added for WhatsApp integration
