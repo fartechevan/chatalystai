@@ -1,12 +1,9 @@
-
 import { Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { createLead } from "@/components/leads/services/leadService";
 import { useToast } from "@/components/ui/use-toast";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 
 interface EmptyLeadStateProps {
   conversationId: string;
@@ -17,8 +14,6 @@ export function EmptyLeadState({ conversationId, onLeadCreated }: EmptyLeadState
   const [defaultPipelineStageId, setDefaultPipelineStageId] = useState<string | null>(null);
   const [defaultPipelineId, setDefaultPipelineId] = useState<string | null>(null);
   const [userId, setUserId] = useState<string | null>(null);
-  const [name, setName] = useState("");
-  const [companyName, setCompanyName] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
 
@@ -34,14 +29,14 @@ export function EmptyLeadState({ conversationId, onLeadCreated }: EmptyLeadState
 
       if (pipelineError) {
         console.error("Error fetching default pipeline:", pipelineError);
-        
+
         // If no default pipeline found, get any pipeline
         const { data: anyPipeline, error: anyPipelineError } = await supabase
           .from('pipelines')
           .select('id, stages:pipeline_stages(id, position)')
           .limit(1)
           .single();
-          
+
         if (anyPipelineError) {
           console.error("Error fetching any pipeline:", anyPipelineError);
           toast({
@@ -51,10 +46,10 @@ export function EmptyLeadState({ conversationId, onLeadCreated }: EmptyLeadState
           });
           return;
         }
-        
+
         if (anyPipeline) {
           setDefaultPipelineId(anyPipeline.id);
-          
+
           // Find the first stage in the pipeline
           if (anyPipeline.stages && anyPipeline.stages.length > 0) {
             // Sort stages by position
@@ -64,7 +59,7 @@ export function EmptyLeadState({ conversationId, onLeadCreated }: EmptyLeadState
         }
       } else if (defaultPipeline) {
         setDefaultPipelineId(defaultPipeline.id);
-        
+
         // Find the first stage in the default pipeline
         if (defaultPipeline.stages && defaultPipeline.stages.length > 0) {
           // Sort stages by position
@@ -91,26 +86,16 @@ export function EmptyLeadState({ conversationId, onLeadCreated }: EmptyLeadState
       return;
     }
 
-    if (!name.trim()) {
-      toast({
-        title: "Error",
-        description: "Lead name is required.",
-        variant: "destructive",
-      });
-      return;
-    }
-
     setIsLoading(true);
 
     try {
       const result = await createLead({
-        name: name,
+        name: "",
         value: 0,
         pipelineStageId: defaultPipelineStageId,
         userId: userId,
         customerInfo: {
-          name: name,
-          company_name: companyName,
+          name: "",
           phone_number: "", // We'll update this later with conversation data
         },
       });
@@ -135,7 +120,7 @@ export function EmptyLeadState({ conversationId, onLeadCreated }: EmptyLeadState
             description: "Lead created and connected to conversation!",
           });
         }
-        
+
         onLeadCreated(result.leadId);
       } else {
         toast({
@@ -165,22 +150,16 @@ export function EmptyLeadState({ conversationId, onLeadCreated }: EmptyLeadState
       <p className="text-muted-foreground text-sm max-w-[220px]">
         This conversation is not connected to any lead yet.
       </p>
-      <div className="flex flex-col space-y-2 w-full max-w-[220px]">
-        <Label htmlFor="name">Name</Label>
-        <Input id="name" value={name} onChange={(e) => setName(e.target.value)} />
-        <Label htmlFor="companyName">Company Name (Optional)</Label>
-        <Input id="companyName" value={companyName} onChange={(e) => setCompanyName(e.target.value)} />
-      </div>
-      <Button 
-        variant="default" 
-        size="sm" 
-        onClick={handleCreateLead} 
+      <Button
+        variant="default"
+        size="sm"
+        onClick={handleCreateLead}
         disabled={isLoading || !defaultPipelineStageId}
         className="w-full max-w-[220px]"
       >
         {isLoading ? "Creating..." : "Create new lead"}
       </Button>
-      
+
       {!defaultPipelineStageId && (
         <p className="text-xs text-muted-foreground">
           No pipeline available. Please create a pipeline first.
