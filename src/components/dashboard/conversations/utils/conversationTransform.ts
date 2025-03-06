@@ -1,55 +1,45 @@
 
 import type { Conversation } from "../types";
-import { supabase } from "@/integrations/supabase/client";
 
-export async function transformConversationsData(data: any) {
-  const transformedConversations: Conversation[] = [];
-  
-  if (!data || !data.conversations) {
-    return transformedConversations;
-  }
-  
-  for (const conversation of data.conversations) {
-    // Fetch participants for this conversation
-    const { data: participants, error: participantsError } = await supabase
-      .from('conversation_participants')
-      .select('*, profiles:user_id(*)')
-      .eq('conversation_id', conversation.conversation_id);
-    
-    if (participantsError) {
-      console.error('Error fetching participants:', participantsError);
-      continue;
-    }
-    
-    // Find customer participant (non-admin)
+/**
+ * Transforms raw conversation data from Supabase into a format ready for display
+ */
+export function transformConversations(rawConversations: any[]): Conversation[] {
+  return rawConversations.map(conv => {
     let customerName = 'Unknown Customer';
-    const customerParticipant = participants?.find(p => p.role !== 'admin') || null;
     
-    // If we found a customer, try to get their name
-    if (customerParticipant) {
-      if (customerParticipant.external_user_identifier) {
-        // Try to fetch customer data if we have an external identifier
-        const { data: customerData, error: customerError } = await supabase
-          .from('customers')
-          .select('name')
-          .eq('id', customerParticipant.external_user_identifier)
-          .single();
-        
-        if (!customerError && customerData) {
-          customerName = customerData.name;
-        }
-      } else if (customerParticipant.profiles) {
-        // Use profile name if available
-        customerName = customerParticipant.profiles.name || customerParticipant.profiles.email || 'Unknown user';
+    // First priority: Use customer name from the lead's customer
+    if (conv.lead?.customer_id && conv.customers?.[conv.lead.customer_id]) {
+      customerName = conv.customers[conv.lead.customer_id].name;
+    } 
+    // Second priority: Use participant external identifier (for WhatsApp number)
+    else if (conv.participants) {
+      const memberParticipant = conv.participants.find(
+        (p: any) => p.role === 'member' && p.external_user_identifier
+      );
+      
+      if (memberParticipant) {
+        customerName = memberParticipant.external_user_identifier;
       }
     }
     
-    transformedConversations.push({
-      ...conversation,
-      participants: participants || [],
-      customer_name: customerName
-    });
-  }
-  
-  return transformedConversations;
+    return {
+      ...conv,
+      customer_name: customerName,
+    };
+  });
+}
+
+/**
+ * Adds profile information to conversation participants
+ */
+export function addProfilesToParticipants(participants: any[], profiles: any[]) {
+  return participants.map(participant => {
+    // We don't try to look up profiles by user_id anymore since that relation doesn't exist
+    // Instead, we just pass through the participant data as is
+    return {
+      ...participant,
+      // If we have profile data in the future, we can add it here
+    };
+  });
 }
