@@ -68,6 +68,7 @@ export async function handleMessageEvent(supabaseClient: SupabaseClient, data: a
   }
   // Create message in app
   if (appConversationId && participantId) {
+    console.log(`Attempting to create message with appConversationId: ${appConversationId}, participantId: ${participantId}, messageText: ${messageText}`);
     const { data: newMessage, error: messageError } = await supabaseClient
       .from('messages')
       .insert({
@@ -78,14 +79,14 @@ export async function handleMessageEvent(supabaseClient: SupabaseClient, data: a
       .select();
 
     if (messageError) {
-      console.error('Error creating message:', messageError);
+      console.error('Error creating message:', messageError, newMessage);
       return false;
     }
 
     console.log(`Created new message in conversation ${appConversationId} from participant ${participantId}`);
     return true;
   } else {
-    console.error('appConversationId or participantId is null');
+    console.error(`appConversationId or participantId is null. appConversationId: ${appConversationId}, participantId: ${participantId}`);
     return false;
   }
 }

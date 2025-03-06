@@ -3,6 +3,7 @@ import { Lead, Conversation, Profile } from "../../types";
 import { fetchLeadById } from "../../api/leadQueries";
 import { useCustomerData } from "./useCustomerData";
 import { useRealTimeUpdates } from "./useRealTimeUpdates";
+import { supabase } from "@/integrations/supabase/client";
 import { calculateDaysSinceCreation } from "./utils/leadUtils";
 
 export function useLeadData(
@@ -63,8 +64,27 @@ export function useLeadData(
               );
               
               if (customerParticipant && customerParticipant.external_user_identifier) {
-                console.log("Finding lead for customer:", customerParticipant.external_user_identifier);
-                await handleCustomerFetch(customerParticipant.external_user_identifier, profiles);
+                console.log("Finding lead for customer with phone number:", customerParticipant.external_user_identifier);
+                
+                // Fetch customer by phone number
+                const { data: existingCustomer, error: customerError } = await supabase
+                  .from('customers')
+                  .select('id')
+                  .eq('phone_number', customerParticipant.external_user_identifier)
+                  .maybeSingle();
+                
+                if (customerError) {
+                  console.error('Error finding existing customer:', customerError);
+                  setLead(null);
+                  setCustomer(null);
+                } else if (existingCustomer) {
+                  // If customer exists, fetch customer data using the customer ID
+                  await handleCustomerFetch(existingCustomer.id, profiles);
+                } else {
+                  // If customer does not exist, set lead and customer to null
+                  setLead(null);
+                  setCustomer(null);
+                }
               } else {
                 setLead(null);
                 setCustomer(null);

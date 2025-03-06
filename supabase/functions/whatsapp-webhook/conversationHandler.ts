@@ -1,5 +1,6 @@
 
 import { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2"
+import { findOrCreateCustomer } from "./customerHandler.ts";
 
 /**
  * Finds an existing conversation or creates a new one with its participants
@@ -9,9 +10,11 @@ export async function findOrCreateConversation(
   remoteJid: string,
   config: any,
   fromMe: boolean,
-  customerId: string | null // Add customerId parameter
+  customerId: string | null
 ): Promise<{ appConversationId: string | null; participantId: string | null }> {
   console.log(`Finding or creating conversation for ${remoteJid}`);
+
+  const { user_reference_id: userId } = config;
 
   // 1. Check if a conversation exists with at least one admin and one member
   const { data: existingConversation, error: conversationError } = await supabaseClient
@@ -20,12 +23,16 @@ export async function findOrCreateConversation(
       conversation_id,
       conversation_participants (
         id,
-        role
-      )
+        role,
+        user_id
+      ),
+      lead_id
     `)
     .eq('integrations_config_id', config.id)
     .limit(1)
     .maybeSingle();
+
+  let leadId = existingConversation?.lead_id;
 
   if (conversationError) {
     console.error('Error finding existing conversation:', conversationError);

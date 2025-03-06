@@ -67,24 +67,47 @@ export function useConversationData(selectedConversation?: Conversation | null) 
             throw new Error("Could not find instance_id");
           }
 
-          // Get customer data from customers table
-          const { data: customerData, error: customerError } = await supabase
-            .from('customers')
-            .select('phone_number')
-            .eq('id', selectedConversation.lead?.customer_id)
-            .single();
+          // Log customer_id before fetching customer data
+          console.log("Fetching customer data for customer_id:", selectedConversation.lead?.customer_id);
 
-          if (customerError || !customerData?.phone_number) {
-            console.error("Customer not found or missing phone number");
+          let customerPhoneNumber: string | undefined;
+
+          if (selectedConversation.lead?.customer_id) {
+            // Get customer data from customers table using lead's customer_id
+            const { data: customerData, error: customerError } = await supabase
+              .from('customers')
+              .select('phone_number')
+              .eq('id', selectedConversation.lead.customer_id)
+              .single();
+
+            if (customerError || !customerData?.phone_number) {
+              console.error("Customer not found or missing phone number");
+              throw new Error("Could not find recipient's phone number");
+            }
+
+            customerPhoneNumber = customerData.phone_number;
+          } else {
+            // If no lead, try to get phone number from conversation participants
+            const customerParticipant = selectedConversation.participants?.find(p => p.role !== 'admin' && p.external_user_identifier);
+            if (customerParticipant?.external_user_identifier) {
+              customerPhoneNumber = customerParticipant.external_user_identifier;
+            } else {
+              console.error("Could not find customer participant with phone number");
+              throw new Error("Could not find recipient's phone number");
+            }
+          }
+
+          if (!customerPhoneNumber) {
+            console.error("Could not find recipient's phone number");
             throw new Error("Could not find recipient's phone number");
           }
 
-          console.log('Before sendWhatsAppMessage - instance_id:', integrationConfigData.instance_id, 'phone_number:', customerData.phone_number);
+          console.log('Before sendWhatsAppMessage - instance_id:', integrationConfigData.instance_id, 'phone_number:', customerPhoneNumber);
 
           // Send the message via WhatsApp
           const whatsappResult = await sendWhatsAppMessage(
             integrationConfigData.instance_id,
-            customerData.phone_number,
+            customerPhoneNumber,
             content
           );
 
