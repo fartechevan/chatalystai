@@ -24,7 +24,11 @@ export function MessageList({ messages, isLoading, conversation }: MessageListPr
       <ScrollArea className="h-full">
         <div className="flex flex-col gap-4 p-4">
           {messages.map((message) => (
-            <MessageItem key={message.message_id} message={message} conversation={conversation} />
+            <MessageItem 
+              key={message.message_id} 
+              message={message} 
+              conversation={conversation} 
+            />
           ))}
           {isLoading && <Loader2 className="h-4 w-4 animate-spin" />}
           <div ref={bottomRef} />

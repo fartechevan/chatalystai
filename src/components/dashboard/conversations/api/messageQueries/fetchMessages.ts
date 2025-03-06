@@ -8,7 +8,7 @@ import type { Message } from "../../types";
 export async function fetchMessages(conversationId: string): Promise<Message[]> {
   const { data: messagesData, error: messagesError } = await supabase
     .from('messages')
-    .select('*, sender_participant_id(*)')
+    .select('*, sender_participant:sender_participant_id(id, role, external_user_identifier)')
     .eq('conversation_id', conversationId)
     .order('created_at', { ascending: true });
 
