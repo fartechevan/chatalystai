@@ -51,10 +51,12 @@ export function LeadDetailsInfo({
         </div>
       </div>
 
-      <div className="grid grid-cols-2 gap-2 items-center">
-        <label className="text-sm text-muted-foreground">Sale</label>
-        <div className="text-sm">{lead?.value?.toLocaleString() || 0} RM</div>
-      </div>
+      {lead && (
+        <div className="grid grid-cols-2 gap-2 items-center">
+          <label className="text-sm text-muted-foreground">Sale</label>
+          <div className="text-sm">{lead.value?.toLocaleString() || 0} RM</div>
+        </div>
+      )}
 
       <Button variant="link" size="sm" className="text-muted-foreground px-0">
         cancel
