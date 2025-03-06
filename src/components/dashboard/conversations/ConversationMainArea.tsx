@@ -11,8 +11,8 @@ interface ConversationMainAreaProps {
   selectedConversation: Conversation | null;
   isLoading: boolean;
   messages: MessageType[];
-  newMessage: string;
-  setNewMessage: (message: string) => void;
+  newMessage: string;  // Changed to string type
+  setNewMessage: (message: string) => void; // Kept as function
   handleSendMessage: () => void;
   sendMessageMutation: any;
   summarizeMutation: any;

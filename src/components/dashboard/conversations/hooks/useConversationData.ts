@@ -154,7 +154,6 @@ export function useConversationData(selectedConversation?: Conversation | null) 
         content
       );
 
-      setNewMessage("");
       return result;
     },
     onSuccess: (data) => {

@@ -16,14 +16,13 @@ export function ConversationView() {
   const [leadDetailsExpanded, setLeadDetailsExpanded] = useState(true);
   const [participantsData, setParticipantsData] = useState<Record<string, any>>({});
   const [customersData, setCustomersData] = useState<Record<string, any>>({});
+  const [newMessage, setNewMessage] = useState(""); // Add this state for new messages
   const queryClient = useQueryClient();
 
   const {
     conversations,
     messages,
     isLoading,
-    newMessage,
-    setNewMessage,
     summary,
     summaryTimestamp,
     sendMessageMutation,
@@ -152,6 +151,7 @@ export function ConversationView() {
   const handleSendMessage = () => {
     if (!newMessage.trim()) return;
     sendMessageMutation.mutate(newMessage.trim());
+    setNewMessage(""); // Clear the message after sending
   };
 
   return (
@@ -179,7 +179,8 @@ export function ConversationView() {
           selectedConversation={selectedConversation}
           isLoading={isLoading}
           messages={messages}
-          newMessage={setNewMessage}
+          newMessage={newMessage} // Pass the state value instead of the setter
+          setNewMessage={setNewMessage} // Pass the setter separately
           handleSendMessage={handleSendMessage}
           sendMessageMutation={sendMessageMutation}
           summarizeMutation={summarizeMutation}
