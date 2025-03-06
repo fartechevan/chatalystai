@@ -13,6 +13,12 @@ export async function findOrCreateConversation(
   customerId: string | null
 ): Promise<{ appConversationId: string | null; participantId: string | null }> {
   console.log(`Finding or creating conversation for ${remoteJid}`);
+  
+  // Skip processing for group chats
+  if (remoteJid.includes('@g.us')) {
+    console.log('Skipping conversation creation for group chat');
+    return { appConversationId: null, participantId: null };
+  }
 
   const { user_reference_id: userId } = config;
   const phoneNumber = remoteJid.split('@')[0];

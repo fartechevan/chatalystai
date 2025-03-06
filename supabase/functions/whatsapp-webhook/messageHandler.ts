@@ -20,6 +20,12 @@ export async function handleMessageEvent(supabaseClient: SupabaseClient, data: a
   const contactName = data.pushName || remoteJid.split('@')[0];
   const messageText = extractMessageContent(data);
   
+  // Skip group chats (messages with @g.us)
+  if (remoteJid.includes('@g.us')) {
+    console.log(`Skipping group chat message from ${remoteJid}`);
+    return true; // Return true to acknowledge receipt, but don't process it
+  }
+  
   console.log(`Processing message from ${fromMe ? 'owner' : 'customer'} ${contactName} (${remoteJid}): ${messageText}`);
   
   // Get the integration config for this instance
