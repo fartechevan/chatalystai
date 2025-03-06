@@ -12,30 +12,30 @@ export type Database = {
       conversation_participants: {
         Row: {
           conversation_id: string
+          customer_id: string | null
           external_user_identifier: string | null
           id: string
           joined_at: string | null
           left_at: string | null
           role: Database["public"]["Enums"]["role_enum"] | null
-          user_id: string | null
         }
         Insert: {
           conversation_id: string
+          customer_id?: string | null
           external_user_identifier?: string | null
           id?: string
           joined_at?: string | null
           left_at?: string | null
           role?: Database["public"]["Enums"]["role_enum"] | null
-          user_id?: string | null
         }
         Update: {
           conversation_id?: string
+          customer_id?: string | null
           external_user_identifier?: string | null
           id?: string
           joined_at?: string | null
           left_at?: string | null
           role?: Database["public"]["Enums"]["role_enum"] | null
-          user_id?: string | null
         }
         Relationships: [
           {
@@ -46,8 +46,8 @@ export type Database = {
             referencedColumns: ["conversation_id"]
           },
           {
-            foreignKeyName: "conversation_participants_user_id_fkey"
-            columns: ["user_id"]
+            foreignKeyName: "conversation_participants_customer_id_fkey"
+            columns: ["customer_id"]
             isOneToOne: false
             referencedRelation: "customers"
             referencedColumns: ["id"]

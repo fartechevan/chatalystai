@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
@@ -205,7 +206,7 @@ export function LeadDetailsPanel({
             </>
           ) : (
             <EmptyLeadState 
-              conversationId={selectedConversation?.conversation_id}
+              conversationId={selectedConversation?.conversation_id || ''}
               onLeadCreated={async (leadId) => {
                 console.log("Lead created:", leadId);
                 // Invalidate the conversations query to refetch conversations
@@ -215,31 +216,7 @@ export function LeadDetailsPanel({
                 const { data: updatedConversation, error } = await supabase
                   .from('conversations')
                   .select('*')
-                  .eq('conversation_id', selectedConversation.conversation_id)
-                  .single();
-
-                if (error) {
-                  console.error("Error fetching updated conversation:", error);
-                  return;
-                }
-
-                // Update the selected conversation state
-                setSelectedConversation(updatedConversation as Conversation);
-              }}
-            />
-          )}
-            <EmptyLeadState 
-              conversationId={selectedConversation?.conversation_id}
-              onLeadCreated={async (leadId) => {
-                console.log("Lead created:", leadId);
-                // Invalidate the conversations query to refetch conversations
-                await queryClient.invalidateQueries({ queryKey: ['conversations'] });
-
-                // Fetch the updated conversation data
-                const { data: updatedConversation, error } = await supabase
-                  .from('conversations')
-                  .select('*')
-                  .eq('conversation_id', selectedConversation.conversation_id)
+                  .eq('conversation_id', selectedConversation?.conversation_id || '')
                   .single();
 
                 if (error) {

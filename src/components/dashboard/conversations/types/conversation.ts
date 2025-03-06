@@ -18,8 +18,8 @@ export interface Conversation {
   updated_at: string;
   lead_id?: string;
   lead?: Lead;
-  participants?: ConversationParticipant[] | any[]; // Conversation participants
-  customer_name?: string; // Added for display purposes
+  participants?: ConversationParticipant[];
+  customer_name?: string;
   messages?: Message[];
-  integrations_config_id?: string; // Added for WhatsApp integration
+  integrations_config_id?: string;
 }
