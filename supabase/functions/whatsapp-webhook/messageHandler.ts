@@ -22,14 +22,11 @@ export async function handleMessageEvent(supabaseClient: SupabaseClient, data: a
   
   console.log(`Processing message from ${fromMe ? 'owner' : 'customer'} ${contactName} (${remoteJid}): ${messageText}`);
   
-  // Hardcode the integration config ID
-  const integrationsConfigId = 'bda44db7-4e9a-4733-a9c7-c4f5d7198905';
-
-  // Fetch the integration config
+  // Get the integration config for this instance
   const { data: config, error: configError } = await supabaseClient
     .from('integrations_config')
     .select('id, user_reference_id')
-    .eq('id', integrationsConfigId)
+    .eq('instance_id', instanceId)
     .maybeSingle();
 
   if (configError) {
@@ -38,7 +35,7 @@ export async function handleMessageEvent(supabaseClient: SupabaseClient, data: a
   }
 
   if (!config) {
-    console.error('No integration config found for id:', integrationsConfigId);
+    console.error('No integration config found for instance:', instanceId);
     return false;
   }
 

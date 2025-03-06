@@ -15,8 +15,9 @@ export async function findOrCreateConversation(
   console.log(`Finding or creating conversation for ${remoteJid}`);
 
   const { user_reference_id: userId } = config;
+  const phoneNumber = remoteJid.split('@')[0];
 
-  // 1. Check if a conversation exists with at least one admin and one member
+  // 1. Check if a conversation exists for this specific remoteJid and integration config
   const { data: existingConversation, error: conversationError } = await supabaseClient
     .from('conversations')
     .select(`
@@ -24,55 +25,67 @@ export async function findOrCreateConversation(
       conversation_participants (
         id,
         role,
-        user_id
+        user_id,
+        external_user_identifier
       ),
       lead_id
     `)
     .eq('integrations_config_id', config.id)
-    .limit(1)
-    .maybeSingle();
-
-  let leadId = existingConversation?.lead_id;
+    .limit(10);
 
   if (conversationError) {
     console.error('Error finding existing conversation:', conversationError);
     return { appConversationId: null, participantId: null };
   }
 
-  if (existingConversation && existingConversation.conversation_participants) {
-    const adminExists = existingConversation.conversation_participants.some(
-      (participant) => participant.role === 'admin'
-    );
-    const memberExists = existingConversation.conversation_participants.some(
-      (participant) => participant.role === 'member'
-    );
-
-    if (adminExists && memberExists) {
-      const appConversationId = existingConversation.conversation_id;
-      console.log(`Found existing conversation ${appConversationId} with admin and member`);
-
-      // Determine participant ID based on message sender
-      let participantId: string | null = null;
-      if (fromMe) {
-        // For fromMe messages, find admin participant
-        participantId = existingConversation.conversation_participants.find(
-          (participant) => participant.role === 'admin'
-        )?.id || null;
-        console.log(`Using admin participant ID: ${participantId} for fromMe message`);
-      } else {
-        // For customer messages, find member participant
-        participantId = existingConversation.conversation_participants.find(
-          (participant) => participant.role === 'member'
-        )?.id || null;
-        console.log(`Using member participant ID: ${participantId} for customer message`);
+  // Find conversation with a member participant matching this remoteJid/phoneNumber
+  let matchingConversation = null;
+  if (existingConversation && existingConversation.length > 0) {
+    console.log(`Found ${existingConversation.length} conversations for config ID ${config.id}`);
+    
+    for (const conv of existingConversation) {
+      if (!conv.conversation_participants) continue;
+      
+      // Find if this conversation has a member participant with the matching phone number
+      const memberWithMatchingPhone = conv.conversation_participants.find(
+        (participant) => participant.role === 'member' && 
+                        participant.external_user_identifier === phoneNumber
+      );
+      
+      if (memberWithMatchingPhone) {
+        console.log(`Found existing conversation for phoneNumber ${phoneNumber}: ${conv.conversation_id}`);
+        matchingConversation = conv;
+        break;
       }
-
-      return { appConversationId, participantId };
     }
   }
 
+  if (matchingConversation) {
+    const appConversationId = matchingConversation.conversation_id;
+    console.log(`Using existing conversation ${appConversationId} for ${remoteJid}`);
+
+    // Determine participant ID based on message sender
+    let participantId: string | null = null;
+    if (fromMe) {
+      // For fromMe messages, find admin participant
+      participantId = matchingConversation.conversation_participants.find(
+        (participant) => participant.role === 'admin'
+      )?.id || null;
+      console.log(`Using admin participant ID: ${participantId} for fromMe message`);
+    } else {
+      // For customer messages, find member participant
+      participantId = matchingConversation.conversation_participants.find(
+        (participant) => participant.role === 'member' && 
+                       participant.external_user_identifier === phoneNumber
+      )?.id || null;
+      console.log(`Using member participant ID: ${participantId} for customer message`);
+    }
+
+    return { appConversationId, participantId };
+  }
+
   // 2. If no suitable conversation exists, create a new one with both participants
-  console.log(`No suitable conversation found for ${remoteJid}, creating new one`);
+  console.log(`No existing conversation found for ${remoteJid}, creating new one`);
 
   // 2.1 Create a new app conversation
   const { data: appConversation, error: appConversationError } = await supabaseClient
@@ -91,7 +104,6 @@ export async function findOrCreateConversation(
   const appConversationId = appConversation.conversation_id;
   console.log(`Created new conversation with ID: ${appConversationId}`);
 
-  // 2.2 Create admin participant (the owner of the WhatsApp)
   // 2.2 Create admin participant (the owner of the WhatsApp)
   let adminParticipantId: string | null = null;
   if (config.user_reference_id) {
@@ -114,7 +126,6 @@ export async function findOrCreateConversation(
   }
 
   // 2.3 Create member participant (the WhatsApp contact)
-  const phoneNumber = remoteJid.split('@')[0];
   const { data: memberParticipant, error: memberParticipantError } = await supabaseClient
     .from('conversation_participants')
     .insert({
