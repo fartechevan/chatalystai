@@ -7,11 +7,12 @@ import type { WhatsAppMessageRequest, WhatsAppMessageResponse } from "./types";
  */
 export async function sendWhatsAppMessage(
   instanceId: string,
-  recipient: string, 
-  message: string
+  recipient: string,
+  message: string,
+  integrationsConfigId: string
 ): Promise<WhatsAppMessageResponse> {
   try {
-    console.log(`Sending WhatsApp message via edge function. InstanceId: ${instanceId}, Recipient: ${recipient}`);
+    console.log(`Sending WhatsApp message via edge function. InstanceId: ${instanceId}, Recipient: ${recipient}, integrationsConfigId: ${integrationsConfigId}`);
 
     // Extract phone number without the @c.us suffix if present
     const phoneNumber = recipient.includes('@') ? recipient.split('@')[0] : recipient;

@@ -108,7 +108,8 @@ export function useConversationData(selectedConversation?: Conversation | null) 
           const whatsappResult = await sendWhatsAppMessage(
             integrationConfigData.instance_id,
             customerPhoneNumber,
-            content
+            content,
+            selectedConversation.integrations_config_id
           );
 
           console.log('After sendWhatsAppMessage - whatsappResult:', whatsappResult);

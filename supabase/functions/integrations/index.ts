@@ -1,15 +1,20 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-const EVO_API_URL = "https://api.evoapicloud.com/message/sendText/";
-const API_KEY = "29ec34d7-43d1-4657-9810-f5e60b527e60";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
-// Add CORS headers for browser compatibility
+const EVO_API_URL = "https://api.evoapicloud.com/message/sendText/";
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
   'Content-Type': 'application/json'
 };
+
+const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
+const supabaseKey = Deno.env.get('SUPABASE_ANON_KEY') || '';
+
+const supabase = createClient(supabaseUrl, supabaseKey);
 
 serve(async (req) => {
   const requestId = crypto.randomUUID();
@@ -34,14 +39,14 @@ serve(async (req) => {
     const rawBody = await req.clone().text();
     console.log(`[${requestId}] Raw request body:`, rawBody);
     
-    const body = JSON.parse(rawBody);
+    const body = await req.json();
     console.log(`[${requestId}] Parsed request body:`, JSON.stringify(body, null, 2));
 
     // Extract data from the request body
-    const { number, text, instanceId } = body;
+    const { number, text, instanceId, integrationsConfigId } = body;
 
-    if (!number || !text || !instanceId) {
-      console.log(`[${requestId}] Missing required parameters. number: ${!!number}, text: ${!!text}, instanceId: ${!!instanceId}`);
+    if (!number || !text || !instanceId || !integrationsConfigId) {
+      console.log(`[${requestId}] Missing required parameters. number: ${!!number}, text: ${!!text}, instanceId: ${!!instanceId}, integrationsConfigId: ${!!integrationsConfigId}`);
       return new Response(
         JSON.stringify({ error: "Missing required parameters" }),
         {
@@ -50,6 +55,26 @@ serve(async (req) => {
         },
       );
     }
+
+    // Fetch API key from integrations_config table
+    const { data: integrationConfig, error: integrationConfigError } = await supabase
+      .from('integrations_config')
+      .select('api_key')
+      .eq('id', integrationsConfigId)
+      .single();
+
+    if (integrationConfigError || !integrationConfig?.api_key) {
+      console.error(`[${requestId}] Error fetching API key:`, integrationConfigError);
+      return new Response(
+        JSON.stringify({ error: "Could not find API key" }),
+        {
+          status: 500,
+          headers: corsHeaders,
+        },
+      );
+    }
+
+    const apiKey = integrationConfig.api_key;
 
     const apiUrl = EVO_API_URL + instanceId;
     console.log(`[${requestId}] Sending message to: ${apiUrl}`);
@@ -65,7 +90,7 @@ serve(async (req) => {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        apikey: API_KEY,
+        apikey: apiKey,
       },
       body: JSON.stringify(evoApiPayload),
     });
