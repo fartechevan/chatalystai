@@ -1,81 +1,70 @@
 
-import React from "react";
-import { DragDropContext, DropResult } from "@hello-pangea/dnd";
+import { DragDropContext, Droppable, Draggable } from "@hello-pangea/dnd";
 import { LeadsStage } from "../LeadsStage";
-import { StageLeads, PipelineStage } from "../hooks/usePipelineData";
-import { moveLead } from "../services/leadService";
-import { useToast } from "@/hooks/use-toast";
+import { PipelineStage, Lead } from "../hooks/usePipelineData";
+import { moveLead } from "@/components/leads/services/leadService";
 
 interface PipelineBoardProps {
   stages: PipelineStage[];
-  stageLeads: StageLeads;
-  onLeadMoved: () => void;
+  leads: Lead[];
+  onDataChange: () => void;
 }
 
-export function PipelineBoard({ stages, stageLeads, onLeadMoved }: PipelineBoardProps) {
-  const { toast } = useToast();
+export function PipelineBoard({ stages, leads, onDataChange }: PipelineBoardProps) {
+  const getLeadsForStage = (stageId: string) => {
+    return leads.filter(lead => lead.pipeline_stage_id === stageId);
+  };
 
-  const handleDragEnd = async (result: DropResult) => {
-    if (!result.destination) return;
-    console.log("Drag end:", result);
+  const handleDragEnd = async (result: any) => {
+    const { destination, source, draggableId } = result;
 
-    const sourceStageId = result.source.droppableId;
-    const destinationStageId = result.destination.droppableId;
-    const leadId = result.draggableId;
+    // Dropped outside a valid droppable area
+    if (!destination) return;
 
-    const sourceStageIndex = stages.findIndex(stage => stage.id === sourceStageId);
-    const destStageIndex = stages.findIndex(stage => stage.id === destinationStageId);
-
-    if (sourceStageIndex === 1 && destStageIndex === 0) {
-      toast({
-        title: "Operation not allowed",
-        description: "Cannot move a lead back to the incoming stage",
-        variant: "destructive",
-      });
+    // Dropped in the same position
+    if (
+      destination.droppableId === source.droppableId &&
+      destination.index === source.index
+    ) {
       return;
     }
 
+    // Move lead in the database
     try {
-      const { success, error } = await moveLead(
-        leadId, 
-        sourceStageId, 
-        destinationStageId, 
-        result.destination.index
+      await moveLead(
+        draggableId,
+        source.droppableId,
+        destination.droppableId,
+        destination.index
       );
       
-      if (!success) throw error;
-
-      toast({
-        title: "Lead moved",
-        description: `Lead moved to ${stages[destStageIndex].name}`,
-      });
-      
-      onLeadMoved();
+      // Refresh data after successful move
+      onDataChange();
     } catch (error) {
       console.error('Error moving lead:', error);
-      toast({
-        title: "Error",
-        description: "Failed to move lead",
-        variant: "destructive",
-      });
-      onLeadMoved();
     }
   };
 
   return (
     <DragDropContext onDragEnd={handleDragEnd}>
-      <div className="flex-1 overflow-x-auto p-6">
-        <div className="flex gap-6 min-w-max">
-          {stages.map((stage, index) => (
-            <LeadsStage
-              key={stage.id}
-              id={stage.id}
-              name={stage.name}
-              index={index}
-              leads={stageLeads[stage.id] || []}
-            />
-          ))}
-        </div>
+      <div className="flex gap-4 h-full overflow-x-auto pb-4">
+        {stages.map((stage) => (
+          <Droppable key={stage.id} droppableId={stage.id}>
+            {(provided) => (
+              <div 
+                className="w-72 flex-shrink-0 bg-muted/40 rounded-lg overflow-hidden flex flex-col"
+                {...provided.droppableProps}
+                ref={provided.innerRef}
+              >
+                <LeadsStage 
+                  stage={stage} 
+                  leads={getLeadsForStage(stage.id)} 
+                />
+                {provided.placeholder}
+              </div>
+            )}
+          </Droppable>
+        ))}
       </div>
     </DragDropContext>
   );

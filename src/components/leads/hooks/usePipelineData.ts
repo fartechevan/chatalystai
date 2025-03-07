@@ -1,121 +1,149 @@
 
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import type { Lead } from "@/components/dashboard/conversations/types";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/components/auth/AuthProvider";
+import { useLeadsRealtime } from "./useLeadsRealtime";
 
-export interface StageLeads {
-  [key: string]: Lead[];
+export interface Pipeline {
+  id: string;
+  name: string;
+  is_default: boolean;
+  user_id: string;
 }
 
 export interface PipelineStage {
   id: string;
   name: string;
   position: number;
+  pipeline_id: string;
+}
+
+export interface Lead {
+  id: string;
+  value: number;
+  customer_id: string;
+  pipeline_stage_id: string;
+  user_id: string;
+  name?: string;
+  company_name?: string;
+  contact_email?: string;
+  contact_phone?: string;
 }
 
 export function usePipelineData(pipelineId: string | null) {
-  const { toast } = useToast();
+  const [pipeline, setPipeline] = useState<Pipeline | null>(null);
   const [stages, setStages] = useState<PipelineStage[]>([]);
-  const [stageLeads, setStageLeads] = useState<StageLeads>({});
+  const [leads, setLeads] = useState<Lead[]>([]);
   const [loading, setLoading] = useState(true);
+  const { toast } = useToast();
+  const { user } = useAuth();
+  
+  // Set up realtime subscription
+  useLeadsRealtime(pipelineId, refreshPipelineData);
 
-  const loadStages = async () => {
-    if (!pipelineId) {
-      setLoading(false);
-      return;
-    }
+  async function fetchPipelineData() {
+    if (!pipelineId || !user) return;
     
-    console.log("Loading stages for pipeline:", pipelineId);
-    
-    const { data, error } = await supabase
-      .from('pipeline_stages')
-      .select('id, name, position')
-      .eq('pipeline_id', pipelineId)
-      .order('position');
+    setLoading(true);
+    try {
+      // Fetch pipeline info
+      const { data: pipelineData, error: pipelineError } = await supabase
+        .from('pipelines')
+        .select('*')
+        .eq('id', pipelineId)
+        .eq('user_id', user.id)
+        .single();
 
-    if (error) {
-      console.error('Error fetching stages:', error);
-      setLoading(false);
-      return;
-    }
-    
-    if (data) {
-      console.log("Loaded stages:", data);
-      setStages(data);
-      
-      const leadsData: StageLeads = {};
-      for (const stage of data) {
-        const { data: stageLeadsData, error: leadsError } = await supabase
-          .from('lead_pipeline')
+      if (pipelineError) {
+        throw pipelineError;
+      }
+
+      setPipeline(pipelineData);
+
+      // Fetch stages
+      const { data: stagesData, error: stagesError } = await supabase
+        .from('pipeline_stages')
+        .select('*')
+        .eq('pipeline_id', pipelineId)
+        .order('position', { ascending: true });
+
+      if (stagesError) {
+        throw stagesError;
+      }
+
+      setStages(stagesData || []);
+
+      // Fetch leads for this pipeline with customer information
+      if (stagesData && stagesData.length > 0) {
+        const stageIds = stagesData.map(stage => stage.id);
+        
+        const { data: leadsData, error: leadsError } = await supabase
+          .from('leads')
           .select(`
-            lead:leads (
-              id,
-              value,
-              customer_id,
-              created_at,
-              updated_at,
-              user_id,
-              customers:customers (
-                name,
-                company_name,
-                phone_number,
-                email
-              )
+            *,
+            customers:customers (
+              name,
+              company_name,
+              email,
+              phone_number
             )
           `)
-          .eq('stage_id', stage.id)
-          .order('position');
-
+          .in('pipeline_stage_id', stageIds);
+        
         if (leadsError) {
-          console.error('Error fetching leads for stage', stage.id, leadsError);
-          leadsData[stage.id] = [];
-        } else {
-          // Filter out any null leads and ensure they match our interface
-          const validLeads = stageLeadsData
-            ?.filter(item => item.lead !== null)
-            .map(item => {
-              if (item.lead) {
-                const lead = item.lead;
-                const typedLead: Lead = {
-                  id: lead.id,
-                  created_at: lead.created_at,
-                  updated_at: lead.updated_at || lead.created_at,
-                  user_id: lead.user_id,
-                  value: lead.value || 0,
-                  customer_id: lead.customer_id || '',
-                  pipeline_stage_id: stage.id,
-                  
-                  // Virtual properties from customer data
-                  company_name: lead.customers?.company_name,
-                  name: lead.customers?.name
-                };
-                return typedLead;
-              }
-              return null;
-            })
-            .filter((lead): lead is Lead => lead !== null);
-          
-          leadsData[stage.id] = validLeads || [];
+          throw leadsError;
         }
+
+        // Transform data to include customer information directly in leads
+        const transformedLeads = (leadsData || []).map(lead => ({
+          id: lead.id,
+          value: lead.value || 0,
+          customer_id: lead.customer_id,
+          pipeline_stage_id: lead.pipeline_stage_id,
+          user_id: lead.user_id,
+          name: lead.customers?.name,
+          company_name: lead.customers?.company_name,
+          contact_email: lead.customers?.email,
+          contact_phone: lead.customers?.phone_number
+        }));
+
+        setLeads(transformedLeads);
+      } else {
+        setLeads([]);
       }
-      
-      console.log("Loaded leads data:", leadsData);
-      setStageLeads(leadsData);
+    } catch (error) {
+      console.error('Error fetching pipeline data:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load pipeline data",
+        variant: "destructive",
+      });
+    } finally {
+      setLoading(false);
     }
-    
-    setLoading(false);
-  };
+  }
+
+  function refreshPipelineData() {
+    fetchPipelineData();
+  }
 
   useEffect(() => {
-    setLoading(true);
-    loadStages();
-  }, [pipelineId]);
+    if (pipelineId) {
+      fetchPipelineData();
+    } else {
+      setPipeline(null);
+      setStages([]);
+      setLeads([]);
+      setLoading(false);
+    }
+  }, [pipelineId, user]);
 
   return {
+    pipeline,
     stages,
-    stageLeads,
+    leads,
     loading,
-    loadStages
+    refreshPipelineData
   };
 }

@@ -1,13 +1,17 @@
 
-import { 
-  Plus, ChevronLeft,
-  Users
-} from "lucide-react";
-import { cn } from "@/lib/utils";
 import { useState, useEffect } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
+import { ChevronLeft, ChevronRight, Plus } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/components/auth/AuthProvider";
 import { PipelineSetupDialog } from "./PipelineSetupDialog";
+
+interface Pipeline {
+  id: string;
+  name: string;
+  is_default: boolean;
+}
 
 interface LeadsSidebarProps {
   selectedPipelineId: string | null;
@@ -16,92 +20,128 @@ interface LeadsSidebarProps {
   onCollapse: () => void;
 }
 
-export function LeadsSidebar({
-  selectedPipelineId,
-  onPipelineSelect,
-  isCollapsed,
-  onCollapse,
+export function LeadsSidebar({ 
+  selectedPipelineId, 
+  onPipelineSelect, 
+  isCollapsed, 
+  onCollapse 
 }: LeadsSidebarProps) {
+  const [pipelines, setPipelines] = useState<Pipeline[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [isSetupDialogOpen, setIsSetupDialogOpen] = useState(false);
   const { toast } = useToast();
-  const [pipelines, setPipelines] = useState<Array<{ id: string; name: string; is_default: boolean }>>([]);
-  const [isSetupOpen, setIsSetupOpen] = useState(false);
+  const { user } = useAuth();
 
-  const loadPipelines = async () => {
-    const { data, error } = await supabase
-      .from('pipelines')
-      .select('id, name, is_default')
-      .order('created_at');
+  const fetchPipelines = async () => {
+    if (!user) return;
+    
+    setLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('pipelines')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('created_at', { ascending: false });
 
-    if (error) {
-      console.error('Error loading pipelines:', error);
+      if (error) throw error;
+      setPipelines(data || []);
+    } catch (error) {
+      console.error('Error fetching pipelines:', error);
       toast({
         title: "Error",
         description: "Failed to load pipelines",
         variant: "destructive",
       });
-      return;
-    }
-
-    setPipelines(data || []);
-
-    // If no pipeline is selected, select the default one
-    if (!selectedPipelineId && data && data.length > 0) {
-      const defaultPipeline = data.find(p => p.is_default) || data[0];
-      onPipelineSelect(defaultPipeline.id);
+    } finally {
+      setLoading(false);
     }
   };
 
   useEffect(() => {
-    loadPipelines();
-  }, [selectedPipelineId, onPipelineSelect]);
+    fetchPipelines();
+
+    // Set up a realtime subscription for pipeline changes
+    if (user) {
+      const subscription = supabase
+        .channel('pipelines_changes')
+        .on('postgres_changes', 
+          { 
+            event: '*', 
+            schema: 'public', 
+            table: 'pipelines',
+            filter: `user_id=eq.${user.id}`
+          }, 
+          () => {
+            fetchPipelines();
+          }
+        )
+        .subscribe();
+
+      return () => {
+        subscription.unsubscribe();
+      };
+    }
+  }, [user]);
+
+  const handlePipelineCreated = (newPipelineId: string) => {
+    fetchPipelines();
+    onPipelineSelect(newPipelineId);
+  };
 
   return (
-    <div className={cn(
-      "border-r bg-muted/30 transition-all duration-300 relative flex flex-col",
-      isCollapsed ? "" : "w-48"
-    )}>
-      <nav className="p-3 space-y-1">
-        {pipelines.map((pipeline) => (
-          <button
-            key={pipeline.id}
-            onClick={() => onPipelineSelect(pipeline.id)}
-            className={cn(
-              "w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm truncate",
-              selectedPipelineId === pipeline.id 
-                ? "bg-primary text-primary-foreground" 
-                : "hover:bg-muted"
-            )}
-            title={pipeline.name}
-          >
-            <Users className="h-4 w-4 flex-shrink-0" />
-            {!isCollapsed && <span>{pipeline.name}</span>}
-          </button>
-        ))}
-      </nav>
-      <div className="mt-2 px-3">
-        <button
-          onClick={() => setIsSetupOpen(true)}
-          className="w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm text-muted-foreground hover:bg-muted"
+    <div 
+      className={`bg-background border-r transition-all duration-300 flex flex-col ${
+        isCollapsed ? 'w-16' : 'w-64'
+      }`}
+    >
+      <div className="p-4 flex justify-between items-center border-b">
+        {!isCollapsed && <h2 className="font-semibold">Pipelines</h2>}
+        <Button 
+          variant="ghost" 
+          size="sm" 
+          className={isCollapsed ? 'mx-auto' : ''}
+          onClick={onCollapse}
         >
-          <Plus className="h-4 w-4 flex-shrink-0" />
-          {!isCollapsed && <span>New Pipeline</span>}
-        </button>
+          {isCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
+        </Button>
       </div>
-      <button
-        onClick={onCollapse}
-        className={cn(
-          "absolute -right-3 top-3 p-1 rounded-full bg-background border shadow-sm hover:bg-accent",
-          "transition-transform",
-          isCollapsed && "rotate-180"
-        )}
-      >
-        <ChevronLeft className="h-4 w-4" />
-      </button>
+      
+      <div className="flex-1 overflow-auto">
+        <div className="p-2">
+          {!loading && pipelines.map((pipeline) => (
+            <Button
+              key={pipeline.id}
+              variant={selectedPipelineId === pipeline.id ? "secondary" : "ghost"}
+              className={`w-full justify-start mb-1 ${isCollapsed ? 'px-2' : ''}`}
+              onClick={() => onPipelineSelect(pipeline.id)}
+            >
+              <div className="truncate">
+                {isCollapsed ? pipeline.name.charAt(0) : pipeline.name}
+              </div>
+            </Button>
+          ))}
+          
+          {loading && Array(3).fill(0).map((_, i) => (
+            <div key={i} className="h-9 bg-gray-100 animate-pulse rounded-md mb-1"></div>
+          ))}
+        </div>
+      </div>
+      
+      <div className="p-2 border-t">
+        <Button 
+          className={`w-full ${isCollapsed ? 'p-2' : ''}`}
+          size={isCollapsed ? "icon" : "default"}
+          onClick={() => setIsSetupDialogOpen(true)}
+        >
+          <Plus className={`h-4 w-4 ${!isCollapsed && 'mr-2'}`} />
+          {!isCollapsed && "New Pipeline"}
+        </Button>
+      </div>
 
-      <PipelineSetupDialog
-        isOpen={isSetupOpen}
-        onClose={() => setIsSetupOpen(false)}
-        onSave={loadPipelines}
+      <PipelineSetupDialog 
+        open={isSetupDialogOpen} 
+        onOpenChange={setIsSetupDialogOpen}
+        onPipelineCreated={handlePipelineCreated}
       />
     </div>
   );
