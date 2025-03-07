@@ -1,8 +1,8 @@
 
-import { LeadsLayout } from "@/components/leads/LeadsLayout";
+import { LeadsList } from "@/components/lists/LeadsList";
 
 const Leads = () => {
-  return <LeadsLayout />;
+  return <LeadsList />;
 };
 
 export default Leads;
