@@ -1,4 +1,3 @@
-
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -37,6 +36,8 @@ export function ConversationHeader({ conversation }: ConversationHeaderProps) {
   // Fetch customer data when conversation changes
   useEffect(() => {
     const fetchCustomerData = async () => {
+      setCustomerData(null); // Reset customerData before fetching new data
+
       if (!conversation?.lead?.customer_id) {
         // If no customer_id in lead, try to find from participants
         if (conversation?.participants) {
