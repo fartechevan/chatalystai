@@ -108,10 +108,10 @@ export function ConversationHeader({ conversation }: ConversationHeaderProps) {
   // Get the first letter for the avatar
   const avatarInitial = contactName.charAt(0);
   
-  // Get company name
-  const companyName = customerData?.company_name || 
-                      conversation.lead?.company_name || 
-                      "Unknown Company";
+  // Get customer phone number
+  const phoneNumber = customerData?.phone_number || 
+                      getPhoneNumberFromParticipants(conversation) || 
+                      "No phone number";
 
   return (
     <div className="flex items-center justify-between p-3 border-b">
@@ -130,7 +130,7 @@ export function ConversationHeader({ conversation }: ConversationHeaderProps) {
         </div>
         <div>
           <h2 className="font-semibold">{contactName}</h2>
-          <p className="text-xs text-gray-500">{companyName}</p>
+          <p className="text-xs text-gray-500">{phoneNumber}</p>
         </div>
       </div>
 
@@ -205,6 +205,18 @@ export function ConversationHeader({ conversation }: ConversationHeaderProps) {
 
 // Helper function to extract contact name from participants
 function getContactNameFromParticipants(conversation: Conversation): string | null {
+  if (!conversation.participants) return null;
+  
+  const memberParticipant = conversation.participants.find(p => p.role === 'member');
+  if (memberParticipant && memberParticipant.external_user_identifier) {
+    return memberParticipant.external_user_identifier;
+  }
+  
+  return null;
+}
+
+// Helper function to extract phone number from participants
+function getPhoneNumberFromParticipants(conversation: Conversation): string | null {
   if (!conversation.participants) return null;
   
   const memberParticipant = conversation.participants.find(p => p.role === 'member');
