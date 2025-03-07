@@ -7,6 +7,7 @@ export interface ConversationParticipant {
   conversation_id: string;
   role: 'admin' | 'member';
   external_user_identifier?: string;
+  customer_id?: string; // Add this property to match the database schema
   profiles?: {
     email?: string;
   };

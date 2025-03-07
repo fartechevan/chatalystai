@@ -26,7 +26,7 @@ export async function fetchConversationsWithParticipants() {
     conversations.map(async (conv) => {
       const { data: participants, error: participantsError } = await supabase
         .from('conversation_participants')
-        .select('*, profiles(email)')
+        .select('id, conversation_id, role, external_user_identifier, customer_id, profiles(email)')
         .eq('conversation_id', conv.conversation_id);
 
       if (participantsError) {

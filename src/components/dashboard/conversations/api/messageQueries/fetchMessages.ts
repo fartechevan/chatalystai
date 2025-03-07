@@ -1,21 +1,31 @@
 
 import { supabase } from "@/integrations/supabase/client";
-import type { Message } from "../../types";
 
 /**
  * Fetches messages for a specific conversation
  */
-export async function fetchMessages(conversationId: string): Promise<Message[]> {
-  const { data: messagesData, error: messagesError } = await supabase
+export async function fetchMessages(conversationId: string) {
+  console.log('Fetching messages for conversation:', conversationId);
+  
+  const { data, error } = await supabase
     .from('messages')
-    .select('*, sender_participant:sender_participant_id(id, role, external_user_identifier)')
+    .select(`
+      *,
+      sender:sender_participant_id (
+        id,
+        role,
+        external_user_identifier,
+        customer_id
+      )
+    `)
     .eq('conversation_id', conversationId)
-    .order('created_at', { ascending: true });
+    .order('created_at');
 
-  if (messagesError) {
-    console.error('Error fetching messages:', messagesError);
-    throw messagesError;
+  if (error) {
+    console.error('Error fetching messages:', error);
+    throw error;
   }
 
-  return messagesData;
+  console.log('Fetched messages:', data);
+  return data;
 }
