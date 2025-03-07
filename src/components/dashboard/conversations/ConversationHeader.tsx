@@ -37,7 +37,36 @@ export function ConversationHeader({ conversation }: ConversationHeaderProps) {
   // Fetch customer data when conversation changes
   useEffect(() => {
     const fetchCustomerData = async () => {
-      if (!conversation?.lead?.customer_id) return;
+      if (!conversation?.lead?.customer_id) {
+        // If no customer_id in lead, try to find from participants
+        if (conversation?.participants) {
+          const memberParticipant = conversation.participants.find(
+            p => p.role === 'member'
+          );
+          
+          if (memberParticipant?.customer_id) {
+            try {
+              const { data, error } = await supabase
+                .from('customers')
+                .select('*')
+                .eq('id', memberParticipant.customer_id)
+                .maybeSingle();
+              
+              if (error) {
+                console.error('Error fetching customer data:', error);
+                return;
+              }
+              
+              if (data) {
+                setCustomerData(data);
+              }
+            } catch (err) {
+              console.error('Error processing customer data:', err);
+            }
+          }
+        }
+        return;
+      }
       
       try {
         const { data, error } = await supabase
@@ -70,9 +99,10 @@ export function ConversationHeader({ conversation }: ConversationHeaderProps) {
     );
   }
 
-  // Determine the contact name to display, prioritizing customer data
+  // Determine the contact name to display based on available data
   const contactName = customerData?.name || 
                       conversation.customer_name || 
+                      getContactNameFromParticipants(conversation) ||
                       "Unknown Contact";
   
   // Get the first letter for the avatar
@@ -171,4 +201,16 @@ export function ConversationHeader({ conversation }: ConversationHeaderProps) {
       </div>
     </div>
   );
+}
+
+// Helper function to extract contact name from participants
+function getContactNameFromParticipants(conversation: Conversation): string | null {
+  if (!conversation.participants) return null;
+  
+  const memberParticipant = conversation.participants.find(p => p.role === 'member');
+  if (memberParticipant && memberParticipant.external_user_identifier) {
+    return memberParticipant.external_user_identifier;
+  }
+  
+  return null;
 }
