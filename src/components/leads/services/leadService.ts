@@ -1,6 +1,5 @@
 
 import { supabase } from "@/integrations/supabase/client";
-import { useToast } from "@/hooks/use-toast";
 
 export async function moveLead(
   leadId: string, 
@@ -43,6 +42,7 @@ export async function createLead(data: {
   value?: number;
   pipelineStageId: string;
   userId: string;
+  customerId?: string;
   customerInfo?: {
     name: string;
     phone_number: string;
@@ -52,10 +52,10 @@ export async function createLead(data: {
   }
 }) {
   try {
-    let customerId: string | null = null;
+    let customerId: string | null = data.customerId || null;
     
-    // Create customer first if customer info is provided
-    if (data.customerInfo) {
+    // Create customer first if customer info is provided and we don't already have a customer ID
+    if (!customerId && data.customerInfo) {
       const { data: customerData, error: customerError } = await supabase
         .from('customers')
         .insert({
