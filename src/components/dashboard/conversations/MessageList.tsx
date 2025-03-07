@@ -19,7 +19,7 @@ export function MessageList({ messages, selectedConversation }: MessageListProps
       try {
         const { data, error } = await supabase
           .from('conversation_participants')
-          .select('id, customer_id, external_user_identifier, role')
+          .select('id, user_id, external_user_identifier, role')
           .eq('conversation_id', selectedConversation.conversation_id);
 
         if (error) throw error;
