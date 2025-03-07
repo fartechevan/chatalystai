@@ -8,8 +8,8 @@ interface MessageItemProps {
 }
 
 export function MessageItem({ message, conversation }: MessageItemProps) {
-  // Check if the message sender is an admin by looking at the sender_participant.role
-  const isAdmin = message.sender_participant?.role === 'admin';
+  // Check if the message sender is an admin by looking at the sender.role
+  const isAdmin = message.sender?.role === 'admin';
   
   return (
     <div
