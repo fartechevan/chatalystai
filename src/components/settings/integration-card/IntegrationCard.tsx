@@ -1,5 +1,6 @@
 
 import { Button } from "@/components/ui/button";
+import { CheckCircle } from "lucide-react";
 import type { Integration } from "../types";
 
 interface IntegrationCardProps {
@@ -35,7 +36,14 @@ export function IntegrationCard({ integration, onConnect }: IntegrationCardProps
           className="w-full"
           onClick={() => onConnect(integration)}
         >
-          {integration.is_connected ? "Connected" : "Connect"}
+          {integration.is_connected ? (
+            <span className="flex items-center">
+              <CheckCircle className="h-4 w-4 mr-2 text-green-500" />
+              Connected
+            </span>
+          ) : (
+            "Connect"
+          )}
         </Button>
       )}
     </div>

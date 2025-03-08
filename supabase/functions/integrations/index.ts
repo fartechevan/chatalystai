@@ -28,7 +28,11 @@ serve(async (req) => {
     );
   }
 
-  if (req.method === 'GET' && req.url.includes('/instance/fetchInstances')) {
+  // Parse URL to get the path
+  const url = new URL(req.url);
+  const path = url.pathname;
+
+  if (req.method === 'GET' && path.includes('/instance/fetchInstances')) {
     const options = {
       method: 'GET',
       headers: { apikey: apiKey }
@@ -54,12 +58,40 @@ serve(async (req) => {
         }
       );
     }
-  } else if (req.method === 'GET' && req.url.includes('/instance/connect/')) {
+  } else if (req.method === 'GET' && path.includes('/instance/connectionState/')) {
     const options = {
       method: 'GET',
       headers: { apikey: apiKey }
     };
-    const instance = req.url.split('/').pop(); // Extract instance from URL
+    const instanceId = path.split('/').pop(); // Extract instance from URL
+    const apiUrl = `${EVO_API_BASE_URL}/instance/connectionState/${instanceId}`;
+
+    try {
+      const response = await fetch(apiUrl, options);
+      const data = await response.json();
+      return new Response(
+        JSON.stringify(data), 
+        {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: response.status,
+        }
+      );
+    } catch (err) {
+      console.error(err);
+      return new Response(
+        JSON.stringify({ error: err.message }), 
+        {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
+    }
+  } else if (req.method === 'GET' && path.includes('/instance/connect/')) {
+    const options = {
+      method: 'GET',
+      headers: { apikey: apiKey }
+    };
+    const instance = path.split('/').pop(); // Extract instance from URL
     const apiUrl = `${EVO_API_BASE_URL}/instance/connect/${instance}`;
 
     try {
@@ -82,7 +114,7 @@ serve(async (req) => {
         }
       );
     }
-  } else if (req.method === 'POST' && req.url.includes('/message/sendText/')) {
+  } else if (req.method === 'POST' && path.includes('/message/sendText/')) {
     try {
       const body = await req.json();
       const options = {
@@ -94,7 +126,7 @@ serve(async (req) => {
         body: JSON.stringify(body)
       };
 
-      const instance = req.url.split('/').pop(); // Extract instance from URL
+      const instance = path.split('/').pop(); // Extract instance from URL
       const apiUrl = `${EVO_API_BASE_URL}/message/sendText/${instance}`;
 
       const response = await fetch(apiUrl, options);
