@@ -26,7 +26,7 @@ import { cn } from "@/lib/utils";
 const menuItems = [
   { title: "Dashboard", icon: Home, path: "/dashboard" },
   { title: "Leads", icon: Target, path: "/dashboard/leads" },
-  { title: "Chat", icon: MessageSquare, path: "/dashboard/conversations", badge: 2 },
+  { title: "Chat", icon: MessageSquare, path: "/dashboard/conversations" },
   { title: "Calendar", icon: Calendar, path: "/dashboard/calendar" },
   { title: "Lists", icon: List, path: "/dashboard/lists" },
   { title: "Mail", icon: Mail, path: "/dashboard/mail" },
@@ -71,11 +71,11 @@ export function DashboardSidebar() {
                 <Link to={item.path} className="flex items-center gap-3">
                   <item.icon className="h-5 w-5" />
                   <span className="text-sm">{item.title}</span>
-                  {item.badge && (
+                  {item.badge ? (
                     <span className="absolute right-2 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] text-white">
                       {item.badge}
                     </span>
-                  )}
+                  ) : null}
                 </Link>
               </SidebarMenuButton>
             ))}

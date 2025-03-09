@@ -29,6 +29,8 @@ export function ConversationView() {
     summarizeMutation
   } = useConversationData(selectedConversation);
 
+  console.log("CV: Conversations:", conversations);
+
   useConversationRealtime(queryClient, selectedConversation);
 
   // Fetch participants data for all conversations
@@ -43,6 +45,8 @@ export function ConversationView() {
           console.error('Error loading participants:', error);
           return;
         }
+
+        console.log("CV: Participants data:", data);
 
         // Create a mapping of conversation_id to participant data
         const participantsMap: Record<string, any> = {};

@@ -28,7 +28,7 @@ export function MessageItem({ message, conversation }: MessageItemProps) {
         <div>
           <div className="flex items-center gap-2 mb-1">
             <span className="text-sm font-medium">
-              {isAdmin ? 'Admin' : 'User'}
+              {isAdmin ? 'Admin' : conversation?.customer_name || 'User'}
             </span>
             <span className="text-xs text-muted-foreground">
               {new Date(message.created_at).toLocaleTimeString([], {

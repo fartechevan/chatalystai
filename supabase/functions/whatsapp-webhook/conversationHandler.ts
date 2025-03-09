@@ -27,12 +27,6 @@ export async function findOrCreateConversation(
     .from('conversations')
     .select(`
       conversation_id,
-      conversation_participants (
-        id,
-        role,
-        customer_id,
-        external_user_identifier
-      ),
       lead_id
     `)
     .eq('integrations_config_id', config.id)
@@ -47,17 +41,23 @@ export async function findOrCreateConversation(
   let matchingConversation = null;
   if (existingConversation && existingConversation.length > 0) {
     console.log(`Found ${existingConversation.length} conversations for config ID ${config.id}`);
-    
+
     for (const conv of existingConversation) {
-      if (!conv.conversation_participants) continue;
-      
-      // Find if this conversation has a member participant with the matching phone number
-      const memberWithMatchingPhone = conv.conversation_participants.find(
-        (participant) => participant.role === 'member' && 
-                        participant.external_user_identifier === phoneNumber
-      );
-      
-      if (memberWithMatchingPhone) {
+      // Query conversation participants to find a matching member
+      const { data: conversationParticipants, error: conversationParticipantsError } = await supabaseClient
+        .from('conversation_participants')
+        .select('*')
+        .eq('conversation_id', conv.conversation_id)
+        .eq('role', 'member')
+        .eq('external_user_identifier', phoneNumber)
+        .single();
+
+      if (conversationParticipantsError) {
+        console.error('Error finding conversation participants:', conversationParticipantsError);
+        continue; // Skip to the next conversation
+      }
+
+      if (conversationParticipants) {
         console.log(`Found existing conversation for phoneNumber ${phoneNumber}: ${conv.conversation_id}`);
         matchingConversation = conv;
         break;
@@ -71,20 +71,23 @@ export async function findOrCreateConversation(
 
     // Determine participant ID based on message sender
     let participantId: string | null = null;
-    if (fromMe) {
-      // For fromMe messages, find admin participant
-      participantId = matchingConversation.conversation_participants.find(
-        (participant) => participant.role === 'admin'
-      )?.id || null;
-      console.log(`Using admin participant ID: ${participantId} for fromMe message`);
-    } else {
-      // For customer messages, find member participant
-      participantId = matchingConversation.conversation_participants.find(
-        (participant) => participant.role === 'member' && 
-                       participant.external_user_identifier === phoneNumber
-      )?.id || null;
-      console.log(`Using member participant ID: ${participantId} for customer message`);
+    
+    // Query conversation participants to find the appropriate participant ID
+    const { data: participant, error: participantError } = await supabaseClient
+      .from('conversation_participants')
+      .select('id')
+      .eq('conversation_id', matchingConversation.conversation_id)
+      .eq('role', fromMe ? 'admin' : 'member')
+      .limit(1)
+      .single();
+
+    if (participantError) {
+      console.error('Error finding participant:', participantError);
+      return { appConversationId: null, participantId: null };
     }
+
+    participantId = participant?.id || null;
+    console.log(`Using participant ID: ${participantId} for ${fromMe ? 'admin' : 'member'} message`);
 
     return { appConversationId, participantId };
   }

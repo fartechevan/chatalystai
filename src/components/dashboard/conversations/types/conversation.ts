@@ -1,4 +1,4 @@
-
+import { Customer } from "./customer";
 import type { Lead } from "./lead";
 import type { Message } from "./message";
 
@@ -11,6 +11,7 @@ export interface ConversationParticipant {
   profiles?: {
     email?: string;
   };
+  customer?: Customer | null;
 }
 
 export interface Conversation {
@@ -23,4 +24,5 @@ export interface Conversation {
   customer_name?: string;
   messages?: Message[];
   integrations_config_id?: string;
+  customer?: { customer: { id?: string; name: string } }[];
 }
