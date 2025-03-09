@@ -27,9 +27,46 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
-  const integrationId = 'bda44db7-4e9a-4733-a9c7-c4f5d7198905';
+  try {
+    // Parse request URL and body
+    const url = new URL(req.url);
+    const path = url.pathname;
 
-  // Fetch integration configuration from Supabase
+    // Handle different paths and methods
+    if (path.includes('/message/sendText/')) {
+      // Process WhatsApp send message request
+      return await handleSendWhatsAppMessage(req);
+    } else if (req.method === 'GET' && path.includes('/instance/fetchInstances')) {
+      return await handleFetchInstances();
+    } else if (req.method === 'GET' && path.includes('/instance/connectionState/')) {
+      const instanceId = path.split('/').pop();
+      return await handleConnectionState(instanceId);
+    } else if (req.method === 'GET' && path.includes('/instance/connect/')) {
+      const instanceId = path.split('/').pop();
+      return await handleConnect(instanceId);
+    } else {
+      return new Response(
+        JSON.stringify({ error: 'Invalid request path or method' }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        }
+      );
+    }
+  } catch (error) {
+    console.error('Unhandled error in request processing:', error);
+    return new Response(
+      JSON.stringify({ error: error.message || 'Unknown server error' }),
+      {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      }
+    );
+  }
+});
+
+// Helper function to fetch integration config
+async function getIntegrationConfig(integrationId = 'bda44db7-4e9a-4733-a9c7-c4f5d7198905') {
   const { data: integration, error: integrationError } = await supabaseClient
     .from('integrations_config')
     .select('api_key, instance_id')
@@ -38,163 +75,194 @@ serve(async (req) => {
 
   if (integrationError) {
     console.error('Error fetching integration config:', integrationError);
-    return new Response(
-      JSON.stringify({ error: 'Failed to fetch integration configuration' }),
-      {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      }
-    );
+    throw new Error('Failed to fetch integration configuration');
   }
 
-  if (!integration) {
-    console.error('Integration config not found');
-    return new Response(
-      JSON.stringify({ error: 'Integration configuration not found' }),
-      {
-        status: 404,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      }
-    );
+  if (!integration || !integration.api_key) {
+    console.error('Integration config not found or missing API key');
+    throw new Error('Integration configuration not found or incomplete');
   }
 
-  const { api_key: apiKey, instance_id: instanceId } = integration;
+  return integration;
+}
 
-  if (!apiKey) {
-    console.error('Missing EVOLUTION_API_KEY in integrations_config');
-    return new Response(
-      JSON.stringify({ error: 'API key not configured in integrations_config' }),
-      {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      }
-    );
-  }
-
-  // Parse URL to get the path
-  const url = new URL(req.url);
-  const path = url.pathname;
-
-  if (req.method === 'GET' && path.includes('/instance/fetchInstances')) {
-    const options = {
-      method: 'GET',
-      headers: { apikey: apiKey }
-    };
-
-    try {
-      const response = await fetch(EVO_API_BASE_URL + '/instance/fetchInstances', options);
-      const data = await response.json();
+// Handler for WhatsApp message sending
+async function handleSendWhatsAppMessage(req) {
+  try {
+    const body = await req.json();
+    console.log('Received request body:', body);
+    
+    // Extract instance ID from request body if provided, otherwise use default
+    const { instanceId, number, text } = body;
+    
+    if (!instanceId || !number || !text) {
+      console.error('Missing required parameters', { instanceId, number, text });
       return new Response(
-        JSON.stringify(data),
+        JSON.stringify({ error: 'Missing required parameters: instanceId, number, or text' }),
         {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: response.status,
-        }
-      );
-    } catch (err) {
-      console.error(err);
-      return new Response(
-        JSON.stringify({ error: err.message }),
-        {
-          status: 500,
+          status: 400,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         }
       );
     }
-  } else if (req.method === 'GET' && path.includes('/instance/connectionState/')) {
-    const options = {
-      method: 'GET',
-      headers: { apikey: apiKey }
-    };
-    const apiUrl = `${EVO_API_BASE_URL}/instance/connectionState/${instanceId}`;
 
-    try {
-      const response = await fetch(apiUrl, options);
-      const data = await response.json();
-      return new Response(
-        JSON.stringify(data),
-        {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: response.status,
-        }
-      );
-    } catch (err) {
-      console.error(err);
-      return new Response(
-        JSON.stringify({ error: err.message }),
-        {
-          status: 500,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        }
-      );
-    }
-  } else if (req.method === 'GET' && path.includes('/instance/connect/')) {
-    const options = {
-      method: 'GET',
-      headers: { apikey: apiKey }
-    };
-    const apiUrl = `${EVO_API_BASE_URL}/instance/connect/${instanceId}`;
+    // Get API key from integration config
+    const integration = await getIntegrationConfig();
+    const apiKey = integration.api_key;
 
-    try {
-      const response = await fetch(apiUrl, options);
-      const data = await response.json();
-      return new Response(
-        JSON.stringify(data),
-        {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: response.status,
-        }
-      );
-    } catch (err) {
-      console.error(err);
-      return new Response(
-        JSON.stringify({ error: err.message }),
-        {
-          status: 500,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        }
-      );
-    }
-  } else if (req.method === 'POST' && path.includes('/message/sendText/')) {
-    try {
-      const body = await req.json();
-      const options = {
-        method: 'POST',
-        headers: {
-          apikey: apiKey,
-          'Content-Type': 'application/json'
+    // Prepare request to Evolution API
+    const apiUrl = `${EVO_API_BASE_URL}/message/sendText/${instanceId}`;
+    console.log('Sending request to Evolution API:', apiUrl);
+    
+    const options = {
+      method: 'POST',
+      headers: {
+        apikey: apiKey,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        number: number,
+        options: {
+          delay: 1200
         },
-        body: JSON.stringify(body)
-      };
-
-      const apiUrl = `${EVO_API_BASE_URL}/message/sendText/${instanceId}`;
-
-      const response = await fetch(apiUrl, options);
-      const data = await response.json();
-      return new Response(
-        JSON.stringify(data),
-        {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: response.status,
+        textMessage: {
+          text: text
         }
-      );
-    } catch (err) {
-      console.error(err);
-      return new Response(
-        JSON.stringify({ error: err.message }),
-        {
-          status: 500,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        }
-      );
-    }
-  } else {
+      })
+    };
+
+    console.log('Request options:', JSON.stringify(options, null, 2));
+    
+    // Send request to Evolution API
+    const response = await fetch(apiUrl, options);
+    const data = await response.json();
+    
+    console.log('Evolution API response:', data);
+    
     return new Response(
-      JSON.stringify({ error: 'Invalid request' }),
+      JSON.stringify(data),
       {
-        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: response.status,
+      }
+    );
+  } catch (error) {
+    console.error('Error in handleSendWhatsAppMessage:', error);
+    return new Response(
+      JSON.stringify({ error: error.message || 'Failed to send WhatsApp message' }),
+      {
+        status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       }
     );
   }
-});
+}
+
+// Handler for fetching WhatsApp instances
+async function handleFetchInstances() {
+  try {
+    const integration = await getIntegrationConfig();
+    const apiKey = integration.api_key;
+    
+    const options = {
+      method: 'GET',
+      headers: { apikey: apiKey }
+    };
+
+    const response = await fetch(`${EVO_API_BASE_URL}/instance/fetchInstances`, options);
+    const data = await response.json();
+    
+    return new Response(
+      JSON.stringify(data),
+      {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: response.status,
+      }
+    );
+  } catch (error) {
+    console.error('Error in handleFetchInstances:', error);
+    return new Response(
+      JSON.stringify({ error: error.message }),
+      {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      }
+    );
+  }
+}
+
+// Handler for checking connection state
+async function handleConnectionState(instanceId) {
+  try {
+    if (!instanceId) {
+      throw new Error('Instance ID is required');
+    }
+    
+    const integration = await getIntegrationConfig();
+    const apiKey = integration.api_key;
+    
+    const options = {
+      method: 'GET',
+      headers: { apikey: apiKey }
+    };
+    
+    const apiUrl = `${EVO_API_BASE_URL}/instance/connectionState/${instanceId}`;
+    const response = await fetch(apiUrl, options);
+    const data = await response.json();
+    
+    return new Response(
+      JSON.stringify(data),
+      {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: response.status,
+      }
+    );
+  } catch (error) {
+    console.error('Error in handleConnectionState:', error);
+    return new Response(
+      JSON.stringify({ error: error.message }),
+      {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      }
+    );
+  }
+}
+
+// Handler for connecting to WhatsApp
+async function handleConnect(instanceId) {
+  try {
+    if (!instanceId) {
+      throw new Error('Instance ID is required');
+    }
+    
+    const integration = await getIntegrationConfig();
+    const apiKey = integration.api_key;
+    
+    const options = {
+      method: 'GET',
+      headers: { apikey: apiKey }
+    };
+    
+    const apiUrl = `${EVO_API_BASE_URL}/instance/connect/${instanceId}`;
+    const response = await fetch(apiUrl, options);
+    const data = await response.json();
+    
+    return new Response(
+      JSON.stringify(data),
+      {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: response.status,
+      }
+    );
+  } catch (error) {
+    console.error('Error in handleConnect:', error);
+    return new Response(
+      JSON.stringify({ error: error.message }),
+      {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      }
+    );
+  }
+}

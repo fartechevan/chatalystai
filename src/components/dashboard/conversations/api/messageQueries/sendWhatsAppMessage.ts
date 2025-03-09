@@ -20,9 +20,9 @@ export async function sendWhatsAppMessage(
     console.log('Phone number being sent to edge function:', phoneNumber);
     
     const payload: WhatsAppMessageRequest = {
+      instanceId: instanceId,
       number: phoneNumber,
-      text: message,
-      instanceId: instanceId
+      text: message
     };
     
     console.log('WhatsApp API request payload:', payload);

@@ -24,4 +24,3 @@ verify_jwt = false
 
 [functions.integrations]
 verify_jwt = false
-
