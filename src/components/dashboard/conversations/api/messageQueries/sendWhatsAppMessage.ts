@@ -27,20 +27,20 @@ export async function sendWhatsAppMessage(
     
     console.log('WhatsApp API request payload:', payload);
     
-    const response = await supabase.functions.invoke('integrations', {
+    const { data, error } = await supabase.functions.invoke('integrations', {
       body: payload
     });
 
-    console.log('WhatsApp API response:', response);
+    console.log('WhatsApp API response:', data, error);
 
-    if (response.error) {
-      console.error('Error sending WhatsApp message:', response.error);
-      throw new Error(response.error.message || 'Failed to send WhatsApp message');
+    if (error) {
+      console.error('Error sending WhatsApp message:', error);
+      throw new Error(error.message || 'Failed to send WhatsApp message');
     }
 
     return {
       success: true,
-      data: response.data
+      data: data
     };
   } catch (error) {
     console.error('Error invoking edge function:', error);
