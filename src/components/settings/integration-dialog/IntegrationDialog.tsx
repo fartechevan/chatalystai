@@ -10,7 +10,8 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useEffect, useState } from "react";
 import type { Integration } from "../types";
-import { useWhatsAppConnection, ConnectionState } from "./hooks/useWhatsAppConnection";
+import { useWhatsAppConnection } from "./hooks/whatsapp/useWhatsAppConnection";
+import type { ConnectionState } from "./hooks/whatsapp/types";
 import { QRCodeScreen } from "./components/QRCodeScreen";
 import { DeviceSelect } from "./components/DeviceSelect";
 import { Loader2, CheckCircle, AlertTriangle } from "lucide-react";
