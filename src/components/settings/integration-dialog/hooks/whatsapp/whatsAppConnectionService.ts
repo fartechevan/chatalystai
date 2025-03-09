@@ -67,22 +67,42 @@ export const checkInstanceStatus = async (
     const data = await response.json();
     console.log('Instance status:', data);
 
-    // Check if instance exists and is connected
-    const instance = Array.isArray(data) && data.find(inst => inst.instance?.instanceId === config.instance_id);
-    const isConnected = instance?.instance?.state === 'open';
-    
-    if (isConnected) {
-      setConnectionState('open');
-      setQrCodeBase64(null);
-    } else if (instance?.instance?.state === 'connecting') {
-      setConnectionState('connecting');
+    // Per Evolution API docs, check if the instance exists and check its connection state
+    // Look for the instance with the matching instanceId
+    if (Array.isArray(data)) {
+      const instance = data.find(item => 
+        item.instance?.instanceId === config.instance_id
+      );
+      
+      if (instance) {
+        // Check connection status from the instance state property
+        const connectionStatus = instance.instance?.state;
+        console.log('Found instance with state:', connectionStatus);
+        
+        if (connectionStatus === 'open') {
+          setConnectionState('open');
+          setQrCodeBase64(null);
+          return true;
+        } else if (connectionStatus === 'connecting') {
+          setConnectionState('connecting');
+          return false;
+        } else {
+          setConnectionState('close');
+          return false;
+        }
+      } else {
+        console.log('Instance not found in response');
+        setConnectionState('unknown');
+        return false;
+      }
     } else {
-      setConnectionState('close');
+      console.log('Unexpected response format:', data);
+      setConnectionState('unknown');
+      return false;
     }
-
-    return isConnected;
   } catch (error) {
     console.error('Error checking connection status:', error);
+    setConnectionState('unknown');
     return false;
   }
 };

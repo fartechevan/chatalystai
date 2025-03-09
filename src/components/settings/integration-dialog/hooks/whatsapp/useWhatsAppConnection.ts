@@ -17,9 +17,8 @@ export function useWhatsAppConnection(selectedIntegration: Integration | null) {
   // Function to check the current connection state explicitly
   const checkCurrentConnectionState = useCallback(async () => {
     if (config) {
-      const currentState = await checkInstanceStatus(config, setConnectionState, setQrCodeBase64);
-      console.log('Current connection state checked:', currentState);
-      return currentState;
+      console.log('Checking current connection state with config:', config);
+      return await checkInstanceStatus(config, setConnectionState, setQrCodeBase64);
     }
     return false;
   }, [config]);
@@ -32,11 +31,9 @@ export function useWhatsAppConnection(selectedIntegration: Integration | null) {
 
     // Start a new polling interval
     const intervalId = setInterval(async () => {
-      const state = await checkConnectionState(config, setConnectionState, toast);
-      if (state === 'open') {
-        clearInterval(intervalId);
-        setPollingInterval(null);
-      }
+      await checkConnectionState(config, setConnectionState, toast);
+      // Re-check instance status to get the accurate state
+      await checkCurrentConnectionState();
     }, 5000); // Check every 5 seconds
 
     setPollingInterval(intervalId);
@@ -64,7 +61,7 @@ export function useWhatsAppConnection(selectedIntegration: Integration | null) {
       const result = await initializeConnection(config, toast);
       
       if (result.success && result.qrCodeDataUrl) {
-        console.log('Formatted QR code URL:', result.qrCodeDataUrl);
+        console.log('QR code generated successfully:', result.qrCodeDataUrl);
         setQrCodeBase64(result.qrCodeDataUrl);
         setConnectionState('connecting');
         
@@ -88,6 +85,7 @@ export function useWhatsAppConnection(selectedIntegration: Integration | null) {
   useEffect(() => {
     // Check initial connection state when the component mounts or config changes
     if (config) {
+      console.log('Initial connection state check with config:', config);
       checkInstanceStatus(config, setConnectionState, setQrCodeBase64);
     }
 
