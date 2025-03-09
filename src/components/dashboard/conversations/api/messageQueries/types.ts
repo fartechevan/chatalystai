@@ -6,6 +6,7 @@ export interface WhatsAppMessageRequest {
   number: string;
   text: string;
   instanceId: string;
+  integrationId: string;
 }
 
 export interface WhatsAppMessageResponse {

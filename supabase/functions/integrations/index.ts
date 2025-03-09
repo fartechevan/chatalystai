@@ -1,7 +1,29 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from '@supabase/supabase-js'
+
+interface RequestBody {
+  integrationId: string;
+  number: string;
+  text: string;
+  instanceId: string;
+}
 
 const EVO_API_BASE_URL = 'https://api.evoapicloud.com'; // Extracted base URL
+
+const supabaseUrl = Deno.env.get('SUPABASE_URL')
+const supabaseKey = Deno.env.get('SUPABASE_ANON_KEY')
+
+if (!supabaseUrl || !supabaseKey) {
+  console.error('Missing SUPABASE_URL or SUPABASE_ANON_KEY environment variables');
+  Deno.exit(1);
+}
+
+const supabaseClient = createClient(supabaseUrl, supabaseKey, {
+  auth: {
+    persistSession: false
+  }
+});
 
 // Define CORS headers
 const corsHeaders = {
@@ -15,108 +37,71 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
-  // Get API key from environment variable
-  const apiKey = Deno.env.get('EVOLUTION_API_KEY');
-  if (!apiKey) {
-    console.error('Missing EVOLUTION_API_KEY environment variable');
+  const url = new URL(req.url);
+  const path = url.pathname;
+
+  // Extract request body
+  let body: RequestBody;
+  try {
+    body = await req.json();
+  } catch (error) {
+    console.error("Error parsing request body:", error);
     return new Response(
-      JSON.stringify({ error: 'API key not configured' }),
-      { 
-        status: 500, 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      JSON.stringify({ error: "Invalid request body" }),
+      {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
       }
     );
   }
 
-  // Parse URL to get the path
-  const url = new URL(req.url);
-  const path = url.pathname;
+  // Extract integrationId from the request body
+  const integrationId = body.integrationId;
 
-  if (req.method === 'GET' && path.includes('/instance/fetchInstances')) {
-    const options = {
-      method: 'GET',
-      headers: { apikey: apiKey }
-    };
+  if (!integrationId) {
+    console.error("Missing integrationId in request body");
+    return new Response(
+      JSON.stringify({ error: "Missing integrationId in request body" }),
+      {
+        status: 400,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      }
+    );
+  }
 
-    try {
-      const response = await fetch(EVO_API_BASE_URL + '/instance/fetchInstances', options);
-      const data = await response.json();
-      return new Response(
-        JSON.stringify(data), 
-        {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: response.status,
-        }
-      );
-    } catch (err) {
-      console.error(err);
-      return new Response(
-        JSON.stringify({ error: err.message }), 
-        {
-          status: 500,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        }
-      );
-    }
-  } else if (req.method === 'GET' && path.includes('/instance/connectionState/')) {
-    const options = {
-      method: 'GET',
-      headers: { apikey: apiKey }
-    };
-    const instanceId = path.split('/').pop(); // Extract instance from URL
-    const apiUrl = `${EVO_API_BASE_URL}/instance/connectionState/${instanceId}`;
+  // Fetch API key from the database
+  const { data, error } = await supabaseClient
+    .from('integration_config')
+    .select('api_key')
+    .eq('id', integrationId)
+    .single();
 
-    try {
-      const response = await fetch(apiUrl, options);
-      const data = await response.json();
-      return new Response(
-        JSON.stringify(data), 
-        {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: response.status,
-        }
-      );
-    } catch (err) {
-      console.error(err);
-      return new Response(
-        JSON.stringify({ error: err.message }), 
-        {
-          status: 500,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        }
-      );
-    }
-  } else if (req.method === 'GET' && path.includes('/instance/connect/')) {
-    const options = {
-      method: 'GET',
-      headers: { apikey: apiKey }
-    };
-    const instance = path.split('/').pop(); // Extract instance from URL
-    const apiUrl = `${EVO_API_BASE_URL}/instance/connect/${instance}`;
+  if (error) {
+    console.error('Error fetching API key from database:', error);
+    return new Response(
+      JSON.stringify({ error: 'Failed to fetch API key from database' }),
+      {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      }
+    );
+  }
 
+  const apiKey = data.api_key;
+
+  if (!apiKey) {
+    console.error('API key not found in database');
+    return new Response(
+      JSON.stringify({ error: 'API key not configured in database' }),
+      {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      }
+    );
+  }
+
+  if (req.method === 'POST' && path.includes('/message/sendText/')) {
     try {
-      const response = await fetch(apiUrl, options);
-      const data = await response.json();
-      return new Response(
-        JSON.stringify(data), 
-        {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: response.status,
-        }
-      );
-    } catch (err) {
-      console.error(err);
-      return new Response(
-        JSON.stringify({ error: err.message }), 
-        {
-          status: 500,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        }
-      );
-    }
-  } else if (req.method === 'POST' && path.includes('/message/sendText/')) {
-    try {
-      const body = await req.json();
       const options = {
         method: 'POST',
         headers: {
