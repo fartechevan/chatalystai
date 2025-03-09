@@ -42,7 +42,7 @@ export async function sendWhatsAppMessage(
       success: true,
       data: data
     };
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error invoking edge function:', error);
     return {
       success: false,

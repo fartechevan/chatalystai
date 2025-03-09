@@ -22,3 +22,6 @@ verify_jwt = false
 [functions.whatsapp-webhook]
 verify_jwt = false
 
+[functions.integrations]
+verify_jwt = false
+
