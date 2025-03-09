@@ -3,7 +3,7 @@ import { useState, useRef, useEffect } from "react";
 import { Loader2 } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { MessageItem } from "./MessageItem";
-import type { Conversation, Message as MessageType } from "../types";
+import type { Conversation, Message as MessageType } from "../../conversations/types";
 
 interface MessageListProps {
   messages: MessageType[];
