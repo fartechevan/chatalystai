@@ -1,4 +1,4 @@
-import { SupabaseClient, createClient } from "https://esm.sh/@supabase/supabase-js@2"
+import { SupabaseClient, createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { findOrCreateCustomer } from "./customerHandler.ts";
 
 /**
@@ -11,7 +11,7 @@ export async function findOrCreateConversation(
   fromMe: boolean,
   customerId: string | null
 ): Promise<{ appConversationId: string | null; participantId: string | null }> {
-  console.log(`Finding or creating conversation for ${remoteJid}`);
+  console.log(`Finding or creating conversation for ${remoteJid} with customerId: ${customerId}`);
   
   // Skip processing for group chats
   if (remoteJid.includes('@g.us')) {
@@ -137,7 +137,7 @@ export async function findOrCreateConversation(
       conversation_id: appConversationId,
       role: 'member',
       external_user_identifier: phoneNumber,
-      customer_id: customerId ? customerId : null,
+      customer_id: customerId,
     })
     .select()
     .single();

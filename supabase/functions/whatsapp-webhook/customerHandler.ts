@@ -4,7 +4,7 @@ import { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
  * Finds an existing customer or creates a new one
  */
 export async function findOrCreateCustomer(supabaseClient: SupabaseClient, phoneNumber: string, contactName: string): Promise<string | null> {
-  console.log(`Finding or creating customer with phone: ${phoneNumber}`);
+  console.log(`Finding or creating customer with phone: ${phoneNumber}, contactName: ${contactName}`);
 
   // Ensure phone number includes country code (+60 for Malaysia)
   let formattedPhoneNumber = phoneNumber;
@@ -48,5 +48,7 @@ export async function findOrCreateCustomer(supabaseClient: SupabaseClient, phone
   }
   
   console.log(`Created new customer with ID: ${newCustomer.id}`);
-  return newCustomer.id;
+  const customerId = newCustomer.id;
+  console.log(`Returning customerId: ${customerId}`);
+  return customerId;
 }

@@ -1,5 +1,5 @@
 
-import { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2"
+import { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { extractMessageContent } from "./utils.ts"
 import { findOrCreateCustomer } from "./customerHandler.ts"
 import { findOrCreateConversation } from "./conversationHandler.ts"
@@ -50,11 +50,11 @@ export async function handleMessageEvent(supabaseClient: SupabaseClient, data: a
   console.log(`Extracted phone number: ${phoneNumber}`);
 
   // Customer handling
+  // Call findOrCreateCustomer regardless of fromMe value
   let customerId: string | null = null;
-  if (!fromMe) {
-    customerId = await findOrCreateCustomer(supabaseClient, phoneNumber, contactName);
-    if (!customerId) return false;
-  }
+  customerId = await findOrCreateCustomer(supabaseClient, phoneNumber, contactName);
+  console.log(`[MessageHandler] Customer ID: ${customerId}`);
+  if (!customerId) return false;
   
   // Conversation handling
   const { appConversationId, participantId } = await findOrCreateConversation(
@@ -62,7 +62,7 @@ export async function handleMessageEvent(supabaseClient: SupabaseClient, data: a
     remoteJid,
     config,
     fromMe,
-    customerId // Pass customerId to findOrCreateConversation
+    customerId
   );
   
   if (!appConversationId || !participantId) {
