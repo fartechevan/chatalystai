@@ -2,8 +2,14 @@
 import { useToast } from "@/hooks/use-toast";
 import type { ConnectionState } from "./types";
 
+interface WhatsAppConfig {
+  instance_id: string;
+  base_url: string;
+  api_key: string;
+}
+
 export const checkConnectionState = async (
-  config: any,
+  config: WhatsAppConfig,
   setConnectionState: (state: ConnectionState) => void,
   toast: ReturnType<typeof useToast>['toast']
 ) => {
@@ -47,7 +53,7 @@ export const checkConnectionState = async (
 };
 
 export const checkInstanceStatus = async (
-  config: any,
+  config: WhatsAppConfig,
   setConnectionState: (state: ConnectionState) => void,
   setQrCodeBase64: (qrCode: string | null) => void
 ) => {
@@ -66,32 +72,36 @@ export const checkInstanceStatus = async (
 
     const data = await response.json();
     console.log('Instance status:', data);
+    console.log('Response from fetchInstances:', data);
 
     // Per Evolution API docs, check if the instance exists and check its connection state
     // Look for the instance with the matching instanceId
     if (Array.isArray(data)) {
-      const instance = data.find(item => 
-        item.instance?.instanceId === config.instance_id
-      );
-      
-      if (instance) {
-        // Check connection status from the instance state property
-        const connectionStatus = instance.instance?.state;
-        console.log('Found instance with state:', connectionStatus);
-        
-        if (connectionStatus === 'open') {
-          setConnectionState('open');
-          setQrCodeBase64(null);
-          return true;
-        } else if (connectionStatus === 'connecting') {
-          setConnectionState('connecting');
-          return false;
-        } else {
-          setConnectionState('close');
-          return false;
-        }
+      const project = data.find(item => {
+        console.log('Item in find method:', item);
+        return item.project?.instances;
+      });
+
+      if (project) {
+        project.project.instances.forEach(instance => {
+          if (instance.id === config.instance_id) {
+            const connectionStatus = instance.connectionStatus;
+            console.log('Found instance with state:', connectionStatus);
+            console.log('Connection status from project level:', connectionStatus);
+
+            if (connectionStatus === 'open') {
+              setConnectionState('open');
+              setQrCodeBase64(null);
+            } else if (connectionStatus === 'connecting') {
+              setConnectionState('connecting');
+            } else {
+              setConnectionState('close');
+            }
+          }
+        });
+        return true;
       } else {
-        console.log('Instance not found in response');
+        console.log('Project not found in response');
         setConnectionState('unknown');
         return false;
       }
@@ -108,7 +118,7 @@ export const checkInstanceStatus = async (
 };
 
 export const initializeConnection = async (
-  config: any,
+  config: WhatsAppConfig,
   toast: ReturnType<typeof useToast>['toast']
 ) => {
   if (!config) {
