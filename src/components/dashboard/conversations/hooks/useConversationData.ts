@@ -50,11 +50,9 @@ export function useConversationData(selectedConversation?: Conversation | null) 
         throw new Error("Could not find admin participant ID");
       }
 
-      // If this conversation is linked to a WhatsApp integration, first send via WhatsApp
+        // If this conversation is linked to a WhatsApp integration, first send via WhatsApp
       if (selectedConversation.integrations_config_id) {
         try {
-          console.log("Sending WhatsApp message for conversation with config ID:", selectedConversation.integrations_config_id);
-
           // Get instance_id from integrations_config table
           const { data: integrationConfigData, error: integrationConfigError } = await supabase
             .from('integrations_config')
@@ -68,10 +66,6 @@ export function useConversationData(selectedConversation?: Conversation | null) 
           }
 
           const instanceId = integrationConfigData.instance_id;
-          console.log("Found instance_id:", instanceId);
-
-          // Log customer_id before fetching customer data
-          console.log("Fetching customer data for customer_id:", selectedConversation.lead?.customer_id);
 
           let customerPhoneNumber: string | undefined;
 
@@ -105,8 +99,6 @@ export function useConversationData(selectedConversation?: Conversation | null) 
             throw new Error("Could not find recipient's phone number");
           }
 
-          console.log('Before sendWhatsAppMessage - instance_id:', instanceId, 'phone_number:', customerPhoneNumber);
-
           // Send the message via WhatsApp
           const whatsappResult = await sendWhatsAppMessage(
             instanceId,
@@ -114,8 +106,6 @@ export function useConversationData(selectedConversation?: Conversation | null) 
             content,
             selectedConversation.integrations_config_id
           );
-
-          console.log('After sendWhatsAppMessage - whatsappResult:', whatsappResult);
 
           // If WhatsApp message fails, show error and don't save to database
           if (!whatsappResult.success) {
@@ -128,7 +118,6 @@ export function useConversationData(selectedConversation?: Conversation | null) 
             return null;
           }
 
-          console.log("WhatsApp message sent successfully:", whatsappResult);
           toast({
             title: "Message sent",
             description: "Your message was successfully sent via WhatsApp",
@@ -143,8 +132,6 @@ export function useConversationData(selectedConversation?: Conversation | null) 
           return null;
         }
       }
-
-      console.log('Before sendMessage - conversation_id:', selectedConversation.conversation_id, 'adminParticipantId:', adminParticipantId);
 
       // If WhatsApp message was successful or not a WhatsApp conversation,
       // save the message to our database

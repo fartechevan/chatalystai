@@ -1,15 +1,13 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-const EVO_API_BASE_URL = 'https://api.evoapicloud.com'; // Extracted base URL
+const EVO_API_BASE_URL = "https://api.evoapicloud.com"; // Extracted base URL
 
 // Supabase configuration
-const supabaseUrl = Deno.env.get('SUPABASE_URL');
-const supabaseKey = Deno.env.get('SUPABASE_ANON_KEY');
+const supabaseUrl = Deno.env.get("SUPABASE_URL");
+const supabaseKey = Deno.env.get("SUPABASE_ANON_KEY");
 
 if (!supabaseUrl || !supabaseKey) {
-  console.error('Missing Supabase URL or key');
   Deno.exit(1);
 }
 
@@ -17,57 +15,58 @@ const supabaseClient = createClient(supabaseUrl, supabaseKey);
 
 // Define CORS headers
 const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  "Access-Control-Allow-Origin": "*",
+  "Access-Control-Allow-Headers":
+    "authorization, x-client-info, apikey, content-type",
 };
 
 serve(async (req) => {
+  console.log("Integrations edge function called", req);
   // Handle CORS preflight requests
-  if (req.method === 'OPTIONS') {
+  if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
 
-  const integrationId = 'bda44db7-4e9a-4733-a9c7-c4f5d7198905';
+  const integrationId = "bda44db7-4e9a-4733-a9c7-c4f5d7198905";
 
   // Fetch integration configuration from Supabase
   const { data: integration, error: integrationError } = await supabaseClient
-    .from('integrations_config')
-    .select('api_key, instance_id')
-    .eq('id', integrationId)
+    .from("integrations_config")
+    .select("api_key, instance_id")
+    .eq("id", integrationId)
     .single();
 
   if (integrationError) {
-    console.error('Error fetching integration config:', integrationError);
     return new Response(
-      JSON.stringify({ error: 'Failed to fetch integration configuration' }),
+      JSON.stringify({ error: "Failed to fetch integration configuration" }),
       {
         status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      }
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      },
     );
   }
 
   if (!integration) {
-    console.error('Integration config not found');
     return new Response(
-      JSON.stringify({ error: 'Integration configuration not found' }),
+      JSON.stringify({ error: "Integration configuration not found" }),
       {
         status: 404,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      }
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      },
     );
   }
 
   const { api_key: apiKey, instance_id: instanceId } = integration;
 
   if (!apiKey) {
-    console.error('Missing EVOLUTION_API_KEY in integrations_config');
     return new Response(
-      JSON.stringify({ error: 'API key not configured in integrations_config' }),
+      JSON.stringify({
+        error: "API key not configured in integrations_config",
+      }),
       {
         status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      }
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      },
     );
   }
 
@@ -75,36 +74,40 @@ serve(async (req) => {
   const url = new URL(req.url);
   const path = url.pathname;
 
-  if (req.method === 'GET' && path.includes('/instance/fetchInstances')) {
+  if (req.method === "GET" && path.includes("/instance/fetchInstances")) {
     const options = {
-      method: 'GET',
-      headers: { apikey: apiKey }
+      method: "GET",
+      headers: { apikey: apiKey },
     };
 
     try {
-      const response = await fetch(EVO_API_BASE_URL + '/instance/fetchInstances', options);
+      const response = await fetch(
+        EVO_API_BASE_URL + "/instance/fetchInstances",
+        options,
+      );
       const data = await response.json();
       return new Response(
         JSON.stringify(data),
         {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
           status: response.status,
-        }
+        },
       );
     } catch (err) {
-      console.error(err);
       return new Response(
         JSON.stringify({ error: err.message }),
         {
           status: 500,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        }
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        },
       );
     }
-  } else if (req.method === 'GET' && path.includes('/instance/connectionState/')) {
+  } else if (
+    req.method === "GET" && path.includes("/instance/connectionState/")
+  ) {
     const options = {
-      method: 'GET',
-      headers: { apikey: apiKey }
+      method: "GET",
+      headers: { apikey: apiKey },
     };
     const apiUrl = `${EVO_API_BASE_URL}/instance/connectionState/${instanceId}`;
 
@@ -114,24 +117,23 @@ serve(async (req) => {
       return new Response(
         JSON.stringify(data),
         {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
           status: response.status,
-        }
+        },
       );
     } catch (err) {
-      console.error(err);
       return new Response(
         JSON.stringify({ error: err.message }),
         {
           status: 500,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        }
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        },
       );
     }
-  } else if (req.method === 'GET' && path.includes('/instance/connect/')) {
+  } else if (req.method === "GET" && path.includes("/instance/connect/")) {
     const options = {
-      method: 'GET',
-      headers: { apikey: apiKey }
+      method: "GET",
+      headers: { apikey: apiKey },
     };
     const apiUrl = `${EVO_API_BASE_URL}/instance/connect/${instanceId}`;
 
@@ -141,30 +143,29 @@ serve(async (req) => {
       return new Response(
         JSON.stringify(data),
         {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
           status: response.status,
-        }
+        },
       );
     } catch (err) {
-      console.error(err);
       return new Response(
         JSON.stringify({ error: err.message }),
         {
           status: 500,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        }
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        },
       );
     }
-  } else if (req.method === 'POST' && path.includes('/message/sendText/')) {
+  } else if (req.method === "POST" && path.includes("/message/sendText/")) {
     try {
       const body = await req.json();
       const options = {
-        method: 'POST',
+        method: "POST",
         headers: {
           apikey: apiKey,
-          'Content-Type': 'application/json'
+          "Content-Type": "application/json",
         },
-        body: JSON.stringify(body)
+        body: JSON.stringify(body),
       };
 
       const apiUrl = `${EVO_API_BASE_URL}/message/sendText/${instanceId}`;
@@ -174,27 +175,26 @@ serve(async (req) => {
       return new Response(
         JSON.stringify(data),
         {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
           status: response.status,
-        }
+        },
       );
     } catch (err) {
-      console.error(err);
       return new Response(
         JSON.stringify({ error: err.message }),
         {
           status: 500,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        }
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        },
       );
     }
   } else {
     return new Response(
-      JSON.stringify({ error: 'Invalid request' }),
+      JSON.stringify({ error: "Invalid request" }),
       {
         status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      }
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      },
     );
   }
 });
