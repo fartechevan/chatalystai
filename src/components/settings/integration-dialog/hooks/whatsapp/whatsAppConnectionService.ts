@@ -79,7 +79,7 @@ export const checkInstanceStatus = async (
     if (Array.isArray(data)) {
       const project = data.find(item => {
         console.log('Item in find method:', item);
-        return item.project?.instances;
+        return item.project?.instances && item.connectionStatus === 'open';
       });
 
       if (project) {
@@ -92,17 +92,17 @@ export const checkInstanceStatus = async (
             if (connectionStatus === 'open') {
               setConnectionState('open');
               setQrCodeBase64(null);
-            } else if (connectionStatus === 'connecting') {
-              setConnectionState('connecting');
             } else {
               setConnectionState('close');
             }
+          } else {
+            setConnectionState('close');
           }
         });
         return true;
       } else {
         console.log('Project not found in response');
-        setConnectionState('unknown');
+        setConnectionState('close');
         return false;
       }
     } else {
