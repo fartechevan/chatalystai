@@ -11,7 +11,7 @@ export function useWhatsAppConnection(selectedIntegration: Integration | null) {
   const { toast } = useToast();
   const [qrCodeBase64, setQrCodeBase64] = useState<string | null>(null);
   const [connectionState, setConnectionState] = useState<ConnectionState>('unknown');
-  const [pollingInterval, setPollingInterval] = useState<number | null>(null);
+  const [pollingInterval, setPollingInterval] = useState<NodeJS.Timeout | null>(null);
 
   const { data: config, isLoading: configLoading } = useQuery({
     queryKey: ['integration-config', selectedIntegration?.id],
@@ -204,8 +204,8 @@ export function useWhatsAppConnection(selectedIntegration: Integration | null) {
 
     // Cleanup interval after 2 minutes if not connected
     setTimeout(() => {
-      if (pollingInterval === intervalId) {
-        clearInterval(intervalId);
+      if (pollingInterval) {
+        clearInterval(pollingInterval);
         setPollingInterval(null);
       }
     }, 120000);
