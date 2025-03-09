@@ -9,13 +9,13 @@ export async function handleSendWhatsAppMessage(req: Request) {
     const body = await req.json();
     console.log('Received request body:', body);
     
-    // Extract instance ID from request body if provided, otherwise use default
-    const { instanceId, number, text } = body;
+    // Extract parameters from the request body if provided, otherwise use default
+    const { number, text } = body;
     
-    if (!instanceId || !number || !text) {
-      console.error('Missing required parameters', { instanceId, number, text });
+    if (!number || !text) {
+      console.error('Missing required parameters', { number, text });
       return new Response(
-        JSON.stringify({ error: 'Missing required parameters: instanceId, number, or text' }),
+        JSON.stringify({ error: 'Missing required parameters: number, or text' }),
         {
           status: 400,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -27,6 +27,7 @@ export async function handleSendWhatsAppMessage(req: Request) {
     const integration = await getIntegrationConfig();
     const apiKey = integration.api_key;
 
+    const instanceId = '405a4162-615e-4d44-bca3-f0fb583c9889';
     // Prepare request to Evolution API
     const apiUrl = `${EVO_API_BASE_URL}/message/sendText/${instanceId}`;
     console.log('Sending request to Evolution API:', apiUrl);
