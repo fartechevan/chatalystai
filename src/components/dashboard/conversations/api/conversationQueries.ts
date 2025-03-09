@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import type { Conversation } from "../types";
 
@@ -12,9 +13,12 @@ export async function fetchConversationsWithParticipants() {
     .from("conversations")
     .select(
       `
-      *,
-      lead:lead_id(*),
+      conversation_id,
+      created_at,
+      updated_at,
+      lead_id,
       integrations_config_id,
+      lead:lead_id(*),
       customer:conversation_participants(
         customer:customer_id(id, name)
       )
@@ -35,10 +39,10 @@ export async function fetchConversationsWithParticipants() {
       const { data: participants, error: participantsError } = await supabase
         .from("conversation_participants")
         .select("id, conversation_id, role, external_user_identifier, customer_id")
-        .eq("conversation_id", conv.id); // Ensure correct key is used
+        .eq("conversation_id", conv.conversation_id); // Using conversation_id instead of id
 
       if (participantsError) {
-        console.error(`Error fetching participants for conversation ${conv.id}:`, participantsError);
+        console.error(`Error fetching participants for conversation ${conv.conversation_id}:`, participantsError);
         return {
           ...conv,
           participants: [],
