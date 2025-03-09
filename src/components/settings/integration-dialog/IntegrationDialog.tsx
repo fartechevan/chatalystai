@@ -35,8 +35,16 @@ export function IntegrationDialog({
     initializeConnection, 
     qrCodeBase64, 
     connectionState, 
-    isLoading 
+    isLoading,
+    checkCurrentConnectionState 
   } = useWhatsAppConnection(selectedIntegration);
+
+  // Check connection status when the dialog is opened
+  useEffect(() => {
+    if (open && selectedIntegration) {
+      checkCurrentConnectionState();
+    }
+  }, [open, selectedIntegration, checkCurrentConnectionState]);
 
   useEffect(() => {
     if (connectionState === 'open' && integrationQRPopup) {

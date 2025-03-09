@@ -1,6 +1,6 @@
 
 import { useToast } from "@/hooks/use-toast";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useWhatsAppConfig } from "./useWhatsAppConfig";
 import { checkConnectionState, checkInstanceStatus, initializeConnection } from "./whatsAppConnectionService";
 import type { ConnectionState } from "./types";
@@ -13,6 +13,16 @@ export function useWhatsAppConnection(selectedIntegration: Integration | null) {
   const [pollingInterval, setPollingInterval] = useState<NodeJS.Timeout | null>(null);
   
   const { config, isLoading: configLoading } = useWhatsAppConfig(selectedIntegration);
+
+  // Function to check the current connection state explicitly
+  const checkCurrentConnectionState = useCallback(async () => {
+    if (config) {
+      const currentState = await checkInstanceStatus(config, setConnectionState, setQrCodeBase64);
+      console.log('Current connection state checked:', currentState);
+      return currentState;
+    }
+    return false;
+  }, [config]);
 
   const startPolling = () => {
     // Clear any existing polling
@@ -33,7 +43,7 @@ export function useWhatsAppConnection(selectedIntegration: Integration | null) {
 
     // Cleanup interval after 2 minutes if not connected
     setTimeout(() => {
-      if (pollingInterval === intervalId) {
+      if (intervalId && pollingInterval === intervalId) {
         clearInterval(intervalId);
         setPollingInterval(null);
       }
@@ -95,6 +105,7 @@ export function useWhatsAppConnection(selectedIntegration: Integration | null) {
     initializeConnection: connectToWhatsApp, 
     qrCodeBase64, 
     connectionState,
-    isLoading: configLoading
+    isLoading: configLoading,
+    checkCurrentConnectionState
   };
 }
