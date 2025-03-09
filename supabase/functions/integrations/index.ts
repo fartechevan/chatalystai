@@ -1,9 +1,7 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from '@supabase/supabase-js'
 
 interface RequestBody {
-  integrationId: string;
   number: string;
   text: string;
   instanceId: string;
@@ -31,6 +29,8 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+const HARDCODED_INTEGRATION_ID = 'bda44db7-4e9a-4733-a9c7-c4f5d7198905';
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -41,7 +41,7 @@ serve(async (req) => {
   const path = url.pathname;
 
   // Extract request body
-  let body: RequestBody;
+  let body: any;
   try {
     body = await req.json();
   } catch (error) {
@@ -55,31 +55,17 @@ serve(async (req) => {
     );
   }
 
-  // Extract integrationId from the request body
-  const integrationId = body.integrationId;
-
-  if (!integrationId) {
-    console.error("Missing integrationId in request body");
-    return new Response(
-      JSON.stringify({ error: "Missing integrationId in request body" }),
-      {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      }
-    );
-  }
-
-  // Fetch API key from the database
+  // Fetch API key and instance ID from the database
   const { data, error } = await supabaseClient
     .from('integration_config')
-    .select('api_key')
-    .eq('id', integrationId)
+    .select('api_key, instance_id')
+    .eq('id', HARDCODED_INTEGRATION_ID)
     .single();
 
   if (error) {
-    console.error('Error fetching API key from database:', error);
+    console.error('Error fetching API key and instance ID from database:', error);
     return new Response(
-      JSON.stringify({ error: 'Failed to fetch API key from database' }),
+      JSON.stringify({ error: 'Failed to fetch API key and instance ID from database' }),
       {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -88,11 +74,12 @@ serve(async (req) => {
   }
 
   const apiKey = data.api_key;
+  const instanceId = data.instance_id;
 
-  if (!apiKey) {
-    console.error('API key not found in database');
+  if (!apiKey || !instanceId) {
+    console.error('API key or instance ID not found in database');
     return new Response(
-      JSON.stringify({ error: 'API key not configured in database' }),
+      JSON.stringify({ error: 'API key or instance ID not configured in database' }),
       {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -111,8 +98,7 @@ serve(async (req) => {
         body: JSON.stringify(body)
       };
 
-      const instance = path.split('/').pop(); // Extract instance from URL
-      const apiUrl = `${EVO_API_BASE_URL}/message/sendText/${instance}`;
+      const apiUrl = `${EVO_API_BASE_URL}/message/sendText/${instanceId}`;
 
       const response = await fetch(apiUrl, options);
       const data = await response.json();

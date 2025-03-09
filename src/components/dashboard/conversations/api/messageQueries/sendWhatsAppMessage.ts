@@ -22,10 +22,9 @@ export async function sendWhatsAppMessage(
     const payload: WhatsAppMessageRequest = {
       number: phoneNumber,
       text: message,
-      instanceId: instanceId,
-      integrationId: integrationsConfigId
+      instanceId: instanceId
     };
-
+    
     console.log('WhatsApp API request payload:', payload);
     
     const response = await supabase.functions.invoke('integrations', {
