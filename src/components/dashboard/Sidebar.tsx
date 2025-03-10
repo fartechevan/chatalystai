@@ -23,7 +23,15 @@ import { Link, useLocation } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
-const menuItems = [
+// Update the type definition to include an optional badge property
+type MenuItem = {
+  title: string;
+  icon: React.ComponentType<any>;
+  path: string;
+  badge?: number;
+};
+
+const menuItems: MenuItem[] = [
   { title: "Dashboard", icon: Home, path: "/dashboard" },
   { title: "Leads", icon: Target, path: "/dashboard/leads" },
   { title: "Chat", icon: MessageSquare, path: "/dashboard/conversations" },
