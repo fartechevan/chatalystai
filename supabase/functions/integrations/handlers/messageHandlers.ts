@@ -41,6 +41,7 @@ export async function handleSendWhatsAppMessage(req: Request) {
     console.log('Sending request to Evolution API:', apiUrl);
     
     // Construct the request body according to Evolution API's expected format
+    // Make sure textMessage.text is properly set
     const requestBody = {
       number: number,
       options: {

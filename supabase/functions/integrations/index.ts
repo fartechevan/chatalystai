@@ -18,9 +18,11 @@ serve(async (req) => {
     // Parse request URL and path
     const url = new URL(req.url);
     const path = url.pathname;
+    console.log('Request path:', path);
 
     // Route requests to appropriate handlers
-    if (req.method === 'POST' && path.includes('/message/sendText/')) {
+    if (req.method === 'POST' && path.includes('/message/sendText')) {
+      console.log("Routing to handleSendWhatsAppMessage");
       return await handleSendWhatsAppMessage(req);
     } else if (req.method === 'GET' && path.includes('/instance/fetchInstances')) {
       console.log("fetchInstances called");
@@ -33,6 +35,7 @@ serve(async (req) => {
       return await handleConnect(instanceId || '');
     } else {
       // Handle unknown routes
+      console.error('Invalid request path or method:', path, req.method);
       return new Response(
         JSON.stringify({ error: 'Invalid request path or method' }),
         {
@@ -48,6 +51,7 @@ serve(async (req) => {
       JSON.stringify({ error: (error as Error).message || 'Unknown server error' }),
       {
         status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       }
     );
   }
