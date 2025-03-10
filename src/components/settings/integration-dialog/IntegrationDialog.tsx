@@ -55,20 +55,38 @@ export function IntegrationDialog({
       
       // Update the integration connection status in the database
       if (selectedIntegration) {
-        updateIntegrationStatus(selectedIntegration.id, true);
+        updateIntegrationStatus(selectedIntegration.id);
       }
     }
   }, [connectionState, integrationQRPopup, selectedIntegration]);
   
-  const updateIntegrationStatus = async (integrationId: string, connected: boolean) => {
+  const updateIntegrationStatus = async (integrationId: string) => {
     try {
-      const { data, error } = await supabase
+      // We don't have an is_connected field, so let's just ensure there's a record
+      const { data: existingConfig, error: checkError } = await supabase
         .from('integrations_config')
-        .update({ is_connected: connected })
-        .eq('integration_id', integrationId);
+        .select('id')
+        .eq('integration_id', integrationId)
+        .maybeSingle();
         
-      if (error) {
-        console.error('Error updating integration status:', error);
+      if (checkError) {
+        console.error('Error checking integration config:', checkError);
+        return;
+      }
+      
+      if (!existingConfig) {
+        // Create a new config if one doesn't exist
+        const { error: insertError } = await supabase
+          .from('integrations_config')
+          .insert({
+            integration_id: integrationId,
+            // Add default values for required fields
+            base_url: 'https://api.evoapicloud.com'
+          });
+        
+        if (insertError) {
+          console.error('Error inserting integration config:', insertError);
+        }
       }
     } catch (error) {
       console.error('Error updating integration status:', error);

@@ -1,6 +1,6 @@
 
 import { Button } from "@/components/ui/button";
-import { Loader2, CheckCircle, Plus } from "lucide-react";
+import { Loader2, CheckCircle, Plus, AlertCircle, X } from "lucide-react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
 import type { ConnectionState } from "../hooks/whatsapp/types";
@@ -21,6 +21,7 @@ export function ConnectionStatus({
   onOpenChange,
 }: ConnectionStatusProps) {
   const [activeTab, setActiveTab] = useState<"settings" | "authorization">("settings");
+  const [phoneNumber, setPhoneNumber] = useState("+60 17-516 8607"); // This would come from the actual connection
 
   if (connectionState === 'connecting') {
     return (
@@ -47,16 +48,16 @@ export function ConnectionStatus({
           <div className="space-y-4">
             {selectedIntegration && (
               <div className="flex items-start space-x-4">
-                <div className="w-40 h-40 bg-green-500 rounded-lg flex items-center justify-center p-4">
+                <div className="w-32 h-32 bg-green-50 rounded-lg flex items-center justify-center p-4">
                   <img
                     src={selectedIntegration.icon_url}
                     alt={selectedIntegration.name}
-                    className="object-contain max-h-24"
+                    className="object-contain max-h-20"
                   />
                 </div>
                 <div className="flex-1">
-                  <h2 className="text-2xl font-bold">WhatsApp for Small Business</h2>
-                  <div className="mt-4 flex items-center space-x-4">
+                  <h2 className="text-xl font-bold">WhatsApp Lite version</h2>
+                  <div className="mt-2 flex items-center space-x-4">
                     <span className="inline-flex items-center px-4 py-1 rounded-full text-sm font-medium bg-green-100 text-green-800">
                       Installed
                     </span>
@@ -68,13 +69,13 @@ export function ConnectionStatus({
               </div>
             )}
             
-            <div className="space-y-4 mt-8">
-              <h3 className="text-xl font-semibold">Backup number</h3>
+            <div className="space-y-4 mt-6">
+              <h3 className="text-lg font-semibold">Backup number</h3>
               <p className="text-gray-500">
                 This WhatsApp account will be used in case your other numbers get disconnected.
               </p>
               <div className="bg-gray-100 p-4 rounded-md">
-                <p className="text-gray-600">+1 800 555 1234</p>
+                <p className="text-gray-600">{phoneNumber}</p>
               </div>
             </div>
             
@@ -90,18 +91,22 @@ export function ConnectionStatus({
                 </TableHeader>
                 <TableBody>
                   <TableRow>
-                    <TableCell className="text-gray-500">+1 800 555 0123</TableCell>
-                    <TableCell className="text-gray-500">+1 800 555 0123</TableCell>
+                    <TableCell className="font-medium">{phoneNumber}</TableCell>
+                    <TableCell>{phoneNumber}</TableCell>
                     <TableCell>
                       <select className="border rounded-md px-2 py-1">
+                        <option>Pipeline</option>
                         <option>Prospects</option>
                         <option>Customers</option>
                         <option>Leads</option>
                       </select>
                     </TableCell>
                     <TableCell>
-                      <div className="flex items-center space-x-2">
+                      <div className="flex items-center justify-between">
                         <CheckCircle className="h-5 w-5 text-green-500" />
+                        <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
+                          <X className="h-4 w-4 text-gray-400" />
+                        </Button>
                       </div>
                     </TableCell>
                   </TableRow>
@@ -112,6 +117,17 @@ export function ConnectionStatus({
                 <Plus className="h-4 w-4 mr-2" />
                 Add number
               </Button>
+            </div>
+            
+            <div className="mt-8 p-4 bg-amber-50 rounded-lg border border-amber-100">
+              <div className="flex items-start space-x-3">
+                <AlertCircle className="h-5 w-5 text-amber-500 flex-shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm text-amber-800">
+                    Don't forget to use your phone at least <strong>once every 14 days</strong> to stay connected.
+                  </p>
+                </div>
+              </div>
             </div>
           </div>
         </TabsContent>

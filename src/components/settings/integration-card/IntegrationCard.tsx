@@ -15,7 +15,7 @@ export function IntegrationCard({ integration, onConnect }: IntegrationCardProps
         <img
           src={integration.icon_url}
           alt={integration.name}
-          className="object-contain"
+          className="object-contain max-h-16"
         />
       </div>
       <h3 className="font-medium mb-2">{integration.name}</h3>

@@ -55,14 +55,42 @@ export function IntegrationsView() {
         // For WhatsApp, check the connection status
         const { data, error } = await supabase
           .from('integrations_config')
-          .select('integration_id, is_connected');
+          .select('id, integration_id');
           
         if (error) throw error;
         
+        // Get connection states for each configuration
         const connected: Record<string, boolean> = {};
-        data.forEach(item => {
-          connected[item.integration_id] = item.is_connected || false;
-        });
+        
+        for (const config of data) {
+          // Default to not connected
+          connected[config.integration_id] = false;
+          
+          try {
+            // Use the useWhatsAppConfig hook's logic directly here
+            const response = await fetch(`https://api.evoapicloud.com/instance/fetchInstances`, {
+              headers: {
+                'apikey': process.env.EVOLUTION_API_KEY || '',
+              },
+            });
+            
+            if (response.ok) {
+              const instancesData = await response.json();
+              
+              if (Array.isArray(instancesData)) {
+                const isAnyInstanceConnected = instancesData.some(item => 
+                  item.connectionStatus === 'open'
+                );
+                
+                if (isAnyInstanceConnected) {
+                  connected[config.integration_id] = true;
+                }
+              }
+            }
+          } catch (fetchError) {
+            console.error('Error fetching WhatsApp connection status:', fetchError);
+          }
+        }
         
         setConnectedIntegrations(connected);
       } catch (error) {

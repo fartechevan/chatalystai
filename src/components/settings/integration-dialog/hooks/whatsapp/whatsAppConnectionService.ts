@@ -3,13 +3,14 @@ import { useToast } from "@/hooks/use-toast";
 import type { ConnectionState } from "./types";
 
 interface WhatsAppConfig {
-  instance_id: string;
-  base_url: string;
-  api_key: string;
+  instance_id?: string;
+  base_url?: string;
+  api_key?: string;
+  [key: string]: any;
 }
 
 export const checkConnectionState = async (
-  config: WhatsAppConfig,
+  config: WhatsAppConfig | null,
   setConnectionState: (state: ConnectionState) => void,
   toast: ReturnType<typeof useToast>['toast']
 ) => {
@@ -18,7 +19,7 @@ export const checkConnectionState = async (
   try {
     const response = await fetch(`${config.base_url}/instance/connectionState/${config.instance_id}`, {
       headers: {
-        'apikey': config.api_key,
+        'apikey': config.api_key || '',
       },
     });
 
@@ -53,7 +54,7 @@ export const checkConnectionState = async (
 };
 
 export const checkInstanceStatus = async (
-  config: WhatsAppConfig,
+  config: WhatsAppConfig | null,
   setConnectionState: (state: ConnectionState) => void,
   setQrCodeBase64: (qrCode: string | null) => void
 ) => {
@@ -62,7 +63,7 @@ export const checkInstanceStatus = async (
   try {
     const response = await fetch(`${config.base_url}/instance/fetchInstances`, {
       headers: {
-        'apikey': config.api_key,
+        'apikey': config.api_key || '',
       },
     });
 
@@ -118,7 +119,7 @@ export const checkInstanceStatus = async (
 };
 
 export const initializeConnection = async (
-  config: WhatsAppConfig,
+  config: WhatsAppConfig | null,
   toast: ReturnType<typeof useToast>['toast']
 ) => {
   if (!config) {
@@ -128,7 +129,7 @@ export const initializeConnection = async (
   try {
     const response = await fetch(`${config.base_url}/instance/connect/${config.instance_id}`, {
       headers: {
-        'apikey': config.api_key,
+        'apikey': config.api_key || '',
       },
     });
 

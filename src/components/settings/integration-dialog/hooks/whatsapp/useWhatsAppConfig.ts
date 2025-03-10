@@ -15,6 +15,17 @@ export function useWhatsAppConfig(selectedIntegration: Integration | null) {
         .maybeSingle();
       
       if (error) throw error;
+      
+      // If no config exists, return a default one
+      if (!data) {
+        return {
+          integration_id: selectedIntegration.id,
+          base_url: 'https://api.evoapicloud.com',
+          instance_id: '',
+          api_key: ''
+        };
+      }
+      
       return data;
     },
     enabled: !!selectedIntegration?.id,
