@@ -1,3 +1,4 @@
+
 import {
   Dialog,
   DialogContent,
@@ -12,6 +13,7 @@ import { useWhatsAppConnection } from "./hooks/whatsapp/useWhatsAppConnection";
 import { QRCodeScreen } from "./components/QRCodeScreen";
 import { DeviceSelect } from "./components/DeviceSelect";
 import { ConnectionStatus } from "./components/ConnectionStatus";
+import { WhatsAppCloudApiDialog } from "./components/WhatsAppCloudApiDialog";
 
 interface IntegrationDialogProps {
   open: boolean;
@@ -38,7 +40,7 @@ export function IntegrationDialog({
 
   // Check connection status when the dialog is opened
   useEffect(() => {
-    if (open && selectedIntegration) {
+    if (open && selectedIntegration && selectedIntegration.name === "WhatsApp") {
       checkCurrentConnectionState();
     }
   }, [open, selectedIntegration, checkCurrentConnectionState]);
@@ -82,6 +84,17 @@ export function IntegrationDialog({
       setIntegrationQRPopup(true);
     }
   };
+
+  // Check if the selected integration is WhatsApp Cloud API
+  if (selectedIntegration?.name === "WhatsApp Cloud API") {
+    return (
+      <WhatsAppCloudApiDialog
+        open={open}
+        onOpenChange={onOpenChange}
+        selectedIntegration={selectedIntegration}
+      />
+    );
+  }
 
   if (integrationQRPopup) {
     return (

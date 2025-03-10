@@ -26,7 +26,24 @@ export function IntegrationsView() {
         .order('name');
       
       if (error) throw error;
-      return data as Integration[];
+      
+      // Add WhatsApp Cloud API integration if not already in the database
+      const whatsappCloudApi = {
+        id: "whatsapp-cloud-api",
+        name: "WhatsApp Cloud API",
+        description: "Connect your WhatsApp Business account through Facebook.",
+        icon_url: "/lovable-uploads/8d699109-6446-4dd5-b026-f2f32a953f05.png",
+        status: "available",
+        is_connected: false
+      };
+      
+      const hasWhatsAppCloudApi = data.some(integration => 
+        integration.name === "WhatsApp Cloud API"
+      );
+      
+      return hasWhatsAppCloudApi 
+        ? data as Integration[]
+        : [...data, whatsappCloudApi] as Integration[];
     },
   });
 
