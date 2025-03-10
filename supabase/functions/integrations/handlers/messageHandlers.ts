@@ -67,6 +67,7 @@ export async function handleSendWhatsAppMessage(req: Request) {
       {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      }
+      })
   }
+
 }

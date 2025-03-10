@@ -50,7 +50,7 @@ export function useConversationData(selectedConversation?: Conversation | null) 
         throw new Error("Could not find admin participant ID");
       }
 
-        // If this conversation is linked to a WhatsApp integration, first send via WhatsApp
+      // If this conversation is linked to a WhatsApp integration, first send via WhatsApp
       if (selectedConversation.integrations_config_id) {
         try {
           // Get instance_id from integrations_config table
@@ -99,6 +99,13 @@ export function useConversationData(selectedConversation?: Conversation | null) 
             throw new Error("Could not find recipient's phone number");
           }
 
+          console.log("Sending WhatsApp message with:", {
+            instanceId,
+            customerPhoneNumber,
+            content,
+            integrationConfigId: selectedConversation.integrations_config_id
+          });
+
           // Send the message via WhatsApp
           const whatsappResult = await sendWhatsAppMessage(
             instanceId,
@@ -106,6 +113,8 @@ export function useConversationData(selectedConversation?: Conversation | null) 
             content,
             selectedConversation.integrations_config_id
           );
+
+          console.log("WhatsApp result:", whatsappResult);
 
           // If WhatsApp message fails, show error and don't save to database
           if (!whatsappResult.success) {
