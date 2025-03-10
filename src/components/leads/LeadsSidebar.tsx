@@ -46,10 +46,7 @@ export function LeadsSidebar({
 
     // If no pipeline is selected, select the default one
     if (!selectedPipelineId && data && data.length > 0) {
-      let defaultPipeline = data.find(p => p.is_default);
-      if (!defaultPipeline) {
-        defaultPipeline = data[0];
-      }
+      const defaultPipeline = data.find(p => p.is_default) || data[0];
       onPipelineSelect(defaultPipeline.id);
     }
   };
