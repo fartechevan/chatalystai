@@ -48,6 +48,7 @@ export function IntegrationDialog({
   const [integrationQRPopup, setIntegrationQRPopup] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
   const [activeTab, setActiveTab] = useState<"settings" | "authorization">("settings");
+  const [isFBInitialized, setIsFBInitialized] = useState(false);
 
   const { 
     initializeConnection, 
@@ -66,6 +67,7 @@ export function IntegrationDialog({
         xfbml      : true,
         version    : 'v12.0'
       });
+      setIsFBInitialized(true);
     };
 
     (function(d, s, id){
@@ -78,20 +80,24 @@ export function IntegrationDialog({
   }, []);
 
   const handleConnectWithFacebook = () => {
-    FB.login(function(response) {
-      if (response.authResponse) {
-        console.log('Welcome! Fetching your information.... ');
-        FB.api('/me', function(response) {
-          console.log('Good to see you, ' + response.name + '.');
-          // Here you can handle the access token and link it to the WhatsApp system user
-          const accessToken = FB.getAuthResponse().accessToken;
-          console.log('Access Token:', accessToken);
-          // Link the access token to the WhatsApp system user
-        });
-      } else {
-        console.log('User cancelled login or did not fully authorize.');
-      }
-    });
+    if (isFBInitialized) {
+      FB.login(function(response) {
+        if (response.authResponse) {
+          console.log('Welcome! Fetching your information.... ');
+          FB.api('/me', function(response) {
+            console.log('Good to see you, ' + response.name + '.');
+            // Here you can handle the access token and link it to the WhatsApp system user
+            const accessToken = FB.getAuthResponse().accessToken;
+            console.log('Access Token:', accessToken);
+            // Link the access token to the WhatsApp system user
+          });
+        } else {
+          console.log('User cancelled login or did not fully authorize.');
+        }
+      });
+    } else {
+      console.log('Facebook SDK not initialized yet.');
+    }
   };
 
   // Check connection status when the dialog is opened
