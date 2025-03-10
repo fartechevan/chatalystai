@@ -36,12 +36,8 @@ export async function handleSendWhatsAppMessage(req: Request) {
       ...getEvolutionAPIOptions(apiKey, 'POST'),
       body: JSON.stringify({
         number: number,
-        options: {
-          delay: 1200
-        },
-        textMessage: {
-          text: text
-        }
+        text: text
+
       })
     };
 
