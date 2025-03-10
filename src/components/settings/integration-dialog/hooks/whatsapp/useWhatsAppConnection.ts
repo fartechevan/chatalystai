@@ -5,23 +5,27 @@ import { useWhatsAppConfig } from "./useWhatsAppConfig";
 import { checkConnectionState, checkInstanceStatus, initializeConnection } from "./whatsAppConnectionService";
 import type { ConnectionState } from "./types";
 import type { Integration } from "../../../types";
+import type { InstanceData } from "./whatsAppConnectionService";
 
 export function useWhatsAppConnection(selectedIntegration: Integration | null) {
   const { toast } = useToast();
   const [qrCodeBase64, setQrCodeBase64] = useState<string | null>(null);
   const [connectionState, setConnectionState] = useState<ConnectionState>('unknown');
   const [pollingInterval, setPollingInterval] = useState<NodeJS.Timeout | null>(null);
-  
+  const [instanceData, setInstanceData] = useState<InstanceData | null>(null); // Use InstanceData type
+
   const { config, isLoading: configLoading } = useWhatsAppConfig(selectedIntegration);
 
   // Function to check the current connection state explicitly
   const checkCurrentConnectionState = useCallback(async () => {
     if (config) {
       console.log('Checking current connection state with config:', config);
-      return await checkInstanceStatus(config, setConnectionState, setQrCodeBase64);
+      // Added setInstanceData to checkInstanceStatus parameters
+      return await checkInstanceStatus(config, setConnectionState, setQrCodeBase64, setInstanceData);
     }
     return false;
-  }, [config]);
+    // Added setInstanceData to checkInstanceStatus dependencies
+  }, [config, setConnectionState, setQrCodeBase64, setInstanceData]);
 
   const startPolling = () => {
     // Clear any existing polling
@@ -32,7 +36,7 @@ export function useWhatsAppConnection(selectedIntegration: Integration | null) {
     // Start a new polling interval
     const intervalId = setInterval(async () => {
       await checkConnectionState(config, setConnectionState, toast);
-      // Re-check instance status to get the accurate state
+      // Re-check instance status to get the accurate state and data
       await checkCurrentConnectionState();
     }, 5000); // Check every 5 seconds
 
@@ -59,12 +63,12 @@ export function useWhatsAppConnection(selectedIntegration: Integration | null) {
 
     try {
       const result = await initializeConnection(config, toast);
-      
+
       if (result.success && result.qrCodeDataUrl) {
         console.log('QR code generated successfully:', result.qrCodeDataUrl);
         setQrCodeBase64(result.qrCodeDataUrl);
         setConnectionState('connecting');
-        
+
         // Start polling for connection status
         startPolling();
         return true;
@@ -86,7 +90,7 @@ export function useWhatsAppConnection(selectedIntegration: Integration | null) {
     // Check initial connection state when the component mounts or config changes
     if (config) {
       console.log('Initial connection state check with config:', config);
-      checkInstanceStatus(config, setConnectionState, setQrCodeBase64);
+      checkInstanceStatus(config, setConnectionState, setQrCodeBase64, setInstanceData); // Pass setInstanceData
     }
 
     return () => {
@@ -97,13 +101,16 @@ export function useWhatsAppConnection(selectedIntegration: Integration | null) {
       setQrCodeBase64(null);
       setConnectionState('unknown');
     };
-  }, [config]);
+    // Added setInstanceData to checkInstanceStatus dependencies
+  }, [config, setConnectionState, setQrCodeBase64, setInstanceData]);
 
-  return { 
-    initializeConnection: connectToWhatsApp, 
-    qrCodeBase64, 
+  return {
+    initializeConnection: connectToWhatsApp,
+    qrCodeBase64,
     connectionState,
     isLoading: configLoading,
-    checkCurrentConnectionState
+    checkCurrentConnectionState,
+    instanceData, // Return instance data
+    setInstanceData,
   };
 }
