@@ -2,7 +2,7 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Plus } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { IntegrationDialog } from "./integration-dialog/IntegrationDialog";
@@ -16,8 +16,9 @@ export function IntegrationsView() {
   const [searchQuery, setSearchQuery] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedIntegration, setSelectedIntegration] = useState<Integration | null>(null);
+  const [connectedIntegrations, setConnectedIntegrations] = useState<Record<string, boolean>>({});
 
-  const { data: integrations = [], isLoading } = useQuery({
+  const { data: integrations = [], isLoading, refetch } = useQuery({
     queryKey: ['integrations'],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -47,12 +48,56 @@ export function IntegrationsView() {
     },
   });
 
+  useEffect(() => {
+    // Check connected integrations from local storage or API
+    const checkConnectionStatus = async () => {
+      try {
+        // For WhatsApp, check the connection status
+        const { data, error } = await supabase
+          .from('integrations_config')
+          .select('integration_id, is_connected');
+          
+        if (error) throw error;
+        
+        const connected: Record<string, boolean> = {};
+        data.forEach(item => {
+          connected[item.integration_id] = item.is_connected || false;
+        });
+        
+        setConnectedIntegrations(connected);
+      } catch (error) {
+        console.error('Error checking connection status:', error);
+      }
+    };
+    
+    checkConnectionStatus();
+  }, [dialogOpen]); // Re-check when dialog is closed
+
   const handleIntegrationClick = (integration: Integration) => {
     setSelectedIntegration(integration);
     setDialogOpen(true);
   };
 
-  const filteredIntegrations = integrations.filter(integration => {
+  const handleDialogClose = (connected: boolean) => {
+    setDialogOpen(false);
+    if (connected && selectedIntegration) {
+      // Update the connected status
+      setConnectedIntegrations(prev => ({
+        ...prev,
+        [selectedIntegration.id]: true
+      }));
+      
+      // Refresh the integrations list
+      refetch();
+    }
+  };
+
+  const integrationsList = integrations.map(integration => ({
+    ...integration,
+    is_connected: connectedIntegrations[integration.id] || false
+  }));
+
+  const filteredIntegrations = integrationsList.filter(integration => {
     const matchesSearch = integration.name.toLowerCase().includes(searchQuery.toLowerCase());
     if (activeTab === "Connected") {
       return matchesSearch && integration.is_connected;
@@ -64,7 +109,7 @@ export function IntegrationsView() {
     <div className="p-8 max-w-7xl mx-auto space-y-8">
       <IntegrationDialog
         open={dialogOpen}
-        onOpenChange={setDialogOpen}
+        onOpenChange={handleDialogClose}
         selectedIntegration={selectedIntegration}
       />
 

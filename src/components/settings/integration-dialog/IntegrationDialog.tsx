@@ -1,4 +1,3 @@
-
 import {
   Dialog,
   DialogContent,
@@ -14,10 +13,11 @@ import { QRCodeScreen } from "./components/QRCodeScreen";
 import { DeviceSelect } from "./components/DeviceSelect";
 import { ConnectionStatus } from "./components/ConnectionStatus";
 import { WhatsAppCloudApiDialog } from "./components/WhatsAppCloudApiDialog";
+import { supabase } from "@/integrations/supabase/client";
 
 interface IntegrationDialogProps {
   open: boolean;
-  onOpenChange: (open: boolean) => void;
+  onOpenChange: (connected: boolean) => void;
   selectedIntegration: Integration | null;
 }
 
@@ -29,6 +29,7 @@ export function IntegrationDialog({
   const [showDeviceSelect, setShowDeviceSelect] = useState(false);
   const [integrationMainPopup, setIntegrationMainPopup] = useState(true);
   const [integrationQRPopup, setIntegrationQRPopup] = useState(false);
+  const [isConnected, setIsConnected] = useState(false);
 
   const { 
     initializeConnection, 
@@ -50,8 +51,29 @@ export function IntegrationDialog({
       // Close QR popup when connection is established
       setIntegrationQRPopup(false);
       setIntegrationMainPopup(true);
+      setIsConnected(true);
+      
+      // Update the integration connection status in the database
+      if (selectedIntegration) {
+        updateIntegrationStatus(selectedIntegration.id, true);
+      }
     }
-  }, [connectionState, integrationQRPopup]);
+  }, [connectionState, integrationQRPopup, selectedIntegration]);
+  
+  const updateIntegrationStatus = async (integrationId: string, connected: boolean) => {
+    try {
+      const { data, error } = await supabase
+        .from('integrations_config')
+        .update({ is_connected: connected })
+        .eq('integration_id', integrationId);
+        
+      if (error) {
+        console.error('Error updating integration status:', error);
+      }
+    } catch (error) {
+      console.error('Error updating integration status:', error);
+    }
+  };
 
   const handleConnect = () => {
     setShowDeviceSelect(true);
@@ -73,8 +95,8 @@ export function IntegrationDialog({
         return;
       }
     }
-    // Otherwise, close the dialog completely
-    onOpenChange(open);
+    // Otherwise, close the dialog completely and notify parent about the connection status
+    onOpenChange(isConnected || connectionState === 'open');
   };
 
   const handleIPhoneSelect = async () => {
@@ -90,7 +112,7 @@ export function IntegrationDialog({
     return (
       <WhatsAppCloudApiDialog
         open={open}
-        onOpenChange={onOpenChange}
+        onOpenChange={(open) => onOpenChange(open)}
         selectedIntegration={selectedIntegration}
       />
     );
@@ -144,12 +166,12 @@ export function IntegrationDialog({
             connectionState={connectionState}
             selectedIntegration={selectedIntegration}
             onConnect={handleConnect}
-            onOpenChange={onOpenChange}
+            onOpenChange={handleDialogChange}
           />
         )}
         
         <button
-          onClick={() => onOpenChange(false)}
+          onClick={() => handleDialogChange(false)}
           className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground"
         >
           <span className="sr-only">Close</span>
