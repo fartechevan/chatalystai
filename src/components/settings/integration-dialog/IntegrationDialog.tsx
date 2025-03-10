@@ -12,12 +12,13 @@ import { useWhatsAppConnection } from "./hooks/whatsapp/useWhatsAppConnection";
 import { QRCodeScreen } from "./components/QRCodeScreen";
 import { DeviceSelect } from "./components/DeviceSelect";
 import { ConnectionStatus } from "./components/ConnectionStatus";
-import { WhatsAppCloudApiDialog } from "./components/WhatsAppCloudApiDialog";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
 import { CheckCircle, Plus, AlertCircle, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
+import { ArrowLeft, Clock } from "lucide-react";
+import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface IntegrationDialogProps {
   open: boolean;
@@ -34,6 +35,7 @@ export function IntegrationDialog({
   const [integrationMainPopup, setIntegrationMainPopup] = useState(true);
   const [integrationQRPopup, setIntegrationQRPopup] = useState(false);
   const [isConnected, setIsConnected] = useState(false);
+  const [activeTab, setActiveTab] = useState<"settings" | "authorization">("settings");
 
   const { 
     initializeConnection, 
@@ -42,6 +44,14 @@ export function IntegrationDialog({
     isLoading,
     checkCurrentConnectionState 
   } = useWhatsAppConnection(selectedIntegration);
+
+    // Function to handle Facebook SDK integration
+    const handleConnectWithFacebook = () => {
+      // In a real implementation, this would initialize the Facebook SDK and trigger the login flow
+      // For this demo, we'll just log the action
+      console.log("Connecting with Facebook SDK...");
+      window.open("https://business.facebook.com/wa/manage/", "_blank");
+    };
 
   // Check connection status when the dialog is opened
   useEffect(() => {
@@ -129,17 +139,6 @@ export function IntegrationDialog({
     }
   };
 
-  // Check if the selected integration is WhatsApp Cloud API
-  if (selectedIntegration?.name === "WhatsApp Cloud API") {
-    return (
-      <WhatsAppCloudApiDialog
-        open={open}
-        onOpenChange={(open) => onOpenChange(open)}
-        selectedIntegration={selectedIntegration}
-      />
-    );
-  }
-
   if (integrationQRPopup) {
     return (
       <QRCodeScreen 
@@ -202,96 +201,169 @@ export function IntegrationDialog({
               <TabsTrigger value="settings" className="flex-1">Settings</TabsTrigger>
               <TabsTrigger value="authorization" className="flex-1">Authorization</TabsTrigger>
             </TabsList>
-            
-            <TabsContent value="settings" className="space-y-6 h-96">
-              <div className="space-y-4">
-                <div className="space-y-4 mt-6">
-                  <h3 className="text-lg font-semibold">Backup number</h3>
-                  <p className="text-gray-500">
-                    This WhatsApp account will be used in case your other numbers get disconnected.
-                  </p>
-                  <div className="bg-gray-100 p-4 rounded-md">
-                    <p className="text-gray-600">+60 17-516 8607</p>
-                  </div>
-                </div>
-                
-                <div className="mt-8">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Name</TableHead>
-                        <TableHead>Number</TableHead>
-                        <TableHead>Pipeline</TableHead>
-                        <TableHead>Status</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      <TableRow>
-                        <TableCell className="font-medium">+60 17-516 8607</TableCell>
-                        <TableCell>+60 17-516 8607</TableCell>
-                        <TableCell>
-                          <select className="border rounded-md px-2 py-1">
-                            <option>Pipeline</option>
-                            <option>Prospects</option>
-                            <option>Customers</option>
-                            <option>Leads</option>
-                          </select>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center justify-between">
-                            <CheckCircle className="h-5 w-5 text-green-500" />
-                            <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
-                              <X className="h-4 w-4 text-gray-400" />
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    </TableBody>
-                  </Table>
-                  
-                  <Button className="mt-4" variant="outline">
-                    <Plus className="h-4 w-4 mr-2" />
-                    Add number
-                  </Button>
-                </div>
-                
-                <div className="mt-8 p-4 bg-amber-50 rounded-lg border border-amber-100">
-                  <div className="flex items-start space-x-3">
-                    <AlertCircle className="h-5 w-5 text-amber-500 flex-shrink-0 mt-0.5" />
+            {/* Render the content based on selected integration */}
+            {selectedIntegration?.name === "WhatsApp Cloud API" ? (
+              <>
+                <TabsContent value="settings" className="space-y-6 h-96">
+                  <ScrollArea className="h-full">
                     <div>
-                      <p className="text-sm text-amber-800">
-                        Don't forget to use your phone at least <strong>once every 14 days</strong> to stay connected.
+                      <h2 className="text-xl font-semibold mb-4">Connect a new number</h2>
+                      
+                      <div className="flex items-center text-amber-700 bg-amber-50 p-3 rounded-md mb-6">
+                        <Clock className="h-5 w-5 mr-2 flex-shrink-0" />
+                        <p>The connection takes about 10 minutes.</p>
+                      </div>
+                      
+                      <p className="mb-6">
+                        The next step will take you to Facebook, where you will connect your number.
+                      </p>
+                      
+                      <div className="space-y-4 mb-6">
+                        <h3 className="font-semibold">Important</h3>
+                        <p>
+                          Before you start, make sure your phone number is not associated with any other WhatsApp account. 
+                          If it is, go back to the previous step.
+                        </p>
+                      </div>
+                      
+                      <div className="space-y-4 mb-6">
+                        <h3 className="font-semibold">During connection, you will:</h3>
+                        <ul className="list-disc list-inside space-y-2 pl-4">
+                          <li>Log in to your personal Facebook account.</li>
+                          <li>Select or create a Facebook Business account.</li>
+                          <li>Select or create a WhatsApp Business account to connect your number.</li>
+                        </ul>
+                      </div>
+                      
+                      <Button 
+                        className="w-full sm:w-auto flex items-center justify-center gap-2 bg-[#1877F2] hover:bg-[#0e69de]"
+                        onClick={handleConnectWithFacebook}
+                      >
+                        <svg viewBox="0 0 36 36" className="h-5 w-5 fill-current" xmlns="http://www.w3.org/2000/svg">
+                          <path d="M34 16h-6v-5.2c0-.8.7-1.8 1.5-1.8h4.5V2h-6.2c-5.3 0-8.8 4-8.8 9v5h-5v7h5v16h7V23h4.8l1.2-7z"></path>
+                        </svg>
+                        Continue with Facebook
+                      </Button>
+                      
+                      <div className="bg-blue-50 p-4 rounded-md mt-8 text-center">
+                        <p className="text-gray-700">
+                          Need help connecting?{" "}
+                          <a href="#" className="text-blue-500 hover:underline">Book a free WhatsApp demo</a>{" "}
+                          or read{" "}
+                          <a href="#" className="text-blue-500 hover:underline">the article</a>.
+                        </p>
+                      </div>
+                    </div>
+                  </ScrollArea>
+                </TabsContent>
+                
+                <TabsContent value="authorization">
+                  <ScrollArea className="h-full">
+                    <div className="space-y-4">
+                      <p className="text-sm text-muted-foreground">
+                        Authorization settings will be available after connecting your WhatsApp account.
                       </p>
                     </div>
-                  </div>
-                </div>
-              </div>
-            </TabsContent>
-            
-            <TabsContent value="authorization" className="space-y-6 h-96">
-              <div className="space-y-4">
-                <p className="text-sm text-muted-foreground">
-                  Authorization settings for your WhatsApp connection.
-                </p>
+                  </ScrollArea>
+                </TabsContent>
+              </>
+            ) : (
+              <>
+                <TabsContent value="settings" className="space-y-6 h-96">
+                  <ScrollArea className="h-full">
+                    <div className="space-y-4">
+                      <div className="space-y-4 mt-6">
+                        <h3 className="text-lg font-semibold">Backup number</h3>
+                        <p className="text-gray-500">
+                          This WhatsApp account will be used in case your other numbers get disconnected.
+                        </p>
+                        <div className="bg-gray-100 p-4 rounded-md">
+                          <p className="text-gray-600">+60 17-516 8607</p>
+                        </div>
+                      </div>
+                      
+                      <div className="mt-8">
+                        <Table>
+                          <TableHeader>
+                            <TableRow>
+                              <TableHead>Name</TableHead>
+                              <TableHead>Number</TableHead>
+                              <TableHead>Pipeline</TableHead>
+                              <TableHead>Status</TableHead>
+                            </TableRow>
+                          </TableHeader>
+                          <TableBody>
+                            <TableRow>
+                              <TableCell className="font-medium">+60 17-516 8607</TableCell>
+                              <TableCell>+60 17-516 8607</TableCell>
+                              <TableCell>
+                                <select className="border rounded-md px-2 py-1">
+                                  <option>Pipeline</option>
+                                  <option>Prospects</option>
+                                  <option>Customers</option>
+                                  <option>Leads</option>
+                                </select>
+                              </TableCell>
+                              <TableCell>
+                                <div className="flex items-center justify-between">
+                                  <CheckCircle className="h-5 w-5 text-green-500" />
+                                  <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
+                                    <X className="h-4 w-4 text-gray-400" />
+                                  </Button>
+                                </div>
+                              </TableCell>
+                            </TableRow>
+                          </TableBody>
+                        </Table>
+                        
+                        <Button className="mt-4" variant="outline">
+                          <Plus className="h-4 w-4 mr-2" />
+                          Add number
+                        </Button>
+                      </div>
+                      
+                      <div className="mt-8 p-4 bg-amber-50 rounded-lg border border-amber-100">
+                        <div className="flex items-start space-x-3">
+                          <AlertCircle className="h-5 w-5 text-amber-500 flex-shrink-0 mt-0.5" />
+                          <div>
+                            <p className="text-sm text-amber-800">
+                              Don't forget to use your phone at least <strong>once every 14 days</strong> to stay connected.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </ScrollArea>
+                </TabsContent>
                 
-                <div className="space-y-4 mt-6">
-                  <h3 className="text-lg font-semibold">API Credentials</h3>
-                  <div className="bg-gray-100 p-4 rounded-md">
-                    <p className="font-mono text-sm break-all">7ed9a88f-92a1-4dbc-9bb0-5cbb48ec3f0a</p>
-                  </div>
-                  <Button variant="outline" size="sm">
-                    Regenerate API Key
-                  </Button>
-                </div>
-                
-                <div className="space-y-4 mt-8">
-                  <h3 className="text-lg font-semibold">Webhook Configuration</h3>
-                  <div className="bg-gray-100 p-4 rounded-md">
-                    <p className="font-mono text-sm break-all">https://api.example.com/whatsapp/webhook</p>
-                  </div>
-                </div>
-              </div>
-            </TabsContent>
+                <TabsContent value="authorization" className="space-y-6 h-96">
+                  <ScrollArea className="h-full">
+                    <div className="space-y-4">
+                      <p className="text-sm text-muted-foreground">
+                        Authorization settings for your WhatsApp connection.
+                      </p>
+                      
+                      <div className="space-y-4 mt-6">
+                        <h3 className="text-lg font-semibold">API Credentials</h3>
+                        <div className="bg-gray-100 p-4 rounded-md">
+                          <p className="font-mono text-sm break-all">7ed9a88f-92a1-4dbc-9bb0-5cbb48ec3f0a</p>
+                        </div>
+                        <Button variant="outline" size="sm">
+                          Regenerate API Key
+                        </Button>
+                      </div>
+                      
+                      <div className="space-y-4 mt-8">
+                        <h3 className="text-lg font-semibold">Webhook Configuration</h3>
+                        <div className="bg-gray-100 p-4 rounded-md">
+                          <p className="font-mono text-sm break-all">https://api.example.com/whatsapp/webhook</p>
+                        </div>
+                      </div>
+                    </div>
+                  </ScrollArea>
+                </TabsContent>
+              </>
+            )}
             
             <div className="mt-6 flex justify-end">
               <Button variant="outline" onClick={() => handleDialogChange(false)}>
