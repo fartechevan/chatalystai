@@ -4,16 +4,19 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Trash2, FileText } from "lucide-react";
+import { Trash2, FileText, File, ExternalLink } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { formatDistanceToNow } from "date-fns";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Badge } from "@/components/ui/badge";
 
 interface Document {
   id: string;
   title: string;
   created_at: string;
   updated_at: string;
+  file_type: string;
+  file_path: string;
 }
 
 interface DocumentListProps {
@@ -41,7 +44,7 @@ export function DocumentList({ onSelectDocument, selectedDocumentId }: DocumentL
       
       const { data, error } = await supabase
         .from('knowledge_documents')
-        .select('id, title, created_at, updated_at')
+        .select('id, title, created_at, updated_at, file_type, file_path')
         .order('updated_at', { ascending: false });
       
       if (error) {
@@ -60,6 +63,30 @@ export function DocumentList({ onSelectDocument, selectedDocumentId }: DocumentL
 
   const handleDeleteDocument = async (id: string) => {
     try {
+      // First check if there's a file to delete
+      const document = documents.find(doc => doc.id === id);
+      
+      if (document?.file_path) {
+        // Delete file from storage if it exists
+        const { error: storageError } = await supabase
+          .storage
+          .from('documents')
+          .remove([document.file_path]);
+        
+        if (storageError) {
+          console.error("Error deleting file from storage:", storageError);
+        }
+      }
+      
+      // Delete chunks first
+      const { error: chunksError } = await supabase
+        .from('knowledge_chunks')
+        .delete()
+        .eq('document_id', id);
+      
+      if (chunksError) throw chunksError;
+      
+      // Then delete the document
       const { error } = await supabase
         .from('knowledge_documents')
         .delete()
@@ -83,6 +110,13 @@ export function DocumentList({ onSelectDocument, selectedDocumentId }: DocumentL
         title: "Error deleting document",
         description: error instanceof Error ? error.message : "An unknown error occurred",
       });
+    }
+  };
+
+  const handleViewOriginalPdf = (document: Document) => {
+    if (document.file_path) {
+      const url = supabase.storage.from('documents').getPublicUrl(document.file_path).data.publicUrl;
+      window.open(url, '_blank');
     }
   };
 
@@ -131,25 +165,47 @@ export function DocumentList({ onSelectDocument, selectedDocumentId }: DocumentL
           onClick={() => onSelectDocument(doc.id)}
         >
           <CardHeader className="p-4">
-            <div className="flex items-start justify-between">
-              <div className="flex items-center gap-2">
-                <FileText className="h-4 w-4 text-muted-foreground" />
-                <CardTitle className="text-base">{doc.title}</CardTitle>
+            <div className="flex items-start gap-2">
+              {doc.file_type === 'pdf' ? (
+                <FileText className="h-5 w-5 text-muted-foreground mt-0.5 shrink-0" />
+              ) : (
+                <File className="h-5 w-5 text-muted-foreground mt-0.5 shrink-0" />
+              )}
+              <div className="flex-1 min-w-0">
+                <CardTitle className="text-base truncate">{doc.title}</CardTitle>
+                <CardDescription className="flex items-center gap-2">
+                  <span>Updated {formatDistanceToNow(new Date(doc.updated_at), { addSuffix: true })}</span>
+                  {doc.file_type && (
+                    <Badge variant="outline" className="text-xs">
+                      {doc.file_type.toUpperCase()}
+                    </Badge>
+                  )}
+                </CardDescription>
               </div>
             </div>
-            <CardDescription>
-              Updated {formatDistanceToNow(new Date(doc.updated_at), { addSuffix: true })}
-            </CardDescription>
           </CardHeader>
-          <CardFooter className="p-4 pt-0">
+          <CardFooter className="p-4 pt-0 flex justify-end gap-2">
+            {doc.file_type === 'pdf' && doc.file_path && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleViewOriginalPdf(doc);
+                }}
+                title="View original PDF"
+              >
+                <ExternalLink className="h-4 w-4 text-muted-foreground" />
+              </Button>
+            )}
             <Button 
-              variant="outline" 
-              size="sm" 
-              className="ml-auto"
+              variant="ghost" 
+              size="sm"
               onClick={(e) => {
                 e.stopPropagation();
                 handleDeleteDocument(doc.id);
               }}
+              title="Delete document"
             >
               <Trash2 className="h-4 w-4 text-destructive" />
             </Button>
