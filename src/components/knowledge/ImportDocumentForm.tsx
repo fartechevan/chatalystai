@@ -72,6 +72,7 @@ export function ImportDocumentForm({ onCancel, onSuccess }: ImportDocumentFormPr
 
   const onSubmit = async (values: FormValues) => {
     try {
+      console.log("Submitting form with values:", values);
       setIsSubmitting(true);
       
       // Create document
@@ -84,7 +85,12 @@ export function ImportDocumentForm({ onCancel, onSuccess }: ImportDocumentFormPr
         .select("id")
         .single();
       
-      if (documentError) throw documentError;
+      if (documentError) {
+        console.error("Document error:", documentError);
+        throw documentError;
+      }
+      
+      console.log("Document created with ID:", documentData.id);
       
       // Generate chunks
       const documentChunks = splitIntoChunks(values.content);
@@ -100,7 +106,12 @@ export function ImportDocumentForm({ onCancel, onSuccess }: ImportDocumentFormPr
           .from("knowledge_chunks")
           .insert(chunksToInsert);
         
-        if (chunksError) throw chunksError;
+        if (chunksError) {
+          console.error("Chunks error:", chunksError);
+          throw chunksError;
+        }
+        
+        console.log("Inserted", chunksToInsert.length, "chunks");
       }
       
       // Refresh data
@@ -111,6 +122,7 @@ export function ImportDocumentForm({ onCancel, onSuccess }: ImportDocumentFormPr
       
     } catch (error) {
       setIsSubmitting(false);
+      console.error("Error importing document:", error);
       toast({
         variant: "destructive",
         title: "Error importing document",
@@ -212,11 +224,22 @@ export function ImportDocumentForm({ onCancel, onSuccess }: ImportDocumentFormPr
         )}
       </CardContent>
       {showChunks && (
-        <CardFooter className="flex justify-end">
-          <Button onClick={() => {
-            setShowChunks(false);
-            form.handleSubmit(onSubmit)();
-          }} disabled={isSubmitting}>
+        <CardFooter className="flex justify-end gap-2">
+          <Button 
+            variant="outline" 
+            onClick={() => setShowChunks(false)}
+            disabled={isSubmitting}
+          >
+            Back to Edit
+          </Button>
+          <Button 
+            onClick={() => {
+              console.log("Confirming import");
+              setShowChunks(false);
+              form.handleSubmit(onSubmit)();
+            }} 
+            disabled={isSubmitting}
+          >
             {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             Confirm & Import
           </Button>
