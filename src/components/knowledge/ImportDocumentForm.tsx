@@ -1,4 +1,3 @@
-
 import { useState, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -210,7 +209,6 @@ export function ImportDocumentForm({ onCancel, onSuccess }: ImportDocumentFormPr
 
   const onSubmit = async (values: FormValues) => {
     try {
-      console.log("Submitting form with values:", values);
       setIsSubmitting(true);
       
       // Create document
@@ -218,10 +216,10 @@ export function ImportDocumentForm({ onCancel, onSuccess }: ImportDocumentFormPr
         .from("knowledge_documents")
         .insert({
           title: values.title,
-          content: values.content,
+          content: values.content || "",
           chunking_method: values.chunkingMethod,
           custom_chunk_size: values.customChunkSize,
-          file_type: pdfFile ? 'pdf' : 'text',
+          file_type: pdfFile ? 'pdf' : 'text'
         })
         .select("id")
         .single();
@@ -276,7 +274,6 @@ export function ImportDocumentForm({ onCancel, onSuccess }: ImportDocumentFormPr
         if (uploadError) {
           console.error("PDF upload error:", uploadError);
           toast({
-            variant: "warning",
             title: "Document saved, but PDF upload failed",
             description: uploadError.message,
           });

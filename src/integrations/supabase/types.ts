@@ -266,6 +266,8 @@ export type Database = {
           document_id: string | null
           embedding: string | null
           id: string
+          metadata: string | null
+          sequence: number | null
           updated_at: string | null
         }
         Insert: {
@@ -274,6 +276,8 @@ export type Database = {
           document_id?: string | null
           embedding?: string | null
           id?: string
+          metadata?: string | null
+          sequence?: number | null
           updated_at?: string | null
         }
         Update: {
@@ -282,6 +286,8 @@ export type Database = {
           document_id?: string | null
           embedding?: string | null
           id?: string
+          metadata?: string | null
+          sequence?: number | null
           updated_at?: string | null
         }
         Relationships: [
@@ -296,24 +302,36 @@ export type Database = {
       }
       knowledge_documents: {
         Row: {
+          chunking_method: string | null
           content: string
           created_at: string | null
+          custom_chunk_size: number | null
+          file_path: string | null
+          file_type: string | null
           id: string
           title: string
           updated_at: string | null
           user_id: string | null
         }
         Insert: {
+          chunking_method?: string | null
           content: string
           created_at?: string | null
+          custom_chunk_size?: number | null
+          file_path?: string | null
+          file_type?: string | null
           id?: string
           title: string
           updated_at?: string | null
           user_id?: string | null
         }
         Update: {
+          chunking_method?: string | null
           content?: string
           created_at?: string | null
+          custom_chunk_size?: number | null
+          file_path?: string | null
+          file_type?: string | null
           id?: string
           title?: string
           updated_at?: string | null
