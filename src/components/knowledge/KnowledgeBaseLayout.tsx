@@ -19,13 +19,19 @@ export function KnowledgeBaseLayout() {
       description: "Your document has been successfully imported.",
     });
   };
+
+  // Ensure this handler explicitly sets showImportForm to true
+  const handleShowImportForm = () => {
+    setShowImportForm(true);
+    console.log("Import form visibility set to:", true);
+  };
   
   return (
     <div className="container mx-auto p-4">
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">Knowledge Base</h1>
         <Button 
-          onClick={() => setShowImportForm(true)} 
+          onClick={handleShowImportForm}
           className="flex items-center gap-2"
         >
           <PlusCircle className="h-4 w-4" />
@@ -33,14 +39,14 @@ export function KnowledgeBaseLayout() {
         </Button>
       </div>
       
-      {showImportForm ? (
+      {showImportForm && (
         <div className="mb-8">
           <ImportDocumentForm 
             onCancel={() => setShowImportForm(false)} 
             onSuccess={handleImportSuccess}
           />
         </div>
-      ) : null}
+      )}
       
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-1">
