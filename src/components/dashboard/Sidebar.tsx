@@ -10,7 +10,8 @@ import {
   Mail,
   BarChart2,
   HelpCircle,
-  UserRound
+  UserRound,
+  BookOpen
 } from "lucide-react";
 import {
   Sidebar,
@@ -37,6 +38,7 @@ const menuItems: MenuItem[] = [
   { title: "Chat", icon: MessageSquare, path: "/dashboard/conversations" },
   { title: "Calendar", icon: Calendar, path: "/dashboard/calendar" },
   { title: "Lists", icon: List, path: "/dashboard/lists" },
+  { title: "Knowledge", icon: BookOpen, path: "/dashboard/knowledge" },
   { title: "Mail", icon: Mail, path: "/dashboard/mail" },
   { title: "Stats", icon: BarChart2, path: "/dashboard/stats" },
   { title: "Settings", icon: Settings, path: "/dashboard/settings" },
