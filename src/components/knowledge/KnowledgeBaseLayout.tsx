@@ -1,5 +1,6 @@
 
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { DocumentList } from "./DocumentList";
 import { ImportDocumentForm } from "./ImportDocumentForm";
 import { ChunksList } from "./ChunksList";
@@ -19,6 +20,7 @@ export function KnowledgeBaseLayout() {
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [selectedDocumentId, setSelectedDocumentId] = useState<string | null>(null);
   const { toast } = useToast();
+  const navigate = useNavigate();
   
   const handleImportSuccess = () => {
     setShowImportForm(false);
@@ -28,11 +30,14 @@ export function KnowledgeBaseLayout() {
     });
   };
 
-  const handleCreateSuccess = () => {
+  const handleCreateSuccess = (documentId: string) => {
     toast({
       title: "Document created",
-      description: "Your document has been successfully created.",
+      description: "Your document has been created. Now you can add chunks to it.",
     });
+    
+    // Navigate to the chunk editor page for the new document
+    navigate(`/dashboard/knowledge/document/${documentId}/edit`);
   };
 
   // Ensure this handler explicitly sets showImportForm to true
