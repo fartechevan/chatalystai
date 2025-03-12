@@ -1,3 +1,4 @@
+
 import { useState, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -21,16 +22,31 @@ import { useQueryClient } from "@tanstack/react-query";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { 
+  ChunkingMethod, 
+  ChunkingOptions, 
+  generateChunks 
+} from "./utils/chunkingUtils";
+import { Checkbox } from "@/components/ui/checkbox";
 
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 
 const formSchema = z.object({
   title: z.string().min(1, "Title is required"),
   content: z.string().optional(),
-  chunkingMethod: z.enum(["lineBreak", "paragraph", "page", "custom"], {
+  chunkingMethod: z.enum([
+    "lineBreak", 
+    "paragraph", 
+    "page", 
+    "custom", 
+    "header",
+    "customLineBreak"
+  ], {
     required_error: "Please select a chunking method",
   }),
   customChunkSize: z.number().optional(),
+  customLineBreakPattern: z.string().optional(),
+  headerLevels: z.array(z.number()).optional(),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -51,6 +67,7 @@ export function ImportDocumentForm({ onCancel, onSuccess }: ImportDocumentFormPr
   const [isProcessingPdf, setIsProcessingPdf] = useState(false);
   const [pdfPreviewUrl, setPdfPreviewUrl] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [selectedHeaderLevels, setSelectedHeaderLevels] = useState<number[]>([1, 2, 3]);
   
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -59,6 +76,8 @@ export function ImportDocumentForm({ onCancel, onSuccess }: ImportDocumentFormPr
       content: "",
       chunkingMethod: "lineBreak",
       customChunkSize: 500,
+      customLineBreakPattern: "\\n\\n\\n",
+      headerLevels: [1, 2, 3],
     },
   });
 
@@ -139,63 +158,37 @@ export function ImportDocumentForm({ onCancel, onSuccess }: ImportDocumentFormPr
     }
   };
 
-  const splitByLineBreak = (content: string): string[] => {
-    return content
-      .split('\n')
-      .map(line => line.trim())
-      .filter(line => line.length > 0);
-  };
-
-  const splitByParagraph = (content: string): string[] => {
-    return content
-      .split(/\n\s*\n/)
-      .map(para => para.trim())
-      .filter(para => para.length > 0);
-  };
-
-  const splitByCustomSize = (content: string, size: number): string[] => {
-    const chunks: string[] = [];
-    let currentChunk = '';
-    
-    content.split(/\s+/).forEach(word => {
-      if (currentChunk.length + word.length + 1 > size) {
-        chunks.push(currentChunk.trim());
-        currentChunk = word;
+  const handleHeaderLevelChange = (level: number) => {
+    setSelectedHeaderLevels(prev => {
+      if (prev.includes(level)) {
+        return prev.filter(l => l !== level);
       } else {
-        currentChunk += (currentChunk ? ' ' : '') + word;
+        return [...prev, level].sort();
       }
     });
     
-    if (currentChunk.trim()) {
-      chunks.push(currentChunk.trim());
-    }
-    
-    return chunks;
-  };
-
-  const generateChunks = (content: string, method: string, customSize?: number): string[] => {
-    switch (method) {
-      case 'lineBreak':
-        return splitByLineBreak(content);
-      case 'paragraph':
-        return splitByParagraph(content);
-      case 'page':
-        // Simple page simulation - split by double newlines
-        return splitByParagraph(content);
-      case 'custom':
-        return splitByCustomSize(content, customSize || 500);
-      default:
-        return splitByLineBreak(content);
-    }
+    form.setValue("headerLevels", 
+      selectedHeaderLevels.includes(level) 
+        ? selectedHeaderLevels.filter(l => l !== level)
+        : [...selectedHeaderLevels, level].sort()
+    );
   };
 
   const handlePreviewChunks = () => {
     const content = form.getValues("content");
     const method = form.getValues("chunkingMethod");
-    const customSize = form.getValues("customChunkSize");
+    const customChunkSize = form.getValues("customChunkSize");
+    const customLineBreakPattern = form.getValues("customLineBreakPattern");
     
     if (content) {
-      const generatedChunks = generateChunks(content, method, customSize);
+      const options: ChunkingOptions = {
+        method: method as ChunkingMethod,
+        customChunkSize,
+        customLineBreakPattern,
+        headerLevels: selectedHeaderLevels
+      };
+      
+      const generatedChunks = generateChunks(content, options);
       setChunks(generatedChunks);
       setShowChunks(true);
     } else {
@@ -232,11 +225,14 @@ export function ImportDocumentForm({ onCancel, onSuccess }: ImportDocumentFormPr
       console.log("Document created with ID:", documentData.id);
       
       // Generate chunks
-      const documentChunks = generateChunks(
-        values.content || "", 
-        values.chunkingMethod,
-        values.customChunkSize
-      );
+      const options: ChunkingOptions = {
+        method: values.chunkingMethod as ChunkingMethod,
+        customChunkSize: values.customChunkSize,
+        customLineBreakPattern: values.customLineBreakPattern,
+        headerLevels: selectedHeaderLevels
+      };
+      
+      const documentChunks = generateChunks(values.content || "", options);
       
       // Insert chunks
       if (documentChunks.length > 0) {
@@ -248,6 +244,7 @@ export function ImportDocumentForm({ onCancel, onSuccess }: ImportDocumentFormPr
             chunkingMethod: values.chunkingMethod,
             index: index + 1,
             totalChunks: documentChunks.length,
+            customOptions: options
           }),
         }));
         
@@ -332,18 +329,21 @@ export function ImportDocumentForm({ onCancel, onSuccess }: ImportDocumentFormPr
               </Button>
             </div>
             
-            <div className="border rounded-md p-4 max-h-[400px] overflow-y-auto">
-              <p className="text-sm text-muted-foreground mb-4">
-                {chunks.length} chunks created using {form.getValues("chunkingMethod")} method:
-              </p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 border rounded-md p-4 max-h-[500px] overflow-y-auto">
               {chunks.map((chunk, index) => (
-                <div key={index} className="mb-2 p-2 border rounded bg-muted/30">
-                  <div className="flex justify-between items-center mb-1">
-                    <span className="text-xs font-medium">Chunk {index + 1}</span>
-                    <span className="text-xs text-muted-foreground">{chunk.length} characters</span>
-                  </div>
-                  <p className="text-sm whitespace-pre-wrap">{chunk}</p>
-                </div>
+                <Card key={index} className="mb-2 bg-muted/30">
+                  <CardHeader className="py-3 px-4">
+                    <div className="flex justify-between items-center">
+                      <CardTitle className="text-sm font-medium">
+                        Chunk {index + 1}
+                      </CardTitle>
+                      <span className="text-xs text-muted-foreground">{chunk.length} characters</span>
+                    </div>
+                  </CardHeader>
+                  <CardContent className="py-2 px-4">
+                    <p className="text-sm whitespace-pre-wrap">{chunk}</p>
+                  </CardContent>
+                </Card>
               ))}
             </div>
           </div>
@@ -458,12 +458,20 @@ export function ImportDocumentForm({ onCancel, onSuccess }: ImportDocumentFormPr
                             <Label htmlFor="lineBreak">By Line Break</Label>
                           </div>
                           <div className="flex items-center space-x-2">
+                            <RadioGroupItem value="customLineBreak" id="customLineBreak" />
+                            <Label htmlFor="customLineBreak">Custom Line Break</Label>
+                          </div>
+                          <div className="flex items-center space-x-2">
                             <RadioGroupItem value="paragraph" id="paragraph" />
                             <Label htmlFor="paragraph">By Paragraph</Label>
                           </div>
                           <div className="flex items-center space-x-2">
                             <RadioGroupItem value="page" id="page" />
                             <Label htmlFor="page">By Page</Label>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <RadioGroupItem value="header" id="header" />
+                            <Label htmlFor="header">By Headers</Label>
                           </div>
                           <div className="flex items-center space-x-2">
                             <RadioGroupItem value="custom" id="custom" />
@@ -496,6 +504,55 @@ export function ImportDocumentForm({ onCancel, onSuccess }: ImportDocumentFormPr
                       </FormItem>
                     )}
                   />
+                )}
+                
+                {chunkingMethod === 'customLineBreak' && (
+                  <FormField
+                    control={form.control}
+                    name="customLineBreakPattern"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Line break pattern</FormLabel>
+                        <FormControl>
+                          <Input 
+                            type="text" 
+                            placeholder="\n\n\n"
+                            {...field} 
+                          />
+                        </FormControl>
+                        <p className="text-sm text-muted-foreground mt-1">
+                          Enter the pattern to use for line breaks. Example: \n\n\n for three newlines.
+                        </p>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                )}
+                
+                {chunkingMethod === 'header' && (
+                  <div className="space-y-3">
+                    <FormLabel>Header levels to use</FormLabel>
+                    <div className="grid grid-cols-3 gap-2">
+                      {[1, 2, 3, 4, 5, 6].map((level) => (
+                        <div key={level} className="flex items-center space-x-2">
+                          <Checkbox 
+                            id={`header-${level}`} 
+                            checked={selectedHeaderLevels.includes(level)}
+                            onCheckedChange={() => handleHeaderLevelChange(level)}
+                          />
+                          <label 
+                            htmlFor={`header-${level}`}
+                            className="text-sm font-medium"
+                          >
+                            H{level}
+                          </label>
+                        </div>
+                      ))}
+                    </div>
+                    <p className="text-sm text-muted-foreground">
+                      Select which header levels should be used as chunk boundaries.
+                    </p>
+                  </div>
                 )}
               </div>
               
@@ -542,7 +599,6 @@ export function ImportDocumentForm({ onCancel, onSuccess }: ImportDocumentFormPr
           </Button>
           <Button 
             onClick={() => {
-              console.log("Confirming import");
               setShowChunks(false);
               form.handleSubmit(onSubmit)();
             }} 
