@@ -13,6 +13,12 @@ interface ChunkMetadata {
   index: number;
   totalChunks: number;
   pageNumber?: number;
+  customOptions?: {
+    method: string;
+    customChunkSize?: number;
+    customLineBreakPattern?: string;
+    headerLevels?: number[];
+  };
 }
 
 interface Chunk {
@@ -104,6 +110,18 @@ export function ChunksList({ documentId }: ChunksListProps) {
     URL.revokeObjectURL(url);
   };
 
+  const getChunkingMethodDisplay = (method: string) => {
+    switch (method) {
+      case 'lineBreak': return 'Line Break';
+      case 'customLineBreak': return 'Custom Line Break';
+      case 'paragraph': return 'Paragraph';
+      case 'page': return 'Page';
+      case 'header': return 'Header';
+      case 'custom': return 'Custom Size';
+      default: return method;
+    }
+  };
+
   if (!documentId) {
     return (
       <div className="bg-muted p-8 rounded-lg text-center">
@@ -114,8 +132,8 @@ export function ChunksList({ documentId }: ChunksListProps) {
 
   if (isLoading) {
     return (
-      <div className="space-y-4">
-        {[1, 2, 3].map((i) => (
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        {Array(6).fill(0).map((_, i) => (
           <Card key={i} className="bg-muted/50">
             <CardHeader className="p-4">
               <Skeleton className="h-5 w-full" />
@@ -147,9 +165,7 @@ export function ChunksList({ documentId }: ChunksListProps) {
           </Badge>
           {documentData?.chunking_method && (
             <Badge variant="secondary">
-              {documentData.chunking_method === 'lineBreak' ? 'Line Break' : 
-               documentData.chunking_method === 'paragraph' ? 'Paragraph' : 
-               documentData.chunking_method === 'page' ? 'Page' : 'Custom Size'}
+              {getChunkingMethodDisplay(documentData.chunking_method)}
             </Badge>
           )}
         </div>
@@ -185,40 +201,52 @@ export function ChunksList({ documentId }: ChunksListProps) {
         </Card>
       )}
       
-      <div className="max-h-[70vh] overflow-y-auto pr-2 space-y-4">
-        {chunks.map((chunk) => {
-          let metadata: ChunkMetadata = { chunkingMethod: 'lineBreak', index: 1, totalChunks: chunks.length };
-          try {
-            if (chunk.metadata) {
-              metadata = JSON.parse(chunk.metadata);
+      <div className="max-h-[70vh] overflow-y-auto pr-2">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {chunks.map((chunk) => {
+            let metadata: ChunkMetadata = { 
+              chunkingMethod: 'lineBreak', 
+              index: 1, 
+              totalChunks: chunks.length 
+            };
+            
+            try {
+              if (chunk.metadata) {
+                metadata = JSON.parse(chunk.metadata);
+              }
+            } catch (e) {
+              console.error("Error parsing chunk metadata:", e);
             }
-          } catch (e) {
-            console.error("Error parsing chunk metadata:", e);
-          }
-          
-          return (
-            <Card key={chunk.id}>
-              <CardHeader className="py-3 px-4">
-                <div className="flex justify-between items-center">
-                  <CardTitle className="text-sm font-medium">
-                    Chunk {chunk.sequence}
-                  </CardTitle>
-                  <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                    <span>{chunk.content.length} characters</span>
-                    {metadata.pageNumber && (
-                      <Badge variant="outline" className="text-xs">
-                        Page {metadata.pageNumber}
-                      </Badge>
-                    )}
+            
+            return (
+              <Card key={chunk.id} className="hover:shadow-md transition-shadow">
+                <CardHeader className="py-3 px-4">
+                  <div className="flex justify-between items-center">
+                    <CardTitle className="text-sm font-medium">
+                      Chunk {chunk.sequence}
+                    </CardTitle>
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <span>{chunk.content.length} characters</span>
+                      {metadata.pageNumber && (
+                        <Badge variant="outline" className="text-xs">
+                          Page {metadata.pageNumber}
+                        </Badge>
+                      )}
+                      {metadata.customOptions?.headerLevels && (
+                        <Badge variant="outline" className="text-xs">
+                          Headers {metadata.customOptions.headerLevels.join(', ')}
+                        </Badge>
+                      )}
+                    </div>
                   </div>
-                </div>
-              </CardHeader>
-              <CardContent className="py-2 px-4">
-                <p className="text-sm whitespace-pre-wrap">{chunk.content}</p>
-              </CardContent>
-            </Card>
-          );
-        })}
+                </CardHeader>
+                <CardContent className="py-2 px-4 max-h-[300px] overflow-y-auto">
+                  <p className="text-sm whitespace-pre-wrap">{chunk.content}</p>
+                </CardContent>
+              </Card>
+            );
+          })}
+        </div>
       </div>
     </div>
   );
