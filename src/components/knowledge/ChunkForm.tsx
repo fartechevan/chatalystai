@@ -2,7 +2,6 @@ import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
-import { generateEmbedding } from "@/lib/embeddings";
 import {
   Dialog,
   DialogContent,
@@ -28,11 +27,9 @@ export function ChunkForm({ documentId, onClose, refetch }: ChunkFormProps) {
   const handleSubmit = async () => {
     setIsLoading(true);
     try {
-      const embedding = await generateEmbedding(content);
-
       const { error } = await supabase
         .from('knowledge_chunks')
-        .insert([{ document_id: documentId, content, embedding: JSON.stringify(embedding) }]);
+        .insert([{ document_id: documentId, content }]);
 
       if (error) {
         throw error;
