@@ -17,7 +17,6 @@ import { TaskBoard } from "./components/lists/TaskBoard";
 import Leads from "./pages/Leads";
 import ComingSoon from "@/pages/ComingSoon";
 import KnowledgeBase from "./pages/KnowledgeBase";
-import { ChunkView } from "./components/knowledge/ChunkView";
 
 const App = () => {
   const queryClient = new QueryClient({

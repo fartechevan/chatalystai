@@ -78,6 +78,14 @@ export function DocumentList({ onSelectDocument, selectedDocumentId }: DocumentL
         }
       }
       
+      // Delete chunks first
+      const { error: chunksError } = await supabase
+        .from('knowledge_chunks')
+        .delete()
+        .eq('document_id', id);
+      
+      if (chunksError) throw chunksError;
+      
       // Then delete the document
       const { error } = await supabase
         .from('knowledge_documents')
@@ -149,32 +157,34 @@ export function DocumentList({ onSelectDocument, selectedDocumentId }: DocumentL
   return (
     <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-2">
       {documents.map((doc) => (
-        <div 
+        <Card 
           key={doc.id}
-          className={`flex items-center justify-between p-4 cursor-pointer transition-colors border rounded-md ${
-            selectedDocumentId === doc.id ? 'border-primary' : 'border-muted'
+          className={`cursor-pointer transition-colors ${
+            selectedDocumentId === doc.id ? 'border-primary' : ''
           }`}
           onClick={() => onSelectDocument(doc.id)}
         >
-          <div className="flex items-start gap-2">
-            {doc.file_type === 'pdf' ? (
-              <FileText className="h-5 w-5 text-muted-foreground mt-0.5 shrink-0" />
-            ) : (
-              <File className="h-5 w-5 text-muted-foreground mt-0.5 shrink-0" />
-            )}
-            <div className="flex-1 min-w-0">
-              <div className="text-base truncate font-medium">{doc.title}</div>
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <span>Updated {formatDistanceToNow(new Date(doc.updated_at), { addSuffix: true })}</span>
-                {doc.file_type && (
-                  <Badge variant="outline" className="text-xs">
-                    {doc.file_type.toUpperCase()}
-                  </Badge>
-                )}
+          <CardHeader className="p-4">
+            <div className="flex items-start gap-2">
+              {doc.file_type === 'pdf' ? (
+                <FileText className="h-5 w-5 text-muted-foreground mt-0.5 shrink-0" />
+              ) : (
+                <File className="h-5 w-5 text-muted-foreground mt-0.5 shrink-0" />
+              )}
+              <div className="flex-1 min-w-0">
+                <CardTitle className="text-base truncate">{doc.title}</CardTitle>
+                <CardDescription className="flex items-center gap-2">
+                  <span>Updated {formatDistanceToNow(new Date(doc.updated_at), { addSuffix: true })}</span>
+                  {doc.file_type && (
+                    <Badge variant="outline" className="text-xs">
+                      {doc.file_type.toUpperCase()}
+                    </Badge>
+                  )}
+                </CardDescription>
               </div>
             </div>
-          </div>
-          <div className="flex gap-2">
+          </CardHeader>
+          <CardFooter className="p-4 pt-0 flex justify-end gap-2">
             {doc.file_type === 'pdf' && doc.file_path && (
               <Button
                 variant="ghost"
@@ -199,8 +209,8 @@ export function DocumentList({ onSelectDocument, selectedDocumentId }: DocumentL
             >
               <Trash2 className="h-4 w-4 text-destructive" />
             </Button>
-          </div>
-        </div>
+          </CardFooter>
+        </Card>
       ))}
     </div>
   );
