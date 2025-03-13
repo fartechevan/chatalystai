@@ -55,14 +55,7 @@ export function CreateDocumentDialog({ open, onOpenChange, onSuccess }: CreateDo
     try {
       setIsSubmitting(true);
 
-      // Get current user
-      const { data: { user }, error: userError } = await supabase.auth.getUser();
-      
-      if (userError || !user) {
-        throw new Error("You must be logged in to create a document");
-      }
-
-      // Create document with user_id
+      // Create document
       const { data: documentData, error: documentError } = await supabase
         .from("knowledge_documents")
         .insert({
@@ -70,7 +63,6 @@ export function CreateDocumentDialog({ open, onOpenChange, onSuccess }: CreateDo
           content: values.description || "",
           chunking_method: "manual", // Default method for manual creation
           file_type: "text",
-          user_id: user.id, // Add user_id to satisfy RLS policy
         })
         .select("id")
         .single();
