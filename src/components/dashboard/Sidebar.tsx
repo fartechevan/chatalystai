@@ -17,7 +17,6 @@ import {
   Sidebar,
   SidebarContent,
   SidebarHeader,
-  SidebarMenuButton,
   useSidebar,
 } from "@/components/ui/sidebar";
 import { Link, useLocation } from "react-router-dom";
