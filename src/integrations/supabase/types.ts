@@ -867,6 +867,20 @@ export type Database = {
             }
             Returns: unknown
           }
+      match_chunks: {
+        Args: {
+          query_embedding: string
+          match_threshold: number
+          match_count: number
+        }
+        Returns: {
+          id: string
+          content: string
+          similarity: number
+          document_id: string
+          document_title: string
+        }[]
+      }
       match_knowledge_chunks: {
         Args: {
           query_embedding: string
