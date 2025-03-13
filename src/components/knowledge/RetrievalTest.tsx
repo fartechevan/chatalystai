@@ -35,15 +35,14 @@ export function RetrievalTest({ documentId }: RetrievalTestProps) {
       const queryEmbedding = await generateEmbedding(query);
       
       // Search for similar chunks using vector similarity
-      // Use the raw fetch method instead of rpc to bypass the function name validation
       const response = await fetch(
-        `${supabase.realtimeUrl.replace('realtime-', '')}/rest/v1/rpc/match_document_chunks`,
+        `${import.meta.env.VITE_SUPABASE_URL}/rest/v1/rpc/match_document_chunks`,
         {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'apikey': supabase.supabaseKey,
-            'Authorization': `Bearer ${supabase.supabaseKey}`
+            'apikey': import.meta.env.VITE_SUPABASE_ANON_KEY,
+            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_ANON_KEY}`
           },
           body: JSON.stringify({
             query_embedding: queryEmbedding,
