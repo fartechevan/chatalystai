@@ -43,11 +43,13 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { generateEmbedding } from "@/lib/embeddings";
 import { ChunkingMethod, generateChunks } from "./utils/chunkingUtils";
 
 type Chunk = {
   id: string;
   content: string;
+  embedding: number[];
   order: number;
 };
 
@@ -122,6 +124,7 @@ export function ChunkEditor() {
       const mappedChunks = existingChunks.map((chunk, index) => ({
         id: chunk.id,
         content: chunk.content,
+        embedding: chunk.embedding ? JSON.parse(chunk.embedding) : [],
         order: index,
       }));
       setChunks(mappedChunks);
@@ -154,6 +157,7 @@ export function ChunkEditor() {
         {
           id: uuidv4(),
           content: newChunkContent.trim(),
+          embedding: [],
           order: chunks.length,
         },
       ]);
@@ -232,6 +236,7 @@ export function ChunkEditor() {
     const newChunks = generatedChunks.map((content, index) => ({
       id: uuidv4(),
       content,
+      embedding: [],
       order: index,
     }));
     
@@ -261,14 +266,19 @@ export function ChunkEditor() {
       
       // Insert new chunks
       if (chunks.length > 0) {
-        const chunksToInsert = chunks.map((chunk, index) => ({
-          document_id: documentId,
-          content: chunk.content,
-          sequence: index + 1,
-          metadata: JSON.stringify({
-            index: index + 1,
-            totalChunks: chunks.length,
-          }),
+        const chunksToInsert = await Promise.all(chunks.map(async (chunk, index) => {
+          const embedding = await generateEmbedding(chunk.content);
+          const embeddingString = JSON.stringify(embedding);
+          return {
+            document_id: documentId,
+            content: chunk.content,
+            embedding: embeddingString,
+            sequence: index + 1,
+            metadata: JSON.stringify({
+              index: index + 1,
+              totalChunks: chunks.length,
+            }),
+          };
         }));
         
         const { error: insertError } = await supabase
