@@ -35,11 +35,11 @@ export function RetrievalTest({ documentId }: RetrievalTestProps) {
       const queryEmbedding = await generateEmbedding(query);
       
       // Search for similar chunks using vector similarity
-      const { data, error } = await supabase.rpc('match_chunks', {
+      const { data, error } = await supabase.rpc('match_document_chunks', {
         query_embedding: queryEmbedding,
         match_threshold: 0.5,
         match_count: 5,
-        document_id: documentId
+        p_document_id: documentId
       });
       
       if (error) {
