@@ -5,8 +5,25 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
-import { FileText, Download } from "lucide-react";
+import { FileText, Download, Hash, Search, SlidersHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { useState } from "react";
 
 interface ChunkMetadata {
   chunkingMethod: string;
@@ -35,6 +52,8 @@ interface ChunksListProps {
 
 export function ChunksList({ documentId }: ChunksListProps) {
   const { toast } = useToast();
+  const [searchTerm, setSearchTerm] = useState("");
+  const [filterStatus, setFilterStatus] = useState("all");
   
   const { data: chunks = [], isLoading } = useQuery({
     queryKey: ['knowledge-chunks', documentId],
@@ -122,6 +141,15 @@ export function ChunksList({ documentId }: ChunksListProps) {
     }
   };
 
+  const truncateContent = (content: string, maxLength = 200) => {
+    if (content.length <= maxLength) return content;
+    return content.substring(0, maxLength) + "...";
+  };
+
+  const filteredChunks = chunks.filter(chunk => 
+    chunk.content.toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
   if (!documentId) {
     return (
       <div className="bg-muted p-8 rounded-lg text-center">
@@ -132,16 +160,9 @@ export function ChunksList({ documentId }: ChunksListProps) {
 
   if (isLoading) {
     return (
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        {Array(6).fill(0).map((_, i) => (
-          <Card key={i} className="bg-muted/50">
-            <CardHeader className="p-4">
-              <Skeleton className="h-5 w-full" />
-            </CardHeader>
-            <CardContent className="p-4 pt-0">
-              <Skeleton className="h-16 w-full" />
-            </CardContent>
-          </Card>
+      <div className="grid grid-cols-1 gap-4">
+        {Array(3).fill(0).map((_, i) => (
+          <Skeleton key={i} className="h-16 w-full" />
         ))}
       </div>
     );
@@ -159,26 +180,53 @@ export function ChunksList({ documentId }: ChunksListProps) {
     <div className="space-y-4">
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <h2 className="text-xl font-semibold">Document Chunks</h2>
-          <Badge variant="outline">
-            {chunks.length} chunks
-          </Badge>
-          {documentData?.chunking_method && (
-            <Badge variant="secondary">
-              {getChunkingMethodDisplay(documentData.chunking_method)}
-            </Badge>
-          )}
+          <h2 className="text-xl font-semibold">{chunks.length} CHUNKS</h2>
         </div>
         
-        <Button 
-          variant="outline" 
-          size="sm" 
-          onClick={handleDownloadChunks}
-          className="flex items-center gap-1"
-        >
-          <Download className="h-4 w-4" />
-          Download Chunks
-        </Button>
+        <div className="flex items-center gap-2">
+          <div className="relative w-[200px]">
+            <Select 
+              defaultValue="all"
+              onValueChange={setFilterStatus}
+            >
+              <SelectTrigger className="w-full bg-muted/50">
+                <SelectValue placeholder="All" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All</SelectItem>
+                <SelectItem value="enabled">Enabled</SelectItem>
+                <SelectItem value="disabled">Disabled</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          
+          <div className="relative w-[250px]">
+            <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Search"
+              className="pl-8"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+          
+          <Button 
+            variant="outline" 
+            size="icon"
+            onClick={handleDownloadChunks}
+            title="Download chunks"
+          >
+            <Download className="h-4 w-4" />
+          </Button>
+          
+          <Button 
+            variant="outline" 
+            size="icon"
+            title="Filter options"
+          >
+            <SlidersHorizontal className="h-4 w-4" />
+          </Button>
+        </div>
       </div>
       
       {documentData?.file_path && documentData.file_type === 'pdf' && (
@@ -202,51 +250,75 @@ export function ChunksList({ documentId }: ChunksListProps) {
       )}
       
       <div className="max-h-[70vh] overflow-y-auto pr-2">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {chunks.map((chunk) => {
-            let metadata: ChunkMetadata = { 
-              chunkingMethod: 'lineBreak', 
-              index: 1, 
-              totalChunks: chunks.length 
-            };
-            
-            try {
-              if (chunk.metadata) {
-                metadata = JSON.parse(chunk.metadata);
+        <Table className="border rounded-lg">
+          <TableHeader>
+            <TableRow className="hover:bg-transparent">
+              <TableHead>Chunk</TableHead>
+              <TableHead className="w-[180px]">Characters</TableHead>
+              <TableHead className="w-[180px]">Retrieval count</TableHead>
+              <TableHead className="w-[120px] text-right">Status</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {filteredChunks.map((chunk, index) => {
+              let metadata: ChunkMetadata = { 
+                chunkingMethod: 'lineBreak', 
+                index: 1, 
+                totalChunks: chunks.length 
+              };
+              
+              try {
+                if (chunk.metadata) {
+                  metadata = JSON.parse(chunk.metadata);
+                }
+              } catch (e) {
+                console.error("Error parsing chunk metadata:", e);
               }
-            } catch (e) {
-              console.error("Error parsing chunk metadata:", e);
-            }
-            
-            return (
-              <Card key={chunk.id} className="hover:shadow-md transition-shadow">
-                <CardHeader className="py-3 px-4">
-                  <div className="flex justify-between items-center">
-                    <CardTitle className="text-sm font-medium">
-                      Chunk {chunk.sequence}
-                    </CardTitle>
-                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                      <span>{chunk.content.length} characters</span>
-                      {metadata.pageNumber && (
-                        <Badge variant="outline" className="text-xs">
-                          Page {metadata.pageNumber}
-                        </Badge>
-                      )}
-                      {metadata.customOptions?.headerLevels && (
-                        <Badge variant="outline" className="text-xs">
-                          Headers {metadata.customOptions.headerLevels.join(', ')}
-                        </Badge>
-                      )}
+              
+              const retrievalCount = metadata.customOptions?.headerLevels?.length || 0;
+              
+              return (
+                <TableRow key={chunk.id} className="group">
+                  <TableCell>
+                    <div className="space-y-1">
+                      <div className="font-medium flex items-center gap-2">
+                        <Hash className="h-4 w-4 text-muted-foreground" />
+                        Chunk-{String(index + 1).padStart(2, '0')}
+                      </div>
+                      <p className="text-sm text-muted-foreground line-clamp-2">
+                        {truncateContent(chunk.content)}
+                      </p>
+                      <div className="flex flex-wrap gap-1 pt-1">
+                        {chunk.content.split(" ")
+                          .filter((word, i, arr) => word.length > 3 && i < 8)
+                          .filter((word, i, arr) => arr.indexOf(word) === i)
+                          .slice(0, 5)
+                          .map((word, i) => (
+                            <Badge key={i} variant="outline" className="text-xs bg-slate-50">
+                              #{word.toLowerCase().replace(/[^\w]/g, '')}
+                            </Badge>
+                          ))}
+                      </div>
                     </div>
-                  </div>
-                </CardHeader>
-                <CardContent className="py-2 px-4 max-h-[300px] overflow-y-auto">
-                  <p className="text-sm whitespace-pre-wrap">{chunk.content}</p>
-                </CardContent>
-              </Card>
-            );
-          })}
-        </div>
+                  </TableCell>
+                  <TableCell>
+                    {chunk.content.length.toLocaleString()} characters
+                  </TableCell>
+                  <TableCell>
+                    {retrievalCount} Retrieval count
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <Badge 
+                      className="ml-auto bg-green-100 text-green-800 hover:bg-green-100"
+                    >
+                      Enabled
+                    </Badge>
+                  </TableCell>
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
       </div>
     </div>
   );
