@@ -35,17 +35,30 @@ export function RetrievalTest({ documentId }: RetrievalTestProps) {
       const queryEmbedding = await generateEmbedding(query);
       
       // Search for similar chunks using vector similarity
-      const { data, error } = await supabase.rpc('match_document_chunks', {
-        query_embedding: queryEmbedding,
-        match_threshold: 0.5,
-        match_count: 5,
-        p_document_id: documentId
-      });
+      // Use the raw fetch method instead of rpc to bypass the function name validation
+      const response = await fetch(
+        `${supabase.realtimeUrl.replace('realtime-', '')}/rest/v1/rpc/match_document_chunks`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': supabase.supabaseKey,
+            'Authorization': `Bearer ${supabase.supabaseKey}`
+          },
+          body: JSON.stringify({
+            query_embedding: queryEmbedding,
+            match_threshold: 0.5, 
+            match_count: 5,
+            p_document_id: documentId
+          })
+        }
+      );
       
-      if (error) {
-        throw error;
+      if (!response.ok) {
+        throw new Error(`Error from Supabase: ${response.statusText}`);
       }
       
+      const data = await response.json();
       setResults(data as ChunkResult[]);
     } catch (err) {
       console.error("Error during retrieval test:", err);
