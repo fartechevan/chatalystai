@@ -38,7 +38,7 @@ const menuItems: MenuItem[] = [
   { title: "Chat", icon: MessageSquare, path: "/dashboard/conversations" },
   { title: "Calendar", icon: Calendar, path: "/dashboard/calendar" },
   { title: "Lists", icon: List, path: "/dashboard/lists" },
-  { title: "Knowledge", icon: BookOpen, path: "/dashboard/knowledge" },
+  { title: "Knowledge", icon: BookOpen, path: "/dashboard/knowledge", badge: 1 },
   { title: "Stats", icon: BarChart2, path: "/dashboard/stats" },
   { title: "Settings", icon: Settings, path: "/dashboard/settings" },
   { title: "Help", icon: HelpCircle, path: "/dashboard/help" },

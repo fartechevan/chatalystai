@@ -26,6 +26,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
+import { RetrievalTest } from "./RetrievalTest";
 
 interface Document {
   id: string;
@@ -179,7 +180,11 @@ export function KnowledgeBaseLayout() {
             <div className="w-3/4">
               <h2 className="text-xl font-semibold mb-4">Document Chunks</h2>
               <Button className="mb-4" onClick={handleAddChunk}>Add Chunk</Button>
-              <ChunksList documentId={selectedDocumentId} />
+              <ChunksList documentId={selectedDocumentId as string} />
+              
+              {selectedDocumentId && (
+                <RetrievalTest documentId={selectedDocumentId} />
+              )}
             </div>
           </>
         ) : (
