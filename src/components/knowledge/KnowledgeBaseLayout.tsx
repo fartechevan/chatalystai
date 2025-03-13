@@ -1,30 +1,17 @@
+
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { DocumentList } from "./DocumentList";
 import { ImportDocumentForm } from "./ImportDocumentForm";
-import { ChunksList } from "./ChunksList";
 import { CreateDocumentDialog } from "./CreateDocumentDialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { Button } from "@/components/ui/button";
-import { PlusCircle, Upload, FilePlus, Braces, Database } from "lucide-react";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
-import { ChunkForm } from "./ChunkForm";
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
-import { useQueryClient, useQuery } from "@tanstack/react-query";
+import { ChunkForm } from "./ChunkForm";
+import { DocumentSelection } from "./DocumentSelection";
+import { DocumentDetails } from "./DocumentDetails";
 
 interface Document {
   id: string;
@@ -44,7 +31,6 @@ export function KnowledgeBaseLayout() {
   const [isChunkFormOpen, setIsChunkFormOpen] = useState(false);
   const navigate = useNavigate();
   const { toast } = useToast();
-  const queryClient = useQueryClient();
 
   const handleImportSuccess = () => {
     setShowImportForm(false);
@@ -64,16 +50,12 @@ export function KnowledgeBaseLayout() {
     navigate(`/dashboard/knowledge/document/${documentId}/edit`);
   };
 
-  const handleShowImportForm = () => {
-    setShowImportForm(true);
-    console.log("Import form visibility set to:", true);
-  };
-
   const handleSelectDocument = async (documentId: string | null) => {
     setSelectedDocumentId(documentId);
     setIsDocumentSelected(!!documentId);
 
     if (documentId) {
+      // Fetch the selected document
       const { data, error } = await supabase
         .from('knowledge_documents')
         .select('*')
@@ -95,72 +77,12 @@ export function KnowledgeBaseLayout() {
     }
   };
 
-  const handleAddChunk = () => {
-    setIsChunkFormOpen(true);
-  };
-
   const handleChunkFormClose = () => {
     setIsChunkFormOpen(false);
-    queryClient.invalidateQueries({ queryKey: ['knowledge-chunks', selectedDocumentId] });
   };
-
-  const handleNavigateToRetrievalTest = () => {
-    navigate('/dashboard/knowledge/retrieval-test');
-  };
-
-  const { refetch } = useQuery({
-    queryKey: ['knowledge-chunks', selectedDocumentId],
-    queryFn: async () => {
-      if (!selectedDocumentId) return [];
-      const { data, error } = await supabase
-        .from('knowledge_chunks')
-        .select('*')
-        .eq('document_id', selectedDocumentId);
-      if (error) {
-        console.error(error);
-        return [];
-      }
-      return data;
-    },
-    enabled: !!selectedDocumentId,
-  });
 
   return (
     <div className="container mx-auto p-4">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold">Knowledge Base</h1>
-
-        <div className="flex space-x-2">
-          <Button 
-            variant="outline" 
-            onClick={handleNavigateToRetrievalTest}
-            className="flex items-center gap-2"
-          >
-            <Database className="h-4 w-4" />
-            Retrieval Test
-          </Button>
-          
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button className="flex items-center gap-2">
-                <PlusCircle className="h-4 w-4" />
-                Add Document
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={handleShowImportForm} className="cursor-pointer">
-                <Upload className="h-4 w-4 mr-2" />
-                Import Document
-              </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => setShowCreateDialog(true)} className="cursor-pointer">
-                <FilePlus className="h-4 w-4 mr-2" />
-                Create New Document
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-      </div>
-
       {showImportForm && (
         <div className="mb-8">
           <ImportDocumentForm
@@ -180,38 +102,33 @@ export function KnowledgeBaseLayout() {
         {isDocumentSelected ? (
           <>
             <div className="w-1/4 pr-4">
-              <h2 className="text-xl font-semibold mb-4">Documents</h2>
-              <DocumentList
-                onSelectDocument={handleSelectDocument}
+              <DocumentSelection 
                 selectedDocumentId={selectedDocumentId}
+                onSelectDocument={handleSelectDocument}
+                setShowImportForm={setShowImportForm}
+                setShowCreateDialog={setShowCreateDialog}
               />
             </div>
 
-            <div className="w-3/4">
-              <h2 className="text-xl font-semibold mb-4">Document Chunks</h2>
-              <Button className="mb-4" onClick={handleAddChunk}>Add Chunk</Button>
-              <ChunksList documentId={selectedDocumentId} />
-            </div>
+            <DocumentDetails 
+              documentId={selectedDocumentId as string}
+              setIsChunkFormOpen={setIsChunkFormOpen}
+            />
           </>
         ) : (
-          <div className="w-full">
-            <h2 className="text-xl font-semibold mb-4">Documents</h2>
-            <DocumentList
-              onSelectDocument={handleSelectDocument}
-              selectedDocumentId={selectedDocumentId}
-            />
-          </div>
+          <DocumentSelection 
+            selectedDocumentId={selectedDocumentId}
+            onSelectDocument={handleSelectDocument}
+            setShowImportForm={setShowImportForm}
+            setShowCreateDialog={setShowCreateDialog}
+          />
         )}
       </div>
 
       <Dialog open={isChunkFormOpen} onOpenChange={setIsChunkFormOpen}>
         <ChunkForm
           documentId={selectedDocumentId || ""}
-          onClose={() => {
-            handleChunkFormClose();
-            setIsChunkFormOpen(false);
-          }}
-          refetch={refetch}
+          onClose={handleChunkFormClose}
         />
       </Dialog>
     </div>
