@@ -867,19 +867,6 @@ export type Database = {
             }
             Returns: unknown
           }
-      match_knowledge_chunks: {
-        Args: {
-          query_embedding: string
-          match_threshold: number
-          match_count: number
-          document_id: string
-        }
-        Returns: {
-          id: string
-          content: string
-          similarity: number
-        }[]
-      }
       sparsevec_out: {
         Args: {
           "": unknown

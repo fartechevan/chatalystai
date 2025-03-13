@@ -1,130 +1,81 @@
-import React, { useState } from "react";
-import { useForm } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import * as z from "zod";
+import { useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { Button } from "@/components/ui/button";
 import {
+  Dialog,
   DialogContent,
   DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
+  DialogTrigger,
 } from "@/components/ui/dialog";
-import {
-  Form,
-  FormControl,
-  FormField,
-  FormItem,
-  FormLabel,
-  FormMessage,
-} from "@/components/ui/form";
-import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Button } from "@/components/ui/button";
 
-const formSchema = z.object({
-  content: z.string().min(1, "Chunk content is required"),
-});
-
-export function ChunkForm({
-  documentId,
-  onClose,
-  refetch
-}: {
+interface ChunkFormProps {
   documentId: string;
   onClose: () => void;
-  refetch?: () => void;
-}) {
+  refetch: () => void;
+}
+
+export function ChunkForm({ documentId, onClose, refetch }: ChunkFormProps) {
+  const [content, setContent] = useState("");
+  const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
-  const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const form = useForm<z.infer<typeof formSchema>>({
-    resolver: zodResolver(formSchema),
-    defaultValues: {
-      content: "",
-    },
-  });
-
-  const onSubmit = async (values: z.infer<typeof formSchema>) => {
+  const handleSubmit = async () => {
+    setIsLoading(true);
     try {
-      setIsSubmitting(true);
-
-      const { data, error } = await supabase
-        .from("knowledge_chunks")
-        .insert({
-          document_id: documentId,
-          content: values.content,
-        })
-        .single();
+      const { error } = await supabase
+        .from('knowledge_chunks')
+        .insert([{ document_id: documentId, content }]);
 
       if (error) {
         throw error;
       }
 
       toast({
-        title: "Chunk created",
-        description: "Your chunk has been successfully created.",
+        title: "Chunk added",
+        description: "The chunk has been successfully added.",
       });
-
-      form.reset();
+      await refetch();
       onClose();
-      refetch && refetch();
     } catch (error) {
       toast({
         variant: "destructive",
-        title: "Error creating chunk",
+        title: "Error adding chunk",
         description: error instanceof Error ? error.message : "An unknown error occurred",
       });
     } finally {
-      setIsSubmitting(false);
+      setIsLoading(false);
     }
   };
 
   return (
-    <DialogContent className="max-w-md">
+    <DialogContent className="sm:max-w-[425px]">
       <DialogHeader>
         <DialogTitle>Add New Chunk</DialogTitle>
         <DialogDescription>
           Add a new chunk to the document.
         </DialogDescription>
       </DialogHeader>
-
-      <Form {...form}>
-        <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-          <FormField
-            control={form.control}
-            name="content"
-            render={({ field }) => (
-              <FormItem>
-                <FormLabel>Chunk Content</FormLabel>
-                <FormControl>
-                  <Textarea
-                    placeholder="Enter chunk content"
-                    className="min-h-[150px]"
-                    {...field}
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
+      <div className="grid gap-4 py-4">
+        <div className="grid grid-cols-4 items-center gap-4">
+          <Label htmlFor="content" className="text-right">
+            Content
+          </Label>
+          <Textarea
+            id="content"
+            className="col-span-3"
+            value={content}
+            onChange={(e) => setContent(e.target.value)}
           />
-
-          <DialogFooter>
-            <Button
-              type="button"
-              variant="outline"
-              onClick={onClose}
-              disabled={isSubmitting}
-            >
-              Cancel
-            </Button>
-            <Button type="submit" disabled={isSubmitting}>
-              Create Chunk
-            </Button>
-          </DialogFooter>
-        </form>
-      </Form>
+        </div>
+      </div>
+      <Button onClick={handleSubmit} disabled={isLoading}>
+        {isLoading ? "Saving..." : "Save"}
+      </Button>
     </DialogContent>
   );
 }
