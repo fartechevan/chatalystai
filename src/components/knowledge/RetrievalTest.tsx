@@ -17,6 +17,7 @@ interface ChunkResult {
   content: string;
   similarity: number;
   document_title: string;
+  document_id: string;
 }
 
 export function RetrievalTest() {
@@ -61,7 +62,11 @@ export function RetrievalTest() {
         throw error;
       }
       
-      setResults(data || []);
+      if (data) {
+        setResults(data as ChunkResult[]);
+      } else {
+        setResults([]);
+      }
     } catch (error) {
       console.error('Error searching chunks:', error);
       toast({
