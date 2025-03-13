@@ -27,7 +27,7 @@ import { cn } from "@/lib/utils";
 // Update the type definition to include an optional badge property
 type MenuItem = {
   title: string;
-  icon: React.ComponentType<any>;
+  icon: React.ComponentType<unknown>;
   path: string;
   badge?: number;
 };
@@ -39,7 +39,6 @@ const menuItems: MenuItem[] = [
   { title: "Calendar", icon: Calendar, path: "/dashboard/calendar" },
   { title: "Lists", icon: List, path: "/dashboard/lists" },
   { title: "Knowledge", icon: BookOpen, path: "/dashboard/knowledge" },
-  { title: "Mail", icon: Mail, path: "/dashboard/mail" },
   { title: "Stats", icon: BarChart2, path: "/dashboard/stats" },
   { title: "Settings", icon: Settings, path: "/dashboard/settings" },
   { title: "Help", icon: HelpCircle, path: "/dashboard/help" },
