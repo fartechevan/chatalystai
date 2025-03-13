@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { DocumentList } from "./DocumentList";
@@ -8,7 +7,7 @@ import { CreateDocumentDialog } from "./CreateDocumentDialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
-import { PlusCircle, Upload, FilePlus } from "lucide-react";
+import { PlusCircle, Upload, FilePlus, Braces, Database } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -65,7 +64,6 @@ export function KnowledgeBaseLayout() {
     navigate(`/dashboard/knowledge/document/${documentId}/edit`);
   };
 
-  // Ensure this handler explicitly sets showImportForm to true
   const handleShowImportForm = () => {
     setShowImportForm(true);
     console.log("Import form visibility set to:", true);
@@ -73,10 +71,9 @@ export function KnowledgeBaseLayout() {
 
   const handleSelectDocument = async (documentId: string | null) => {
     setSelectedDocumentId(documentId);
-    setIsDocumentSelected(!!documentId); // Update the state
+    setIsDocumentSelected(!!documentId);
 
     if (documentId) {
-      // Fetch the selected document
       const { data, error } = await supabase
         .from('knowledge_documents')
         .select('*')
@@ -104,8 +101,11 @@ export function KnowledgeBaseLayout() {
 
   const handleChunkFormClose = () => {
     setIsChunkFormOpen(false);
-    // Invalidate the query to refresh the chunks list
     queryClient.invalidateQueries({ queryKey: ['knowledge-chunks', selectedDocumentId] });
+  };
+
+  const handleNavigateToRetrievalTest = () => {
+    navigate('/dashboard/knowledge/retrieval-test');
   };
 
   const { refetch } = useQuery({
@@ -130,24 +130,35 @@ export function KnowledgeBaseLayout() {
       <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-bold">Knowledge Base</h1>
 
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button className="flex items-center gap-2">
-              <PlusCircle className="h-4 w-4" />
-              Add Document
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={handleShowImportForm} className="cursor-pointer">
-              <Upload className="h-4 w-4 mr-2" />
-              Import Document
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => setShowCreateDialog(true)} className="cursor-pointer">
-              <FilePlus className="h-4 w-4 mr-2" />
-              Create New Document
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        <div className="flex space-x-2">
+          <Button 
+            variant="outline" 
+            onClick={handleNavigateToRetrievalTest}
+            className="flex items-center gap-2"
+          >
+            <Database className="h-4 w-4" />
+            Retrieval Test
+          </Button>
+          
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button className="flex items-center gap-2">
+                <PlusCircle className="h-4 w-4" />
+                Add Document
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={handleShowImportForm} className="cursor-pointer">
+                <Upload className="h-4 w-4 mr-2" />
+                Import Document
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setShowCreateDialog(true)} className="cursor-pointer">
+                <FilePlus className="h-4 w-4 mr-2" />
+                Create New Document
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </div>
 
       {showImportForm && (
