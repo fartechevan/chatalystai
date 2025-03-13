@@ -9,7 +9,7 @@ import { IntegrationDialog } from "./integration-dialog/IntegrationDialog";
 import { IntegrationCard } from "./integration-card/IntegrationCard";
 import type { Integration } from "./types";
 
-const tabs = ["All", "Inbox", "Automations", "Lead sources", "Connected"];
+const tabs = ["All", "Connected"];
 
 export function IntegrationsView() {
   const [activeTab, setActiveTab] = useState("All");
