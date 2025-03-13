@@ -67,40 +67,35 @@ export function DashboardSidebar() {
           </SidebarHeader>
           <div className="px-2 py-2">
             {menuItems.map((item) => (
-              <SidebarMenuButton
+              <Link 
                 key={item.title}
-                asChild
-                isActive={location.pathname === item.path}
-                tooltip={item.title}
+                to={item.path}
                 className={cn(
-                  "relative w-full",
-                  location.pathname === item.path ? "bg-white/10 text-white" : "text-gray-400 hover:text-white hover:bg-white/5"
+                  "relative w-full flex items-center gap-3 px-3 py-1.5 rounded-lg text-sm",
+                  location.pathname === item.path 
+                    ? "bg-white/10 text-white" 
+                    : "text-gray-400 hover:text-white hover:bg-white/5"
                 )}
               >
-                <Link to={item.path} className="flex items-center gap-3">
-                  <item.icon className="h-5 w-5" />
-                  <span className="text-sm">{item.title}</span>
-                  {item.badge ? (
-                    <span className="absolute right-2 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] text-white">
-                      {item.badge}
-                    </span>
-                  ) : null}
-                </Link>
-              </SidebarMenuButton>
+                <item.icon className="h-5 w-5" />
+                <span>{item.title}</span>
+                {item.badge ? (
+                  <span className="absolute right-2 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] text-white">
+                    {item.badge}
+                  </span>
+                ) : null}
+              </Link>
             ))}
           </div>
 
           <div className="mt-auto px-2 pb-4">
-            <SidebarMenuButton
-              asChild
-              tooltip="Profile"
-              className="w-full text-gray-400 hover:text-white hover:bg-white/5"
+            <Link 
+              to="/dashboard/profile"
+              className="flex items-center gap-3 px-3 py-1.5 rounded-lg text-sm text-gray-400 hover:text-white hover:bg-white/5"
             >
-              <Link to="/dashboard/profile" className="flex items-center gap-3">
-                <UserRound className="h-5 w-5" />
-                <span className="text-sm">Profile</span>
-              </Link>
-            </SidebarMenuButton>
+              <UserRound className="h-5 w-5" />
+              <span>Profile</span>
+            </Link>
           </div>
         </SidebarContent>
       </Sidebar>
