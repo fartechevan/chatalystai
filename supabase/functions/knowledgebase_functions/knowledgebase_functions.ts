@@ -10,6 +10,13 @@ const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY');
 
 const supabase: SupabaseClient = createClient(SUPABASE_URL!, SUPABASE_ANON_KEY!);
 
+// Define the type for the returned chunks
+interface KnowledgeChunk {
+  id: string;
+  content: string;
+  similarity: number;
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return cors(req, new Response('ok'));
@@ -54,7 +61,7 @@ serve(async (req) => {
     // Generate embedding for the question
     const questionEmbedding = await generateEmbedding(question);
 
-    // Search the knowledge base for chunks with similar embeddings
+    // Call the match_knowledge_chunks function
     const { data: chunks, error } = await supabase.rpc('match_knowledge_chunks', {
       query_embedding: questionEmbedding,
       similarity_threshold: 0.7,
@@ -72,12 +79,17 @@ serve(async (req) => {
       );
     }
 
-    const answer = `This is a placeholder answer for the question: ${question}`;
-    const references = chunks.map((chunk) => chunk.id);
+    // Map the chunks to the KnowledgeChunk interface
+    const knowledgeChunks: KnowledgeChunk[] = (chunks as any[]).map((chunk: any) => ({
+      id: chunk.id,
+      content: chunk.content,
+      similarity: chunk.similarity,
+    }));
 
     const response = {
-      answer: answer,
-      references: references,
+      answer: `This is a placeholder answer for the question: ${question}`,
+      references: knowledgeChunks.map((chunk) => chunk.id),
+      chunks: knowledgeChunks, // Include the chunks in the response
     };
 
     return cors(
