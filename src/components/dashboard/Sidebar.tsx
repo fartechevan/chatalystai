@@ -11,7 +11,8 @@ import {
   BarChart2,
   HelpCircle,
   UserRound,
-  BookOpen
+  BookOpen,
+  LogOut
 } from "lucide-react";
 import {
   Sidebar,
@@ -20,9 +21,12 @@ import {
   SidebarMenuButton,
   useSidebar,
 } from "@/components/ui/sidebar";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "@/hooks/use-toast";
+import { useAuth } from "@/components/auth/AuthProvider";
 
 // Update the type definition to include an optional badge property
 type MenuItem = {
@@ -46,7 +50,29 @@ const menuItems: MenuItem[] = [
 
 export function DashboardSidebar() {
   const location = useLocation();
+  const navigate = useNavigate();
   const { toggleSidebar } = useSidebar();
+  const { user } = useAuth();
+
+  const handleLogout = async () => {
+    try {
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
+      
+      toast({
+        title: "Success",
+        description: "You have been logged out successfully",
+      });
+      
+      navigate("/login");
+    } catch (error: any) {
+      toast({
+        title: "Error",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
 
   return (
     <>
@@ -62,7 +88,9 @@ export function DashboardSidebar() {
         <SidebarContent>
           <SidebarHeader>
             <div className="flex items-center justify-start px-4 py-2">
-              <span className="text-sm font-medium text-white">John Doe</span>
+              <span className="text-sm font-medium text-white">
+                {user?.email || "User"}
+              </span>
             </div>
           </SidebarHeader>
           <div className="px-2 py-2">
@@ -100,6 +128,17 @@ export function DashboardSidebar() {
                 <UserRound className="h-5 w-5" />
                 <span className="text-sm">Profile</span>
               </Link>
+            </SidebarMenuButton>
+            
+            <SidebarMenuButton
+              onClick={handleLogout}
+              tooltip="Logout"
+              className="w-full text-gray-400 hover:text-white hover:bg-white/5 mt-2"
+            >
+              <div className="flex items-center gap-3">
+                <LogOut className="h-5 w-5" />
+                <span className="text-sm">Logout</span>
+              </div>
             </SidebarMenuButton>
           </div>
         </SidebarContent>
