@@ -36,11 +36,16 @@ serve(async (req) => {
       content: msg.content
     }))
 
+    const apiKey = Deno.env.get('OPENAI_API_KEY');
+    if (!apiKey) {
+      throw new Error('OPENAI_API_KEY environment variable is not set.');
+    }
+
     // Analyze sentiment with OpenAI
     const openAIResponse = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${Deno.env.get('OPENAI_API_KEY')}`,
+        'Authorization': `Bearer ${apiKey}`,
         'Content-Type': 'application/json'
       },
       body: JSON.stringify({
@@ -54,6 +59,12 @@ serve(async (req) => {
         ]
       })
     })
+
+    if (!openAIResponse.ok) {
+      const errorData = await openAIResponse.json();
+      console.error('OpenAI API error:', errorData);
+      throw new Error(`OpenAI API error: ${errorData.error?.message || 'Unknown error'}`);
+    }
 
     const openAIData = await openAIResponse.json()
     const analysis = JSON.parse(openAIData.choices[0].message.content)

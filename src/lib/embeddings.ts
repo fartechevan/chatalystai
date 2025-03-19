@@ -1,13 +1,17 @@
+
 import OpenAI from 'openai';
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY,
-});
-
 export async function generateEmbedding(content: string): Promise<number[]> {
-  if (!process.env.OPENAI_API_KEY) {
-    throw new Error('OPENAI_API_KEY environment variable is not set.');
+  const apiKey = process.env.OPENAI_API_KEY;
+  
+  if (!apiKey) {
+    console.error('OPENAI_API_KEY environment variable is not set.');
+    throw new Error('OpenAI API key is missing. Please make sure it is properly set in the environment variables.');
   }
+
+  const openai = new OpenAI({
+    apiKey: apiKey,
+  });
 
   try {
     const response = await openai.embeddings.create({
