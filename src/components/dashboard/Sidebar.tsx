@@ -134,8 +134,8 @@ export function DashboardSidebar() {
             
             <SidebarMenuButton
               tooltip="Logout"
-              className="w-full text-gray-400 hover:text-white hover:bg-white/5 mt-2"
               onClick={handleLogout}
+              className="w-full text-gray-400 hover:text-white hover:bg-white/5 mt-2"
             >
               <div className="flex items-center gap-3">
                 <LogOut className="h-5 w-5" />
