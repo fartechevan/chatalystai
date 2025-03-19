@@ -28,7 +28,7 @@ Deno.serve(async (req) => {
 
     const apiKey = Deno.env.get('OPENAI_API_KEY')
     if (!apiKey) {
-      throw new Error('OPENAI_API_KEY is not set')
+      throw new Error('OPENAI_API_KEY is not set in environment variables')
     }
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
