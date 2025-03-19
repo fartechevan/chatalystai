@@ -24,3 +24,9 @@ verify_jwt = false
 
 [functions.integrations]
 verify_jwt = false
+
+[functions.knowledge-base]
+verify_jwt = false
+
+[functions.analyze-sentiment]
+verify_jwt = false
