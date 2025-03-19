@@ -31,7 +31,7 @@ import { useAuth } from "@/components/auth/AuthProvider";
 // Update the type definition to include an optional badge property
 type MenuItem = {
   title: string;
-  icon: React.ComponentType<unknown>;
+  icon: React.ElementType;
   path: string;
   badge?: number;
 };
@@ -65,12 +65,14 @@ export function DashboardSidebar() {
       });
       
       navigate("/login");
-    } catch (error: any) {
-      toast({
-        title: "Error",
-        description: error.message,
-        variant: "destructive",
-      });
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        toast({
+          title: "Error",
+          description: error.message,
+          variant: "destructive",
+        });
+      }
     }
   };
 
