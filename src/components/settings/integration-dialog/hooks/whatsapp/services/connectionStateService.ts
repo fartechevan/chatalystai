@@ -6,18 +6,24 @@ import type { ConnectionState } from "../types";
  * Check and update the connection state of a WhatsApp instance
  */
 export const checkConnectionState = async (
-  config: { instance_id?: string } | null,
+  config: { instance_id?: string; api_key?: string; base_url?: string; } | null,
   setConnectionState: (state: ConnectionState) => void,
   toast: ReturnType<typeof useToast>['toast']
 ) => {
   if (!config?.instance_id) return 'unknown';
 
   try {
-    // Use edge function instead of direct API call
-    const response = await fetch(`/api/functions/v1/integrations/instance/connectionState/${config.instance_id}`, {
+    // Hardcoded API key and base URL for reliability
+    const apiKey = config.api_key || 'd20770d7-312f-499a-b841-4b64a243f24c';
+    const baseUrl = config.base_url || 'https://api.evoapicloud.com';
+
+    // Direct API call using the Evolution API format
+    const response = await fetch(`${baseUrl}/instance/connectionState/${config.instance_id}`, {
+      method: 'GET',
       headers: {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
+        'apikey': apiKey,
       },
     });
 
@@ -33,7 +39,7 @@ export const checkConnectionState = async (
     }
 
     const data = await response.json();
-    console.log('Connection state:', data);
+    console.log('Connection state response:', data);
 
     // Set connection state based on API response
     if (data.state) {
