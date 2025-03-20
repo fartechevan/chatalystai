@@ -17,9 +17,11 @@ export const checkConnectionState = async (
   if (!config?.instance_id) return 'unknown';
 
   try {
-    const response = await fetch(`${config.base_url}/instance/connectionState/${config.instance_id}`, {
+    // Use edge function instead of direct API call
+    const response = await fetch(`/api/functions/v1/integrations/instance/connectionState/${config.instance_id}`, {
       headers: {
-        'apikey': config.api_key || '',
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
       },
     });
 
@@ -68,9 +70,11 @@ export const checkInstanceStatus = async (
   if (!config) return false;
 
   try {
-    const response = await fetch(`${config.base_url}/instance/fetchInstances`, {
+    // Use edge function instead of direct API call
+    const response = await fetch(`/api/functions/v1/integrations/instance/fetchInstances`, {
       headers: {
-        'apikey': config.api_key || '',
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
       },
     });
 

@@ -6,12 +6,33 @@ import { getIntegrationConfig } from "../services/integrationService.ts";
 // Handler for fetching WhatsApp instances
 export async function handleFetchInstances() {
   try {
-    const integration = await getIntegrationConfig();
-    const apiKey = integration.api_key;
+    console.log('Starting handleFetchInstances');
     
+    // Get integration config with hardcoded ID
+    const integration = await getIntegrationConfig('bda44db7-4e9a-4733-a9c7-c4f5d7198905');
+    console.log('Retrieved integration config');
+    
+    const apiKey = integration.api_key;
+    console.log(`Using API key length: ${apiKey?.length || 0}`);
+    
+    // Set up API request
     const options = getEvolutionAPIOptions(apiKey);
+    console.log('Fetching instances from Evolution API...');
+    console.log(`URL: ${EVO_API_BASE_URL}/instance/fetchInstances`);
+    
     const response = await fetch(`${EVO_API_BASE_URL}/instance/fetchInstances`, options);
+    console.log(`Response status: ${response.status}`);
+    
+    // Check if the response is valid JSON before parsing
+    const contentType = response.headers.get('content-type');
+    if (!contentType || !contentType.includes('application/json')) {
+      const text = await response.text();
+      console.error('Invalid response format:', text);
+      throw new Error('Invalid response format from API');
+    }
+    
     const data = await response.json();
+    console.log('Instances data retrieved successfully');
     
     return new Response(
       JSON.stringify(data),
