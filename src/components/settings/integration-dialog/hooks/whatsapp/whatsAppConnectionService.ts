@@ -27,6 +27,13 @@ export const checkConnectionState = async (
       throw new Error('Failed to check WhatsApp connection state');
     }
 
+    // Verify we have JSON before parsing
+    const contentType = response.headers.get('content-type');
+    if (!contentType || !contentType.includes('application/json')) {
+      console.error('Invalid content type received:', contentType);
+      throw new Error('Invalid response format from API');
+    }
+
     const data = await response.json();
     console.log('Connection state:', data);
 
@@ -69,6 +76,13 @@ export const checkInstanceStatus = async (
 
     if (!response.ok) {
       throw new Error('Failed to check WhatsApp connection status');
+    }
+
+    // Verify we have JSON before parsing
+    const contentType = response.headers.get('content-type');
+    if (!contentType || !contentType.includes('application/json')) {
+      console.error('Invalid content type received:', contentType);
+      throw new Error('Invalid response format from API');
     }
 
     const data = await response.json();
@@ -127,13 +141,37 @@ export const initializeConnection = async (
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
+        'Accept': 'application/json',
       },
     });
 
     if (!response.ok) {
-      const errorData = await response.text();
-      console.error('WhatsApp connection error response:', errorData);
-      throw new Error(`Failed to connect to WhatsApp: ${errorData}`);
+      // Try to get error message as text first
+      let errorMessage = '';
+      try {
+        // Check if response is JSON
+        const contentType = response.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+          const errorData = await response.json();
+          errorMessage = errorData.error || 'Unknown error';
+        } else {
+          // If not JSON, get as text
+          errorMessage = await response.text();
+        }
+      } catch (parseError) {
+        errorMessage = `Status: ${response.status} - Could not parse error response`;
+      }
+      
+      console.error('WhatsApp connection error response:', errorMessage);
+      throw new Error(`Failed to connect to WhatsApp: ${errorMessage}`);
+    }
+
+    // Verify we have JSON before parsing
+    const contentType = response.headers.get('content-type');
+    if (!contentType || !contentType.includes('application/json')) {
+      const htmlResponse = await response.text();
+      console.error('Invalid content type received:', contentType, 'Response:', htmlResponse);
+      throw new Error('Received HTML instead of JSON from API');
     }
 
     const data = await response.json();
