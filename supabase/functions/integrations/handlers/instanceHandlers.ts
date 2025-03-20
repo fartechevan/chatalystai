@@ -76,10 +76,21 @@ export async function handleConnect(instanceId: string) {
     const integration = await getIntegrationConfig();
     const apiKey = integration.api_key;
     
-    const options = getEvolutionAPIOptions(apiKey);
+    // We need to use POST method for connecting according to Evolution API docs
+    const options = getEvolutionAPIOptions(apiKey, 'POST');
     const apiUrl = `${EVO_API_BASE_URL}/instance/connect/${instanceId}`;
+    
+    console.log(`Connecting to WhatsApp instance ${instanceId} at ${apiUrl}`);
+    
     const response = await fetch(apiUrl, options);
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`Error response from Evolution API: ${errorText}`);
+      throw new Error(`API responded with status ${response.status}: ${errorText}`);
+    }
+    
     const data = await response.json();
+    console.log('WhatsApp connection response:', data);
     
     return new Response(
       JSON.stringify(data),

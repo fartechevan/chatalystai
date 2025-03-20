@@ -6,13 +6,20 @@ export const EVO_API_BASE_URL = 'https://api.evoapicloud.com';
 
 // Get Evolution API key and build request options
 export function getEvolutionAPIOptions(apiKey: string, method = 'GET'): RequestInit {
-  return {
+  const options: RequestInit = {
     method,
     headers: {
       apikey: apiKey,
       'Content-Type': 'application/json'
     }
   };
+  
+  // For POST requests, add an empty body if none provided
+  if (method === 'POST') {
+    options.body = JSON.stringify({});
+  }
+  
+  return options;
 }
 
 // Format QR code base64 string to proper data URL
