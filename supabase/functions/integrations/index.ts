@@ -24,14 +24,15 @@ serve(async (req) => {
     if (req.method === 'POST' && path.includes('/message/sendText')) {
       console.log("Routing to handleSendWhatsAppMessage");
       return await handleSendWhatsAppMessage(req);
-    } else if (req.method === 'GET' && path.includes('/instance/fetchInstances')) {
+    } else if (path.includes('/instance/fetchInstances')) {
       console.log("fetchInstances called");
       return await handleFetchInstances();
-    } else if (req.method === 'GET' && path.includes('/instance/connectionState/')) {
+    } else if (path.includes('/instance/connectionState/')) {
       const instanceId = path.split('/').pop();
       return await handleConnectionState(instanceId || '');
-    } else if (req.method === 'GET' && path.includes('/instance/connect/')) {
+    } else if (path.includes('/instance/connect/')) {
       const instanceId = path.split('/').pop();
+      console.log(`connect called for instance: ${instanceId}`);
       return await handleConnect(instanceId || '');
     } else {
       // Handle unknown routes

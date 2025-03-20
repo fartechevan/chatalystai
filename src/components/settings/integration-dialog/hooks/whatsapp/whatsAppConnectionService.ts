@@ -78,31 +78,21 @@ export const checkInstanceStatus = async (
     // Per Evolution API docs, check if the instance exists and check its connection state
     // Look for the instance with the matching instanceId
     if (Array.isArray(data)) {
-      const project = data.find(item => {
-        console.log('Item in find method:', item);
-        return item.project?.instances && item.connectionStatus === 'open';
-      });
-
-      if (project) {
-        project.project.instances.forEach(instance => {
-          if (instance.id === config.instance_id) {
-            const connectionStatus = instance.connectionStatus;
-            console.log('Found instance with state:', connectionStatus);
-            console.log('Connection status from project level:', connectionStatus);
-
-            if (connectionStatus === 'open') {
-              setConnectionState('open');
-              setQrCodeBase64(null);
-            } else {
-              setConnectionState('close');
-            }
-          } else {
-            setConnectionState('close');
-          }
-        });
-        return true;
+      const instance = data.find(item => item.id === config.instance_id);
+      
+      if (instance) {
+        console.log('Found instance with state:', instance.connectionStatus);
+        
+        if (instance.connectionStatus === 'open') {
+          setConnectionState('open');
+          setQrCodeBase64(null);
+          return true;
+        } else {
+          setConnectionState('close');
+          return false;
+        }
       } else {
-        console.log('Project not found in response');
+        console.log('Instance not found in response');
         setConnectionState('close');
         return false;
       }
@@ -122,19 +112,28 @@ export const initializeConnection = async (
   config: WhatsAppConfig | null,
   toast: ReturnType<typeof useToast>['toast']
 ) => {
-  if (!config) {
+  if (!config || !config.instance_id) {
+    toast({
+      title: "Configuration Error",
+      description: "Instance ID is missing in the configuration",
+      variant: "destructive",
+    });
     return { success: false };
   }
 
   try {
-    const response = await fetch(`${config.base_url}/instance/connect/${config.instance_id}`, {
+    // Use edge function instead of direct API call
+    const response = await fetch(`/api/functions/v1/integrations/instance/connect/${config.instance_id}`, {
+      method: 'GET',
       headers: {
-        'apikey': config.api_key || '',
+        'Content-Type': 'application/json',
       },
     });
 
     if (!response.ok) {
-      throw new Error('Failed to connect to WhatsApp');
+      const errorData = await response.text();
+      console.error('WhatsApp connection error response:', errorData);
+      throw new Error(`Failed to connect to WhatsApp: ${errorData}`);
     }
 
     const data = await response.json();
@@ -155,13 +154,18 @@ export const initializeConnection = async (
       console.error('QR code data not found in response:', data);
       toast({
         title: "QR Code Error",
-        description: "Failed to get QR code from WhatsApp",
+        description: "Failed to get QR code from WhatsApp. Check console for details.",
         variant: "destructive",
       });
       return { success: false };
     }
   } catch (error) {
     console.error('WhatsApp connection error:', error);
+    toast({
+      title: "Connection Error",
+      description: error.message || "Failed to connect to WhatsApp",
+      variant: "destructive",
+    });
     return { success: false };
   }
 };
