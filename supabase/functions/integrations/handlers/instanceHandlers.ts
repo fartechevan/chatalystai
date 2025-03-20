@@ -45,6 +45,15 @@ export async function handleConnectionState(instanceId: string) {
     const options = getEvolutionAPIOptions(apiKey);
     const apiUrl = `${EVO_API_BASE_URL}/instance/connectionState/${instanceId}`;
     const response = await fetch(apiUrl, options);
+    
+    // Check if the response is valid JSON before parsing
+    const contentType = response.headers.get('content-type');
+    if (!contentType || !contentType.includes('application/json')) {
+      const text = await response.text();
+      console.error('Invalid response format:', text);
+      throw new Error('Invalid response format from API');
+    }
+    
     const data = await response.json();
     
     return new Response(
@@ -83,10 +92,13 @@ export async function handleConnect(instanceId: string) {
     console.log(`Connecting to WhatsApp instance ${instanceId} at ${apiUrl}`);
     
     const response = await fetch(apiUrl, options);
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error(`Error response from Evolution API: ${errorText}`);
-      throw new Error(`API responded with status ${response.status}: ${errorText}`);
+    
+    // Check if the response is valid JSON before parsing
+    const contentType = response.headers.get('content-type');
+    if (!contentType || !contentType.includes('application/json')) {
+      const text = await response.text();
+      console.error('Invalid response format:', text);
+      throw new Error('Invalid response format from API');
     }
     
     const data = await response.json();
