@@ -1,16 +1,20 @@
 
 import { useEffect, useState } from "react";
 
+// Define interface for the FB global object
+interface FacebookSDK {
+  init: (options: { appId: string; cookie: boolean; xfbml: boolean; version: string }) => void;
+  login: (callback: (response: { authResponse?: { accessToken: string } }) => void) => void;
+  api: (path: string, callback: (response: { name: string }) => void) => void;
+  getAuthResponse: () => { accessToken: string };
+}
+
+// Extend Window interface without redeclaring FB
 declare global {
   interface Window {
     fbAsyncInit: () => void;
+    FB: FacebookSDK;
   }
-  const FB: {
-    init: (options: { appId: string; cookie: boolean; xfbml: boolean; version: string }) => void;
-    login: (callback: (response: { authResponse?: { accessToken: string } }) => void) => void;
-    api: (path: string, callback: (response: { name: string }) => void) => void;
-    getAuthResponse: () => { accessToken: string };
-  };
 }
 
 export function useFacebookSDK() {
@@ -19,7 +23,7 @@ export function useFacebookSDK() {
   useEffect(() => {
     // Load the Facebook SDK
     window.fbAsyncInit = function() {
-      FB.init({
+      window.FB.init({
         appId      : 'your-app-id', // Replace with your Facebook app ID
         cookie     : true,
         xfbml      : true,
@@ -39,13 +43,13 @@ export function useFacebookSDK() {
 
   const handleConnectWithFacebook = () => {
     if (isFBInitialized) {
-      FB.login(function(response) {
+      window.FB.login(function(response) {
         if (response.authResponse) {
           console.log('Welcome! Fetching your information.... ');
-          FB.api('/me', function(response) {
+          window.FB.api('/me', function(response) {
             console.log('Good to see you, ' + response.name + '.');
             // Here you can handle the access token and link it to the WhatsApp system user
-            const accessToken = FB.getAuthResponse().accessToken;
+            const accessToken = window.FB.getAuthResponse().accessToken;
             console.log('Access Token:', accessToken);
             // Link the access token to the WhatsApp system user
           });
