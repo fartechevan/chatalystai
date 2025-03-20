@@ -10,7 +10,8 @@ export function getEvolutionAPIOptions(apiKey: string, method = 'GET'): RequestI
     method,
     headers: {
       apikey: apiKey,
-      'Content-Type': 'application/json'
+      'Content-Type': 'application/json',
+      'Accept': 'application/json'
     }
   };
   
