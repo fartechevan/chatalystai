@@ -124,7 +124,10 @@ export function DashboardSidebar() {
             <SidebarMenuButton
               asChild
               tooltip="Profile"
-              className="w-full text-gray-400 hover:text-white hover:bg-white/5"
+              className={cn(
+                "w-full",
+                location.pathname === "/dashboard/profile" ? "bg-white/10 text-white" : "text-gray-400 hover:text-white hover:bg-white/5"
+              )}
             >
               <Link to="/dashboard/profile" className="flex items-center gap-3">
                 <UserRound className="h-5 w-5" />
