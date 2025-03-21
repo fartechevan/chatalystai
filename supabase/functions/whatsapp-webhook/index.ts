@@ -23,13 +23,36 @@ serve(async (req) => {
       const rawBody = await req.clone().text();
       console.log(`[${requestId}] Raw request body:`, rawBody);
       
-      // Parse the JSON body
-      const body = JSON.parse(rawBody);
-      console.log(`[${requestId}] Parsed webhook payload:`, JSON.stringify(body, null, 2));
+      let body;
+      try {
+        // Parse the JSON body
+        body = JSON.parse(rawBody);
+        console.log(`[${requestId}] Parsed webhook payload:`, JSON.stringify(body, null, 2));
+      } catch (parseError) {
+        console.error(`[${requestId}] Error parsing webhook JSON:`, parseError);
+        return new Response(
+          JSON.stringify({ error: 'Invalid JSON payload' }),
+          { 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 400 
+          }
+        );
+      }
 
       // Extract relevant data from the webhook
       const { event, data, instance } = body;
       console.log(`[${requestId}] Received ${event} event from instance ${instance}`);
+
+      if (!event || !instance) {
+        console.error(`[${requestId}] Missing required fields in webhook payload`);
+        return new Response(
+          JSON.stringify({ error: 'Missing required fields: event or instance' }),
+          { 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            status: 400 
+          }
+        );
+      }
 
       // Create Supabase client
       const supabaseClient = createClient(
@@ -49,13 +72,18 @@ serve(async (req) => {
 
       if (webhookError) {
         console.error(`[${requestId}] Error storing webhook event:`, webhookError);
-        return createErrorResponse(webhookError);
+      } else {
+        console.log(`[${requestId}] Successfully stored webhook event`);
       }
       
       // If this is a message event, handle conversation linking
       let processingResult = false;
       if (event === 'messages.upsert' && data) {
+        console.log(`[${requestId}] Processing messages.upsert event`);
         processingResult = await handleMessageEvent(supabaseClient, data, instance);
+        console.log(`[${requestId}] Message event processing result: ${processingResult}`);
+      } else {
+        console.log(`[${requestId}] Skipping event handling for non-message event: ${event}`);
       }
 
       // Return success response
