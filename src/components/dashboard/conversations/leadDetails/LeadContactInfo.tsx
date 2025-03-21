@@ -17,6 +17,7 @@ export function LeadContactInfo({ customer, lead }: LeadContactInfoProps) {
   const { toast } = useToast();
   const [isEditing, setIsEditing] = useState(false);
   const [companyName, setCompanyName] = useState(lead?.company_name || customer?.company_name || "");
+  const [companyAddress, setCompanyAddress] = useState(lead?.company_address || customer?.company_address || "");
   
   // Get the most appropriate name to display
   const displayName = customer?.name || lead?.name || 'Contact';
@@ -40,16 +41,42 @@ export function LeadContactInfo({ customer, lead }: LeadContactInfoProps) {
     }
 
     try {
-      if (customer?.id) {
-        // Update customer record
-        const { error } = await supabase
-          .from('customers')
-          .update({
-            company_name: companyName
-          })
-          .eq('id', customer.id);
+      // Create an array to store all update operations
+      const updateOperations = [];
 
-        if (error) throw error;
+      if (customer?.id) {
+        // Add customer update operation
+        updateOperations.push(
+          supabase
+            .from('customers')
+            .update({
+              company_name: companyName,
+              company_address: companyAddress
+            })
+            .eq('id', customer.id)
+        );
+      }
+
+      if (lead?.id) {
+        // Add lead update operation
+        updateOperations.push(
+          supabase
+            .from('leads')
+            .update({
+              company_name: companyName,
+              company_address: companyAddress
+            })
+            .eq('id', lead.id)
+        );
+      }
+
+      // Execute all update operations concurrently
+      const results = await Promise.all(updateOperations);
+
+      // Check for errors in any of the operations
+      const errors = results.filter(result => result.error);
+      if (errors.length > 0) {
+        throw errors[0].error;
       }
 
       toast({
@@ -112,6 +139,16 @@ export function LeadContactInfo({ customer, lead }: LeadContactInfoProps) {
               />
             </div>
             
+            <div className="space-y-2">
+              <Label htmlFor="company-address">Company Address</Label>
+              <Input 
+                id="company-address"
+                value={companyAddress}
+                onChange={(e) => setCompanyAddress(e.target.value)}
+                placeholder="Enter company address"
+              />
+            </div>
+            
             <div className="flex gap-2">
               <Button 
                 variant="default" 
@@ -135,6 +172,13 @@ export function LeadContactInfo({ customer, lead }: LeadContactInfoProps) {
               <span className="text-sm text-muted-foreground">Company:</span>
               <p className="text-sm">{companyName || "Not specified"}</p>
             </div>
+            
+            {companyAddress && (
+              <div className="space-y-1">
+                <span className="text-sm text-muted-foreground">Address:</span>
+                <p className="text-sm">{companyAddress}</p>
+              </div>
+            )}
             
             <Button 
               variant="outline" 
