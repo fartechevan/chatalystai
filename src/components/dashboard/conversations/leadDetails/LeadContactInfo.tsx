@@ -45,7 +45,7 @@ export function LeadContactInfo({ customer, lead }: LeadContactInfoProps) {
       const updateOperations = [];
 
       if (customer?.id) {
-        // Add customer update operation
+        // Add customer update operation - these fields exist in the customers table
         updateOperations.push(
           supabase
             .from('customers')
@@ -57,18 +57,9 @@ export function LeadContactInfo({ customer, lead }: LeadContactInfoProps) {
         );
       }
 
-      if (lead?.id) {
-        // Add lead update operation
-        updateOperations.push(
-          supabase
-            .from('leads')
-            .update({
-              company_name: companyName,
-              company_address: companyAddress
-            })
-            .eq('id', lead.id)
-        );
-      }
+      // For leads table, we can't directly update virtual fields
+      // We're not updating the leads table with these fields since they come from the customer table
+      // If we need to save this information for leads without customers, we would need a database schema change
 
       // Execute all update operations concurrently
       const results = await Promise.all(updateOperations);
