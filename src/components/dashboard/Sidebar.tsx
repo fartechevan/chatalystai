@@ -1,4 +1,3 @@
-
 import { 
   Home, 
   Menu, 
@@ -28,7 +27,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { useAuth } from "@/components/auth/AuthProvider";
 
-// Update the type definition to include an optional badge property
 type MenuItem = {
   title: string;
   icon: React.ElementType;
@@ -88,13 +86,6 @@ export function DashboardSidebar() {
       </Button>
       <Sidebar collapsible="icon" className="bg-[#1C2434]">
         <SidebarContent>
-          <SidebarHeader>
-            <div className="flex items-center justify-start px-4 py-2">
-              <span className="text-sm font-medium text-white">
-                {user?.email || "User"}
-              </span>
-            </div>
-          </SidebarHeader>
           <div className="px-2 py-2">
             {menuItems.map((item) => (
               <SidebarMenuButton
