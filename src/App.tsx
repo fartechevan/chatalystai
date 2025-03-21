@@ -18,6 +18,7 @@ import Leads from "./pages/Leads";
 import ComingSoon from "@/pages/ComingSoon";
 import KnowledgeBase from "./pages/KnowledgeBase";
 import { ChunkView } from "./components/knowledge/ChunkView";
+import Profile from "./pages/Profile";
 
 const App = () => {
   const queryClient = new QueryClient({
@@ -59,6 +60,7 @@ const App = () => {
                     <Route path="help" element={<ComingSoon />} />
                     <Route path="mail" element={<ComingSoon />} />
                     <Route path="knowledge" element={<KnowledgeBase />} />
+                    <Route path="profile" element={<Profile />} />
                   </Route>
                 </Routes>
               </BrowserRouter>
