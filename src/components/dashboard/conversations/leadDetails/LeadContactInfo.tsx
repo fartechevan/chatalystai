@@ -1,5 +1,5 @@
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,8 +16,8 @@ interface LeadContactInfoProps {
 export function LeadContactInfo({ customer, lead }: LeadContactInfoProps) {
   const { toast } = useToast();
   const [isEditing, setIsEditing] = useState(false);
-  const [companyName, setCompanyName] = useState(lead?.company_name || customer?.company_name || "");
-  const [companyAddress, setCompanyAddress] = useState(lead?.company_address || customer?.company_address || "");
+  const [companyName, setCompanyName] = useState("");
+  const [companyAddress, setCompanyAddress] = useState("");
   
   // Get the most appropriate name to display
   const displayName = customer?.name || lead?.name || 'Contact';
@@ -29,6 +29,31 @@ export function LeadContactInfo({ customer, lead }: LeadContactInfoProps) {
     if (displayName) return displayName[0].toUpperCase();
     return 'C';
   };
+
+  // Load company data from customer when component mounts or when customer/lead changes
+  useEffect(() => {
+    if (customer) {
+      setCompanyName(customer.company_name || "");
+      setCompanyAddress(customer.company_address || "");
+    } else if (lead?.customer_id) {
+      // If there's a lead with a customer ID but no customer object yet,
+      // fetch the customer data to get company information
+      const fetchCustomerData = async () => {
+        const { data, error } = await supabase
+          .from('customers')
+          .select('company_name, company_address')
+          .eq('id', lead.customer_id)
+          .single();
+          
+        if (data && !error) {
+          setCompanyName(data.company_name || "");
+          setCompanyAddress(data.company_address || "");
+        }
+      };
+      
+      fetchCustomerData();
+    }
+  }, [customer, lead]);
 
   const handleSave = async () => {
     if (!customer?.id && !lead?.id) {
@@ -55,11 +80,19 @@ export function LeadContactInfo({ customer, lead }: LeadContactInfoProps) {
             })
             .eq('id', customer.id)
         );
+      } else if (lead?.customer_id) {
+        // If we have a lead with a customer ID but no customer object,
+        // update the customer record directly
+        updateOperations.push(
+          supabase
+            .from('customers')
+            .update({
+              company_name: companyName,
+              company_address: companyAddress
+            })
+            .eq('id', lead.customer_id)
+        );
       }
-
-      // For leads table, we can't directly update virtual fields
-      // We're not updating the leads table with these fields since they come from the customer table
-      // If we need to save this information for leads without customers, we would need a database schema change
 
       // Execute all update operations concurrently
       const results = await Promise.all(updateOperations);
