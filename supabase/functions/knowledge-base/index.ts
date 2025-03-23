@@ -1,14 +1,13 @@
 
 import { serve } from 'https://deno.land/std@0.190.0/http/server.ts';
 import { cors } from '../_shared/cors.ts';
-import { createClient } from '@supabase/supabase-js';
-import { SupabaseClient } from '@supabase/supabase-js';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { v4 as uuidv4 } from 'https://esm.sh/uuid@9.0.0';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
 const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY');
 
-const supabase: SupabaseClient = createClient(SUPABASE_URL!, SUPABASE_ANON_KEY!);
+const supabase = createClient(SUPABASE_URL!, SUPABASE_ANON_KEY!);
 
 // Define generateEmbedding function directly in this file
 async function generateEmbedding(content: string): Promise<number[]> {

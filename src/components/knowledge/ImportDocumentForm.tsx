@@ -1,4 +1,3 @@
-
 import { useState, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -174,7 +173,6 @@ export function ImportDocumentForm({ onCancel, onSuccess }: ImportDocumentFormPr
         setShowChunks(true);
         
         toast({
-          variant: "warning",
           title: "Using fallback chunking",
           description: "Smart chunking failed. Using paragraph-based chunking instead.",
         });
@@ -192,7 +190,6 @@ export function ImportDocumentForm({ onCancel, onSuccess }: ImportDocumentFormPr
       setShowChunks(true);
       
       toast({
-        variant: "warning",
         title: "Using fallback chunking",
         description: "Smart chunking failed. Using paragraph-based chunking instead.",
       });
@@ -235,7 +232,6 @@ export function ImportDocumentForm({ onCancel, onSuccess }: ImportDocumentFormPr
           documentChunks = generateChunks(values.content || "", options);
           
           toast({
-            variant: "warning",
             title: "Using fallback chunking",
             description: "Smart chunking failed. Using paragraph-based chunking instead.",
           });
