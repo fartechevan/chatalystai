@@ -19,8 +19,6 @@ import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2, Upload, FileText, ChevronRight } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
   ChunkingMethod, 
@@ -33,9 +31,6 @@ const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 const formSchema = z.object({
   title: z.string().min(1, "Title is required"),
   content: z.string().optional(),
-  chunkingMethod: z.enum(["lineBreak", "paragraph", "header"], {
-    required_error: "Please select a chunking method",
-  }),
 });
 
 type FormValues = z.infer<typeof formSchema>;
@@ -55,6 +50,7 @@ export function ImportDocumentForm({ onCancel, onSuccess }: ImportDocumentFormPr
   const [pdfText, setPdfText] = useState<string>("");
   const [isProcessingPdf, setIsProcessingPdf] = useState(false);
   const [pdfPreviewUrl, setPdfPreviewUrl] = useState<string | null>(null);
+  const [isProcessingChunks, setIsProcessingChunks] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   const form = useForm<FormValues>({
@@ -62,11 +58,8 @@ export function ImportDocumentForm({ onCancel, onSuccess }: ImportDocumentFormPr
     defaultValues: {
       title: "",
       content: "",
-      chunkingMethod: "lineBreak",
     },
   });
-
-  const chunkingMethod = form.watch("chunkingMethod");
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -143,25 +136,68 @@ export function ImportDocumentForm({ onCancel, onSuccess }: ImportDocumentFormPr
     }
   };
 
-  const handlePreviewChunks = () => {
+  const handlePreviewChunks = async () => {
     const content = form.getValues("content");
-    const method = form.getValues("chunkingMethod");
     
-    if (content) {
-      const options: ChunkingOptions = {
-        method: method as ChunkingMethod,
-        headerLevels: [1, 2, 3], // For header chunking method
-      };
-      
-      const generatedChunks = generateChunks(content, options);
-      setChunks(generatedChunks);
-      setShowChunks(true);
-    } else {
+    if (!content) {
       toast({
         variant: "destructive",
         title: "No content",
         description: "Please add content or upload a PDF to preview chunks.",
       });
+      return;
+    }
+    
+    setIsProcessingChunks(true);
+    
+    try {
+      // Call the smart-chunking edge function
+      const { data, error } = await supabase.functions.invoke('smart-chunking', {
+        body: { content, maxChunks: 15 }
+      });
+      
+      if (error) {
+        throw error;
+      }
+      
+      if (data.chunks && Array.isArray(data.chunks)) {
+        setChunks(data.chunks);
+        setShowChunks(true);
+      } else {
+        // Fallback to paragraph chunking if OpenAI fails
+        const options: ChunkingOptions = {
+          method: 'paragraph' as ChunkingMethod,
+        };
+        
+        const generatedChunks = generateChunks(content, options);
+        setChunks(generatedChunks);
+        setShowChunks(true);
+        
+        toast({
+          variant: "warning",
+          title: "Using fallback chunking",
+          description: "Smart chunking failed. Using paragraph-based chunking instead.",
+        });
+      }
+    } catch (error) {
+      console.error("Error previewing chunks:", error);
+      
+      // Fallback to paragraph chunking if there's an error
+      const options: ChunkingOptions = {
+        method: 'paragraph' as ChunkingMethod,
+      };
+      
+      const generatedChunks = generateChunks(content, options);
+      setChunks(generatedChunks);
+      setShowChunks(true);
+      
+      toast({
+        variant: "warning",
+        title: "Using fallback chunking",
+        description: "Smart chunking failed. Using paragraph-based chunking instead.",
+      });
+    } finally {
+      setIsProcessingChunks(false);
     }
   };
 
@@ -169,13 +205,50 @@ export function ImportDocumentForm({ onCancel, onSuccess }: ImportDocumentFormPr
     try {
       setIsSubmitting(true);
       
+      // Use the last generated chunks or generate new ones if needed
+      let documentChunks = chunks;
+      
+      if (documentChunks.length === 0) {
+        try {
+          // Try to get smart chunks from OpenAI
+          const { data, error } = await supabase.functions.invoke('smart-chunking', {
+            body: { content: values.content, maxChunks: 15 }
+          });
+          
+          if (error) {
+            throw error;
+          }
+          
+          if (data.chunks && Array.isArray(data.chunks)) {
+            documentChunks = data.chunks;
+          } else {
+            throw new Error('Invalid chunk data format');
+          }
+        } catch (error) {
+          console.error("Error getting smart chunks:", error);
+          
+          // Fallback to paragraph chunking
+          const options: ChunkingOptions = {
+            method: 'paragraph' as ChunkingMethod,
+          };
+          
+          documentChunks = generateChunks(values.content || "", options);
+          
+          toast({
+            variant: "warning",
+            title: "Using fallback chunking",
+            description: "Smart chunking failed. Using paragraph-based chunking instead.",
+          });
+        }
+      }
+      
       // Create document
       const { data: documentData, error: documentError } = await supabase
         .from("knowledge_documents")
         .insert({
           title: values.title,
           content: values.content || "",
-          chunking_method: values.chunkingMethod,
+          chunking_method: "openai",
           file_type: pdfFile ? 'pdf' : 'text'
         })
         .select("id")
@@ -188,13 +261,6 @@ export function ImportDocumentForm({ onCancel, onSuccess }: ImportDocumentFormPr
       
       console.log("Document created with ID:", documentData.id);
       
-      // Generate chunks
-      const options: ChunkingOptions = {
-        method: values.chunkingMethod as ChunkingMethod,
-      };
-      
-      const documentChunks = generateChunks(values.content || "", options);
-      
       // Insert chunks
       if (documentChunks.length > 0) {
         const chunksToInsert = documentChunks.map((chunk, index) => ({
@@ -202,7 +268,7 @@ export function ImportDocumentForm({ onCancel, onSuccess }: ImportDocumentFormPr
           content: chunk,
           sequence: index + 1,
           metadata: JSON.stringify({
-            chunkingMethod: values.chunkingMethod,
+            chunkingMethod: "openai",
             index: index + 1,
             totalChunks: documentChunks.length,
           }),
@@ -257,7 +323,7 @@ export function ImportDocumentForm({ onCancel, onSuccess }: ImportDocumentFormPr
       
       toast({
         title: "Document imported successfully",
-        description: `Created ${documentChunks.length} chunks.`,
+        description: `Created ${documentChunks.length} chunks using AI-powered chunking.`,
       });
       
     } catch (error) {
@@ -280,7 +346,7 @@ export function ImportDocumentForm({ onCancel, onSuccess }: ImportDocumentFormPr
         {showChunks ? (
           <div className="space-y-4">
             <div className="flex justify-between items-center">
-              <h3 className="text-lg font-medium">Document Chunks Preview</h3>
+              <h3 className="text-lg font-medium">AI-Generated Document Chunks Preview</h3>
               <Button 
                 variant="outline" 
                 onClick={() => setShowChunks(false)}
@@ -400,37 +466,10 @@ export function ImportDocumentForm({ onCancel, onSuccess }: ImportDocumentFormPr
           <Form {...form}>
             <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4 mt-6">
               <div className="border rounded-md p-4 space-y-4">
-                <h3 className="text-sm font-medium">Chunking Options</h3>
-                
-                <FormField
-                  control={form.control}
-                  name="chunkingMethod"
-                  render={({ field }) => (
-                    <FormItem className="space-y-3">
-                      <FormControl>
-                        <RadioGroup
-                          onValueChange={field.onChange}
-                          defaultValue={field.value}
-                          className="grid grid-cols-3 gap-4"
-                        >
-                          <div className="flex items-center space-x-2">
-                            <RadioGroupItem value="lineBreak" id="lineBreak" />
-                            <Label htmlFor="lineBreak">By Line Break</Label>
-                          </div>
-                          <div className="flex items-center space-x-2">
-                            <RadioGroupItem value="paragraph" id="paragraph" />
-                            <Label htmlFor="paragraph">By Paragraph</Label>
-                          </div>
-                          <div className="flex items-center space-x-2">
-                            <RadioGroupItem value="header" id="header" />
-                            <Label htmlFor="header">By Headers (h1-h3)</Label>
-                          </div>
-                        </RadioGroup>
-                      </FormControl>
-                      <FormMessage />
-                    </FormItem>
-                  )}
-                />
+                <h3 className="text-sm font-medium">AI-Powered Chunking</h3>
+                <p className="text-sm text-muted-foreground">
+                  Your document will be automatically split into meaningful chunks using AI, optimized for vector database storage and retrieval.
+                </p>
               </div>
               
               <div className="flex justify-between pt-2">
@@ -438,9 +477,16 @@ export function ImportDocumentForm({ onCancel, onSuccess }: ImportDocumentFormPr
                   type="button" 
                   variant="outline" 
                   onClick={handlePreviewChunks}
-                  disabled={isSubmitting || !form.getValues("content")}
+                  disabled={isSubmitting || isProcessingChunks || !form.getValues("content")}
                 >
-                  Preview Chunks
+                  {isProcessingChunks ? (
+                    <>
+                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                      Processing...
+                    </>
+                  ) : (
+                    "Preview AI Chunks"
+                  )}
                 </Button>
                 
                 <div className="space-x-2">

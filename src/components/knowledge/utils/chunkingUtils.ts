@@ -5,13 +5,15 @@ export type ChunkingMethod =
   | 'page' 
   | 'custom' 
   | 'header'
-  | 'customLineBreak';
+  | 'customLineBreak'
+  | 'openai';
 
 export interface ChunkingOptions {
   method: ChunkingMethod;
   customChunkSize?: number;
   customLineBreakPattern?: string;
   headerLevels?: number[];
+  maxChunks?: number;
 }
 
 export const splitByLineBreak = (content: string): string[] => {
@@ -112,6 +114,14 @@ export const splitByCustomSize = (content: string, size: number): string[] => {
   return chunks;
 };
 
+// This function is a placeholder that will be replaced by the actual OpenAI chunking
+// The actual chunking will happen in the edge function
+export const splitByOpenAI = async (content: string): Promise<string[]> => {
+  // For immediate preview, we'll use a simple paragraph split
+  // The actual OpenAI processing will happen during submission
+  return splitByParagraph(content);
+};
+
 export const generateChunks = (
   content: string, 
   options: ChunkingOptions
@@ -129,6 +139,10 @@ export const generateChunks = (
       return splitByHeader(content, options.headerLevels || [1, 2, 3]);
     case 'custom':
       return splitByCustomSize(content, options.customChunkSize || 500);
+    case 'openai':
+      // For preview purposes, we'll use paragraph splitting
+      // The actual OpenAI processing will happen during submission
+      return splitByParagraph(content);
     default:
       return splitByLineBreak(content);
   }
