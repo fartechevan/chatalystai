@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from "react";
 import { Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -9,6 +10,7 @@ import { WeeklyView } from "./WeeklyView";
 import { MonthlyView } from "./MonthlyView";
 import { ViewSelector } from "./components/ViewSelector";
 import { DailyView } from "./components/DailyView";
+import { TaskFormDialog } from "./components/TaskFormDialog";
 
 interface Task {
   id: string;
@@ -40,6 +42,7 @@ export function TaskBoard() {
     { id: 'today', title: COLUMN_TITLES.today, tasks: [] },
     { id: 'tomorrow', title: COLUMN_TITLES.tomorrow, tasks: [] },
   ]);
+  const [isTaskFormOpen, setIsTaskFormOpen] = useState(false);
   const { toast } = useToast();
   const { user } = useAuth();
 
@@ -56,42 +59,44 @@ export function TaskBoard() {
     return null;
   };
 
+  const fetchTasks = async () => {
+    if (!user) return;
+    
+    const { data: fetchedTasks, error } = await supabase
+      .from('tasks')
+      .select('*')
+      .or(`created_by.eq.${user.id},assignee_id.eq.${user.id}`);
+
+    if (error) {
+      console.error('Error fetching tasks:', error);
+      toast({
+        title: "Error fetching tasks",
+        description: error.message,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setTasks(fetchedTasks || []);
+
+    const groupedTasks = columns.map(column => ({
+      ...column,
+      tasks: (fetchedTasks || [])
+        .filter(task => categorizeTaskByDueDate(task) === column.id)
+        .map(task => ({
+          id: task.id,
+          title: task.title,
+          due_date: task.due_date,
+          assignee_id: task.assignee_id,
+          type: task.type as 'follow-up' | 'meeting'
+        }))
+    }));
+
+    setColumns(groupedTasks);
+  };
+
   useEffect(() => {
     if (!user) return;
-
-    const fetchTasks = async () => {
-      const { data: fetchedTasks, error } = await supabase
-        .from('tasks')
-        .select('*')
-        .or(`created_by.eq.${user.id},assignee_id.eq.${user.id}`);
-
-      if (error) {
-        console.error('Error fetching tasks:', error);
-        toast({
-          title: "Error fetching tasks",
-          description: error.message,
-          variant: "destructive",
-        });
-        return;
-      }
-
-      setTasks(fetchedTasks || []);
-
-      const groupedTasks = columns.map(column => ({
-        ...column,
-        tasks: (fetchedTasks || [])
-          .filter(task => categorizeTaskByDueDate(task) === column.id)
-          .map(task => ({
-            id: task.id,
-            title: task.title,
-            due_date: task.due_date,
-            assignee_id: task.assignee_id,
-            type: task.type as 'follow-up' | 'meeting'
-          }))
-      }));
-
-      setColumns(groupedTasks);
-    };
 
     fetchTasks();
 
@@ -238,7 +243,7 @@ export function TaskBoard() {
       <div className="flex justify-between items-center mb-6">
         <ViewSelector currentView={viewMode} onViewChange={setViewMode} />
         <div className="flex items-center space-x-4">
-          <Button>
+          <Button onClick={() => setIsTaskFormOpen(true)}>
             <Plus className="mr-2 h-4 w-4" />
             NEW TASK
           </Button>
@@ -246,6 +251,12 @@ export function TaskBoard() {
       </div>
 
       {renderContent()}
+
+      <TaskFormDialog 
+        isOpen={isTaskFormOpen} 
+        onClose={() => setIsTaskFormOpen(false)}
+        onTaskCreated={fetchTasks}
+      />
     </div>
   );
 }
