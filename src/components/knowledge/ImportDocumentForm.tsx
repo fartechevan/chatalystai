@@ -33,7 +33,7 @@ const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
 const formSchema = z.object({
   title: z.string().min(1, "Title is required"),
   content: z.string().optional(),
-  chunkingMethod: z.enum(["lineBreak", "paragraph"], {
+  chunkingMethod: z.enum(["lineBreak", "paragraph", "header"], {
     required_error: "Please select a chunking method",
   }),
 });
@@ -150,6 +150,7 @@ export function ImportDocumentForm({ onCancel, onSuccess }: ImportDocumentFormPr
     if (content) {
       const options: ChunkingOptions = {
         method: method as ChunkingMethod,
+        headerLevels: [1, 2, 3], // For header chunking method
       };
       
       const generatedChunks = generateChunks(content, options);
@@ -410,7 +411,7 @@ export function ImportDocumentForm({ onCancel, onSuccess }: ImportDocumentFormPr
                         <RadioGroup
                           onValueChange={field.onChange}
                           defaultValue={field.value}
-                          className="grid grid-cols-2 gap-4"
+                          className="grid grid-cols-3 gap-4"
                         >
                           <div className="flex items-center space-x-2">
                             <RadioGroupItem value="lineBreak" id="lineBreak" />
@@ -419,6 +420,10 @@ export function ImportDocumentForm({ onCancel, onSuccess }: ImportDocumentFormPr
                           <div className="flex items-center space-x-2">
                             <RadioGroupItem value="paragraph" id="paragraph" />
                             <Label htmlFor="paragraph">By Paragraph</Label>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <RadioGroupItem value="header" id="header" />
+                            <Label htmlFor="header">By Headers (h1-h3)</Label>
                           </div>
                         </RadioGroup>
                       </FormControl>
