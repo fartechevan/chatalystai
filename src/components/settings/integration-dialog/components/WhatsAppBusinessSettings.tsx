@@ -33,6 +33,7 @@ export function WhatsAppBusinessSettings({ selectedIntegration, onConnect }: Wha
   const { toast } = useToast();
   const { config } = useWhatsAppConfig(selectedIntegration);
 
+  // Fetch WhatsApp instances
   useEffect(() => {
     const fetchInstances = async () => {
       if (!selectedIntegration) return;
@@ -83,6 +84,7 @@ export function WhatsAppBusinessSettings({ selectedIntegration, onConnect }: Wha
     fetchInstances();
   }, [selectedIntegration, toast]);
 
+  // Handle logout of WhatsApp instance
   const handleLogout = async (instanceId: string) => {
     if (!selectedIntegration) return;
     
@@ -92,17 +94,14 @@ export function WhatsAppBusinessSettings({ selectedIntegration, onConnect }: Wha
       const success = await logoutWhatsAppInstance(
         instanceId,
         () => {
-          // On success, update the instances list
+          // On success, update the instances list by removing the logged out instance
           setInstances(prev => prev.filter(instance => instance.id !== instanceId));
         },
-        { toast } // Pass the toast object correctly
+        { toast } // Pass the toast object for notifications
       );
       
-      if (success) {
-        toast({
-          title: "Success",
-          description: "WhatsApp instance disconnected successfully",
-        });
+      if (!success) {
+        console.error('Failed to logout WhatsApp instance');
       }
     } catch (error) {
       console.error('Error logging out instance:', error);

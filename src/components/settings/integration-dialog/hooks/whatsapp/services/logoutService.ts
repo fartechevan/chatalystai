@@ -2,89 +2,81 @@
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 
-export interface LogoutServiceDeps {
-  toast: ReturnType<typeof useToast>['toast'];
-}
+type LogoutOptions = {
+  toast: ReturnType<typeof useToast>;
+};
 
 /**
  * Logs out a WhatsApp instance
- * 
- * @param instanceId The ID of the instance to disconnect
+ * @param instanceId The ID of the instance to log out
  * @param onSuccess Callback function to execute on successful logout
- * @param deps Service dependencies (toast)
- * @returns Promise<boolean> indicating success or failure
+ * @param options Additional options including toast notifications
+ * @returns Promise<boolean> Whether the logout was successful
  */
-export const logoutWhatsAppInstance = async (
+export async function logoutWhatsAppInstance(
   instanceId: string,
-  onSuccess: () => void,
-  deps: LogoutServiceDeps
-): Promise<boolean> => {
+  onSuccess?: () => void,
+  options?: LogoutOptions
+): Promise<boolean> {
   try {
-    console.log(`Logging out WhatsApp instance with ID: ${instanceId}`);
+    console.log(`Attempting to log out WhatsApp instance: ${instanceId}`);
     
-    // Get the integration config to see if we need to remove records
-    const { data: config, error: configError } = await supabase
-      .from('integrations_config')
-      .select('id')
-      .eq('instance_id', instanceId)
-      .maybeSingle();
-      
-    if (configError) {
-      console.error('Error fetching integration config:', configError);
-    }
-    
-    // Call the edge function to logout the instance
-    const { data, error } = await supabase.functions.invoke('integrations', {
-      method: 'DELETE',
-      body: {
-        path: ['instance', 'logout', instanceId],
-      }
+    // Call the edge function to log out the instance
+    const { data, error } = await supabase.functions.invoke("integrations", {
+      body: { 
+        action: "logout",
+        instanceId 
+      },
+      method: 'POST',
+      path: `instance/logout/${instanceId}`
     });
     
     if (error) {
-      console.error('Error in logout WhatsApp instance:', error);
-      deps.toast({
-        title: "Logout Failed",
-        description: error.message || "Failed to disconnect WhatsApp instance",
+      console.error('Error logging out WhatsApp instance:', error);
+      options?.toast?.toast({
+        title: "Logout Error",
+        description: error.message || "Failed to log out WhatsApp instance",
         variant: "destructive"
       });
       return false;
     }
     
-    console.log('Logout response:', data);
+    console.log('WhatsApp instance logout response:', data);
     
-    // If we have an integration_config entry, update it
-    if (config?.id) {
-      // Update the config to remove the instance_id
-      const { error: updateError } = await supabase
-        .from('integrations_config')
-        .update({ 
-          instance_id: null,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', config.id);
-        
-      if (updateError) {
-        console.error('Error updating integration config after logout:', updateError);
-        deps.toast({
-          title: "Warning",
-          description: "Instance logged out but database wasn't updated",
-          variant: "default"
-        });
-      }
+    // Clean up the integrations_config table
+    const { error: dbError } = await supabase
+      .from('integrations_config')
+      .update({ instance_id: null })
+      .eq('instance_id', instanceId);
+    
+    if (dbError) {
+      console.error('Error updating integrations_config:', dbError);
+      options?.toast?.toast({
+        title: "Warning",
+        description: "Instance logged out but database not updated",
+        variant: "destructive"
+      });
+      // Still consider this a success since the instance was logged out
     }
     
-    // Call the onSuccess callback
-    onSuccess();
+    // Call the success callback if provided
+    if (onSuccess && typeof onSuccess === 'function') {
+      onSuccess();
+    }
+    
+    options?.toast?.toast({
+      title: "Success",
+      description: "WhatsApp instance disconnected successfully",
+    });
     
     return true;
   } catch (error) {
     console.error('Exception in logoutWhatsAppInstance:', error);
-    deps.toast({
+    options?.toast?.toast({
       title: "Error",
-      description: (error as Error).message || "An unexpected error occurred",
+      description: `Failed to disconnect WhatsApp instance: ${(error as Error).message}`,
       variant: "destructive"
     });
     return false;
   }
-};
+}
