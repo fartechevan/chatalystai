@@ -43,8 +43,8 @@ export const checkConnectionState = async (
 
     if (!instance) {
       console.log('Instance not found in the list');
-      setConnectionState('close');
-      return 'close';
+      setConnectionState('closed');
+      return 'closed';
     }
 
     console.log('Found instance with status:', instance.connectionStatus || instance.status);
@@ -73,8 +73,8 @@ export const checkConnectionState = async (
 
       if (!response.ok) {
         console.error('Failed to check connection state:', response.status);
-        setConnectionState('close');
-        return 'close';
+        setConnectionState('closed');
+        return 'closed';
       }
 
       // Verify we have JSON
@@ -102,8 +102,8 @@ export const checkConnectionState = async (
         
         return data.state;
       } else {
-        setConnectionState('close');
-        return 'close';
+        setConnectionState('closed');
+        return 'closed';
       }
     }
   } catch (error) {

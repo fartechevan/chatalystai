@@ -9,7 +9,7 @@ import type { WhatsAppConfig } from "../types";
 export async function logoutWhatsAppInstance(
   instanceId: string,
   onSuccess?: () => void,
-  toast?: ReturnType<typeof useToast>
+  toastObj?: { toast: ReturnType<typeof useToast>['toast'] }
 ): Promise<boolean> {
   try {
     console.log(`Logging out WhatsApp instance: ${instanceId}`);
@@ -19,7 +19,7 @@ export async function logoutWhatsAppInstance(
     
     if (error) {
       console.error('Error logging out WhatsApp instance:', error);
-      toast?.toast({
+      toastObj?.toast({
         title: 'Error',
         description: `Failed to logout WhatsApp instance: ${error.message}`,
         variant: 'destructive'
@@ -35,7 +35,7 @@ export async function logoutWhatsAppInstance(
     }
     
     // Show success toast if toast is provided
-    toast?.toast({
+    toastObj?.toast({
       title: 'Success',
       description: 'WhatsApp instance logged out successfully'
     });
@@ -43,7 +43,7 @@ export async function logoutWhatsAppInstance(
     return true;
   } catch (error: any) {
     console.error('Error in logoutWhatsAppInstance:', error);
-    toast?.toast({
+    toastObj?.toast({
       title: 'Error',
       description: `An unexpected error occurred: ${error.message}`,
       variant: 'destructive'
@@ -59,11 +59,11 @@ export async function removeWhatsAppInstance(
   config: WhatsAppConfig,
   instanceId: string,
   onSuccess?: () => void,
-  toast?: ReturnType<typeof useToast>
+  toastObj?: { toast: ReturnType<typeof useToast>['toast'] }
 ): Promise<boolean> {
   try {
     // First logout the instance
-    const logoutSuccess = await logoutWhatsAppInstance(instanceId, undefined, toast);
+    const logoutSuccess = await logoutWhatsAppInstance(instanceId, undefined, toastObj);
     
     if (!logoutSuccess) {
       console.error('Failed to logout WhatsApp instance, aborting removal');
@@ -80,7 +80,7 @@ export async function removeWhatsAppInstance(
       
       if (error) {
         console.error('Error removing WhatsApp integration config:', error);
-        toast?.toast({
+        toastObj?.toast({
           title: 'Error',
           description: `Failed to remove WhatsApp integration config: ${error.message}`,
           variant: 'destructive'
@@ -97,7 +97,7 @@ export async function removeWhatsAppInstance(
     return true;
   } catch (error: any) {
     console.error('Error in removeWhatsAppInstance:', error);
-    toast?.toast({
+    toastObj?.toast({
       title: 'Error',
       description: `An unexpected error occurred: ${error.message}`,
       variant: 'destructive'

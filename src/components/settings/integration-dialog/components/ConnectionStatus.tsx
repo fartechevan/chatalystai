@@ -1,3 +1,4 @@
+
 import { Button } from "@/components/ui/button";
 import { Loader2, CheckCircle, Plus, AlertCircle, X } from "lucide-react";
 import type { ConnectionState } from "../hooks/whatsapp/types";
@@ -34,7 +35,7 @@ export function ConnectionStatus({
       <div className="flex items-start space-x-4">
         <div className="w-32 h-32 bg-green-50 rounded-lg flex items-center justify-center p-4">
           <img
-            src={selectedIntegration?.icon_url}
+            src={selectedIntegration?.icon_url || selectedIntegration?.icon}
             alt={selectedIntegration?.name}
             className="object-contain max-h-20"
           />
@@ -60,7 +61,7 @@ export function ConnectionStatus({
       {selectedIntegration && (
         <div className="aspect-video rounded-md bg-gradient-to-br from-green-50 to-green-100 mb-4 flex items-center justify-center p-8">
           <img
-            src={selectedIntegration.icon_url}
+            src={selectedIntegration.icon_url || selectedIntegration.icon}
             alt={selectedIntegration.name}
             className="object-contain max-h-32"
           />

@@ -31,7 +31,7 @@ export const checkInstanceStatus = async (
 
     if (!response.ok) {
       console.error('Failed to check WhatsApp connection status:', response.status, response.statusText);
-      setConnectionState('close');
+      setConnectionState('closed');
       return false;
     }
 
@@ -66,12 +66,12 @@ export const checkInstanceStatus = async (
           setQrCodeBase64(null);
           return true;
         } else {
-          setConnectionState('close');
+          setConnectionState('closed');
           return false;
         }
       } else {
         console.log('Instance not found in response');
-        setConnectionState('close');
+        setConnectionState('closed');
         return false;
       }
     } else {
