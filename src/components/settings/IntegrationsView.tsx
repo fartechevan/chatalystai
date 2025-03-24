@@ -23,6 +23,24 @@ export function IntegrationsView() {
   const { data: integrations = [], isLoading, refetch } = useQuery({
     queryKey: ['integrations'],
     queryFn: async () => {
+      // Define the expected shape of raw data from Supabase
+      interface RawIntegrationData {
+        id: string;
+        name: string;
+        type?: string; // This might be missing in some records
+        configuration?: Record<string, any>;
+        created_at?: string;
+        updated_at?: string;
+        base_url?: string;
+        provider?: string;
+        category?: string;
+        status?: string;
+        icon?: string;
+        icon_url?: string;
+        description?: string;
+        is_connected?: boolean;
+      }
+
       const { data, error } = await supabase
         .from('integrations')
         .select('*')
@@ -31,7 +49,7 @@ export function IntegrationsView() {
       if (error) throw error;
       
       // Ensure every integration has the type property
-      const typedData = data.map(item => ({
+      const typedData = (data as RawIntegrationData[]).map(item => ({
         ...item,
         type: item.type || "messenger" // Add default type if missing
       })) as Integration[];
