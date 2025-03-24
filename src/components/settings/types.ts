@@ -18,5 +18,5 @@ export interface Integration {
   is_connected?: boolean;
 }
 
-// Define the connection state type to include 'close'
-export type ConnectionState = 'idle' | 'connecting' | 'open' | 'close';
+// Define the connection state type to include 'unknown'
+export type ConnectionState = 'idle' | 'connecting' | 'open' | 'close' | 'unknown';
