@@ -1,6 +1,6 @@
 
 import { useToast } from "@/hooks/use-toast";
-import type { ConnectionState } from "../../../../types";
+import type { ConnectionState } from "../types";
 
 /**
  * Check and update the connection state of a WhatsApp instance
@@ -10,7 +10,7 @@ export const checkConnectionState = async (
   setConnectionState: (state: ConnectionState) => void,
   toast: ReturnType<typeof useToast>['toast']
 ) => {
-  if (!config?.instance_id) return 'unknown';
+  if (!config?.instance_id) return 'unknown' as ConnectionState;
 
   try {
     // Use base URL from config
@@ -31,7 +31,7 @@ export const checkConnectionState = async (
     if (!instanceResponse.ok) {
       console.error('Failed to fetch instances:', instanceResponse.status);
       setConnectionState('unknown');
-      return 'unknown';
+      return 'unknown' as ConnectionState;
     }
 
     const instances = await instanceResponse.json();
@@ -44,7 +44,7 @@ export const checkConnectionState = async (
     if (!instance) {
       console.log('Instance not found in the list');
       setConnectionState('idle');
-      return 'idle';
+      return 'idle' as ConnectionState;
     }
 
     console.log('Found instance with status:', instance.connectionStatus || instance.status);
@@ -59,7 +59,7 @@ export const checkConnectionState = async (
         description: "Successfully connected to WhatsApp",
       });
       
-      return 'open';
+      return 'open' as ConnectionState;
     } else {
       // If not connected, try the specific connectionState endpoint
       const response = await fetch(`${baseUrl}/instance/connectionState/${config.instance_id}`, {
@@ -74,7 +74,7 @@ export const checkConnectionState = async (
       if (!response.ok) {
         console.error('Failed to check connection state:', response.status);
         setConnectionState('idle');
-        return 'idle';
+        return 'idle' as ConnectionState;
       }
 
       // Verify we have JSON
@@ -82,7 +82,7 @@ export const checkConnectionState = async (
       if (!contentType || !contentType.includes('application/json')) {
         console.error('Invalid content type received:', contentType);
         setConnectionState('unknown');
-        return 'unknown';
+        return 'unknown' as ConnectionState;
       }
 
       const data = await response.json();
@@ -90,6 +90,7 @@ export const checkConnectionState = async (
 
       // Set connection state based on API response
       if (data.state) {
+        // Convert 'close' to 'idle' since that's in our ConnectionState type
         const convertedState = data.state === 'close' ? 'idle' : data.state as ConnectionState;
         setConnectionState(convertedState);
         
@@ -104,12 +105,12 @@ export const checkConnectionState = async (
         return convertedState;
       } else {
         setConnectionState('idle');
-        return 'idle';
+        return 'idle' as ConnectionState;
       }
     }
   } catch (error) {
     console.error('Error checking connection state:', error);
     setConnectionState('unknown');
-    return 'unknown';
+    return 'unknown' as ConnectionState;
   }
 };

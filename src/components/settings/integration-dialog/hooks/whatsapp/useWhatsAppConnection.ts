@@ -18,7 +18,11 @@ export function useWhatsAppConnection(selectedIntegration: Integration | null) {
   const checkCurrentConnectionState = useCallback(async () => {
     if (config) {
       console.log('Checking current connection state with config:', config);
-      return await checkInstanceStatus(config, setConnectionState, setQrCodeBase64);
+      return await checkInstanceStatus(
+        config, 
+        (state: ConnectionState) => setConnectionState(state), 
+        setQrCodeBase64
+      );
     }
     return false;
   }, [config]);
@@ -31,7 +35,11 @@ export function useWhatsAppConnection(selectedIntegration: Integration | null) {
 
     // Start a new polling interval
     const intervalId = setInterval(async () => {
-      await checkConnectionState(config, setConnectionState, toast);
+      await checkConnectionState(
+        config, 
+        (state: ConnectionState) => setConnectionState(state), 
+        toast
+      );
       // Re-check instance status to get the accurate state
       await checkCurrentConnectionState();
     }, 5000); // Check every 5 seconds
@@ -86,7 +94,11 @@ export function useWhatsAppConnection(selectedIntegration: Integration | null) {
     // Check initial connection state when the component mounts or config changes
     if (config) {
       console.log('Initial connection state check with config:', config);
-      checkInstanceStatus(config, setConnectionState, setQrCodeBase64);
+      checkInstanceStatus(
+        config, 
+        (state: ConnectionState) => setConnectionState(state), 
+        setQrCodeBase64
+      );
     }
 
     return () => {

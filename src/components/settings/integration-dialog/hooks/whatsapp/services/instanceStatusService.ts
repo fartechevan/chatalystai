@@ -1,5 +1,5 @@
 
-import type { ConnectionState } from "../../../../types";
+import type { ConnectionState } from "../types";
 
 /**
  * Check the status of a WhatsApp instance

@@ -46,11 +46,11 @@ export function IntegrationsView() {
         integration.name === "WhatsApp Cloud API"
       );
       
-      // Ensure all entries have the required type field
-      const typedData: Integration[] = data.map(item => ({
+      // Add the type field to all integrations if it's missing
+      const typedData = data.map(item => ({
         ...item,
         type: item.type || "messenger" // Add default type if missing
-      }));
+      })) as Integration[];
       
       return hasWhatsAppCloudApi 
         ? typedData
@@ -222,7 +222,8 @@ export function IntegrationsView() {
 
   const integrationsList = integrations.map(integration => ({
     ...integration,
-    is_connected: connectedIntegrations[integration.id] || false
+    is_connected: connectedIntegrations[integration.id] || false,
+    type: integration.type || "messenger" // Ensure type exists for all integrations
   }));
 
   const filteredIntegrations = integrationsList.filter(integration => {
