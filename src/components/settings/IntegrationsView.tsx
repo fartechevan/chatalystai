@@ -1,3 +1,4 @@
+
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Plus } from "lucide-react";
@@ -36,7 +37,8 @@ export function IntegrationsView() {
         description: "Connect your WhatsApp Business account through Facebook.",
         icon_url: "/lovable-uploads/8d699109-6446-4dd5-b026-f2f32a953f05.png",
         status: "available",
-        is_connected: false
+        is_connected: false,
+        base_url: "https://api.evoapicloud.com"
       };
       
       const hasWhatsAppCloudApi = data.some(integration => 
@@ -53,18 +55,26 @@ export function IntegrationsView() {
     // Check connected integrations from local storage or API
     const checkConnectionStatus = async () => {
       try {
+        console.log('Checking connection status for integrations');
+        
         // For WhatsApp, check the connection status
         const { data, error } = await supabase
           .from('integrations_config')
           .select('id, integration_id, instance_id');
           
-        if (error) throw error;
+        if (error) {
+          console.error('Error fetching integration configs:', error);
+          throw error;
+        }
+        
+        console.log('Integration configs:', data);
         
         // Get connection states for each configuration
         const connected: Record<string, boolean> = {};
         
         for (const config of data) {
           if (!config.instance_id) {
+            console.log(`No instance_id for integration ${config.integration_id}, marking as not connected`);
             connected[config.integration_id] = false;
             continue;
           }
@@ -73,6 +83,8 @@ export function IntegrationsView() {
           connected[config.integration_id] = false;
           
           try {
+            console.log(`Checking connection status for integration ${config.integration_id} with instance ${config.instance_id}`);
+            
             // Use the supabase edge function to check status
             const { data: instancesData, error } = await supabase.functions.invoke('integrations', {
               method: 'GET'
@@ -83,20 +95,31 @@ export function IntegrationsView() {
               continue;
             }
             
+            console.log('Instances data for connection check:', instancesData);
+            
             if (Array.isArray(instancesData)) {
               const isAnyInstanceConnected = instancesData.some(item => 
-                item.connectionStatus === 'open' && item.id === config.instance_id
+                (item.connectionStatus === 'open' || 
+                 item.status === 'open' || 
+                 item.state === 'open') && 
+                item.id === config.instance_id
               );
               
               if (isAnyInstanceConnected) {
+                console.log(`Integration ${config.integration_id} with instance ${config.instance_id} is connected`);
                 connected[config.integration_id] = true;
+              } else {
+                console.log(`Integration ${config.integration_id} with instance ${config.instance_id} is not connected`);
               }
+            } else {
+              console.warn('Instances data is not an array:', instancesData);
             }
           } catch (fetchError) {
             console.error('Error fetching WhatsApp connection status:', fetchError);
           }
         }
         
+        console.log('Final connection statuses:', connected);
         setConnectedIntegrations(connected);
       } catch (error) {
         console.error('Error checking connection status:', error);
@@ -118,6 +141,8 @@ export function IntegrationsView() {
           description: "Fetching WhatsApp instances and checking connection status",
         });
         
+        console.log('Fetching WhatsApp instances for integration:', integration.id);
+        
         // Fetch instances and save to database with integration ID
         const { data, error } = await supabase.functions.invoke("integrations", {
           body: { integration_id: integration.id }
@@ -127,7 +152,7 @@ export function IntegrationsView() {
           console.error('Error fetching WhatsApp instances:', error);
           toast({
             title: "Connection Error",
-            description: "Could not fetch WhatsApp instances",
+            description: "Could not fetch WhatsApp instances: " + error.message,
             variant: "destructive"
           });
         } else {
@@ -135,7 +160,7 @@ export function IntegrationsView() {
           
           // Check if any instance is connected
           const hasConnectedInstance = Array.isArray(data) && data.some(
-            instance => instance.connectionStatus === 'open' || instance.status === 'open'
+            instance => instance.connectionStatus === 'open' || instance.status === 'open' || instance.state === 'open'
           );
           
           if (hasConnectedInstance) {
@@ -149,10 +174,24 @@ export function IntegrationsView() {
               ...prev,
               [integration.id]: true
             }));
+          } else {
+            console.log('No connected WhatsApp instances found');
+            if (Array.isArray(data) && data.length === 0) {
+              toast({
+                title: "No WhatsApp Instances",
+                description: "No WhatsApp instances found. You can create one.",
+                variant: "default"
+              });
+            }
           }
         }
       } catch (error) {
         console.error('Error in handleIntegrationClick:', error);
+        toast({
+          title: "Error",
+          description: "An unexpected error occurred: " + (error as Error).message,
+          variant: "destructive"
+        });
       }
     }
     

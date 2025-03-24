@@ -6,11 +6,11 @@ import { saveIntegrationConfigFromInstances } from "../services/integrationServi
 // Handler for fetching WhatsApp instances
 export async function handleFetchInstances(integrationId?: string) {
   try {
-    console.log('Starting handleFetchInstances');
+    console.log('Starting handleFetchInstances with integrationId:', integrationId);
     
     // Set up API request using the EVOLUTION_API_KEY from environment
     const options = getEvolutionAPIOptions();
-    console.log('Fetching instances from Evolution API...');
+    console.log(`Fetching instances from Evolution API...`);
     console.log(`URL: ${EVO_API_BASE_URL}/instance/fetchInstances`);
     
     const response = await fetch(`${EVO_API_BASE_URL}/instance/fetchInstances`, options);
@@ -25,7 +25,15 @@ export async function handleFetchInstances(integrationId?: string) {
     }
     
     const instances = await response.json();
-    console.log('Instances data retrieved successfully:', Array.isArray(instances) ? instances.length : 'not an array');
+    console.log('Instances data retrieved successfully:', instances);
+    console.log('Number of instances:', Array.isArray(instances) ? instances.length : 'not an array');
+    
+    // Log full instance details for debugging
+    if (Array.isArray(instances)) {
+      instances.forEach((instance, index) => {
+        console.log(`Instance ${index + 1}:`, JSON.stringify(instance));
+      });
+    }
     
     // Enhance instance information by fetching connection state for each
     const enhancedInstances = [];
@@ -35,7 +43,9 @@ export async function handleFetchInstances(integrationId?: string) {
           // Try to get instance details including ownerJid
           const instanceId = instance.id || instance.instance?.instanceId;
           if (instanceId) {
+            console.log(`Fetching connection state for instance ${instanceId}`);
             const instanceStateResponse = await fetch(`${EVO_API_BASE_URL}/instance/connectionState/${instanceId}`, options);
+            
             if (instanceStateResponse.ok) {
               const stateData = await instanceStateResponse.json();
               console.log(`Instance ${instanceId} state:`, stateData);
@@ -47,9 +57,11 @@ export async function handleFetchInstances(integrationId?: string) {
                 ownerJid: stateData.owner || stateData.instance?.owner || instance.owner
               });
             } else {
+              console.warn(`Failed to get connection state for instance ${instanceId}:`, instanceStateResponse.status);
               enhancedInstances.push(instance);
             }
           } else {
+            console.warn('Instance without ID:', instance);
             enhancedInstances.push(instance);
           }
         } catch (instanceError) {
@@ -60,9 +72,11 @@ export async function handleFetchInstances(integrationId?: string) {
     }
     
     const finalInstances = enhancedInstances.length > 0 ? enhancedInstances : instances;
+    console.log('Final instances to return:', finalInstances);
     
     // If an integrationId is provided, save the instances data to the database
     if (integrationId && Array.isArray(finalInstances)) {
+      console.log(`Saving ${finalInstances.length} instances for integration ${integrationId} to database`);
       await saveIntegrationConfigFromInstances(integrationId, finalInstances);
     }
     
@@ -94,7 +108,10 @@ export async function handleConnectionState(instanceId: string) {
     
     const options = getEvolutionAPIOptions();
     const apiUrl = `${EVO_API_BASE_URL}/instance/connectionState/${instanceId}`;
+    console.log(`Checking connection state for instance ${instanceId} at ${apiUrl}`);
+    
     const response = await fetch(apiUrl, options);
+    console.log(`Connection state response status: ${response.status}`);
     
     // Check if the response is valid JSON before parsing
     const contentType = response.headers.get('content-type');
@@ -105,6 +122,7 @@ export async function handleConnectionState(instanceId: string) {
     }
     
     const data = await response.json();
+    console.log('Connection state response data:', data);
     
     return new Response(
       JSON.stringify(data),
@@ -139,6 +157,7 @@ export async function handleConnect(instanceId: string) {
     console.log(`Connecting to WhatsApp instance ${instanceId} at ${apiUrl}`);
     
     const response = await fetch(apiUrl, options);
+    console.log(`Connect response status: ${response.status}`);
     
     // Check if the response is valid JSON before parsing
     const contentType = response.headers.get('content-type');

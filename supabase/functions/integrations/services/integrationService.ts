@@ -19,6 +19,8 @@ export async function saveIntegrationConfigFromInstances(integrationId: string, 
   
   for (const instance of instances) {
     try {
+      console.log('Processing instance:', JSON.stringify(instance));
+      
       const instanceId = instance.id || instance.instance?.instanceId;
       const ownerJid = instance.ownerJid || instance.owner || instance.instance?.owner;
       
@@ -47,6 +49,8 @@ export async function saveIntegrationConfigFromInstances(integrationId: string, 
         instance_id: instanceId,
         user_reference_id: ownerJid || null
       };
+      
+      console.log('Config data to save:', configData);
       
       let result;
       if (existingConfig) {
