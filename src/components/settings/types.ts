@@ -3,7 +3,7 @@
 export interface Integration {
   id: string;
   name: string;
-  type: string; // Ensure this property exists
+  type: string; // This property is required
   configuration?: Record<string, any>;
   created_at?: string;
   updated_at?: string;

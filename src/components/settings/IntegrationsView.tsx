@@ -1,3 +1,4 @@
+
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Plus } from "lucide-react";
@@ -29,7 +30,7 @@ export function IntegrationsView() {
       
       if (error) throw error;
       
-      // Important: Ensure every integration has the type property
+      // Ensure every integration has the type property
       const typedData = data.map(item => ({
         ...item,
         type: item.type || "messenger" // Add default type if missing
@@ -44,7 +45,7 @@ export function IntegrationsView() {
         status: "available",
         is_connected: false,
         base_url: "https://api.evoapicloud.com",
-        type: "messenger" // Ensure type property exists
+        type: "messenger" // Explicitly set the type property
       };
       
       const hasWhatsAppCloudApi = typedData.some(integration => 
@@ -220,7 +221,7 @@ export function IntegrationsView() {
   const integrationsList = integrations.map(integration => ({
     ...integration,
     is_connected: connectedIntegrations[integration.id] || false,
-    type: integration.type || "messenger" // Ensure every integration has the type property
+    type: integration.type || "messenger" // Ensure type property exists for all integrations
   }));
 
   const filteredIntegrations = integrationsList.filter(integration => {
