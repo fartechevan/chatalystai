@@ -8,10 +8,10 @@ export function useWhatsAppConversations(instanceId: string | null, isConnected:
     queryFn: async () => {
       if (!instanceId) throw new Error('No instance ID provided');
       
-      // First get the configuration for the WhatsApp instance
+      // First get the configuration and base_url for the WhatsApp instance
       const { data: config, error: configError } = await supabase
         .from('integrations_config')
-        .select('base_url')
+        .select('integration_id')
         .eq('instance_id', instanceId)
         .single();
       
@@ -20,7 +20,19 @@ export function useWhatsAppConversations(instanceId: string | null, isConnected:
         throw new Error('Failed to fetch WhatsApp configuration');
       }
       
-      const baseUrl = config?.base_url || 'https://api.evoapicloud.com';
+      // Then get the integration to get the base_url
+      const { data: integration, error: integrationError } = await supabase
+        .from('integrations')
+        .select('base_url')
+        .eq('id', config.integration_id)
+        .single();
+      
+      if (integrationError) {
+        console.error('Error fetching integration details:', integrationError);
+        throw new Error('Failed to fetch integration details');
+      }
+      
+      const baseUrl = integration?.base_url || 'https://api.evoapicloud.com';
       console.log('Using base URL:', baseUrl);
 
       // Use the Edge Function to fetch conversations

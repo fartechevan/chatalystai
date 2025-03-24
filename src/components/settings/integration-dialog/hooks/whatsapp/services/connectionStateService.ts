@@ -13,7 +13,7 @@ export const checkConnectionState = async (
   if (!config?.instance_id) return 'unknown';
 
   try {
-    // Use base URL from config or default
+    // Use base URL from config
     const baseUrl = config.base_url || 'https://api.evoapicloud.com';
 
     console.log('Checking connection state for instance:', config.instance_id);

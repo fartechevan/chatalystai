@@ -41,7 +41,7 @@ export const initializeConnection = async (
   try {
     console.log('Connecting to WhatsApp API with config:', config);
     
-    // Hardcoded base URL for reliability, but use config base_url if available
+    // Use base URL from config
     const baseUrl = config.base_url || 'https://api.evoapicloud.com';
     
     // First check if the instance exists
