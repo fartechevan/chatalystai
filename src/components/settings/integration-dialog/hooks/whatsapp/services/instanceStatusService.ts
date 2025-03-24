@@ -9,7 +9,7 @@ export const checkInstanceStatus = async (
   setConnectionState: (state: ConnectionState) => void,
   setQrCodeBase64: (qrCode: string | null) => void
 ) => {
-  if (!config) return false;
+  if (!config || !config.instance_id) return false;
 
   try {
     // Hardcoded API key and base URL for reliability
@@ -32,7 +32,8 @@ export const checkInstanceStatus = async (
 
     if (!response.ok) {
       console.error('Failed to check WhatsApp connection status:', response.status, response.statusText);
-      throw new Error('Failed to check WhatsApp connection status');
+      setConnectionState('close');
+      return false;
     }
 
     // Verify we have JSON before parsing
@@ -40,21 +41,28 @@ export const checkInstanceStatus = async (
     if (!contentType || !contentType.includes('application/json')) {
       const textResponse = await response.text();
       console.error('Invalid content type received:', contentType, 'Response:', textResponse);
-      throw new Error('Invalid response format from API');
+      setConnectionState('unknown');
+      return false;
     }
 
     const data = await response.json();
     console.log('Instance status response:', data);
 
-    // Per Evolution API docs, check if the instance exists and check its connection state
-    // Look for the instance with the matching instanceId
+    // Per Evolution API docs, check if the instance exists and its connection state
     if (Array.isArray(data)) {
+      // Try to find the instance by id
       const instance = data.find(item => item.id === config.instance_id);
       
       if (instance) {
-        console.log('Found instance with state:', instance.connectionStatus);
+        console.log('Found instance with state:', instance.connectionStatus || instance.status);
         
-        if (instance.connectionStatus === 'open') {
+        // Check various status fields that might indicate connection state
+        const isConnected = 
+          instance.connectionStatus === 'open' || 
+          instance.status === 'open' || 
+          instance.state === 'open';
+          
+        if (isConnected) {
           setConnectionState('open');
           setQrCodeBase64(null);
           return true;

@@ -34,3 +34,7 @@ verify_jwt = false
 [functions.smart-chunking]
 verify_jwt = false
 
+# Make sure to enable the WhatsApp connection edge function
+[functions.whatsapp-connection]
+verify_jwt = false
+
