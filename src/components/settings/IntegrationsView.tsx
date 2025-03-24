@@ -1,4 +1,3 @@
-
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Plus } from "lucide-react";
@@ -121,8 +120,7 @@ export function IntegrationsView() {
         
         // Fetch instances and save to database with integration ID
         const { data, error } = await supabase.functions.invoke("integrations", {
-          path: "/instance/fetchInstances",
-          query: { integration_id: integration.id }
+          body: { integration_id: integration.id }
         });
         
         if (error) {
