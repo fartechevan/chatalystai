@@ -11,7 +11,7 @@ export function useWhatsAppConversations(instanceId: string | null, isConnected:
       // First get the configuration for the WhatsApp instance
       const { data: config, error: configError } = await supabase
         .from('integrations_config')
-        .select('*')
+        .select('base_url')
         .eq('instance_id', instanceId)
         .single();
       
@@ -20,18 +20,13 @@ export function useWhatsAppConversations(instanceId: string | null, isConnected:
         throw new Error('Failed to fetch WhatsApp configuration');
       }
       
-      if (!config) throw new Error('Configuration not found');
-      
-      console.log('Found WhatsApp configuration:', config);
-
-      // Use API key and base URL from config, with fallbacks
-      const apiKey = config.api_key || 'd20770d7-312f-499a-b841-4b64a243f24c';
-      const baseUrl = config.base_url || 'https://api.evoapicloud.com';
+      const baseUrl = config?.base_url || 'https://api.evoapicloud.com';
+      console.log('Using base URL:', baseUrl);
 
       // Fetch conversations from Evolution API
       const response = await fetch(`${baseUrl}/chat/findMessages/${instanceId}`, {
         headers: {
-          'apikey': apiKey,
+          'apikey': process.env.EVOLUTION_API_KEY || '',
         },
       });
 

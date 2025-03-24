@@ -220,7 +220,6 @@ export type Database = {
       }
       integrations_config: {
         Row: {
-          api_key: string | null
           base_url: string
           created_at: string
           id: string
@@ -230,7 +229,6 @@ export type Database = {
           user_reference_id: string | null
         }
         Insert: {
-          api_key?: string | null
           base_url?: string
           created_at?: string
           id?: string
@@ -240,7 +238,6 @@ export type Database = {
           user_reference_id?: string | null
         }
         Update: {
-          api_key?: string | null
           base_url?: string
           created_at?: string
           id?: string

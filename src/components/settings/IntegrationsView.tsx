@@ -55,7 +55,7 @@ export function IntegrationsView() {
         // For WhatsApp, check the connection status
         const { data, error } = await supabase
           .from('integrations_config')
-          .select('id, integration_id');
+          .select('id, integration_id, instance_id');
           
         if (error) throw error;
         
@@ -63,28 +63,32 @@ export function IntegrationsView() {
         const connected: Record<string, boolean> = {};
         
         for (const config of data) {
+          if (!config.instance_id) {
+            connected[config.integration_id] = false;
+            continue;
+          }
+          
           // Default to not connected
           connected[config.integration_id] = false;
           
           try {
-            // Use the useWhatsAppConfig hook's logic directly here
-            const response = await fetch(`https://api.evoapicloud.com/instance/fetchInstances`, {
-              headers: {
-                'apikey': process.env.EVOLUTION_API_KEY || '',
-              },
+            // Use the supabase edge function to check status
+            const { data: instancesData, error } = await supabase.functions.invoke('integrations', {
+              method: 'GET'
             });
             
-            if (response.ok) {
-              const instancesData = await response.json();
+            if (error) {
+              console.error('Error fetching WhatsApp connection status:', error);
+              continue;
+            }
+            
+            if (Array.isArray(instancesData)) {
+              const isAnyInstanceConnected = instancesData.some(item => 
+                item.connectionStatus === 'open' && item.id === config.instance_id
+              );
               
-              if (Array.isArray(instancesData)) {
-                const isAnyInstanceConnected = instancesData.some(item => 
-                  item.connectionStatus === 'open'
-                );
-                
-                if (isAnyInstanceConnected) {
-                  connected[config.integration_id] = true;
-                }
+              if (isAnyInstanceConnected) {
+                connected[config.integration_id] = true;
               }
             }
           } catch (fetchError) {

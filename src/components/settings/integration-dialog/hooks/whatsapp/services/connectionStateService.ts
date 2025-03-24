@@ -6,15 +6,14 @@ import type { ConnectionState } from "../types";
  * Check and update the connection state of a WhatsApp instance
  */
 export const checkConnectionState = async (
-  config: { instance_id?: string; api_key?: string; base_url?: string; } | null,
+  config: { instance_id?: string; base_url?: string; } | null,
   setConnectionState: (state: ConnectionState) => void,
   toast: ReturnType<typeof useToast>['toast']
 ) => {
   if (!config?.instance_id) return 'unknown';
 
   try {
-    // Hardcoded API key and base URL for reliability
-    const apiKey = config.api_key || 'd20770d7-312f-499a-b841-4b64a243f24c';
+    // Use base URL from config or default
     const baseUrl = config.base_url || 'https://api.evoapicloud.com';
 
     console.log('Checking connection state for instance:', config.instance_id);
@@ -25,7 +24,7 @@ export const checkConnectionState = async (
       headers: {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
-        'apikey': apiKey,
+        'apikey': process.env.EVOLUTION_API_KEY || '',
       },
     });
 
@@ -68,7 +67,7 @@ export const checkConnectionState = async (
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
-          'apikey': apiKey,
+          'apikey': process.env.EVOLUTION_API_KEY || '',
         },
       });
 

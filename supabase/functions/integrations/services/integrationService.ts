@@ -16,7 +16,7 @@ const supabaseClient = createClient(supabaseUrl, supabaseKey);
 export async function getIntegrationConfig(integrationId = 'bda44db7-4e9a-4733-a9c7-c4f5d7198905') {
   const { data: integration, error: integrationError } = await supabaseClient
     .from('integrations_config')
-    .select('api_key, instance_id')
+    .select('instance_id')
     .eq('id', integrationId)
     .single();
 
@@ -25,9 +25,9 @@ export async function getIntegrationConfig(integrationId = 'bda44db7-4e9a-4733-a
     throw new Error('Failed to fetch integration configuration');
   }
 
-  if (!integration || !integration.api_key) {
-    console.error('Integration config not found or missing API key');
-    throw new Error('Integration configuration not found or incomplete');
+  if (!integration) {
+    console.error('Integration config not found');
+    throw new Error('Integration configuration not found');
   }
 
   return integration;
