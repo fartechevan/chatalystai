@@ -1,3 +1,4 @@
+
 import { useState, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -216,7 +217,7 @@ export function ImportDocumentForm({ onCancel, onSuccess }: ImportDocumentFormPr
             throw error;
           }
           
-          if (data.chunks && Array.isArray(data.chunks)) {
+          if (data && data.chunks && Array.isArray(data.chunks)) {
             documentChunks = data.chunks;
           } else {
             throw new Error('Invalid chunk data format');

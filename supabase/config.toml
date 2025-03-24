@@ -33,3 +33,4 @@ verify_jwt = false
 
 [functions.smart-chunking]
 verify_jwt = false
+
