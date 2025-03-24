@@ -33,7 +33,12 @@ serve(async (req) => {
       return await handleFindMessages(req);
     } else if (path.includes('/instance/fetchInstances')) {
       console.log("fetchInstances called");
-      return await handleFetchInstances();
+      
+      // Check if integration_id is provided in the query string
+      const integrationId = url.searchParams.get('integration_id');
+      console.log('Integration ID from query:', integrationId);
+      
+      return await handleFetchInstances(integrationId || undefined);
     } else if (path.includes('/instance/connectionState/')) {
       const instanceId = path.split('/').pop();
       return await handleConnectionState(instanceId || '');

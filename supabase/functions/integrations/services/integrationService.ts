@@ -42,3 +42,77 @@ export function verifyEvolutionApiKey() {
   }
   return true;
 }
+
+// Save or update integration config from instances data
+export async function saveIntegrationConfigFromInstances(integrationId: string, instances: any[]) {
+  try {
+    console.log('Saving integration config from instances data:', {
+      integrationId, 
+      instances: Array.isArray(instances) ? instances.length : 'not an array'
+    });
+    
+    if (!Array.isArray(instances) || instances.length === 0) {
+      console.log('No instances to save');
+      return;
+    }
+    
+    // Process each instance
+    for (const instance of instances) {
+      // Extract user_reference_id from ownerJid if available
+      const userReferenceId = instance.owner?.id || 
+                              instance.owner?.jid || 
+                              instance.ownerJid || 
+                              instance.phone || 
+                              '';
+      
+      console.log('Processing instance:', {
+        instanceId: instance.id,
+        userReferenceId,
+        connectionStatus: instance.connectionStatus || instance.status
+      });
+      
+      // Check if there's already a config for this instance
+      const { data: existingConfig } = await supabaseClient
+        .from('integrations_config')
+        .select('id')
+        .eq('instance_id', instance.id)
+        .maybeSingle();
+      
+      if (existingConfig) {
+        // Update existing config
+        console.log('Updating existing config for instance:', instance.id);
+        const { error: updateError } = await supabaseClient
+          .from('integrations_config')
+          .update({
+            user_reference_id: userReferenceId,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', existingConfig.id);
+        
+        if (updateError) {
+          console.error('Error updating integration config:', updateError);
+        }
+      } else {
+        // Create new config for this instance
+        console.log('Creating new config for instance:', instance.id);
+        const { error: insertError } = await supabaseClient
+          .from('integrations_config')
+          .insert({
+            integration_id: integrationId,
+            instance_id: instance.id,
+            user_reference_id: userReferenceId,
+            base_url: 'https://api.evoapicloud.com'
+          });
+        
+        if (insertError) {
+          console.error('Error creating integration config:', insertError);
+        }
+      }
+    }
+    
+    return { success: true };
+  } catch (error) {
+    console.error('Error saving integration config:', error);
+    throw error;
+  }
+}
