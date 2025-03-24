@@ -1,14 +1,16 @@
 
-export type ConnectionState = 'open' | 'connecting' | 'close' | 'unknown';
+export type ConnectionState = 'open' | 'connecting' | 'unknown' | 'closed';
 
 export interface WhatsAppConfig {
+  id?: string;
+  integration_id: string;
   instance_id: string;
-  base_url: string;
-  api_key: string;
-  [key: string]: any;
+  user_reference_id?: string;
+  base_url?: string;
 }
 
 export interface ConnectionResult {
   success: boolean;
   qrCodeDataUrl?: string;
+  error?: string;
 }

@@ -7,6 +7,8 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import type { Integration } from "../../types";
+import { logoutWhatsAppInstance } from "../hooks/whatsapp/services/logoutService";
+import { useWhatsAppConfig } from "../hooks/whatsapp/useWhatsAppConfig";
 
 interface WhatsAppBusinessSettingsProps {
   selectedIntegration: Integration | null;
@@ -26,7 +28,9 @@ interface WhatsAppInstance {
 export function WhatsAppBusinessSettings({ selectedIntegration, onConnect }: WhatsAppBusinessSettingsProps) {
   const [instances, setInstances] = useState<WhatsAppInstance[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isLogoutLoading, setIsLogoutLoading] = useState<string | null>(null);
   const { toast } = useToast();
+  const { config } = useWhatsAppConfig(selectedIntegration);
 
   useEffect(() => {
     const fetchInstances = async () => {
@@ -62,6 +66,39 @@ export function WhatsAppBusinessSettings({ selectedIntegration, onConnect }: Wha
 
     fetchInstances();
   }, [selectedIntegration, toast]);
+
+  const handleLogout = async (instanceId: string) => {
+    if (!selectedIntegration) return;
+    
+    setIsLogoutLoading(instanceId);
+    
+    try {
+      const success = await logoutWhatsAppInstance(
+        instanceId,
+        () => {
+          // On success, update the instances list
+          setInstances(prev => prev.filter(instance => instance.id !== instanceId));
+        },
+        toast
+      );
+      
+      if (success) {
+        toast({
+          title: "Success",
+          description: "WhatsApp instance disconnected successfully",
+        });
+      }
+    } catch (error) {
+      console.error('Error logging out instance:', error);
+      toast({
+        title: "Error",
+        description: "Failed to disconnect WhatsApp instance",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLogoutLoading(null);
+    }
+  };
 
   const getStatusIcon = (instance: WhatsAppInstance) => {
     const isConnected = 
@@ -119,8 +156,18 @@ export function WhatsAppBusinessSettings({ selectedIntegration, onConnect }: Wha
                         <TableCell>
                           <div className="flex items-center justify-between">
                             {getStatusIcon(instance)}
-                            <Button variant="ghost" size="sm" className="h-6 w-6 p-0">
-                              <X className="h-4 w-4 text-gray-400" />
+                            <Button 
+                              variant="ghost" 
+                              size="sm" 
+                              className="h-6 w-6 p-0"
+                              onClick={() => handleLogout(instance.id)}
+                              disabled={isLogoutLoading === instance.id}
+                            >
+                              {isLogoutLoading === instance.id ? (
+                                <Loader2 className="h-4 w-4 animate-spin" />
+                              ) : (
+                                <X className="h-4 w-4 text-gray-400" />
+                              )}
                             </Button>
                           </div>
                         </TableCell>

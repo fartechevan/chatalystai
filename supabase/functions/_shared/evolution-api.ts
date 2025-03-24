@@ -1,6 +1,4 @@
 
-// File: supabase/functions/_shared/evolution-api.ts
-
 // Get the Evolution API base URL from environment variables or use default
 export const EVO_API_BASE_URL = Deno.env.get("EVOLUTION_API_URL") || "https://api.evoapicloud.com";
 
@@ -20,4 +18,12 @@ export function getEvolutionAPIOptions(method: string = 'GET') {
       'apikey': apiKey,
     },
   };
+}
+
+// Helper to format the API URL with the instance ID
+export function getInstanceApiUrl(endpoint: string, instanceId?: string) {
+  if (instanceId) {
+    return `${EVO_API_BASE_URL}/${endpoint}/${instanceId}`;
+  }
+  return `${EVO_API_BASE_URL}/${endpoint}`;
 }
