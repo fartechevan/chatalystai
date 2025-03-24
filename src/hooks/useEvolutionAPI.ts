@@ -1,4 +1,3 @@
-
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -41,14 +40,30 @@ export function useEvolutionAPI(instanceId: string | null) {
     queryKey: ['evolution-config', instanceId],
     queryFn: async () => {
       if (!instanceId) return null;
-      const { data, error } = await supabase
+      
+      // First get the configuration for this instance
+      const { data: instanceConfig, error: configError } = await supabase
         .from('integrations_config')
-        .select('base_url, instance_id')
+        .select('integration_id, instance_id')
         .eq('instance_id', instanceId)
         .single();
       
-      if (error) throw error;
-      return data || { base_url: 'https://api.evoapicloud.com', instance_id: instanceId };
+      if (configError) throw configError;
+      
+      // Then get the base_url from the integration
+      const { data: integration, error: integrationError } = await supabase
+        .from('integrations')
+        .select('base_url')
+        .eq('id', instanceConfig.integration_id)
+        .single();
+      
+      if (integrationError) throw integrationError;
+      
+      return { 
+        base_url: integration.base_url, 
+        instance_id: instanceId,
+        integration_id: instanceConfig.integration_id
+      };
     },
     enabled: !!instanceId
   });

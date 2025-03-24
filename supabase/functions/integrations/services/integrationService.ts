@@ -14,23 +14,39 @@ const supabaseClient = createClient(supabaseUrl, supabaseKey);
 
 // Helper function to fetch integration config
 export async function getIntegrationConfig(integrationId = 'bda44db7-4e9a-4733-a9c7-c4f5d7198905') {
+  // First get the integration details
   const { data: integration, error: integrationError } = await supabaseClient
-    .from('integrations_config')
-    .select('instance_id, base_url')
+    .from('integrations')
+    .select('id, base_url')
     .eq('id', integrationId)
     .single();
 
   if (integrationError) {
-    console.error('Error fetching integration config:', integrationError);
-    throw new Error('Failed to fetch integration configuration');
+    console.error('Error fetching integration:', integrationError);
+    throw new Error('Failed to fetch integration information');
   }
 
   if (!integration) {
-    console.error('Integration config not found');
-    throw new Error('Integration configuration not found');
+    console.error('Integration not found');
+    throw new Error('Integration not found');
   }
 
-  return integration;
+  // Then get the configuration associated with this integration
+  const { data: config, error: configError } = await supabaseClient
+    .from('integrations_config')
+    .select('instance_id')
+    .eq('integration_id', integrationId)
+    .single();
+
+  if (configError && configError.code !== 'PGRST116') { // Not found is ok
+    console.error('Error fetching integration config:', configError);
+    throw new Error('Failed to fetch integration configuration');
+  }
+
+  return {
+    ...integration,
+    instance_id: config?.instance_id || ''
+  };
 }
 
 // Verify Evolution API key is available
@@ -100,8 +116,7 @@ export async function saveIntegrationConfigFromInstances(integrationId: string, 
           .insert({
             integration_id: integrationId,
             instance_id: instance.id,
-            user_reference_id: userReferenceId,
-            base_url: 'https://api.evoapicloud.com'
+            user_reference_id: userReferenceId
           });
         
         if (insertError) {

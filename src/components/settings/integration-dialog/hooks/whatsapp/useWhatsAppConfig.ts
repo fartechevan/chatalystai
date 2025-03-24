@@ -8,24 +8,39 @@ export function useWhatsAppConfig(selectedIntegration: Integration | null) {
     queryKey: ['integration-config', selectedIntegration?.id],
     queryFn: async () => {
       if (!selectedIntegration?.id) return null;
-      const { data, error } = await supabase
+      
+      // First fetch the integration to get the base_url
+      const { data: integration, error: integrationError } = await supabase
+        .from('integrations')
+        .select('id, base_url')
+        .eq('id', selectedIntegration.id)
+        .single();
+      
+      if (integrationError) throw integrationError;
+      
+      // Then fetch the configuration
+      const { data: config, error: configError } = await supabase
         .from('integrations_config')
-        .select('id, integration_id, instance_id, base_url')
+        .select('id, integration_id, instance_id')
         .eq('integration_id', selectedIntegration.id)
         .maybeSingle();
       
-      if (error) throw error;
+      if (configError && configError.code !== 'PGRST116') throw configError;
       
-      // If no config exists, return a default one
-      if (!data) {
+      // If no config exists, return a default one with the integration's base_url
+      if (!config) {
         return {
           integration_id: selectedIntegration.id,
-          base_url: 'https://api.evoapicloud.com',
+          base_url: integration.base_url,
           instance_id: ''
         };
       }
       
-      return data;
+      // Return the merged object with data from both tables
+      return {
+        ...config,
+        base_url: integration.base_url
+      };
     },
     enabled: !!selectedIntegration?.id,
   });

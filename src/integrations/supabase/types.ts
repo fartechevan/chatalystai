@@ -187,6 +187,7 @@ export type Database = {
       }
       integrations: {
         Row: {
+          base_url: string | null
           created_at: string | null
           description: string | null
           icon_url: string | null
@@ -197,6 +198,7 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          base_url?: string | null
           created_at?: string | null
           description?: string | null
           icon_url?: string | null
@@ -207,6 +209,7 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          base_url?: string | null
           created_at?: string | null
           description?: string | null
           icon_url?: string | null
@@ -220,7 +223,6 @@ export type Database = {
       }
       integrations_config: {
         Row: {
-          base_url: string
           created_at: string
           id: string
           instance_id: string | null
@@ -229,7 +231,6 @@ export type Database = {
           user_reference_id: string | null
         }
         Insert: {
-          base_url?: string
           created_at?: string
           id?: string
           instance_id?: string | null
@@ -238,7 +239,6 @@ export type Database = {
           user_reference_id?: string | null
         }
         Update: {
-          base_url?: string
           created_at?: string
           id?: string
           instance_id?: string | null

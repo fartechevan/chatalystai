@@ -12,7 +12,7 @@ export const checkInstanceStatus = async (
   if (!config || !config.instance_id) return false;
 
   try {
-    // Use base URL from config or default
+    // Use base URL from config
     const baseUrl = config.base_url || 'https://api.evoapicloud.com';
     
     console.log('Checking instance status with:', { instanceId: config.instance_id, baseUrl });
