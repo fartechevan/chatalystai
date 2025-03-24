@@ -13,7 +13,7 @@ export function IntegrationCard({ integration, onConnect }: IntegrationCardProps
     <div className="border rounded-lg p-4 hover:shadow-md transition-shadow">
       <div className="aspect-video rounded-md bg-gradient-to-br from-blue-50 to-blue-100 mb-4 flex items-center justify-center">
         <img
-          src={integration.icon_url}
+          src={integration.icon_url || integration.icon}
           alt={integration.name}
           className="object-contain max-h-16"
         />

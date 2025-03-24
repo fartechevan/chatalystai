@@ -12,4 +12,8 @@ export interface Integration {
   category?: string;
   status?: string;
   icon?: string;
+  // Additional fields needed in the application
+  icon_url?: string;
+  description?: string;
+  is_connected?: boolean;
 }

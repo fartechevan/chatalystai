@@ -1,4 +1,3 @@
-
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
@@ -6,7 +5,7 @@ import { CheckCircle, Plus, AlertCircle, X, Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import type { Integration } from "../../types";
+import type { Integration } from "./types";
 
 interface WhatsAppBusinessSettingsProps {
   selectedIntegration: Integration | null;

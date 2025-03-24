@@ -79,7 +79,7 @@ export function WhatsAppBusinessSettings({ selectedIntegration, onConnect }: Wha
           // On success, update the instances list
           setInstances(prev => prev.filter(instance => instance.id !== instanceId));
         },
-        toast
+        { toast } // Pass the toast object correctly
       );
       
       if (success) {

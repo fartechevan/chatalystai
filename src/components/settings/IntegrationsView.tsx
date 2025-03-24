@@ -38,16 +38,23 @@ export function IntegrationsView() {
         icon_url: "/lovable-uploads/8d699109-6446-4dd5-b026-f2f32a953f05.png",
         status: "available",
         is_connected: false,
-        base_url: "https://api.evoapicloud.com"
+        base_url: "https://api.evoapicloud.com",
+        type: "messenger" // Add the required type field
       };
       
       const hasWhatsAppCloudApi = data.some(integration => 
         integration.name === "WhatsApp Cloud API"
       );
       
+      // Cast the data to Integration[] after adding the missing type field
+      const typedData = data.map(item => ({
+        ...item,
+        type: item.type || "messenger" // Add default type if missing
+      })) as Integration[];
+      
       return hasWhatsAppCloudApi 
-        ? data as Integration[]
-        : [...data, whatsappCloudApi] as Integration[];
+        ? typedData
+        : [...typedData, whatsappCloudApi] as Integration[];
     },
   });
 
