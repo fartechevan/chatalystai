@@ -23,13 +23,16 @@ Deno.serve(async (req) => {
     
     let requestBody = {};
     try {
-      requestBody = await req.json();
+      if (req.method !== "GET" && req.method !== "HEAD") {
+        requestBody = await req.json();
+        console.log('Request body:', requestBody);
+      }
     } catch (e) {
       // If JSON parsing fails, continue with empty object
       console.log('No request body or invalid JSON');
     }
     
-    const { integration_id } = requestBody;
+    const { integration_id } = requestBody as { integration_id?: string };
     
     // Handle different functionality based on path segments and request method
     switch (path[0]) {
