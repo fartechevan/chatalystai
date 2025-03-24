@@ -1,22 +1,14 @@
 
 import { corsHeaders } from "../../_shared/cors.ts";
 import { EVO_API_BASE_URL, getEvolutionAPIOptions } from "../../_shared/evolution-api.ts";
-import { getIntegrationConfig } from "../services/integrationService.ts";
 
 // Handler for fetching WhatsApp instances
 export async function handleFetchInstances() {
   try {
     console.log('Starting handleFetchInstances');
     
-    // Get integration config with hardcoded ID
-    const integration = await getIntegrationConfig('bda44db7-4e9a-4733-a9c7-c4f5d7198905');
-    console.log('Retrieved integration config');
-    
-    const apiKey = integration.api_key;
-    console.log(`Using API key length: ${apiKey?.length || 0}`);
-    
-    // Set up API request
-    const options = getEvolutionAPIOptions(apiKey);
+    // Set up API request using the EVOLUTION_API_KEY from environment
+    const options = getEvolutionAPIOptions();
     console.log('Fetching instances from Evolution API...');
     console.log(`URL: ${EVO_API_BASE_URL}/instance/fetchInstances`);
     
@@ -60,10 +52,7 @@ export async function handleConnectionState(instanceId: string) {
       throw new Error('Instance ID is required');
     }
     
-    const integration = await getIntegrationConfig();
-    const apiKey = integration.api_key;
-    
-    const options = getEvolutionAPIOptions(apiKey);
+    const options = getEvolutionAPIOptions();
     const apiUrl = `${EVO_API_BASE_URL}/instance/connectionState/${instanceId}`;
     const response = await fetch(apiUrl, options);
     
@@ -103,11 +92,8 @@ export async function handleConnect(instanceId: string) {
       throw new Error('Instance ID is required');
     }
     
-    const integration = await getIntegrationConfig();
-    const apiKey = integration.api_key;
-    
     // We need to use POST method for connecting according to Evolution API docs
-    const options = getEvolutionAPIOptions(apiKey, 'POST');
+    const options = getEvolutionAPIOptions('POST');
     const apiUrl = `${EVO_API_BASE_URL}/instance/connect/${instanceId}`;
     
     console.log(`Connecting to WhatsApp instance ${instanceId} at ${apiUrl}`);

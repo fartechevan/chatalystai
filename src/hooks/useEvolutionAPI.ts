@@ -38,17 +38,17 @@ export function useEvolutionAPI(instanceId: string | null) {
 
   // Fetch instance configuration
   const { data: config } = useQuery({
-    queryKey: ['evolution-config'],
+    queryKey: ['evolution-config', instanceId],
     queryFn: async () => {
       if (!instanceId) return null;
       const { data, error } = await supabase
         .from('integrations_config')
-        .select('*')
+        .select('base_url, instance_id')
         .eq('instance_id', instanceId)
         .single();
       
       if (error) throw error;
-      return data;
+      return data || { base_url: 'https://api.evoapicloud.com', instance_id: instanceId };
     },
     enabled: !!instanceId
   });
@@ -59,13 +59,13 @@ export function useEvolutionAPI(instanceId: string | null) {
     queryFn: async () => {
       if (!config || !instanceId) throw new Error('No configuration found');
       
-      const response = await fetch(`${config.base_url}/instance/fetchInstances`, {
-        headers: { 'apikey': config.api_key },
+      // Now using edge function to fetch instances
+      const { data, error } = await supabase.functions.invoke('integrations', {
+        method: 'GET'
       });
       
-      if (!response.ok) throw new Error('Failed to fetch instance info');
+      if (error) throw new Error('Failed to fetch instance info');
       
-      const data = await response.json();
       return data.find((inst: any) => inst.instance?.instanceId === instanceId);
     },
     enabled: !!config && !!instanceId,
@@ -79,7 +79,7 @@ export function useEvolutionAPI(instanceId: string | null) {
       if (!config || !instanceId) throw new Error('No configuration found');
       
       const response = await fetch(`${config.base_url}/chat/findChats/${instanceId}`, {
-        headers: { 'apikey': config.api_key },
+        headers: { 'apikey': process.env.EVOLUTION_API_KEY || '' },
       });
       
       if (!response.ok) throw new Error('Failed to fetch chats');
@@ -106,7 +106,7 @@ export function useEvolutionAPI(instanceId: string | null) {
         if (!config || !instanceId || !chatId) throw new Error('Missing required parameters');
         
         const response = await fetch(`${config.base_url}/chat/findMessages/${instanceId}/${chatId}`, {
-          headers: { 'apikey': config.api_key },
+          headers: { 'apikey': process.env.EVOLUTION_API_KEY || '' },
         });
         
         if (!response.ok) throw new Error('Failed to fetch messages');
@@ -131,21 +131,18 @@ export function useEvolutionAPI(instanceId: string | null) {
     mutationFn: async ({ chatId, message }: { chatId: string; message: string }) => {
       if (!config || !instanceId) throw new Error('No configuration found');
       
-      const response = await fetch(`${config.base_url}/message/sendText/${instanceId}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'apikey': config.api_key
-        },
-        body: JSON.stringify({
+      // Send message using our edge function
+      const { data, error } = await supabase.functions.invoke('integrations/message/sendText/', {
+        body: {
+          instanceId,
           number: chatId,
           text: message
-        })
+        }
       });
       
-      if (!response.ok) throw new Error('Failed to send message');
+      if (error) throw new Error('Failed to send message');
       
-      return response.json();
+      return data;
     },
     onSuccess: (_, variables) => {
       // Invalidate and refetch messages for the chat

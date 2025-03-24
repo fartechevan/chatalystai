@@ -4,7 +4,6 @@ import { formatQrCodeUrl } from "../utils/formatters";
 
 interface WhatsAppConfig {
   instance_id?: string;
-  api_key?: string;
   base_url?: string;
   [key: string]: any;
 }
@@ -42,8 +41,7 @@ export const initializeConnection = async (
   try {
     console.log('Connecting to WhatsApp API with config:', config);
     
-    // Hardcoded API key and base URL for reliability
-    const apiKey = config.api_key || 'd20770d7-312f-499a-b841-4b64a243f24c';
+    // Hardcoded base URL for reliability, but use config base_url if available
     const baseUrl = config.base_url || 'https://api.evoapicloud.com';
     
     // First check if the instance exists
@@ -52,7 +50,7 @@ export const initializeConnection = async (
       headers: {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
-        'apikey': apiKey,
+        'apikey': process.env.EVOLUTION_API_KEY || '',
       },
     });
 
@@ -76,7 +74,7 @@ export const initializeConnection = async (
         headers: {
           'Content-Type': 'application/json',
           'Accept': 'application/json',
-          'apikey': apiKey,
+          'apikey': process.env.EVOLUTION_API_KEY || '',
         },
         body: JSON.stringify({
           instanceName: config.instance_id,
@@ -100,7 +98,7 @@ export const initializeConnection = async (
       headers: {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
-        'apikey': apiKey,
+        'apikey': process.env.EVOLUTION_API_KEY || '',
       },
     });
 

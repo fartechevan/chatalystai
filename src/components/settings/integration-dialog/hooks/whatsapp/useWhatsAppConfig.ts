@@ -10,7 +10,7 @@ export function useWhatsAppConfig(selectedIntegration: Integration | null) {
       if (!selectedIntegration?.id) return null;
       const { data, error } = await supabase
         .from('integrations_config')
-        .select('*')
+        .select('id, integration_id, instance_id, base_url')
         .eq('integration_id', selectedIntegration.id)
         .maybeSingle();
       
@@ -21,8 +21,7 @@ export function useWhatsAppConfig(selectedIntegration: Integration | null) {
         return {
           integration_id: selectedIntegration.id,
           base_url: 'https://api.evoapicloud.com',
-          instance_id: '',
-          api_key: ''
+          instance_id: ''
         };
       }
       

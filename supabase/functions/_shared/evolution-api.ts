@@ -5,11 +5,11 @@
 export const EVO_API_BASE_URL = 'https://api.evoapicloud.com';
 
 // Get Evolution API key and build request options
-export function getEvolutionAPIOptions(apiKey: string, method = 'GET'): RequestInit {
+export function getEvolutionAPIOptions(method = 'GET'): RequestInit {
   const options: RequestInit = {
     method,
     headers: {
-      apikey: apiKey,
+      apikey: Deno.env.get('EVOLUTION_API_KEY') || '',
       'Content-Type': 'application/json',
       'Accept': 'application/json'
     }

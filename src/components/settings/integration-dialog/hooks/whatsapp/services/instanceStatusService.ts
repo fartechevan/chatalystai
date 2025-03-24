@@ -5,18 +5,17 @@ import type { ConnectionState } from "../types";
  * Check the status of a WhatsApp instance
  */
 export const checkInstanceStatus = async (
-  config: { instance_id?: string; api_key?: string; base_url?: string; } | null,
+  config: { instance_id?: string; base_url?: string; } | null,
   setConnectionState: (state: ConnectionState) => void,
   setQrCodeBase64: (qrCode: string | null) => void
 ) => {
   if (!config || !config.instance_id) return false;
 
   try {
-    // Hardcoded API key and base URL for reliability
-    const apiKey = config.api_key || 'd20770d7-312f-499a-b841-4b64a243f24c';
+    // Use base URL from config or default
     const baseUrl = config.base_url || 'https://api.evoapicloud.com';
     
-    console.log('Checking instance status with:', { instanceId: config.instance_id, apiKey, baseUrl });
+    console.log('Checking instance status with:', { instanceId: config.instance_id, baseUrl });
 
     // Direct API call using the Evolution API format
     const response = await fetch(`${baseUrl}/instance/fetchInstances`, {
@@ -24,7 +23,7 @@ export const checkInstanceStatus = async (
       headers: {
         'Content-Type': 'application/json',
         'Accept': 'application/json',
-        'apikey': apiKey,
+        'apikey': process.env.EVOLUTION_API_KEY || '',
       },
     });
 
