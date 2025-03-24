@@ -2,6 +2,8 @@
 import { corsHeaders } from "../_shared/cors.ts";
 import { handleFetchInstances, handleConnectionState, handleConnect, handleLogout } from "./handlers/instanceHandlers.ts";
 import { handleFindChats, handleFindMessages } from "./handlers/chatHandlers.ts";
+
+// Note the sendTextMessage import was incorrect in the original file
 import { handleSendTextMessage } from "./handlers/messageHandlers.ts";
 
 Deno.serve(async (req) => {

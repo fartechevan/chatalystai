@@ -1,47 +1,50 @@
 
 import { corsHeaders } from "../../_shared/cors.ts";
-import { EVO_API_BASE_URL, getEvolutionAPIOptions } from "../../_shared/evolution-api.ts";
-import { getIntegrationConfig } from "../services/integrationService.ts";
+import { getEvolutionAPIOptions, getInstanceApiUrl } from "../../_shared/evolution-api.ts";
 
-// Handler for WhatsApp message sending
-export async function handleSendWhatsAppMessage(req: Request) {
+export async function handleSendTextMessage(req: Request) {
   try {
-    const body = await req.json();
-    console.log('Received request body:', body);
+    const requestData = await req.json();
+    const { instanceId, number, text } = requestData;
     
-    // Extract parameters from the request body if provided, otherwise use default
-    const { number, text, instanceId } = body;
-    
-    if (!number || !text || !instanceId) {
-      console.error('Missing required parameters', { number, text, instanceId });
+    if (!instanceId || !number || !text) {
       return new Response(
-        JSON.stringify({ error: 'Missing required parameters: number, text, or instanceId' }),
+        JSON.stringify({ error: "Missing required parameters: instanceId, number, or text" }),
         {
           status: 400,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
         }
       );
     }
-
-    // Prepare request to Evolution API
-    const apiUrl = `${EVO_API_BASE_URL}/message/sendText/${instanceId}`;
-    console.log('Sending request to Evolution API:', apiUrl);
     
-    const options = {
-      ...getEvolutionAPIOptions('POST'),
-      body: JSON.stringify({
-        number: number,
-        text: text
-      })
-    };
-
-    console.log('Request options:', JSON.stringify(options, null, 2));
+    console.log(`Sending text message from instance ${instanceId} to ${number}: ${text}`);
     
-    // Send request to Evolution API
+    // Format the API endpoint URL
+    const apiUrl = getInstanceApiUrl('message/sendText', instanceId);
+    
+    // Set up request options
+    const options = getEvolutionAPIOptions('POST', {
+      number,
+      options: { delay: 1200 },
+      textMessage: { text }
+    });
+    
+    console.log(`Making request to: ${apiUrl}`);
+    
+    // Send the message
     const response = await fetch(apiUrl, options);
-    const data = await response.json();
+    console.log(`Send message response status: ${response.status}`);
     
-    console.log('Evolution API response:', data);
+    // Check if the response is valid JSON before parsing
+    const contentType = response.headers.get('content-type');
+    if (!contentType || !contentType.includes('application/json')) {
+      const text = await response.text();
+      console.error('Invalid response format:', text);
+      throw new Error('Invalid response format from API');
+    }
+    
+    const data = await response.json();
+    console.log('Send message response:', data);
     
     return new Response(
       JSON.stringify(data),
@@ -51,12 +54,13 @@ export async function handleSendWhatsAppMessage(req: Request) {
       }
     );
   } catch (error) {
-    console.error('Error in handleSendWhatsAppMessage:', error);
+    console.error('Error in handleSendTextMessage:', error);
     return new Response(
-      JSON.stringify({ error: error.message || 'Failed to send WhatsApp message' }),
+      JSON.stringify({ error: error.message }),
       {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      })
+      }
+    );
   }
 }

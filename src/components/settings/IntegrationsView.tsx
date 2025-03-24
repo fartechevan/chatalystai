@@ -1,4 +1,3 @@
-
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Plus } from "lucide-react";
@@ -30,6 +29,12 @@ export function IntegrationsView() {
       
       if (error) throw error;
       
+      // Important: Ensure every integration has the type property
+      const typedData = data.map(item => ({
+        ...item,
+        type: item.type || "messenger" // Add default type if missing
+      })) as Integration[];
+      
       // Add WhatsApp Cloud API integration if not already in the database
       const whatsappCloudApi: Integration = {
         id: "whatsapp-cloud-api",
@@ -39,22 +44,14 @@ export function IntegrationsView() {
         status: "available",
         is_connected: false,
         base_url: "https://api.evoapicloud.com",
-        type: "messenger" // Add the required type field
+        type: "messenger" // Ensure type property exists
       };
       
-      const hasWhatsAppCloudApi = data.some(integration => 
+      const hasWhatsAppCloudApi = typedData.some(integration => 
         integration.name === "WhatsApp Cloud API"
       );
       
-      // Add the type field to all integrations if it's missing
-      const typedData = data.map(item => ({
-        ...item,
-        type: item.type || "messenger" // Add default type if missing
-      })) as Integration[];
-      
-      return hasWhatsAppCloudApi 
-        ? typedData
-        : [...typedData, whatsappCloudApi];
+      return hasWhatsAppCloudApi ? typedData : [...typedData, whatsappCloudApi];
     },
   });
 
@@ -223,7 +220,7 @@ export function IntegrationsView() {
   const integrationsList = integrations.map(integration => ({
     ...integration,
     is_connected: connectedIntegrations[integration.id] || false,
-    type: integration.type || "messenger" // Ensure type exists for all integrations
+    type: integration.type || "messenger" // Ensure every integration has the type property
   }));
 
   const filteredIntegrations = integrationsList.filter(integration => {
