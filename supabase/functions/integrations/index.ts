@@ -2,8 +2,6 @@
 import { corsHeaders } from "../_shared/cors.ts";
 import { handleFetchInstances, handleConnectionState, handleConnect, handleLogout } from "./handlers/instanceHandlers.ts";
 import { handleFindChats, handleFindMessages } from "./handlers/chatHandlers.ts";
-
-// Note the sendTextMessage import was incorrect in the original file
 import { handleSendTextMessage } from "./handlers/messageHandlers.ts";
 
 Deno.serve(async (req) => {
@@ -34,7 +32,11 @@ Deno.serve(async (req) => {
       console.log('No request body or invalid JSON');
     }
     
-    const { integration_id } = requestBody as { integration_id?: string };
+    const { integration_id, action, instanceId } = requestBody as { 
+      integration_id?: string;
+      action?: string;
+      instanceId?: string;
+    };
     
     // Handle different functionality based on path segments and request method
     switch (path[0]) {
@@ -51,6 +53,9 @@ Deno.serve(async (req) => {
           return handleConnect(path[2]);
         } else if (path[1] === "logout" && path[2]) {
           return handleLogout(path[2]);
+        } else if (action === "logout" && instanceId) {
+          // Handle logout via action parameter
+          return handleLogout(instanceId);
         }
         break;
       
