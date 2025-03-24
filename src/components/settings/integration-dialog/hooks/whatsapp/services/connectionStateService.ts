@@ -17,8 +17,10 @@ export const checkConnectionState = async (
     const apiKey = config.api_key || 'd20770d7-312f-499a-b841-4b64a243f24c';
     const baseUrl = config.base_url || 'https://api.evoapicloud.com';
 
-    // Direct API call using the Evolution API format
-    const response = await fetch(`${baseUrl}/instance/connectionState/${config.instance_id}`, {
+    console.log('Checking connection state for instance:', config.instance_id);
+
+    // First check if the instance exists
+    const instanceResponse = await fetch(`${baseUrl}/instance/fetchInstances`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
@@ -27,36 +29,84 @@ export const checkConnectionState = async (
       },
     });
 
-    if (!response.ok) {
-      throw new Error('Failed to check WhatsApp connection state');
+    if (!instanceResponse.ok) {
+      console.error('Failed to fetch instances:', instanceResponse.status);
+      setConnectionState('unknown');
+      return 'unknown';
     }
 
-    // Verify we have JSON before parsing
-    const contentType = response.headers.get('content-type');
-    if (!contentType || !contentType.includes('application/json')) {
-      console.error('Invalid content type received:', contentType);
-      throw new Error('Invalid response format from API');
+    const instances = await instanceResponse.json();
+    console.log('Available instances:', instances);
+
+    // Find this instance in the list
+    const instance = Array.isArray(instances) ? 
+      instances.find(inst => inst.id === config.instance_id) : null;
+
+    if (!instance) {
+      console.log('Instance not found in the list');
+      setConnectionState('close');
+      return 'close';
     }
 
-    const data = await response.json();
-    console.log('Connection state response:', data);
-
-    // Set connection state based on API response
-    if (data.state) {
-      setConnectionState(data.state as ConnectionState);
+    console.log('Found instance with status:', instance.connectionStatus || instance.status);
+    
+    // Check status directly from the instance data
+    if (instance.connectionStatus === 'open' || instance.status === 'open') {
+      setConnectionState('open');
       
       // If connected, show toast
-      if (data.state === 'open') {
-        toast({
-          title: "WhatsApp Connected",
-          description: "Successfully connected to WhatsApp",
-        });
-      }
+      toast({
+        title: "WhatsApp Connected",
+        description: "Successfully connected to WhatsApp",
+      });
+      
+      return 'open';
     } else {
-      setConnectionState('unknown');
-    }
+      // If not connected, try the specific connectionState endpoint
+      const response = await fetch(`${baseUrl}/instance/connectionState/${config.instance_id}`, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'apikey': apiKey,
+        },
+      });
 
-    return data.state || 'unknown';
+      if (!response.ok) {
+        console.error('Failed to check connection state:', response.status);
+        setConnectionState('close');
+        return 'close';
+      }
+
+      // Verify we have JSON
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        console.error('Invalid content type received:', contentType);
+        setConnectionState('unknown');
+        return 'unknown';
+      }
+
+      const data = await response.json();
+      console.log('Connection state response:', data);
+
+      // Set connection state based on API response
+      if (data.state) {
+        setConnectionState(data.state as ConnectionState);
+        
+        // If connected, show toast
+        if (data.state === 'open') {
+          toast({
+            title: "WhatsApp Connected",
+            description: "Successfully connected to WhatsApp",
+          });
+        }
+        
+        return data.state;
+      } else {
+        setConnectionState('close');
+        return 'close';
+      }
+    }
   } catch (error) {
     console.error('Error checking connection state:', error);
     setConnectionState('unknown');

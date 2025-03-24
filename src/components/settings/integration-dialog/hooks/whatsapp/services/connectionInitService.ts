@@ -21,7 +21,16 @@ export const initializeConnection = async (
   config: WhatsAppConfig | null,
   toast: ReturnType<typeof useToast>['toast']
 ): Promise<ConnectionResult> => {
-  if (!config || !config.instance_id) {
+  if (!config) {
+    toast({
+      title: "Configuration Error",
+      description: "WhatsApp configuration is missing",
+      variant: "destructive",
+    });
+    return { success: false };
+  }
+
+  if (!config.instance_id) {
     toast({
       title: "Configuration Error",
       description: "Instance ID is missing in the configuration",
@@ -31,14 +40,61 @@ export const initializeConnection = async (
   }
 
   try {
-    // Instead of using an edge function, let's use direct API call for testing
     console.log('Connecting to WhatsApp API with config:', config);
     
     // Hardcoded API key and base URL for reliability
     const apiKey = config.api_key || 'd20770d7-312f-499a-b841-4b64a243f24c';
     const baseUrl = config.base_url || 'https://api.evoapicloud.com';
     
-    // Direct API call using the Evolution API format
+    // First check if the instance exists
+    const statusResponse = await fetch(`${baseUrl}/instance/fetchInstances`, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+        'apikey': apiKey,
+      },
+    });
+
+    if (!statusResponse.ok) {
+      console.error('Failed to check WhatsApp instances:', await statusResponse.text());
+      throw new Error('Failed to check WhatsApp instances');
+    }
+
+    const instances = await statusResponse.json();
+    console.log('Existing instances:', instances);
+
+    // Check if our instance exists already
+    const instanceExists = Array.isArray(instances) && 
+      instances.some(inst => inst.id === config.instance_id);
+
+    // If instance doesn't exist, create it first
+    if (!instanceExists) {
+      console.log('Instance not found, creating new instance:', config.instance_id);
+      const createResponse = await fetch(`${baseUrl}/instance/create`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'apikey': apiKey,
+        },
+        body: JSON.stringify({
+          instanceName: config.instance_id,
+          token: config.instance_id,
+          qrcode: true
+        }),
+      });
+
+      if (!createResponse.ok) {
+        console.error('Failed to create instance:', await createResponse.text());
+        throw new Error('Failed to create WhatsApp instance');
+      }
+
+      console.log('Instance created successfully');
+      await new Promise(resolve => setTimeout(resolve, 1000)); // Small delay after creation
+    }
+    
+    // Now connect to the instance
     const response = await fetch(`${baseUrl}/instance/connect/${config.instance_id}`, {
       method: 'GET',
       headers: {
@@ -52,7 +108,7 @@ export const initializeConnection = async (
     console.log('WhatsApp API response status:', response.status);
 
     if (!response.ok) {
-      // Try to get error message as text first
+      // Try to get error message
       let errorMessage = '';
       try {
         // Check if response is JSON
@@ -92,6 +148,11 @@ export const initializeConnection = async (
     else if (data.base64) {
       const base64Value = data.base64;
       const qrCodeDataUrl = formatQrCodeUrl(base64Value);
+      return { success: true, qrCodeDataUrl };
+    }
+    // If we have a qr property directly
+    else if (data.qr) {
+      const qrCodeDataUrl = formatQrCodeUrl(data.qr);
       return { success: true, qrCodeDataUrl };
     }
     else {

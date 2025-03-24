@@ -15,6 +15,14 @@ export function DeviceSelect({
   onOpenChange, 
   onIPhoneSelect 
 }: DeviceSelectProps) {
+  const handleIPhoneSelect = async () => {
+    try {
+      onIPhoneSelect();
+    } catch (error) {
+      console.error("Error selecting iPhone:", error);
+    }
+  };
+  
   return (
     <BaseDialog
       open={open}
@@ -36,6 +44,9 @@ export function DeviceSelect({
             variant="outline" 
             size="lg"
             className="w-full py-8 text-lg"
+            onClick={() => {
+              onIPhoneSelect(); // For now, both buttons do the same thing
+            }}
           >
             Android
           </Button>
@@ -43,7 +54,7 @@ export function DeviceSelect({
             variant="outline" 
             size="lg"
             className="w-full py-8 text-lg"
-            onClick={onIPhoneSelect}
+            onClick={handleIPhoneSelect}
           >
             iPhone
           </Button>
