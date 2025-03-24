@@ -1,3 +1,4 @@
+
 declare global {
   interface Window {
     fbAsyncInit: () => void;
@@ -116,6 +117,7 @@ export function IntegrationDialog({
             selectedIntegration={selectedIntegration}
             handleConnectWithFacebook={handleConnectWithFacebook}
             onClose={() => handleDialogChange(false)}
+            onConnect={handleConnect}
           />
         </div>
         

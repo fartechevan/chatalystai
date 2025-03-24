@@ -12,12 +12,14 @@ interface IntegrationTabsProps {
   selectedIntegration: Integration | null;
   handleConnectWithFacebook: () => void;
   onClose: () => void;
+  onConnect?: () => void;
 }
 
 export function IntegrationTabs({ 
   selectedIntegration, 
   handleConnectWithFacebook,
-  onClose
+  onClose,
+  onConnect
 }: IntegrationTabsProps) {
   const [activeTab, setActiveTab] = useState<"settings" | "authorization">("settings");
 
@@ -42,7 +44,10 @@ export function IntegrationTabs({
       ) : (
         <>
           <TabsContent value="settings" className="space-y-6 h-96">
-            <WhatsAppBusinessSettings />
+            <WhatsAppBusinessSettings 
+              selectedIntegration={selectedIntegration}
+              onConnect={onConnect || (() => {})}
+            />
           </TabsContent>
           
           <TabsContent value="authorization" className="space-y-6 h-96">

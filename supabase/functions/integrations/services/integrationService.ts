@@ -1,133 +1,79 @@
 
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
 
-// Supabase configuration
-const supabaseUrl = Deno.env.get('SUPABASE_URL');
-const supabaseKey = Deno.env.get('SUPABASE_ANON_KEY');
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL") || "";
+const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || "";
 
-if (!supabaseUrl || !supabaseKey) {
-  console.error('Missing Supabase URL or key');
-  Deno.exit(1);
-}
-
-const supabaseClient = createClient(supabaseUrl, supabaseKey);
-
-// Helper function to fetch integration config
-export async function getIntegrationConfig(integrationId = 'bda44db7-4e9a-4733-a9c7-c4f5d7198905') {
-  // First get the integration details
-  const { data: integration, error: integrationError } = await supabaseClient
-    .from('integrations')
-    .select('id, base_url')
-    .eq('id', integrationId)
-    .single();
-
-  if (integrationError) {
-    console.error('Error fetching integration:', integrationError);
-    throw new Error('Failed to fetch integration information');
-  }
-
-  if (!integration) {
-    console.error('Integration not found');
-    throw new Error('Integration not found');
-  }
-
-  // Then get the configuration associated with this integration
-  const { data: config, error: configError } = await supabaseClient
-    .from('integrations_config')
-    .select('instance_id')
-    .eq('integration_id', integrationId)
-    .single();
-
-  if (configError && configError.code !== 'PGRST116') { // Not found is ok
-    console.error('Error fetching integration config:', configError);
-    throw new Error('Failed to fetch integration configuration');
-  }
-
-  return {
-    ...integration,
-    instance_id: config?.instance_id || ''
-  };
-}
-
-// Verify Evolution API key is available
-export function verifyEvolutionApiKey() {
-  const apiKey = Deno.env.get('EVOLUTION_API_KEY');
-  if (!apiKey) {
-    console.error('EVOLUTION_API_KEY environment variable is not set');
-    throw new Error('Evolution API Key is not configured');
-  }
-  return true;
-}
-
-// Save or update integration config from instances data
+/**
+ * Saves integration configuration from WhatsApp instances data
+ */
 export async function saveIntegrationConfigFromInstances(integrationId: string, instances: any[]) {
-  try {
-    console.log('Saving integration config from instances data:', {
-      integrationId, 
-      instances: Array.isArray(instances) ? instances.length : 'not an array'
-    });
-    
-    if (!Array.isArray(instances) || instances.length === 0) {
-      console.log('No instances to save');
-      return;
-    }
-    
-    // Process each instance
-    for (const instance of instances) {
-      // Extract user_reference_id from ownerJid if available
-      const userReferenceId = instance.owner?.id || 
-                              instance.owner?.jid || 
-                              instance.ownerJid || 
-                              instance.phone || 
-                              '';
+  if (!instances || !Array.isArray(instances) || instances.length === 0) {
+    console.log('No instances provided, skipping database update');
+    return;
+  }
+  
+  console.log(`Saving ${instances.length} instances for integration ${integrationId}`);
+  
+  const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+  
+  for (const instance of instances) {
+    try {
+      const instanceId = instance.id || instance.instance?.instanceId;
+      const ownerJid = instance.ownerJid || instance.owner || instance.instance?.owner;
       
-      console.log('Processing instance:', {
-        instanceId: instance.id,
-        userReferenceId,
-        connectionStatus: instance.connectionStatus || instance.status
-      });
+      if (!instanceId) {
+        console.warn('Missing instance ID, skipping record');
+        continue;
+      }
       
-      // Check if there's already a config for this instance
-      const { data: existingConfig } = await supabaseClient
+      console.log(`Processing instance ${instanceId} with owner ${ownerJid || 'unknown'}`);
+      
+      // Check if config already exists for this integration and instance
+      const { data: existingConfig, error: checkError } = await supabase
         .from('integrations_config')
         .select('id')
-        .eq('instance_id', instance.id)
+        .eq('integration_id', integrationId)
+        .eq('instance_id', instanceId)
         .maybeSingle();
       
+      if (checkError) {
+        console.error('Error checking for existing config:', checkError);
+        continue;
+      }
+      
+      const configData = {
+        integration_id: integrationId,
+        instance_id: instanceId,
+        user_reference_id: ownerJid || null
+      };
+      
+      let result;
       if (existingConfig) {
         // Update existing config
-        console.log('Updating existing config for instance:', instance.id);
-        const { error: updateError } = await supabaseClient
+        result = await supabase
           .from('integrations_config')
-          .update({
-            user_reference_id: userReferenceId,
-            updated_at: new Date().toISOString()
-          })
+          .update(configData)
           .eq('id', existingConfig.id);
         
-        if (updateError) {
-          console.error('Error updating integration config:', updateError);
-        }
+        console.log(`Updated existing config for instance ${instanceId}`);
       } else {
-        // Create new config for this instance
-        console.log('Creating new config for instance:', instance.id);
-        const { error: insertError } = await supabaseClient
+        // Insert new config
+        result = await supabase
           .from('integrations_config')
-          .insert({
-            integration_id: integrationId,
-            instance_id: instance.id,
-            user_reference_id: userReferenceId
-          });
+          .insert(configData);
         
-        if (insertError) {
-          console.error('Error creating integration config:', insertError);
-        }
+        console.log(`Inserted new config for instance ${instanceId}`);
       }
+      
+      if (result.error) {
+        console.error('Error saving integration config:', result.error);
+      }
+      
+    } catch (error) {
+      console.error('Error processing instance:', error);
     }
-    
-    return { success: true };
-  } catch (error) {
-    console.error('Error saving integration config:', error);
-    throw error;
   }
+  
+  console.log('Finished saving integration configurations');
 }
