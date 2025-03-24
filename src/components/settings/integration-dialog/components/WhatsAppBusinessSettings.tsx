@@ -29,6 +29,7 @@ export function WhatsAppBusinessSettings({ selectedIntegration, onConnect }: Wha
   const [instances, setInstances] = useState<WhatsAppInstance[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isLogoutLoading, setIsLogoutLoading] = useState<string | null>(null);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const { toast } = useToast();
   const { config } = useWhatsAppConfig(selectedIntegration);
 
@@ -37,13 +38,17 @@ export function WhatsAppBusinessSettings({ selectedIntegration, onConnect }: Wha
       if (!selectedIntegration) return;
       
       setIsLoading(true);
+      setLoadError(null);
       try {
+        console.log('Fetching instances for integration:', selectedIntegration.id);
+        
         const { data, error } = await supabase.functions.invoke("integrations", {
           body: { integration_id: selectedIntegration.id }
         });
         
         if (error) {
           console.error('Error fetching WhatsApp instances:', error);
+          setLoadError("Could not load WhatsApp instances: " + error.message);
           toast({
             title: "Error",
             description: "Could not fetch WhatsApp instances",
@@ -54,10 +59,21 @@ export function WhatsAppBusinessSettings({ selectedIntegration, onConnect }: Wha
           console.log('WhatsApp instances:', data);
           setInstances(data);
         } else {
+          console.log('Unexpected data format:', data);
           setInstances([]);
+          toast({
+            title: "Info",
+            description: "No WhatsApp instances found",
+          });
         }
       } catch (error) {
         console.error('Error in fetchInstances:', error);
+        setLoadError("Could not load WhatsApp instances: " + (error as Error).message);
+        toast({
+          title: "Error",
+          description: "An unexpected error occurred",
+          variant: "destructive"
+        });
         setInstances([]);
       } finally {
         setIsLoading(false);
@@ -115,6 +131,18 @@ export function WhatsAppBusinessSettings({ selectedIntegration, onConnect }: Wha
     return (
       <div className="flex items-center justify-center h-64">
         <Loader2 className="h-8 w-8 animate-spin text-primary" />
+      </div>
+    );
+  }
+
+  if (loadError) {
+    return (
+      <div className="flex flex-col items-center justify-center h-64 space-y-4">
+        <AlertCircle className="h-10 w-10 text-red-500" />
+        <p className="text-red-500">{loadError}</p>
+        <Button onClick={() => window.location.reload()}>
+          Retry
+        </Button>
       </div>
     );
   }

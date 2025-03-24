@@ -1,6 +1,6 @@
 
 import { useToast } from "@/hooks/use-toast";
-import type { ConnectionState } from "../types";
+import type { ConnectionState } from "../../../../types";
 
 /**
  * Check and update the connection state of a WhatsApp instance
@@ -43,8 +43,8 @@ export const checkConnectionState = async (
 
     if (!instance) {
       console.log('Instance not found in the list');
-      setConnectionState('closed');
-      return 'closed';
+      setConnectionState('idle');
+      return 'idle';
     }
 
     console.log('Found instance with status:', instance.connectionStatus || instance.status);
@@ -73,8 +73,8 @@ export const checkConnectionState = async (
 
       if (!response.ok) {
         console.error('Failed to check connection state:', response.status);
-        setConnectionState('closed');
-        return 'closed';
+        setConnectionState('idle');
+        return 'idle';
       }
 
       // Verify we have JSON
@@ -90,7 +90,8 @@ export const checkConnectionState = async (
 
       // Set connection state based on API response
       if (data.state) {
-        setConnectionState(data.state as ConnectionState);
+        const convertedState = data.state === 'close' ? 'idle' : data.state as ConnectionState;
+        setConnectionState(convertedState);
         
         // If connected, show toast
         if (data.state === 'open') {
@@ -100,10 +101,10 @@ export const checkConnectionState = async (
           });
         }
         
-        return data.state;
+        return convertedState;
       } else {
-        setConnectionState('closed');
-        return 'closed';
+        setConnectionState('idle');
+        return 'idle';
       }
     }
   } catch (error) {
