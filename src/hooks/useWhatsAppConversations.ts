@@ -23,19 +23,16 @@ export function useWhatsAppConversations(instanceId: string | null, isConnected:
       const baseUrl = config?.base_url || 'https://api.evoapicloud.com';
       console.log('Using base URL:', baseUrl);
 
-      // Fetch conversations from Evolution API
-      const response = await fetch(`${baseUrl}/chat/findMessages/${instanceId}`, {
-        headers: {
-          'apikey': process.env.EVOLUTION_API_KEY || '',
-        },
+      // Use the Edge Function to fetch conversations
+      const { data, error } = await supabase.functions.invoke('integrations/chat/findMessages', {
+        body: { instanceId }
       });
-
-      if (!response.ok) {
-        console.error('Failed to fetch WhatsApp conversations:', response.status, response.statusText);
-        throw new Error(`Failed to fetch WhatsApp conversations: ${response.status}`);
+      
+      if (error) {
+        console.error('Failed to fetch WhatsApp conversations:', error);
+        throw new Error(`Failed to fetch WhatsApp conversations: ${error.message}`);
       }
 
-      const data = await response.json();
       console.log('WhatsApp conversation data:', data);
       return data;
     },

@@ -78,21 +78,20 @@ export function useEvolutionAPI(instanceId: string | null) {
     queryFn: async () => {
       if (!config || !instanceId) throw new Error('No configuration found');
       
-      const response = await fetch(`${config.base_url}/chat/findChats/${instanceId}`, {
-        headers: { 'apikey': process.env.EVOLUTION_API_KEY || '' },
+      const { data, error } = await supabase.functions.invoke('integrations/chat/findChats', {
+        body: { instanceId }
       });
       
-      if (!response.ok) throw new Error('Failed to fetch chats');
+      if (error) throw new Error('Failed to fetch chats');
       
-      const data = await response.json();
-      return data.map((chat: any) => ({
+      return data?.map((chat: any) => ({
         id: chat.id,
         name: chat.name || chat.id,
         lastMessage: chat.lastMessage ? {
           content: chat.lastMessage.content,
           timestamp: chat.lastMessage.timestamp
         } : undefined
-      }));
+      })) || [];
     },
     enabled: !!config && !!instanceId,
     refetchInterval: 10000 // Refresh every 10 seconds
@@ -105,21 +104,23 @@ export function useEvolutionAPI(instanceId: string | null) {
       queryFn: async () => {
         if (!config || !instanceId || !chatId) throw new Error('Missing required parameters');
         
-        const response = await fetch(`${config.base_url}/chat/findMessages/${instanceId}/${chatId}`, {
-          headers: { 'apikey': process.env.EVOLUTION_API_KEY || '' },
+        const { data, error } = await supabase.functions.invoke('integrations/chat/findMessages', {
+          body: { 
+            instanceId,
+            chatId 
+          }
         });
         
-        if (!response.ok) throw new Error('Failed to fetch messages');
+        if (error) throw new Error('Failed to fetch messages');
         
-        const data = await response.json();
-        return data.messages.map((msg: any) => ({
+        return data?.messages?.map((msg: any) => ({
           key: msg.key.id,
           id: msg.key.id,
           content: msg.message?.conversation || msg.message?.extendedTextMessage?.text || '',
           fromMe: msg.key.fromMe,
           timestamp: msg.messageTimestamp,
           sender: msg.key.participant || msg.key.remoteJid
-        }));
+        })) || [];
       },
       enabled: !!config && !!instanceId && !!chatId,
       refetchInterval: 5000 // Refresh every 5 seconds
@@ -132,7 +133,7 @@ export function useEvolutionAPI(instanceId: string | null) {
       if (!config || !instanceId) throw new Error('No configuration found');
       
       // Send message using our edge function
-      const { data, error } = await supabase.functions.invoke('integrations/message/sendText/', {
+      const { data, error } = await supabase.functions.invoke('integrations/message/sendText', {
         body: {
           instanceId,
           number: chatId,

@@ -6,10 +6,16 @@ export const EVO_API_BASE_URL = 'https://api.evoapicloud.com';
 
 // Get Evolution API key and build request options
 export function getEvolutionAPIOptions(method = 'GET'): RequestInit {
+  const apiKey = Deno.env.get('EVOLUTION_API_KEY');
+  
+  if (!apiKey) {
+    console.error('EVOLUTION_API_KEY environment variable is not set');
+  }
+  
   const options: RequestInit = {
     method,
     headers: {
-      apikey: Deno.env.get('EVOLUTION_API_KEY') || '',
+      apikey: apiKey || '',
       'Content-Type': 'application/json',
       'Accept': 'application/json'
     }

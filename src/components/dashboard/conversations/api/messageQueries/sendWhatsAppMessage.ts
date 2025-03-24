@@ -27,8 +27,8 @@ export async function sendWhatsAppMessage(
     
     console.log('WhatsApp API request payload:', payload);
     
-    // Make sure we're passing the path in the function invocation
-    const { data, error } = await supabase.functions.invoke('integrations/message/sendText/', {
+    // Call the edge function with the correct path
+    const { data, error } = await supabase.functions.invoke('integrations/message/sendText', {
       body: payload
     });
 

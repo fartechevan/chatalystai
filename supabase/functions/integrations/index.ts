@@ -7,6 +7,7 @@ import {
   handleConnect 
 } from "./handlers/instanceHandlers.ts";
 import { handleSendWhatsAppMessage } from "./handlers/messageHandlers.ts";
+import { handleFindChats, handleFindMessages } from "./handlers/chatHandlers.ts";
 
 serve(async (req) => {
   // Handle CORS preflight requests
@@ -24,6 +25,12 @@ serve(async (req) => {
     if (req.method === 'POST' && path.includes('/message/sendText')) {
       console.log("Routing to handleSendWhatsAppMessage");
       return await handleSendWhatsAppMessage(req);
+    } else if (path.includes('/chat/findChats')) {
+      console.log("Routing to handleFindChats");
+      return await handleFindChats(req);
+    } else if (path.includes('/chat/findMessages')) {
+      console.log("Routing to handleFindMessages");
+      return await handleFindMessages(req);
     } else if (path.includes('/instance/fetchInstances')) {
       console.log("fetchInstances called");
       return await handleFetchInstances();

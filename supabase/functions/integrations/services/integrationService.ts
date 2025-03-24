@@ -16,7 +16,7 @@ const supabaseClient = createClient(supabaseUrl, supabaseKey);
 export async function getIntegrationConfig(integrationId = 'bda44db7-4e9a-4733-a9c7-c4f5d7198905') {
   const { data: integration, error: integrationError } = await supabaseClient
     .from('integrations_config')
-    .select('instance_id')
+    .select('instance_id, base_url')
     .eq('id', integrationId)
     .single();
 
@@ -31,4 +31,14 @@ export async function getIntegrationConfig(integrationId = 'bda44db7-4e9a-4733-a
   }
 
   return integration;
+}
+
+// Verify Evolution API key is available
+export function verifyEvolutionApiKey() {
+  const apiKey = Deno.env.get('EVOLUTION_API_KEY');
+  if (!apiKey) {
+    console.error('EVOLUTION_API_KEY environment variable is not set');
+    throw new Error('Evolution API Key is not configured');
+  }
+  return true;
 }
