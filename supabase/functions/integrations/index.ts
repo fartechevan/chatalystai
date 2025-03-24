@@ -21,7 +21,15 @@ Deno.serve(async (req) => {
     
     console.log(`Request method: ${req.method}, path segments:`, path);
     
-    const { integration_id } = await req.json().catch(() => ({}));
+    let requestBody = {};
+    try {
+      requestBody = await req.json();
+    } catch (e) {
+      // If JSON parsing fails, continue with empty object
+      console.log('No request body or invalid JSON');
+    }
+    
+    const { integration_id } = requestBody;
     
     // Handle different functionality based on path segments and request method
     switch (path[0]) {

@@ -1,5 +1,5 @@
 
-import type { ConnectionState } from "../types";
+import type { ConnectionState } from "../../../../types";
 
 /**
  * Check the status of a WhatsApp instance
@@ -31,7 +31,7 @@ export const checkInstanceStatus = async (
 
     if (!response.ok) {
       console.error('Failed to check WhatsApp connection status:', response.status, response.statusText);
-      setConnectionState('closed');
+      setConnectionState('idle');
       return false;
     }
 
@@ -66,12 +66,12 @@ export const checkInstanceStatus = async (
           setQrCodeBase64(null);
           return true;
         } else {
-          setConnectionState('closed');
+          setConnectionState('idle');
           return false;
         }
       } else {
         console.log('Instance not found in response');
-        setConnectionState('closed');
+        setConnectionState('idle');
         return false;
       }
     } else {
