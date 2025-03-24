@@ -31,7 +31,7 @@ export function IntegrationsView() {
       if (error) throw error;
       
       // Add WhatsApp Cloud API integration if not already in the database
-      const whatsappCloudApi = {
+      const whatsappCloudApi: Integration = {
         id: "whatsapp-cloud-api",
         name: "WhatsApp Cloud API",
         description: "Connect your WhatsApp Business account through Facebook.",
@@ -46,15 +46,15 @@ export function IntegrationsView() {
         integration.name === "WhatsApp Cloud API"
       );
       
-      // Cast the data to Integration[] after adding the missing type field
-      const typedData = data.map(item => ({
+      // Ensure all entries have the required type field
+      const typedData: Integration[] = data.map(item => ({
         ...item,
         type: item.type || "messenger" // Add default type if missing
-      })) as Integration[];
+      }));
       
       return hasWhatsAppCloudApi 
         ? typedData
-        : [...typedData, whatsappCloudApi] as Integration[];
+        : [...typedData, whatsappCloudApi];
     },
   });
 
