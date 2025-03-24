@@ -1,37 +1,23 @@
 
-// Constants and utilities for Evolution API integration
+// File: supabase/functions/_shared/evolution-api.ts
 
-// Base URL for Evolution API
-export const EVO_API_BASE_URL = 'https://api.evoapicloud.com';
+// Get the Evolution API base URL from environment variables or use default
+export const EVO_API_BASE_URL = Deno.env.get("EVOLUTION_API_URL") || "https://api.evoapicloud.com";
 
-// Get Evolution API key and build request options
-export function getEvolutionAPIOptions(method = 'GET'): RequestInit {
-  const apiKey = Deno.env.get('EVOLUTION_API_KEY');
+// Get Evolution API options with the appropriate headers
+export function getEvolutionAPIOptions(method: string = 'GET') {
+  const apiKey = Deno.env.get("EVOLUTION_API_KEY") || "";
   
   if (!apiKey) {
-    console.error('EVOLUTION_API_KEY environment variable is not set');
+    console.error("EVOLUTION_API_KEY environment variable is not set");
   }
   
-  const options: RequestInit = {
+  return {
     method,
     headers: {
-      apikey: apiKey || '',
       'Content-Type': 'application/json',
-      'Accept': 'application/json'
-    }
+      'Accept': 'application/json',
+      'apikey': apiKey,
+    },
   };
-  
-  // For POST requests, add an empty body if none provided
-  if (method === 'POST') {
-    options.body = JSON.stringify({});
-  }
-  
-  return options;
-}
-
-// Format QR code base64 string to proper data URL
-export function formatQrCodeUrl(base64Value: string): string {
-  return base64Value.startsWith('data:image/')
-    ? base64Value
-    : `data:image/png;base64,${base64Value}`;
 }

@@ -10,8 +10,11 @@ import { handleSendWhatsAppMessage } from "./handlers/messageHandlers.ts";
 import { handleFindChats, handleFindMessages } from "./handlers/chatHandlers.ts";
 
 serve(async (req) => {
+  console.log("Request received:", req.method, req.url);
+  
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
+    console.log("Handling CORS preflight request");
     return new Response(null, { headers: corsHeaders });
   }
 
@@ -20,6 +23,20 @@ serve(async (req) => {
     const url = new URL(req.url);
     const path = url.pathname;
     console.log('Request path:', path);
+
+    // Extract request body if present
+    let requestBody = {};
+    if (req.method === 'POST') {
+      try {
+        const bodyText = await req.text();
+        if (bodyText) {
+          requestBody = JSON.parse(bodyText);
+          console.log('Request body:', requestBody);
+        }
+      } catch (error) {
+        console.error('Error parsing request body:', error);
+      }
+    }
 
     // Route requests to appropriate handlers
     if (req.method === 'POST' && path.includes('/message/sendText')) {
@@ -31,31 +48,29 @@ serve(async (req) => {
     } else if (path.includes('/chat/findMessages')) {
       console.log("Routing to handleFindMessages");
       return await handleFindMessages(req);
-    } else if (path.includes('/instance/fetchInstances')) {
-      console.log("fetchInstances called");
-      
-      // Check if integration_id is provided in the query string
-      const integrationId = url.searchParams.get('integration_id');
-      console.log('Integration ID from query:', integrationId);
-      
-      return await handleFetchInstances(integrationId || undefined);
     } else if (path.includes('/instance/connectionState/')) {
       const instanceId = path.split('/').pop();
+      console.log(`Routing to handleConnectionState for instance ${instanceId}`);
       return await handleConnectionState(instanceId || '');
     } else if (path.includes('/instance/connect/')) {
       const instanceId = path.split('/').pop();
-      console.log(`connect called for instance: ${instanceId}`);
+      console.log(`Routing to handleConnect for instance ${instanceId}`);
       return await handleConnect(instanceId || '');
     } else {
-      // Handle unknown routes
-      console.error('Invalid request path or method:', path, req.method);
-      return new Response(
-        JSON.stringify({ error: 'Invalid request path or method' }),
-        {
-          status: 400,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        }
-      );
+      // Default handler for fetching instances
+      console.log("Routing to handleFetchInstances");
+      
+      let integrationId = null;
+      
+      // Check different ways the integration_id might be provided
+      if (req.method === 'POST' && requestBody && 'integration_id' in requestBody) {
+        integrationId = requestBody.integration_id;
+      } else if (url.searchParams.has('integration_id')) {
+        integrationId = url.searchParams.get('integration_id');
+      }
+      
+      console.log('Integration ID for fetchInstances:', integrationId);
+      return await handleFetchInstances(integrationId || undefined);
     }
   } catch (error) {
     // Handle unhandled errors
