@@ -1,9 +1,10 @@
 
 import { corsHeaders } from "../../_shared/cors.ts";
 import { EVO_API_BASE_URL, getEvolutionAPIOptions } from "../../_shared/evolution-api.ts";
+import { saveIntegrationConfigFromInstances } from "../services/integrationService.ts";
 
 // Handler for fetching WhatsApp instances
-export async function handleFetchInstances() {
+export async function handleFetchInstances(integrationId?: string) {
   try {
     console.log('Starting handleFetchInstances');
     
@@ -23,11 +24,16 @@ export async function handleFetchInstances() {
       throw new Error('Invalid response format from API');
     }
     
-    const data = await response.json();
-    console.log('Instances data retrieved successfully');
+    const instances = await response.json();
+    console.log('Instances data retrieved successfully:', Array.isArray(instances) ? instances.length : 'not an array');
+    
+    // If an integrationId is provided, save the instances data to the database
+    if (integrationId && Array.isArray(instances)) {
+      await saveIntegrationConfigFromInstances(integrationId, instances);
+    }
     
     return new Response(
-      JSON.stringify(data),
+      JSON.stringify(instances),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: response.status,

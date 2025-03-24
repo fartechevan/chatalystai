@@ -8,6 +8,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { IntegrationDialog } from "./integration-dialog/IntegrationDialog";
 import { IntegrationCard } from "./integration-card/IntegrationCard";
 import type { Integration } from "./types";
+import { useToast } from "@/hooks/use-toast";
 
 const tabs = ["All", "Connected"];
 
@@ -17,6 +18,7 @@ export function IntegrationsView() {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedIntegration, setSelectedIntegration] = useState<Integration | null>(null);
   const [connectedIntegrations, setConnectedIntegrations] = useState<Record<string, boolean>>({});
+  const { toast } = useToast();
 
   const { data: integrations = [], isLoading, refetch } = useQuery({
     queryKey: ['integrations'],
@@ -105,8 +107,58 @@ export function IntegrationsView() {
     checkConnectionStatus();
   }, [dialogOpen]); // Re-check when dialog is closed
 
-  const handleIntegrationClick = (integration: Integration) => {
+  const handleIntegrationClick = async (integration: Integration) => {
+    // Set selected integration
     setSelectedIntegration(integration);
+    
+    // For WhatsApp integrations, fetch instances before opening dialog
+    if (integration.name === "WhatsApp") {
+      try {
+        toast({
+          title: "Checking WhatsApp connection...",
+          description: "Fetching WhatsApp instances and checking connection status",
+        });
+        
+        // Fetch instances and save to database with integration ID
+        const { data, error } = await supabase.functions.invoke("integrations", {
+          path: "/instance/fetchInstances",
+          query: { integration_id: integration.id }
+        });
+        
+        if (error) {
+          console.error('Error fetching WhatsApp instances:', error);
+          toast({
+            title: "Connection Error",
+            description: "Could not fetch WhatsApp instances",
+            variant: "destructive"
+          });
+        } else {
+          console.log('WhatsApp instances fetched successfully:', data);
+          
+          // Check if any instance is connected
+          const hasConnectedInstance = Array.isArray(data) && data.some(
+            instance => instance.connectionStatus === 'open' || instance.status === 'open'
+          );
+          
+          if (hasConnectedInstance) {
+            toast({
+              title: "WhatsApp Connected",
+              description: "Found connected WhatsApp instance",
+            });
+            
+            // Update connected status
+            setConnectedIntegrations(prev => ({
+              ...prev,
+              [integration.id]: true
+            }));
+          }
+        }
+      } catch (error) {
+        console.error('Error in handleIntegrationClick:', error);
+      }
+    }
+    
+    // Open the dialog
     setDialogOpen(true);
   };
 
