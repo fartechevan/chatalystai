@@ -13,20 +13,15 @@ declare global {
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
 } from "@/components/ui/dialog";
-import { Loader2 } from "lucide-react";
 import { useEffect, useState } from "react";
 import type { Integration } from "../types";
-import { useWhatsAppConnection } from "./hooks/whatsapp/useWhatsAppConnection";
+import { useFacebookSDK } from "./hooks/useFacebookSDK";
 import { QRCodeScreen } from "./components/QRCodeScreen";
 import { DeviceSelect } from "./components/DeviceSelect";
-import { ConnectionStatus } from "./components/ConnectionStatus";
 import { IntegrationTabs } from "./components/IntegrationTabs";
-import { useFacebookSDK } from "./hooks/useFacebookSDK";
-import { supabase } from "@/integrations/supabase/client";
+import { DialogMain } from "./components/DialogMain";
+import { useIntegrationConnectionState } from "./hooks/useIntegrationConnectionState";
 
 interface IntegrationDialogProps {
   open: boolean;
@@ -39,79 +34,22 @@ export function IntegrationDialog({
   onOpenChange,
   selectedIntegration,
 }: IntegrationDialogProps) {
-  const [showDeviceSelect, setShowDeviceSelect] = useState(false);
-  const [integrationMainPopup, setIntegrationMainPopup] = useState(true);
-  const [integrationQRPopup, setIntegrationQRPopup] = useState(false);
-  const [isConnected, setIsConnected] = useState(false);
-  
-  const { isFBInitialized, handleConnectWithFacebook } = useFacebookSDK();
+  const { handleConnectWithFacebook } = useFacebookSDK();
 
-  const { 
-    initializeConnection, 
-    qrCodeBase64, 
-    connectionState, 
+  const {
+    showDeviceSelect,
+    setShowDeviceSelect,
+    integrationMainPopup,
+    setIntegrationMainPopup,
+    integrationQRPopup,
+    setIntegrationQRPopup,
+    isConnected,
+    qrCodeBase64,
+    connectionState,
     isLoading,
-    checkCurrentConnectionState 
-  } = useWhatsAppConnection(selectedIntegration);
-
-  // Check connection status when the dialog is opened
-  useEffect(() => {
-    if (open && selectedIntegration && selectedIntegration.name === "WhatsApp") {
-      checkCurrentConnectionState();
-    }
-  }, [open, selectedIntegration, checkCurrentConnectionState]);
-
-  useEffect(() => {
-    if (connectionState === 'open' && integrationQRPopup) {
-      // Close QR popup when connection is established
-      setIntegrationQRPopup(false);
-      setIntegrationMainPopup(true);
-      setIsConnected(true);
-      
-      // Update the integration connection status in the database
-      if (selectedIntegration) {
-        updateIntegrationStatus(selectedIntegration.id);
-      }
-    }
-  }, [connectionState, integrationQRPopup, selectedIntegration]);
-  
-  const updateIntegrationStatus = async (integrationId: string) => {
-    try {
-      // We don't have an is_connected field, so let's just ensure there's a record
-      const { data: existingConfig, error: checkError } = await supabase
-        .from('integrations_config')
-        .select('id')
-        .eq('integration_id', integrationId)
-        .maybeSingle();
-        
-      if (checkError) {
-        console.error('Error checking integration config:', checkError);
-        return;
-      }
-      
-      if (!existingConfig) {
-        // Create a new config if one doesn't exist
-        const { error: insertError } = await supabase
-          .from('integrations_config')
-          .insert({
-            integration_id: integrationId,
-            // Add default values for required fields
-            base_url: 'https://api.evoapicloud.com'
-          });
-        
-        if (insertError) {
-          console.error('Error inserting integration config:', insertError);
-        }
-      }
-    } catch (error) {
-      console.error('Error updating integration status:', error);
-    }
-  };
-
-  const handleConnect = () => {
-    setShowDeviceSelect(true);
-    setIntegrationMainPopup(false);
-  };
+    handleConnect,
+    handleIPhoneSelect
+  } = useIntegrationConnectionState(selectedIntegration, open);
 
   const handleDialogChange = (open: boolean) => {
     if (!open) {
@@ -130,14 +68,6 @@ export function IntegrationDialog({
     }
     // Otherwise, close the dialog completely and notify parent about the connection status
     onOpenChange(isConnected || connectionState === 'open');
-  };
-
-  const handleIPhoneSelect = async () => {
-    const success = await initializeConnection();
-    if (success) {
-      setShowDeviceSelect(false);
-      setIntegrationQRPopup(true);
-    }
   };
 
   if (integrationQRPopup) {
@@ -172,28 +102,13 @@ export function IntegrationDialog({
     <Dialog open={open} onOpenChange={handleDialogChange}>
       <DialogContent className="max-w-5xl w-4/5 flex space-x-4">
         {/* Left Column */}
-        <div className="w-1/2">
-          <DialogHeader>
-            <DialogTitle>Connect WhatsApp</DialogTitle>
-            <DialogDescription>
-              Connect multiple WhatsApp numbers to send important conversations straight to your inbox.
-              Then nurture them with tools like templates and Salesbot!
-            </DialogDescription>
-          </DialogHeader>
-          
-          {isLoading ? (
-            <div className="flex items-center justify-center p-8">
-              <Loader2 className="h-8 w-8 animate-spin text-primary" />
-            </div>
-          ) : (
-            <ConnectionStatus 
-              connectionState={connectionState}
-              selectedIntegration={selectedIntegration}
-              onConnect={handleConnect}
-              onOpenChange={handleDialogChange}
-            />
-          )}
-        </div>
+        <DialogMain 
+          selectedIntegration={selectedIntegration}
+          connectionState={connectionState}
+          isLoading={isLoading}
+          onConnect={handleConnect}
+          onOpenChange={handleDialogChange}
+        />
 
         {/* Right Column */}
         <div className="w-1/2">
