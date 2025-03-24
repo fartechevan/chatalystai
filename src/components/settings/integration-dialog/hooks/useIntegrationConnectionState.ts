@@ -3,6 +3,7 @@ import { useState, useEffect } from "react";
 import { Integration } from "../../types";
 import { useWhatsAppConnection } from "./whatsapp/useWhatsAppConnection";
 import { supabase } from "@/integrations/supabase/client";
+import { ConnectionState } from "./whatsapp/types";
 
 export function useIntegrationConnectionState(
   selectedIntegration: Integration | null, 

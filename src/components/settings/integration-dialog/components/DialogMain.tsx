@@ -3,10 +3,11 @@ import { Integration } from "../../types";
 import { DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Loader2 } from "lucide-react";
 import { ConnectionStatus } from "./ConnectionStatus";
+import { ConnectionState } from "../hooks/whatsapp/types";
 
 interface DialogMainProps {
   selectedIntegration: Integration | null;
-  connectionState: string;
+  connectionState: ConnectionState;
   isLoading: boolean;
   onConnect: () => void;
   onOpenChange: (open: boolean) => void;
