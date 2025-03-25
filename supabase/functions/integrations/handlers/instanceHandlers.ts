@@ -1,4 +1,3 @@
-
 import { corsHeaders } from "../../_shared/cors.ts";
 import { EVO_API_BASE_URL, getEvolutionAPIOptions, getInstanceApiUrl } from "../../_shared/evolution-api.ts";
 import { saveIntegrationConfigFromInstances } from "../services/integrationService.ts";
@@ -114,6 +113,7 @@ export async function handleConnectionState(instanceId: string) {
       throw new Error('Instance ID is required');
     }
     
+    // Get the Evolution API options
     const options = getEvolutionAPIOptions();
     const apiUrl = `${EVO_API_BASE_URL}/instance/connectionState/${instanceId}`;
     console.log(`Checking connection state for instance ${instanceId} at ${apiUrl}`);
@@ -136,7 +136,7 @@ export async function handleConnectionState(instanceId: string) {
       JSON.stringify(data),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: response.status,
+        status: 200, // Always return 200 to prevent client side rejection
       }
     );
   } catch (error) {
@@ -144,7 +144,7 @@ export async function handleConnectionState(instanceId: string) {
     return new Response(
       JSON.stringify({ error: error.message }),
       {
-        status: 500,
+        status: 200, // Always return 200 to prevent client side rejection
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       }
     );

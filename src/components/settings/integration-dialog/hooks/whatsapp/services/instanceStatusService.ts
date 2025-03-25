@@ -1,5 +1,6 @@
 
 import type { ConnectionState } from "../types";
+import { supabase } from "@/integrations/supabase/client";
 
 /**
  * Check the status of a WhatsApp instance
@@ -12,70 +13,62 @@ export const checkInstanceStatus = async (
   if (!config || !config.instance_id) return false;
 
   try {
-    // Use base URL from config
-    const baseUrl = config.base_url || 'https://api.evoapicloud.com';
+    const instanceId = config.instance_id;
+    console.log('Checking instance status for ID:', instanceId);
     
-    console.log('Checking instance status with:', { instanceId: config.instance_id, baseUrl });
-
-    // Direct API call using the Evolution API format
-    const response = await fetch(`${baseUrl}/instance/fetchInstances`, {
-      method: 'GET',
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-        'apikey': process.env.EVOLUTION_API_KEY || '',
-      },
+    // First, try to get saved instance info from localStorage which includes the token
+    const savedInstanceStr = localStorage.getItem('whatsapp_instance');
+    let apiKey = '';
+    
+    if (savedInstanceStr) {
+      try {
+        const savedInstance = JSON.parse(savedInstanceStr);
+        apiKey = savedInstance.token;
+        console.log('Using saved API key from localStorage');
+      } catch (e) {
+        console.error('Error parsing saved instance:', e);
+      }
+    }
+    
+    // Call the edge function to check connection state
+    console.log('Calling edge function for connection state check with instance ID:', instanceId);
+    const { data, error } = await supabase.functions.invoke('integrations/instance/connectionState', {
+      body: { 
+        instanceId,
+        apiKey
+      }
     });
 
-    console.log('Status check response status:', response.status);
-
-    if (!response.ok) {
-      console.error('Failed to check WhatsApp connection status:', response.status, response.statusText);
+    if (error) {
+      console.error('Failed to check WhatsApp connection status:', error);
       setConnectionState('idle');
       return false;
     }
 
-    // Verify we have JSON before parsing
-    const contentType = response.headers.get('content-type');
-    if (!contentType || !contentType.includes('application/json')) {
-      const textResponse = await response.text();
-      console.error('Invalid content type received:', contentType, 'Response:', textResponse);
-      setConnectionState('unknown');
-      return false;
-    }
-
-    const data = await response.json();
     console.log('Instance status response:', data);
 
-    // Per Evolution API docs, check if the instance exists and its connection state
-    if (Array.isArray(data)) {
-      // Try to find the instance by id
-      const instance = data.find(item => item.id === config.instance_id);
-      
-      if (instance) {
-        console.log('Found instance with state:', instance.connectionStatus || instance.status);
+    // Check the status from the response
+    if (data) {
+      // Parse the connection state - could be multiple formats based on Evolution API
+      const connectionStatus = 
+        data.state || 
+        data.connectionStatus || 
+        data.status || 
+        (data.instance && data.instance.state);
         
-        // Check various status fields that might indicate connection state
-        const isConnected = 
-          instance.connectionStatus === 'open' || 
-          instance.status === 'open' || 
-          instance.state === 'open';
-          
-        if (isConnected) {
-          setConnectionState('open');
-          setQrCodeBase64(null);
-          return true;
-        } else {
-          setConnectionState('idle');
-          return false;
-        }
+      console.log('Connection status detected:', connectionStatus);
+        
+      // Check if connected
+      if (connectionStatus === 'open') {
+        setConnectionState('open');
+        setQrCodeBase64(null);
+        return true;
       } else {
-        console.log('Instance not found in response');
         setConnectionState('idle');
         return false;
       }
     } else {
-      console.log('Unexpected response format:', data);
+      console.log('No data in response');
       setConnectionState('unknown');
       return false;
     }
