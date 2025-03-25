@@ -1,3 +1,4 @@
+
 import { corsHeaders } from "../../_shared/cors.ts";
 import { EVO_API_BASE_URL, getEvolutionAPIOptions, getInstanceApiUrl } from "../../_shared/evolution-api.ts";
 import { saveIntegrationConfigFromInstances } from "../services/integrationService.ts";
@@ -193,15 +194,21 @@ export async function handleLogout(instanceId: string) {
   try {
     console.log(`Processing logout request for instance: ${instanceId}`);
     
-    // Here you would typically call your WhatsApp API to logout the instance
-    // For example:
-    // const response = await fetch(`${baseUrl}/api/instance/logout`, {
-    //   method: 'POST',
-    //   headers: { 'Content-Type': 'application/json' },
-    //   body: JSON.stringify({ instanceId }),
-    // });
+    if (!instanceId) {
+      throw new Error('Instance ID is required for logout');
+    }
     
-    // For now, we'll just simulate a successful response
+    // Here we would call the Evolution API to logout the instance
+    // For now, we'll implement a mock successful response
+    // In a real implementation, you would make an API call to the Evolution API
+    
+    // Mock API call (replace with actual API call in production)
+    // const options = getEvolutionAPIOptions('DELETE');
+    // const apiUrl = `${EVO_API_BASE_URL}/instance/logout/${instanceId}`;
+    // const response = await fetch(apiUrl, options);
+    // const data = await response.json();
+    
+    // Simulated successful response
     const successResponse = {
       success: true,
       message: `Successfully logged out instance ${instanceId}`

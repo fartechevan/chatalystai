@@ -97,7 +97,7 @@ export function WhatsAppBusinessSettings({ selectedIntegration, onConnect }: Wha
           // On success, update the instances list by removing the logged out instance
           setInstances(prev => prev.filter(instance => instance.id !== instanceId));
         },
-        { toast }
+        { toast: { toast, dismiss: () => {}, toasts: [] } }
       );
       
       if (!success) {
