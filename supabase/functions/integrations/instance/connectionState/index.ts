@@ -1,8 +1,7 @@
 
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { corsHeaders } from "../../../_shared/cors.ts";
 
-serve(async (req) => {
+Deno.serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -29,11 +28,11 @@ serve(async (req) => {
 
     console.log(`[${requestId}] Checking connection state for instance: ${instanceId}`);
     
-    // Use the Evolution API token from the request or from environment
-    const token = apiKey || Deno.env.get('EVOLUTION_API_KEY');
+    // Use the API key from the request instead of environment variable
+    const token = apiKey;
     
     if (!token) {
-      console.error(`[${requestId}] Missing API token`);
+      console.error(`[${requestId}] Missing API token in request`);
       return new Response(
         JSON.stringify({ error: 'API token is required' }),
         { 
