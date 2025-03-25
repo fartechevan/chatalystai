@@ -181,6 +181,15 @@ export function IntegrationsView() {
         } else {
           console.log('WhatsApp instances fetched successfully:', data);
           
+          // Store the instance credentials in localStorage if available
+          if (Array.isArray(data) && data.length > 0) {
+            const instanceData = {
+              id: data[0].id,
+              token: data[0].token
+            };
+            localStorage.setItem('whatsapp_instance', JSON.stringify(instanceData));
+          }
+          
           // Check if any instance is connected
           const hasConnectedInstance = Array.isArray(data) && data.some(
             instance => instance.connectionStatus === 'open' || instance.status === 'open' || instance.state === 'open'
