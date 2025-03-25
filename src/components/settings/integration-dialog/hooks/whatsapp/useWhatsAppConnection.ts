@@ -9,6 +9,7 @@ import type { Integration } from "../../../types";
 export function useWhatsAppConnection(selectedIntegration: Integration | null) {
   const { toast } = useToast();
   const [qrCodeBase64, setQrCodeBase64] = useState<string | null>(null);
+  const [pairingCode, setPairingCode] = useState<string | null>(null);
   const [connectionState, setConnectionState] = useState<ConnectionState>('unknown');
   const [pollingInterval, setPollingInterval] = useState<NodeJS.Timeout | null>(null);
   
@@ -68,9 +69,17 @@ export function useWhatsAppConnection(selectedIntegration: Integration | null) {
     try {
       const result = await initializeConnection(config, toast);
       
-      if (result.success && result.qrCodeDataUrl) {
-        console.log('QR code generated successfully:', result.qrCodeDataUrl);
-        setQrCodeBase64(result.qrCodeDataUrl);
+      if (result.success) {
+        if (result.qrCodeDataUrl) {
+          console.log('QR code generated successfully:', result.qrCodeDataUrl);
+          setQrCodeBase64(result.qrCodeDataUrl);
+        }
+        
+        if (result.pairingCode) {
+          console.log('Pairing code generated:', result.pairingCode);
+          setPairingCode(result.pairingCode);
+        }
+        
         setConnectionState('connecting');
         
         // Start polling for connection status
@@ -107,6 +116,7 @@ export function useWhatsAppConnection(selectedIntegration: Integration | null) {
         clearInterval(pollingInterval);
       }
       setQrCodeBase64(null);
+      setPairingCode(null);
       setConnectionState('unknown');
     };
   }, [config]);
@@ -114,6 +124,7 @@ export function useWhatsAppConnection(selectedIntegration: Integration | null) {
   return { 
     initializeConnection: connectToWhatsApp, 
     qrCodeBase64, 
+    pairingCode,
     connectionState,
     isLoading: configLoading,
     checkCurrentConnectionState
