@@ -49,11 +49,13 @@ serve(async (req) => {
     console.log(`[${requestId}] Using token: ${token.substring(0, 5)}...`);
     
     const response = await fetch(evolutionApiUrl, {
-      method: 'POST', // Changed from GET to POST as required by Evolution API
+      method: 'POST', // Using POST as specified in Evolution API docs
       headers: {
         'apikey': token,
         'Content-Type': 'application/json'
-      }
+      },
+      // Adding an empty body as some APIs require this even with POST requests
+      body: JSON.stringify({})
     });
     
     console.log(`[${requestId}] Evolution API response status: ${response.status}`);
@@ -84,7 +86,7 @@ serve(async (req) => {
           details: errorDetails
         }),
         { 
-          status: response.status,
+          status: 200, // Return 200 to prevent client side rejection, but include error in body
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         }
       );
@@ -103,7 +105,7 @@ serve(async (req) => {
           details: responseContent
         }),
         { 
-          status: 500,
+          status: 200, // Return 200 to prevent client side rejection, but include error in body
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         }
       );
@@ -122,11 +124,11 @@ serve(async (req) => {
     
     return new Response(
       JSON.stringify({ 
-        error: error.message,
+        error: error.message || 'Unknown error',
         stack: error.stack
       }),
       { 
-        status: 500,
+        status: 200, // Return 200 to prevent client side rejection, but include error in body
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       }
     );
