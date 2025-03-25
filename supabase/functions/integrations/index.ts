@@ -1,3 +1,4 @@
+
 import { corsHeaders } from "../_shared/cors.ts";
 import { handleFetchInstances, handleConnectionState, handleConnect, handleLogout } from "./handlers/instanceHandlers.ts";
 import { handleFindChats, handleFindMessages } from "./handlers/chatHandlers.ts";
@@ -31,10 +32,11 @@ Deno.serve(async (req) => {
       console.log('No request body or invalid JSON');
     }
     
-    const { integration_id, action, instanceId } = requestBody as { 
+    const { integration_id, action, instanceId, apiKey } = requestBody as { 
       integration_id?: string;
       action?: string;
       instanceId?: string;
+      apiKey?: string;
     };
     
     // Handle different functionality based on path segments and request method
@@ -47,14 +49,14 @@ Deno.serve(async (req) => {
       
       case "instance":
         if (path[1] === "connectionState" && path[2]) {
-          return handleConnectionState(path[2]);
+          return handleConnectionState(path[2], apiKey);
         } else if (path[1] === "connect" && path[2]) {
-          return handleConnect(path[2]);
+          return handleConnect(path[2], apiKey);
         } else if (path[1] === "logout" && path[2]) {
           return handleLogout(path[2]);
         } else if (path[1] === "connectionState" && !path[2]) {
           // Handle the case where instanceId is in the body instead of path
-          return handleConnectionState(instanceId || '');
+          return handleConnectionState(instanceId || '', apiKey || '');
         }
         break;
       

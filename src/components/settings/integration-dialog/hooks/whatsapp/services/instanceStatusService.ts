@@ -35,7 +35,7 @@ export const checkInstanceStatus = async (
     const { data, error } = await supabase.functions.invoke('integrations/instance/connectionState', {
       body: { 
         instanceId,
-        apiKey
+        apiKey // Pass the API key from localStorage
       }
     });
 

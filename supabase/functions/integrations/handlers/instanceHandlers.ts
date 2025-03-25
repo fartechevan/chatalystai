@@ -1,3 +1,4 @@
+
 import { corsHeaders } from "../../_shared/cors.ts";
 import { EVO_API_BASE_URL, getEvolutionAPIOptions, getInstanceApiUrl } from "../../_shared/evolution-api.ts";
 import { saveIntegrationConfigFromInstances } from "../services/integrationService.ts";
@@ -107,16 +108,27 @@ export async function handleFetchInstances(integrationId?: string) {
 }
 
 // Handler for checking connection state
-export async function handleConnectionState(instanceId: string) {
+export async function handleConnectionState(instanceId: string, apiKey?: string) {
   try {
     if (!instanceId) {
       throw new Error('Instance ID is required');
     }
     
-    // Get the Evolution API options
-    const options = getEvolutionAPIOptions();
+    // Get the Evolution API options, using the provided apiKey if available
+    const options = apiKey 
+      ? {
+          method: 'GET',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'apikey': apiKey,
+          },
+        }
+      : getEvolutionAPIOptions();
+    
     const apiUrl = `${EVO_API_BASE_URL}/instance/connectionState/${instanceId}`;
     console.log(`Checking connection state for instance ${instanceId} at ${apiUrl}`);
+    console.log(`Using API key: ${apiKey ? apiKey.substring(0, 5) + '...' : 'from environment'}`);
     
     const response = await fetch(apiUrl, options);
     console.log(`Connection state response status: ${response.status}`);
@@ -152,17 +164,28 @@ export async function handleConnectionState(instanceId: string) {
 }
 
 // Handler for connecting to WhatsApp
-export async function handleConnect(instanceId: string) {
+export async function handleConnect(instanceId: string, apiKey?: string) {
   try {
     if (!instanceId) {
       throw new Error('Instance ID is required');
     }
     
-    // We need to use POST method for connecting according to Evolution API docs
-    const options = getEvolutionAPIOptions('POST');
+    // Use the provided apiKey if available, otherwise use environment variable
+    const options = apiKey 
+      ? {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'application/json',
+            'apikey': apiKey,
+          },
+        }
+      : getEvolutionAPIOptions('POST');
+    
     const apiUrl = `${EVO_API_BASE_URL}/instance/connect/${instanceId}`;
     
     console.log(`Connecting to WhatsApp instance ${instanceId} at ${apiUrl}`);
+    console.log(`Using API key: ${apiKey ? apiKey.substring(0, 5) + '...' : 'from environment'}`);
     
     const response = await fetch(apiUrl, options);
     console.log(`Connect response status: ${response.status}`);
