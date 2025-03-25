@@ -1,4 +1,3 @@
-
 import { corsHeaders } from "../_shared/cors.ts";
 import { handleFetchInstances, handleConnectionState, handleConnect, handleLogout } from "./handlers/instanceHandlers.ts";
 import { handleFindChats, handleFindMessages } from "./handlers/chatHandlers.ts";
@@ -53,6 +52,9 @@ Deno.serve(async (req) => {
           return handleConnect(path[2]);
         } else if (path[1] === "logout" && path[2]) {
           return handleLogout(path[2]);
+        } else if (path[1] === "connectionState" && !path[2]) {
+          // Handle the case where instanceId is in the body instead of path
+          return handleConnectionState(instanceId || '');
         }
         break;
       
