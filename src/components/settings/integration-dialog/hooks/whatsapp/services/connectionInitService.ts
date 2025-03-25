@@ -1,8 +1,13 @@
 
 import { supabase } from "@/integrations/supabase/client";
 import { formatQrCodeUrl } from "../utils/formatters";
-import type { ToasterToast } from "@/hooks/use-toast";
 import type { WhatsAppConfig } from "../types";
+
+interface ToastProps {
+  title?: string;
+  description?: string;
+  variant?: "default" | "destructive";
+}
 
 interface ConnectionResult {
   success: boolean;
@@ -13,7 +18,7 @@ interface ConnectionResult {
 
 export async function initializeConnection(
   config: WhatsAppConfig,
-  toast: (props: { title?: string; description?: string; variant?: "default" | "destructive" }) => void
+  toast: (props: ToastProps) => void
 ): Promise<ConnectionResult> {
   try {
     // Try to get saved instance info from localStorage
