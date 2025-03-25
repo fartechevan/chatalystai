@@ -50,15 +50,23 @@ export async function handleFetchInstances(integrationId?: string) {
               const stateData = await instanceStateResponse.json();
               console.log(`Instance ${instanceId} state:`, stateData);
               
+              // Add the token to each instance so it can be used for future requests
+              const token = options.headers?.apikey || '';
+              
               // Merge the instance data with its state information
               enhancedInstances.push({
                 ...instance,
                 ...stateData,
-                ownerJid: stateData.owner || stateData.instance?.owner || instance.owner
+                ownerJid: stateData.owner || stateData.instance?.owner || instance.owner,
+                token: token // Include the API token
               });
             } else {
               console.warn(`Failed to get connection state for instance ${instanceId}:`, instanceStateResponse.status);
-              enhancedInstances.push(instance);
+              // Still add the token even if we couldn't get the state
+              enhancedInstances.push({
+                ...instance,
+                token: options.headers?.apikey || ''
+              });
             }
           } else {
             console.warn('Instance without ID:', instance);
