@@ -1,4 +1,3 @@
-
 declare global {
   interface Window {
     fbAsyncInit: () => void;
@@ -15,7 +14,7 @@ import {
   Dialog,
   DialogContent,
 } from "@/components/ui/dialog";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import type { Integration } from "../types";
 import { useFacebookSDK } from "./hooks/useFacebookSDK";
 import { QRCodeScreen } from "./components/QRCodeScreen";
@@ -46,6 +45,7 @@ export function IntegrationDialog({
     setIntegrationQRPopup,
     isConnected,
     qrCodeBase64,
+    pairingCode,
     connectionState,
     isLoading,
     handleConnect,
@@ -81,6 +81,7 @@ export function IntegrationDialog({
           setIntegrationMainPopup(true);
         }}
         qrCodeBase64={qrCodeBase64}
+        pairingCode={pairingCode}
       />
     );
   }

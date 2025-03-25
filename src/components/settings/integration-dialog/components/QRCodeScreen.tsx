@@ -6,20 +6,32 @@ interface QRCodeScreenProps {
   onClose: () => void;
   onOpenChange: (open: boolean) => void;
   qrCodeBase64?: string | null;
+  pairingCode?: string | null;
 }
 
-export function QRCodeScreen({ open, onClose, onOpenChange, qrCodeBase64 }: QRCodeScreenProps) {
+export function QRCodeScreen({ open, onClose, onOpenChange, qrCodeBase64, pairingCode }: QRCodeScreenProps) {
   console.log('QR Code Data:', qrCodeBase64); // Debug log
+  console.log('Pairing Code:', pairingCode); // Debug log
 
   return (
     <BaseDialog
       open={open}
       onOpenChange={onOpenChange}
       onClose={onClose}
-      title="Scan QR Code"
-      description="Open WhatsApp on your iPhone and scan the QR code to connect"
+      title="Connect WhatsApp"
+      description="Scan the QR code or enter the pairing code in WhatsApp to connect"
     >
       <div className="space-y-6">
+        {pairingCode && (
+          <div className="p-4 bg-blue-50 border border-blue-100 rounded-lg text-center">
+            <p className="text-sm font-medium text-blue-800">Pairing Code</p>
+            <p className="text-xl font-bold tracking-wider mt-2">{pairingCode}</p>
+            <p className="text-xs text-blue-600 mt-2">
+              Enter this code in WhatsApp → Settings → Linked Devices → Link a Device
+            </p>
+          </div>
+        )}
+        
         <div className="grid grid-cols-2 gap-8">
           <div className="flex items-center justify-center">
             <video 
@@ -42,7 +54,7 @@ export function QRCodeScreen({ open, onClose, onOpenChange, qrCodeBase64 }: QRCo
                 />
               ) : (
                 <div className="w-full h-full flex items-center justify-center text-gray-400">
-                  Loading QR code...
+                  {pairingCode ? 'Use pairing code instead' : 'Loading QR code...'}
                 </div>
               )}
             </div>

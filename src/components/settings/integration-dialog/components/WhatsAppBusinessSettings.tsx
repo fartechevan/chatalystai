@@ -2,7 +2,7 @@
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
-import { CheckCircle, Plus, AlertCircle, X, Loader2 } from "lucide-react";
+import { CheckCircle, Plus, AlertCircle, X, Loader2, PhoneCall } from "lucide-react";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -23,6 +23,7 @@ interface WhatsAppInstance {
   state?: string;
   status?: string;
   ownerJid?: string;
+  token?: string;
 }
 
 export function WhatsAppBusinessSettings({ selectedIntegration, onConnect }: WhatsAppBusinessSettingsProps) {
@@ -59,6 +60,15 @@ export function WhatsAppBusinessSettings({ selectedIntegration, onConnect }: Wha
         } else if (Array.isArray(data)) {
           console.log('WhatsApp instances:', data);
           setInstances(data);
+          
+          // Store instance credentials in localStorage for later use
+          if (data.length > 0) {
+            const instanceData = {
+              id: data[0].id,
+              token: data[0].token
+            };
+            localStorage.setItem('whatsapp_instance', JSON.stringify(instanceData));
+          }
         } else {
           console.log('Unexpected data format:', data);
           setInstances([]);
@@ -126,6 +136,12 @@ export function WhatsAppBusinessSettings({ selectedIntegration, onConnect }: Wha
       <AlertCircle className="h-5 w-5 text-amber-500" />;
   };
 
+  const isConnected = (instance: WhatsAppInstance) => {
+    return instance.connectionStatus === 'open' || 
+           instance.status === 'open' || 
+           instance.state === 'open';
+  };
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -146,6 +162,22 @@ export function WhatsAppBusinessSettings({ selectedIntegration, onConnect }: Wha
     );
   }
 
+  // If no instances found, show contact support
+  if (instances.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center h-64 space-y-4">
+        <PhoneCall className="h-10 w-10 text-primary" />
+        <p className="text-lg font-medium">No WhatsApp instances available</p>
+        <p className="text-gray-500 text-center max-w-md">
+          Please contact support to set up your WhatsApp Business account integration.
+        </p>
+        <Button onClick={() => window.location.reload()}>
+          Refresh
+        </Button>
+      </div>
+    );
+  }
+
   return (
     <ScrollArea className="h-full">
       <div className="space-y-4">
@@ -155,68 +187,66 @@ export function WhatsAppBusinessSettings({ selectedIntegration, onConnect }: Wha
             This WhatsApp account will be used in case your other numbers get disconnected.
           </p>
           
-          {instances.length > 0 ? (
-            <>
-              <div className="mt-8">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Name</TableHead>
-                      <TableHead>Number</TableHead>
-                      <TableHead>Pipeline</TableHead>
-                      <TableHead>Status</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {instances.map(instance => (
-                      <TableRow key={instance.id}>
-                        <TableCell className="font-medium">{instance.ownerJid || instance.id}</TableCell>
-                        <TableCell>{instance.number || 'Unknown'}</TableCell>
-                        <TableCell>
-                          <select className="border rounded-md px-2 py-1">
-                            <option>Pipeline</option>
-                            <option>Prospects</option>
-                            <option>Customers</option>
-                            <option>Leads</option>
-                          </select>
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex items-center justify-between">
-                            {getStatusIcon(instance)}
-                            <Button 
-                              variant="ghost" 
-                              size="sm" 
-                              className="h-6 w-6 p-0"
-                              onClick={() => handleLogout(instance.id)}
-                              disabled={isLogoutLoading === instance.id}
-                            >
-                              {isLogoutLoading === instance.id ? (
-                                <Loader2 className="h-4 w-4 animate-spin" />
-                              ) : (
-                                <X className="h-4 w-4 text-gray-400" />
-                              )}
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-                
-                <Button className="mt-4" variant="outline" onClick={onConnect}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add number
-                </Button>
-              </div>
-            </>
-          ) : (
-            <div className="mt-8 text-center space-y-4 py-6 bg-gray-50 rounded-lg">
-              <p className="text-gray-600">No WhatsApp instances connected</p>
-              <Button onClick={onConnect}>
-                Connect WhatsApp
-              </Button>
-            </div>
-          )}
+          <div className="mt-8">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Number</TableHead>
+                  <TableHead>Pipeline</TableHead>
+                  <TableHead>Status</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {instances.map(instance => (
+                  <TableRow key={instance.id}>
+                    <TableCell className="font-medium">{instance.ownerJid || instance.id}</TableCell>
+                    <TableCell>{instance.number || 'Unknown'}</TableCell>
+                    <TableCell>
+                      <select className="border rounded-md px-2 py-1">
+                        <option>Pipeline</option>
+                        <option>Prospects</option>
+                        <option>Customers</option>
+                        <option>Leads</option>
+                      </select>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center justify-between">
+                        {getStatusIcon(instance)}
+                        {isConnected(instance) ? (
+                          <Button 
+                            variant="ghost" 
+                            size="sm" 
+                            className="h-6 w-6 p-0"
+                            onClick={() => handleLogout(instance.id)}
+                            disabled={isLogoutLoading === instance.id}
+                          >
+                            {isLogoutLoading === instance.id ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <X className="h-4 w-4 text-gray-400" />
+                            )}
+                          </Button>
+                        ) : (
+                          <Button
+                            size="sm"
+                            onClick={onConnect}
+                          >
+                            Connect
+                          </Button>
+                        )}
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+            
+            <Button className="mt-4" variant="outline" onClick={onConnect}>
+              <Plus className="h-4 w-4 mr-2" />
+              Add number
+            </Button>
+          </div>
         </div>
         
         <div className="mt-8 p-4 bg-amber-50 rounded-lg border border-amber-100">
