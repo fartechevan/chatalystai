@@ -42,6 +42,7 @@ export async function initializeConnection(
     }
     
     console.log(`Initializing WhatsApp connection for instance: ${instanceId}`);
+    console.log(`API Key available: ${apiKey ? 'Yes' : 'No'}`);
     
     // Call the direct Evolution API endpoint through our edge function
     const { data, error } = await supabase.functions.invoke('integrations/instance/connect', {
@@ -62,6 +63,17 @@ export async function initializeConnection(
     }
     
     console.log('Connection initialization response:', data);
+    
+    // If data contains an error field, handle it
+    if (data && data.error) {
+      console.error('Error from Evolution API:', data.error, data.details);
+      toast({
+        title: "Connection Error",
+        description: data.error,
+        variant: "destructive",
+      });
+      return { success: false, error: data.error };
+    }
     
     if (!data || (!data.qrcode && !data.base64 && !data.pairingCode)) {
       console.error('Invalid response data:', data);
