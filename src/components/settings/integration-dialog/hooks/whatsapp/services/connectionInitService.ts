@@ -45,24 +45,28 @@ export async function initializeConnection(
     console.log(`API Key available: ${apiKey ? 'Yes' : 'No'}`);
     
     // Call the direct Evolution API endpoint through our edge function
-    const { data, error } = await supabase.functions.invoke('integrations/instance/connect', {
+    const response = await supabase.functions.invoke('integrations/instance/connect', {
       body: { 
         instanceId,
         apiKey
       }
     });
     
-    if (error) {
-      console.error('Error initializing WhatsApp connection:', error);
+    // Log full response for debugging
+    console.log('Full Edge Function response:', response);
+    
+    if (response.error) {
+      console.error('Error initializing WhatsApp connection:', response.error);
       toast({
         title: "Connection Error",
-        description: error.message,
+        description: response.error.message || "Failed to connect",
         variant: "destructive",
       });
-      return { success: false, error: error.message };
+      return { success: false, error: response.error.message };
     }
     
-    console.log('Connection initialization response:', data);
+    const { data } = response;
+    console.log('Connection initialization response data:', data);
     
     // If data contains an error field, handle it
     if (data && data.error) {
