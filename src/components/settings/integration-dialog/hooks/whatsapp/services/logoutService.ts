@@ -26,9 +26,7 @@ export async function logoutWhatsAppInstance(
       body: { 
         action: "logout",
         instanceId 
-      },
-      method: 'POST',
-      path: `instance/logout/${instanceId}`
+      }
     });
     
     if (error) {

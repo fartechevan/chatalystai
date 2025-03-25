@@ -53,9 +53,6 @@ Deno.serve(async (req) => {
           return handleConnect(path[2]);
         } else if (path[1] === "logout" && path[2]) {
           return handleLogout(path[2]);
-        } else if (action === "logout" && instanceId) {
-          // Handle logout via action parameter
-          return handleLogout(instanceId);
         }
         break;
       
@@ -74,6 +71,11 @@ Deno.serve(async (req) => {
           return handleSendTextMessage(req);
         }
         break;
+    }
+    
+    // Handle action-based operations from request body
+    if (action === "logout" && instanceId) {
+      return handleLogout(instanceId);
     }
     
     // If no matching endpoint found
