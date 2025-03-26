@@ -58,12 +58,17 @@ export async function initializeConnection(
     };
     console.log('Request body for edge function:', JSON.stringify(requestBody, null, 2));
     
-    // Call the direct Evolution API endpoint through our edge function
-    console.log('Invoking edge function: integrations/instance/connect');
+    // Try to connect using the instanceHandlers.handleConnect function directly
+    console.log('Calling handleConnect through normal integrations endpoint with direct handler path');
     
     try {
-      const response = await supabase.functions.invoke('integrations/instance/connect', {
-        body: requestBody
+      // Use the regular integrations endpoint but with a specific action parameter
+      const response = await supabase.functions.invoke('integrations', {
+        body: {
+          action: 'connect',
+          instanceId,
+          apiKey
+        }
       });
       
       // Log full response for debugging
@@ -76,64 +81,60 @@ export async function initializeConnection(
         console.error('Error stack:', response.error.stack);
         console.error('Response data:', response.data);
         
-        // Special handling for FunctionsHttpError - try to get detailed error from the response
-        if (response.error.name === 'FunctionsHttpError') {
-          // Try the alternative approach with direct fetch to the edge function 
-          console.log('Attempting direct fetch to edge function as fallback');
-          
-          const directUrl = `${window.location.origin}/.netlify/functions/index?api=integrations/instance/connect`;
-          
-          // Get current session token for auth - Fix for the TypeScript error
-          const { data: sessionData } = await supabase.auth.getSession();
-          const accessToken = sessionData?.session?.access_token || '';
-          
-          console.log('Direct fetch to edge function with auth token:', accessToken ? 'Available (truncated)' : 'Not available');
-          
-          const directResponse = await fetch(directUrl, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${accessToken}`
-            },
-            body: JSON.stringify(requestBody)
-          });
-          
-          if (!directResponse.ok) {
-            console.error(`Direct fetch failed with status: ${directResponse.status}`);
-            throw new Error(`Failed to connect: ${directResponse.statusText}`);
-          }
-          
-          const directData = await directResponse.json();
-          console.log('Direct fetch response:', directData);
-          
-          // Process the successful response from direct fetch
-          if (directData.qrcode || directData.base64 || directData.pairingCode) {
-            const qrCodeBase64 = directData.qrcode || directData.base64 || null;
-            const pairingCode = directData.pairingCode || null;
-            
-            const formattedQrCode = qrCodeBase64 ? formatQrCodeUrl(qrCodeBase64) : null;
-            
-            if (pairingCode) {
-              toast({
-                title: "Pairing Code",
-                description: `Enter this code on your phone: ${pairingCode}`,
-              });
-            }
-            
-            return {
-              success: true,
-              qrCodeDataUrl: formattedQrCode,
-              pairingCode
-            };
-          }
+        // Try alternative approach with direct fetch to Evolution API
+        console.log('Attempting direct connection to Evolution API as fallback');
+        
+        // Get current session token for auth
+        const { data: sessionData } = await supabase.auth.getSession();
+        const accessToken = sessionData?.session?.access_token || '';
+        
+        // Create base URL for direct Evolution API call
+        const baseUrl = config.base_url || 'https://api.evoapicloud.com';
+        const evolutionApiUrl = `${baseUrl}/instance/connect/${instanceId}`;
+        
+        console.log('Direct fetch to Evolution API:', evolutionApiUrl);
+        console.log('Using API key:', apiKey ? `${apiKey.substring(0, 5)}...` : 'None available');
+        
+        const directResponse = await fetch(evolutionApiUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': apiKey || '',
+            'Authorization': `Bearer ${accessToken}`
+          },
+          body: JSON.stringify({})
+        });
+        
+        if (!directResponse.ok) {
+          console.error(`Direct API call failed with status: ${directResponse.status}`);
+          const errorText = await directResponse.text();
+          console.error('Error response:', errorText);
+          throw new Error(`Failed to connect: ${directResponse.statusText}`);
         }
         
-        toast({
-          title: "Connection Error",
-          description: response.error.message || "Failed to connect",
-          variant: "destructive",
-        });
-        return { success: false, error: response.error.message };
+        const directData = await directResponse.json();
+        console.log('Direct API response:', directData);
+        
+        // Process the successful response from direct fetch
+        if (directData.qrcode || directData.base64 || directData.pairingCode) {
+          const qrCodeBase64 = directData.qrcode || directData.base64 || null;
+          const pairingCode = directData.pairingCode || null;
+          
+          const formattedQrCode = qrCodeBase64 ? formatQrCodeUrl(qrCodeBase64) : null;
+          
+          if (pairingCode) {
+            toast({
+              title: "Pairing Code",
+              description: `Enter this code on your phone: ${pairingCode}`,
+            });
+          }
+          
+          return {
+            success: true,
+            qrCodeDataUrl: formattedQrCode,
+            pairingCode
+          };
+        }
       }
       
       const { data } = response;
@@ -195,7 +196,7 @@ export async function initializeConnection(
         pairingCode
       };
     } catch (fetchError) {
-      console.error('Error calling edge function:', fetchError);
+      console.error('Error calling edge function or API:', fetchError);
       toast({
         title: "Connection Error",
         description: fetchError.message || "Failed to connect to server",

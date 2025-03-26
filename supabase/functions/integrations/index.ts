@@ -1,102 +1,77 @@
 
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { corsHeaders } from "../_shared/cors.ts";
-import { handleFetchInstances, handleConnectionState, handleConnect, handleLogout } from "./handlers/instanceHandlers.ts";
-import { handleFindChats, handleFindMessages } from "./handlers/chatHandlers.ts";
-import { handleSendTextMessage } from "./handlers/messageHandlers.ts";
+import { handleFetchInstances, handleConnect, handleConnectionState } from "./handlers/instanceHandlers.ts";
 
-Deno.serve(async (req) => {
+serve(async (req) => {
+  // Generate a unique ID for this request for tracking in logs
+  const requestId = crypto.randomUUID();
+  console.log(`[${requestId}] Starting integrations request processing`);
+
   // Handle CORS preflight requests
-  if (req.method === "OPTIONS") {
+  if (req.method === 'OPTIONS') {
+    console.log(`[${requestId}] Handling CORS preflight request`);
     return new Response(null, { headers: corsHeaders });
   }
-  
+
   try {
-    const url = new URL(req.url);
-    const path = url.pathname.split("/").filter(Boolean);
-    
-    // Remove 'integrations' from path if present as the first segment
-    if (path[0] === "integrations") {
-      path.shift();
-    }
-    
-    console.log(`Request method: ${req.method}, path segments:`, path);
-    
-    let requestBody = {};
+    let requestBodyText;
     try {
-      if (req.method !== "GET" && req.method !== "HEAD") {
-        requestBody = await req.json();
-        console.log('Request body:', requestBody);
-      }
+      requestBodyText = await req.text();
+      console.log(`[${requestId}] Raw request body: ${requestBodyText}`);
     } catch (e) {
-      // If JSON parsing fails, continue with empty object
-      console.log('No request body or invalid JSON');
+      console.log(`[${requestId}] Error reading request body as text: ${e}`);
     }
     
-    const { integration_id, action, instanceId, apiKey } = requestBody as { 
-      integration_id?: string;
-      action?: string;
-      instanceId?: string;
-      apiKey?: string;
-    };
-    
-    // Handle different functionality based on path segments and request method
-    switch (path[0]) {
-      // Instance management endpoints
-      case undefined:
-      case "":
-        // For the base endpoint, fetch WhatsApp instances
-        return handleFetchInstances(integration_id);
-      
-      case "instance":
-        if (path[1] === "connectionState" && path[2]) {
-          return handleConnectionState(path[2], apiKey);
-        } else if (path[1] === "connect" && path[2]) {
-          return handleConnect(path[2], apiKey);
-        } else if (path[1] === "logout" && path[2]) {
-          return handleLogout(path[2]);
-        } else if (path[1] === "connectionState" && !path[2]) {
-          // Handle the case where instanceId is in the body instead of path
-          return handleConnectionState(instanceId || '', apiKey || '');
-        }
-        break;
-      
-      // Chat endpoints
-      case "chat":
-        if (path[1] === "findChats") {
-          return handleFindChats(req);
-        } else if (path[1] === "findMessages") {
-          return handleFindMessages(req);
-        }
-        break;
-      
-      // Message endpoints
-      case "message":
-        if (path[1] === "sendText") {
-          return handleSendTextMessage(req);
-        }
-        break;
-    }
-    
-    // Handle action-based operations from request body
-    if (action === "logout" && instanceId) {
-      return handleLogout(instanceId);
-    }
-    
-    // If no matching endpoint found
-    return new Response(
-      JSON.stringify({ error: "Endpoint not found" }),
-      {
-        status: 404,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+    let body;
+    try {
+      // If we have the text version, parse it, otherwise use json()
+      if (requestBodyText) {
+        body = JSON.parse(requestBodyText);
+      } else {
+        body = await req.json();
       }
-    );
+      console.log(`[${requestId}] Parsed request body:`, body);
+    } catch (e) {
+      console.error(`[${requestId}] Error parsing request body:`, e);
+      body = {};
+    }
+
+    const { integration_id, action, instanceId, apiKey } = body;
+
+    console.log(`[${requestId}] Request parameters - integration_id: ${integration_id}, action: ${action}`);
+
+    // Handle GET requests for fetching instances
+    if (req.method === 'GET') {
+      console.log(`[${requestId}] Processing GET request to fetch instances`);
+      return await handleFetchInstances();
+    }
+
+    // Handle different actions based on the 'action' parameter
+    switch (action) {
+      case 'connect':
+        console.log(`[${requestId}] Processing connect action for instance: ${instanceId}`);
+        return await handleConnect(instanceId, apiKey);
+        
+      case 'connectionState':
+        console.log(`[${requestId}] Processing connectionState action for instance: ${instanceId}`);
+        return await handleConnectionState(instanceId, apiKey);
+        
+      default:
+        console.log(`[${requestId}] Processing default action (fetch instances) with integration_id: ${integration_id}`);
+        return await handleFetchInstances(integration_id);
+    }
   } catch (error) {
-    console.error("Error processing request:", error);
+    console.error(`Error in integrations function:`, error);
+    
     return new Response(
-      JSON.stringify({ error: error.message || "Internal server error" }),
-      {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      JSON.stringify({ 
+        error: error.message || 'An unexpected error occurred', 
+        stack: error.stack 
+      }),
+      { 
+        status: 200, // Return 200 to prevent client side rejection, but include error in body
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       }
     );
   }
