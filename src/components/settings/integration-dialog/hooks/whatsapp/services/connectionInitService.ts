@@ -60,85 +60,143 @@ export async function initializeConnection(
     
     // Call the direct Evolution API endpoint through our edge function
     console.log('Invoking edge function: integrations/instance/connect');
-    const response = await supabase.functions.invoke('integrations/instance/connect', {
-      body: requestBody
-    });
     
-    // Log full response for debugging
-    console.log('Full Edge Function response:', JSON.stringify(response, null, 2));
-    
-    if (response.error) {
-      console.error('Error from edge function:', response.error);
-      console.error('Error name:', response.error.name);
-      console.error('Error message:', response.error.message);
-      console.error('Error stack:', response.error.stack);
-      console.error('Response data:', response.data);
+    try {
+      const response = await supabase.functions.invoke('integrations/instance/connect', {
+        body: requestBody
+      });
+      
+      // Log full response for debugging
+      console.log('Full Edge Function response:', JSON.stringify(response, null, 2));
+      
+      if (response.error) {
+        console.error('Error from edge function:', response.error);
+        console.error('Error name:', response.error.name);
+        console.error('Error message:', response.error.message);
+        console.error('Error stack:', response.error.stack);
+        console.error('Response data:', response.data);
+        
+        // Special handling for FunctionsHttpError - try to get detailed error from the response
+        if (response.error.name === 'FunctionsHttpError') {
+          // Try the alternative approach with direct fetch to the edge function 
+          console.log('Attempting direct fetch to edge function as fallback');
+          
+          const directUrl = `${window.location.origin}/.netlify/functions/index?api=integrations/instance/connect`;
+          
+          const directResponse = await fetch(directUrl, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${supabase.auth.session()?.access_token || ''}`
+            },
+            body: JSON.stringify(requestBody)
+          });
+          
+          if (!directResponse.ok) {
+            console.error(`Direct fetch failed with status: ${directResponse.status}`);
+            throw new Error(`Failed to connect: ${directResponse.statusText}`);
+          }
+          
+          const directData = await directResponse.json();
+          console.log('Direct fetch response:', directData);
+          
+          // Process the successful response from direct fetch
+          if (directData.qrcode || directData.base64 || directData.pairingCode) {
+            const qrCodeBase64 = directData.qrcode || directData.base64 || null;
+            const pairingCode = directData.pairingCode || null;
+            
+            const formattedQrCode = qrCodeBase64 ? formatQrCodeUrl(qrCodeBase64) : null;
+            
+            if (pairingCode) {
+              toast({
+                title: "Pairing Code",
+                description: `Enter this code on your phone: ${pairingCode}`,
+              });
+            }
+            
+            return {
+              success: true,
+              qrCodeDataUrl: formattedQrCode,
+              pairingCode
+            };
+          }
+        }
+        
+        toast({
+          title: "Connection Error",
+          description: response.error.message || "Failed to connect",
+          variant: "destructive",
+        });
+        return { success: false, error: response.error.message };
+      }
+      
+      const { data } = response;
+      console.log('Connection initialization response data:', JSON.stringify(data, null, 2));
+      
+      // If data contains an error field, handle it
+      if (data && data.error) {
+        console.error('Error from Evolution API:', data.error);
+        console.error('Error details:', data.details);
+        toast({
+          title: "Connection Error",
+          description: data.error,
+          variant: "destructive",
+        });
+        return { success: false, error: data.error };
+      }
+      
+      if (!data || (!data.qrcode && !data.base64 && !data.pairingCode)) {
+        console.error('Invalid response data:', data);
+        toast({
+          title: "Connection Error",
+          description: "Invalid response from server",
+          variant: "destructive",
+        });
+        return { success: false, error: "Invalid response from server" };
+      }
+      
+      // Get the QR code from the response
+      const qrCodeBase64 = data.qrcode || data.base64 || null;
+      const pairingCode = data.pairingCode || null;
+      
+      if (!qrCodeBase64 && !pairingCode) {
+        console.error('No QR code or pairing code in response');
+        toast({
+          title: "Connection Error",
+          description: "No QR code or pairing code received",
+          variant: "destructive",
+        });
+        return { success: false, error: "No QR code or pairing code received" };
+      }
+      
+      // Format the QR code URL if needed
+      const formattedQrCode = qrCodeBase64 ? formatQrCodeUrl(qrCodeBase64) : null;
+      
+      console.log('Successfully generated QR code or pairing code');
+      console.log('Formatted QR code available:', !!formattedQrCode);
+      console.log('Pairing code available:', !!pairingCode);
+      
+      if (pairingCode) {
+        toast({
+          title: "Pairing Code",
+          description: `Enter this code on your phone: ${pairingCode}`,
+        });
+      }
+      
+      return {
+        success: true,
+        qrCodeDataUrl: formattedQrCode,
+        pairingCode
+      };
+    } catch (fetchError) {
+      console.error('Error calling edge function:', fetchError);
       toast({
         title: "Connection Error",
-        description: response.error.message || "Failed to connect",
+        description: fetchError.message || "Failed to connect to server",
         variant: "destructive",
       });
-      return { success: false, error: response.error.message };
+      return { success: false, error: fetchError.message };
     }
-    
-    const { data } = response;
-    console.log('Connection initialization response data:', JSON.stringify(data, null, 2));
-    
-    // If data contains an error field, handle it
-    if (data && data.error) {
-      console.error('Error from Evolution API:', data.error);
-      console.error('Error details:', data.details);
-      toast({
-        title: "Connection Error",
-        description: data.error,
-        variant: "destructive",
-      });
-      return { success: false, error: data.error };
-    }
-    
-    if (!data || (!data.qrcode && !data.base64 && !data.pairingCode)) {
-      console.error('Invalid response data:', data);
-      toast({
-        title: "Connection Error",
-        description: "Invalid response from server",
-        variant: "destructive",
-      });
-      return { success: false, error: "Invalid response from server" };
-    }
-    
-    // Get the QR code from the response
-    const qrCodeBase64 = data.qrcode || data.base64 || null;
-    const pairingCode = data.pairingCode || null;
-    
-    if (!qrCodeBase64 && !pairingCode) {
-      console.error('No QR code or pairing code in response');
-      toast({
-        title: "Connection Error",
-        description: "No QR code or pairing code received",
-        variant: "destructive",
-      });
-      return { success: false, error: "No QR code or pairing code received" };
-    }
-    
-    // Format the QR code URL if needed
-    const formattedQrCode = qrCodeBase64 ? formatQrCodeUrl(qrCodeBase64) : null;
-    
-    console.log('Successfully generated QR code or pairing code');
-    console.log('Formatted QR code available:', !!formattedQrCode);
-    console.log('Pairing code available:', !!pairingCode);
-    
-    if (pairingCode) {
-      toast({
-        title: "Pairing Code",
-        description: `Enter this code on your phone: ${pairingCode}`,
-      });
-    }
-    
-    return {
-      success: true,
-      qrCodeDataUrl: formattedQrCode,
-      pairingCode
-    };
   } catch (error) {
     console.error('Uncaught error in initializeConnection:', error);
     console.error('Error name:', error.name);
