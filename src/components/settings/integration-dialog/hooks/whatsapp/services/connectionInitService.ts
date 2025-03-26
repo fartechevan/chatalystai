@@ -51,39 +51,56 @@ export async function initializeConnection(
     console.log(`Initializing WhatsApp connection for instance: ${instanceId}`);
     console.log(`API Key available: ${apiKey ? 'Yes (' + apiKey.substring(0, 5) + '...)' : 'No'}`);
     
-    // Prepare the request body
-    const requestBody = { 
-      instanceId,
-      apiKey
-    };
-    console.log('Request body for edge function:', JSON.stringify(requestBody, null, 2));
-    
-    // Try to connect using the instanceHandlers.handleConnect function directly
-    console.log('Calling handleConnect through normal integrations endpoint with direct handler path');
-    
+    // Call the direct endpoint for connecting the WhatsApp instance
     try {
-      // Use the regular integrations endpoint but with a specific action parameter
-      const response = await supabase.functions.invoke('integrations', {
+      console.log('Calling instance/connect endpoint directly');
+      
+      const response = await supabase.functions.invoke('integrations/instance/connect', {
         body: {
-          action: 'connect',
           instanceId,
           apiKey
         }
       });
       
       // Log full response for debugging
-      console.log('Full Edge Function response:', JSON.stringify(response, null, 2));
+      console.log('Instance connect response:', JSON.stringify(response, null, 2));
       
       if (response.error) {
         console.error('Error from edge function:', response.error);
-        console.error('Error name:', response.error.name);
-        console.error('Error message:', response.error.message);
-        console.error('Error stack:', response.error.stack);
-        console.error('Response data:', response.data);
+        toast({
+          title: "Connection Error",
+          description: response.error.message || "Failed to connect",
+          variant: "destructive",
+        });
+        return { success: false, error: response.error.message };
+      }
+      
+      const { data } = response;
+      
+      // Check if we received a QR code or pairing code from the Evolution API
+      if (data && (data.qrcode || data.base64 || data.pairingCode)) {
+        // We got a proper response with either QR code or pairing code
+        const qrCodeBase64 = data.qrcode || data.base64 || null;
+        const pairingCode = data.pairingCode || null;
         
-        // Try alternative approach with direct fetch to Evolution API
-        console.log('Attempting direct connection to Evolution API as fallback');
+        const formattedQrCode = qrCodeBase64 ? formatQrCodeUrl(qrCodeBase64) : null;
         
+        if (pairingCode) {
+          toast({
+            title: "Pairing Code",
+            description: `Enter this code on your phone: ${pairingCode}`,
+          });
+        }
+        
+        return {
+          success: true,
+          qrCodeDataUrl: formattedQrCode,
+          pairingCode
+        };
+      } else {
+        // The response doesn't have expected QR code format
+        // Attempt to call the direct Evolution API endpoint as a fallback
+
         // Get current session token for auth
         const { data: sessionData } = await supabase.auth.getSession();
         const accessToken = sessionData?.session?.access_token || '';
@@ -93,7 +110,6 @@ export async function initializeConnection(
         const evolutionApiUrl = `${baseUrl}/instance/connect/${instanceId}`;
         
         console.log('Direct fetch to Evolution API:', evolutionApiUrl);
-        console.log('Using API key:', apiKey ? `${apiKey.substring(0, 5)}...` : 'None available');
         
         const directResponse = await fetch(evolutionApiUrl, {
           method: 'POST',
@@ -109,7 +125,12 @@ export async function initializeConnection(
           console.error(`Direct API call failed with status: ${directResponse.status}`);
           const errorText = await directResponse.text();
           console.error('Error response:', errorText);
-          throw new Error(`Failed to connect: ${directResponse.statusText}`);
+          toast({
+            title: "Connection Error",
+            description: "Failed to connect to WhatsApp server",
+            variant: "destructive",
+          });
+          return { success: false, error: `Failed to connect: ${directResponse.statusText}` };
         }
         
         const directData = await directResponse.json();
@@ -134,81 +155,27 @@ export async function initializeConnection(
             qrCodeDataUrl: formattedQrCode,
             pairingCode
           };
+        } else {
+          console.error('No QR code or pairing code data returned from API');
+          toast({
+            title: "Connection Error",
+            description: "Could not generate QR code or pairing code",
+            variant: "destructive",
+          });
+          return { success: false, error: "No QR code or pairing code data returned" };
         }
       }
-      
-      const { data } = response;
-      console.log('Connection initialization response data:', JSON.stringify(data, null, 2));
-      
-      // If data contains an error field, handle it
-      if (data && data.error) {
-        console.error('Error from Evolution API:', data.error);
-        console.error('Error details:', data.details);
-        toast({
-          title: "Connection Error",
-          description: data.error,
-          variant: "destructive",
-        });
-        return { success: false, error: data.error };
-      }
-      
-      if (!data || (!data.qrcode && !data.base64 && !data.pairingCode)) {
-        console.error('Invalid response data:', data);
-        toast({
-          title: "Connection Error",
-          description: "Invalid response from server",
-          variant: "destructive",
-        });
-        return { success: false, error: "Invalid response from server" };
-      }
-      
-      // Get the QR code from the response
-      const qrCodeBase64 = data.qrcode || data.base64 || null;
-      const pairingCode = data.pairingCode || null;
-      
-      if (!qrCodeBase64 && !pairingCode) {
-        console.error('No QR code or pairing code in response');
-        toast({
-          title: "Connection Error",
-          description: "No QR code or pairing code received",
-          variant: "destructive",
-        });
-        return { success: false, error: "No QR code or pairing code received" };
-      }
-      
-      // Format the QR code URL if needed
-      const formattedQrCode = qrCodeBase64 ? formatQrCodeUrl(qrCodeBase64) : null;
-      
-      console.log('Successfully generated QR code or pairing code');
-      console.log('Formatted QR code available:', !!formattedQrCode);
-      console.log('Pairing code available:', !!pairingCode);
-      
-      if (pairingCode) {
-        toast({
-          title: "Pairing Code",
-          description: `Enter this code on your phone: ${pairingCode}`,
-        });
-      }
-      
-      return {
-        success: true,
-        qrCodeDataUrl: formattedQrCode,
-        pairingCode
-      };
-    } catch (fetchError) {
-      console.error('Error calling edge function or API:', fetchError);
+    } catch (apiError) {
+      console.error('Error calling API:', apiError);
       toast({
         title: "Connection Error",
-        description: fetchError.message || "Failed to connect to server",
+        description: apiError.message || "Failed to initialize WhatsApp connection",
         variant: "destructive",
       });
-      return { success: false, error: fetchError.message };
+      return { success: false, error: apiError.message };
     }
   } catch (error) {
     console.error('Uncaught error in initializeConnection:', error);
-    console.error('Error name:', error.name);
-    console.error('Error message:', error.message);
-    console.error('Error stack:', error.stack);
     toast({
       title: "Connection Error",
       description: error.message || "Failed to initialize WhatsApp connection",
