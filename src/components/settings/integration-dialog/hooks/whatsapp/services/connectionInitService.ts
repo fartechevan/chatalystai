@@ -83,11 +83,17 @@ export async function initializeConnection(
           
           const directUrl = `${window.location.origin}/.netlify/functions/index?api=integrations/instance/connect`;
           
+          // Get current session token for auth - Fix for the TypeScript error
+          const { data: sessionData } = await supabase.auth.getSession();
+          const accessToken = sessionData?.session?.access_token || '';
+          
+          console.log('Direct fetch to edge function with auth token:', accessToken ? 'Available (truncated)' : 'Not available');
+          
           const directResponse = await fetch(directUrl, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
-              'Authorization': `Bearer ${supabase.auth.session()?.access_token || ''}`
+              'Authorization': `Bearer ${accessToken}`
             },
             body: JSON.stringify(requestBody)
           });
