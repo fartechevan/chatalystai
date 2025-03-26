@@ -21,42 +21,57 @@ export async function initializeConnection(
   toast: (props: ToastProps) => void
 ): Promise<ConnectionResult> {
   try {
+    console.log('initializeConnection called with config:', JSON.stringify(config, null, 2));
+    
     // Try to get saved instance info from localStorage
     const savedInstanceStr = localStorage.getItem('whatsapp_instance');
+    console.log('Raw saved instance from localStorage:', savedInstanceStr);
+    
     let instanceId = config.instance_id;
     let apiKey = '';
     
     if (savedInstanceStr) {
       try {
         const savedInstance = JSON.parse(savedInstanceStr);
+        console.log('Parsed saved instance:', savedInstance);
         instanceId = savedInstance.id;
         apiKey = savedInstance.token;
-        console.log('Using saved instance:', instanceId);
+        console.log('Using saved instance ID:', instanceId);
+        console.log('API Key retrieved from localStorage (first 5 chars):', apiKey ? apiKey.substring(0, 5) + '...' : 'none');
       } catch (e) {
         console.error('Error parsing saved instance:', e);
       }
     }
     
     if (!instanceId) {
+      console.error('No WhatsApp instance ID found');
       throw new Error('No WhatsApp instance ID found. Please try connecting again.');
     }
     
     console.log(`Initializing WhatsApp connection for instance: ${instanceId}`);
-    console.log(`API Key available: ${apiKey ? 'Yes' : 'No'}`);
+    console.log(`API Key available: ${apiKey ? 'Yes (' + apiKey.substring(0, 5) + '...)' : 'No'}`);
+    
+    // Prepare the request body
+    const requestBody = { 
+      instanceId,
+      apiKey
+    };
+    console.log('Request body for edge function:', JSON.stringify(requestBody, null, 2));
     
     // Call the direct Evolution API endpoint through our edge function
+    console.log('Invoking edge function: integrations/instance/connect');
     const response = await supabase.functions.invoke('integrations/instance/connect', {
-      body: { 
-        instanceId,
-        apiKey
-      }
+      body: requestBody
     });
     
     // Log full response for debugging
-    console.log('Full Edge Function response:', response);
+    console.log('Full Edge Function response:', JSON.stringify(response, null, 2));
     
     if (response.error) {
-      console.error('Error initializing WhatsApp connection:', response.error);
+      console.error('Error from edge function:', response.error);
+      console.error('Error name:', response.error.name);
+      console.error('Error message:', response.error.message);
+      console.error('Error stack:', response.error.stack);
       console.error('Response data:', response.data);
       toast({
         title: "Connection Error",
@@ -67,11 +82,12 @@ export async function initializeConnection(
     }
     
     const { data } = response;
-    console.log('Connection initialization response data:', data);
+    console.log('Connection initialization response data:', JSON.stringify(data, null, 2));
     
     // If data contains an error field, handle it
     if (data && data.error) {
-      console.error('Error from Evolution API:', data.error, data.details);
+      console.error('Error from Evolution API:', data.error);
+      console.error('Error details:', data.details);
       toast({
         title: "Connection Error",
         description: data.error,
@@ -108,6 +124,8 @@ export async function initializeConnection(
     const formattedQrCode = qrCodeBase64 ? formatQrCodeUrl(qrCodeBase64) : null;
     
     console.log('Successfully generated QR code or pairing code');
+    console.log('Formatted QR code available:', !!formattedQrCode);
+    console.log('Pairing code available:', !!pairingCode);
     
     if (pairingCode) {
       toast({
@@ -122,7 +140,10 @@ export async function initializeConnection(
       pairingCode
     };
   } catch (error) {
-    console.error('Error in initializeConnection:', error);
+    console.error('Uncaught error in initializeConnection:', error);
+    console.error('Error name:', error.name);
+    console.error('Error message:', error.message);
+    console.error('Error stack:', error.stack);
     toast({
       title: "Connection Error",
       description: error.message || "Failed to initialize WhatsApp connection",
