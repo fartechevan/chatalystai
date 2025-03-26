@@ -57,6 +57,7 @@ export async function initializeConnection(
     
     if (response.error) {
       console.error('Error initializing WhatsApp connection:', response.error);
+      console.error('Response data:', response.data);
       toast({
         title: "Connection Error",
         description: response.error.message || "Failed to connect",
@@ -120,7 +121,7 @@ export async function initializeConnection(
       qrCodeDataUrl: formattedQrCode,
       pairingCode
     };
-  } catch (error: any) {
+  } catch (error) {
     console.error('Error in initializeConnection:', error);
     toast({
       title: "Connection Error",

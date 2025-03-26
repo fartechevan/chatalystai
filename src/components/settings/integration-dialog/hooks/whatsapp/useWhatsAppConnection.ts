@@ -67,6 +67,7 @@ export function useWhatsAppConnection(selectedIntegration: Integration | null) {
     }
 
     try {
+      console.log('Attempting to connect with instanceId:', config.instance_id, 'and baseUrl:', config.base_url);
       const result = await initializeConnection(config, toast);
       
       if (result.success) {
