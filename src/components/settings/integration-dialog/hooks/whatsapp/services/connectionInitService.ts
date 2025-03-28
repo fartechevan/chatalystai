@@ -46,9 +46,9 @@ export async function initializeConnection(
     console.log(`Initializing WhatsApp connection for instance: ${instanceId}`);
     console.log(`API Key available: ${apiKey ? 'Yes (' + apiKey.substring(0, 5) + '...)' : 'No'}`);
     
-    // Try to connect using the edge function
+    // Try to connect using the edge function specifically designed for connect
     try {
-      // Call the instance/connect endpoint via edge function
+      // Call the dedicated instance/connect endpoint
       const data = await callEvolutionApiViaEdgeFunction('instance/connect', instanceId, apiKey);
       
       // Process the response data for QR code or pairing code
