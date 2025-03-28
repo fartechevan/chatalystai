@@ -13,7 +13,17 @@ export async function callEvolutionApiViaEdgeFunction(
   console.log(`Calling ${endpoint} through Edge Function for instance ${instanceId}`);
   
   try {
-    const response = await supabase.functions.invoke(`integrations/${endpoint}`, {
+    // Determine the correct edge function path based on the endpoint
+    let functionPath = 'integrations';
+    
+    // Special case for instance/connect which has its own dedicated edge function
+    if (endpoint === 'instance/connect') {
+      functionPath = 'integrations/instance/connect';
+    } else if (endpoint === 'instance/connectionState') {
+      functionPath = 'integrations/instance/connectionState';
+    }
+    
+    const response = await supabase.functions.invoke(functionPath, {
       body: {
         instanceId,
         apiKey,
