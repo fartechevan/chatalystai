@@ -30,8 +30,48 @@ export const checkInstanceStatus = async (
       }
     }
     
-    // Call the edge function to check connection state
-    console.log('Calling edge function for connection state check with instance ID:', instanceId);
+    // First check with direct API call as specified in the curl command
+    try {
+      console.log('Directly checking connection state with Evolution API');
+      const baseUrl = config.base_url || 'https://api.evoapicloud.com';
+      const directUrl = `${baseUrl}/instance/connectionState/${instanceId}`;
+      
+      console.log(`Making direct API call to: ${directUrl}`);
+      const response = await fetch(directUrl, {
+        method: 'GET',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json',
+          'apikey': apiKey || '64D1C2D8D89F-4916-A1DD-B1F666B79341', // Use the provided API key as fallback
+        },
+      });
+      
+      console.log(`Direct API call status: ${response.status}`);
+      
+      if (response.ok) {
+        const data = await response.json();
+        console.log('Direct connection check response:', data);
+        
+        if (data && data.state) {
+          // Convert 'close' to 'idle' since that's in our ConnectionState type
+          const convertedState = data.state === 'close' ? 'idle' : data.state as ConnectionState;
+          setConnectionState(convertedState);
+          
+          if (data.state === 'open') {
+            setQrCodeBase64(null);
+          }
+          
+          return data.state === 'open';
+        }
+      } else {
+        console.error('Direct API call failed:', await response.text());
+      }
+    } catch (directError) {
+      console.error('Error making direct API call:', directError);
+    }
+    
+    // As a fallback, try using the edge function
+    console.log('Falling back to edge function for connection state check');
     const { data, error } = await supabase.functions.invoke('integrations/instance/connectionState', {
       body: { 
         instanceId,
@@ -40,12 +80,12 @@ export const checkInstanceStatus = async (
     });
 
     if (error) {
-      console.error('Failed to check WhatsApp connection status:', error);
+      console.error('Failed to check WhatsApp connection status via edge function:', error);
       setConnectionState('idle');
       return false;
     }
 
-    console.log('Instance status response:', data);
+    console.log('Edge function connection status response:', data);
 
     // Check the status from the response
     if (data) {

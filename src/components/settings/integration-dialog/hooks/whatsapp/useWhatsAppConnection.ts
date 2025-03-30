@@ -2,7 +2,9 @@
 import { useToast } from "@/hooks/use-toast";
 import { useState, useEffect, useCallback } from "react";
 import { useWhatsAppConfig } from "./useWhatsAppConfig";
-import { checkConnectionState, checkInstanceStatus, initializeConnection } from "./whatsAppConnectionService";
+import { checkConnectionState } from "./services/connectionStateService";
+import { checkInstanceStatus } from "./services/instanceStatusService";
+import { initializeConnection } from "./services/connectionInitService";
 import type { ConnectionState } from "./types";
 import type { Integration } from "../../../types";
 
@@ -68,6 +70,54 @@ export function useWhatsAppConnection(selectedIntegration: Integration | null) {
 
     try {
       console.log('Attempting to connect with instanceId:', config.instance_id, 'and baseUrl:', config.base_url);
+      
+      // Save instance info to localStorage for direct API access when needed
+      if (selectedIntegration) {
+        // Try to fetch instances first to get token information
+        try {
+          console.log('Fetching instances to get token information');
+          const response = await fetch(`${config.base_url || 'https://api.evoapicloud.com'}/instance/fetchInstances`, {
+            method: 'GET',
+            headers: {
+              'Content-Type': 'application/json',
+              'Accept': 'application/json',
+              'apikey': '64D1C2D8D89F-4916-A1DD-B1F666B79341', // Use the provided API key
+            },
+          });
+          
+          if (response.ok) {
+            const instances = await response.json();
+            console.log('Fetched instances:', instances);
+            
+            // Find our instance
+            const instance = Array.isArray(instances) ? 
+              instances.find(inst => inst.id === config.instance_id) : null;
+              
+            if (instance) {
+              console.log('Found our instance in the list:', instance.id);
+              localStorage.setItem('whatsapp_instance', JSON.stringify(instance));
+            }
+          }
+        } catch (fetchError) {
+          console.error('Error fetching instances:', fetchError);
+        }
+      }
+      
+      // Check connection state before continuing
+      console.log('Checking connection state using the curl method');
+      const isAlreadyConnected = await checkCurrentConnectionState();
+      
+      if (isAlreadyConnected) {
+        console.log('Instance is already connected');
+        setConnectionState('open');
+        toast({
+          title: "Already Connected",
+          description: "WhatsApp is already connected",
+        });
+        return true;
+      }
+      
+      // Continue with connection initialization
       const result = await initializeConnection(config, toast);
       
       if (result.success) {
