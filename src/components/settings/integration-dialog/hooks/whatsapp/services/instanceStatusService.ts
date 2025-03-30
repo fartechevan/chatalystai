@@ -1,49 +1,53 @@
 
 import type { ConnectionState } from "../types";
-import { supabase } from "@/integrations/supabase/client";
+import { connectToInstance } from "./instanceConnectService";
 
 /**
  * Check the status of a WhatsApp instance
  */
 export const checkInstanceStatus = async (
-  config: { instance_id?: string; base_url?: string; } | null,
   setConnectionState: (state: ConnectionState) => void,
   setQrCodeBase64: (qrCode: string | null) => void
 ) => {
-  if (!config || !config.instance_id) return false;
 
   try {
-    const instanceId = config.instance_id;
-    console.log('Checking instance status for ID:', instanceId);
-    
     // First, try to get saved instance info from localStorage which includes the token
     const savedInstanceStr = localStorage.getItem('whatsapp_instance');
     let apiKey = '';
-    
+    let instance_id = '';
     if (savedInstanceStr) {
       try {
         const savedInstance = JSON.parse(savedInstanceStr);
         apiKey = savedInstance.token;
+        instance_id = savedInstance.id;
+
         console.log('Using saved API key from localStorage');
       } catch (e) {
         console.error('Error parsing saved instance:', e);
       }
     }
     
-    // Call the edge function to check connection state
-    console.log('Calling edge function for connection state check with instance ID:', instanceId);
-    const { data, error } = await supabase.functions.invoke('integrations/instance/connectionState', {
-      body: { 
-        instanceId,
-        apiKey // Pass the API key from localStorage
+    // Create base URL for direct Evolution API call
+    
+    // Make the direct API call
+    console.log('Calling direct API for connection state check with instance ID:', instance_id);
+    const apiUrl = `https://api.evoapicloud.com/instance/connectionState/${instance_id}`;
+    console.log('Calling direct API for connection state check with instance ID:', instance_id);
+    
+    const response = await fetch(apiUrl, {
+      method: 'GET',
+      headers: {
+        'apikey': '018D33AE2E9F-4C1B-A516-ACACFB07B29A'
       }
     });
 
-    if (error) {
-      console.error('Failed to check WhatsApp connection status:', error);
+    if (!response.ok) {
+      console.error('Failed to check connection state:', response.status);
       setConnectionState('idle');
       return false;
     }
+
+    const data = await response.json();
 
     console.log('Instance status response:', data);
 
