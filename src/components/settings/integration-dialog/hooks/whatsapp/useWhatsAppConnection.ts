@@ -2,7 +2,7 @@
 import { useToast } from "@/hooks/use-toast";
 import { useState, useEffect, useCallback } from "react";
 import { useWhatsAppConfig } from "./useWhatsAppConfig";
-import { checkConnectionState, checkInstanceStatus, initializeConnection } from "./whatsAppConnectionService";
+import { checkInstanceStatus } from "./whatsAppConnectionService";
 import type { ConnectionState } from "./types";
 import type { Integration } from "../../../types";
 
@@ -36,7 +36,7 @@ export function useWhatsAppConnection(selectedIntegration: Integration | null) {
 
     // Start a new polling interval
     const intervalId = setInterval(async () => {
-      await checkConnectionState(
+      await checkInstanceStatus(
         config, 
         (state: ConnectionState) => setConnectionState(state), 
         toast
