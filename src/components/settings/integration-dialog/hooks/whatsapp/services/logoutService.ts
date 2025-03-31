@@ -13,11 +13,11 @@ export async function logoutWhatsAppInstance(
   const apiKey = await getEvolutionApiKey();
   
   if (!apiKey) {
-    console.error("No API key available for logout");
+    console.error("No API key available in vault for logout");
     if (options?.toast) {
       options.toast.toast({
         title: "Error",
-        description: "No API key available for logout",
+        description: "No API key available in Supabase Vault for logout",
         variant: "destructive"
       });
     }
