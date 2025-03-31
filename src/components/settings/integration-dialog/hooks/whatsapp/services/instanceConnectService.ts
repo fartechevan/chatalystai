@@ -1,84 +1,69 @@
-import { supabase } from "@/integrations/supabase/client"; // Removed getEvolutionURL
-// Import the centralized API key and server URL
-import { evolutionApiKey, evolutionServerUrl } from "./config";
+
+import { getEvolutionApiKey, evolutionServerUrl } from "../services/config";
+import { useToast } from "@/hooks/use-toast";
+import { processConnectionData } from "./qrHandlers";
+import type { ConnectionState } from "../types";
 
 /**
- * Connects to a specific Evolution API instance to get QR code or pairing code.
+ * Connect to a WhatsApp instance
  */
 export async function connectToInstance(
-  setQrCodeBase64: (qrCode: string | null) => void,
+  setQrCodeBase64: (url: string | null) => void,
   setPairingCode: (code: string | null) => void,
-  setConnectionState: (state: string) => void,
+  setConnectionState: (state: ConnectionState) => void,
   startPolling: () => void,
-  // Remove apiKey parameter
   instanceId: string
 ) {
-
-  // Use the imported server URL
-  const baseUrl = evolutionServerUrl;
-  if (!baseUrl) {
-     console.error("Evolution API base URL is not configured.");
-     throw new Error("Evolution API base URL is not configured.");
-  }
-
-  // API Key check
-  if (!evolutionApiKey) {
-    console.error('API key is missing from config.');
-    throw new Error('API key is required for connection.');
-  }
-
-  // Get current session token for auth (if still needed by API)
-  // Note: Often, API key is sufficient, and session token might not be required for this endpoint.
-  // Verify if Authorization header is truly needed for the /instance/connect endpoint.
-  // const { data: sessionData } = await supabase.auth.getSession();
-  // const accessToken = sessionData?.session?.access_token || '';
-
-  // Create full URL for API call
-  const apiUrl = `${baseUrl}/instance/connect/${instanceId}`;
-
-  console.log(`Connecting to instance via Evolution API: ${apiUrl}`);
-
-  const response = await fetch(apiUrl, {
-    method: 'GET',
-    headers: {
-      'Content-Type': 'application/json',
-      'apikey': evolutionApiKey, // Use imported key
-      // 'Authorization': `Bearer ${accessToken}` // Remove if not needed
-    }
-  });
+  const apiKey = await getEvolutionApiKey();
   
-  if (!response.ok) {
-    console.error(`Instance connection failed with status: ${response.status}`);
-    const errorText = await response.text();
-    console.error('Error response:', errorText);
-    throw new Error(`Failed to connect: ${response.statusText}`);
+  if (!apiKey) {
+    console.error("Missing API key for Evolution API");
+    return { success: false, error: "Missing API key for Evolution API" };
   }
-  
-  const result = await response.json();
 
-  if (result.success) {
-    if (result.qrCodeDataUrl) {
-      console.log('QR code generated successfully:', result.qrCodeDataUrl);
-      // Assuming setQrCodeBase64 is a function to handle QR code data
-      setQrCodeBase64(result.qrCodeDataUrl);
+  if (!instanceId) {
+    console.error("Missing instance ID for Connection");
+    return { success: false, error: "Missing instance ID" };
+  }
+
+  console.log(`Attempting to connect with API Key: ${apiKey ? "***" : "Not Set"}, Instance ID: ${instanceId}`);
+  
+  try {
+    const endpoint = `/instance/connect/${instanceId}`;
+    const url = `${evolutionServerUrl}${endpoint}`;
+    
+    console.log("Connection URL:", url);
+    
+    const response = await fetch(url, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+        "apikey": apiKey,
+      },
+    });
+
+    if (!response.ok) {
+      console.error(`Error connecting to instance (${response.status}):`, await response.text());
+      return { success: false, error: `Error ${response.status}: ${response.statusText}` };
     }
-    
-    if (result.pairingCode) {
-      console.log('Pairing code generated:', result.pairingCode);
-      // Assuming setPairingCode is a function to handle pairing code
-      setPairingCode(result.pairingCode);
-    }
-    
-    setConnectionState('connecting');
-    
-    // Start polling for connection status
-    startPolling();
-    return {
-      success: true,
-      qrCodeDataUrl: result.qrCodeDataUrl || null,
-      pairingCode: result.pairingCode || null
+
+    const data = await response.json();
+    console.log("Connection response:", data);
+
+    // Process QR code and update UI
+    const toastFn = (props: any) => {
+      const { toast } = useToast();
+      toast(props);
     };
-  } else {
-    return false;
+
+    const result = processConnectionData(data, toastFn);
+    
+    // Trigger polling to check connection status
+    startPolling();
+    
+    return result;
+  } catch (error) {
+    console.error("Error connecting to WhatsApp instance:", error);
+    return { success: false, error: String(error) };
   }
 }
