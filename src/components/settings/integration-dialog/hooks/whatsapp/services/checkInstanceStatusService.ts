@@ -1,59 +1,56 @@
+// Import the centralized API key and server URL
+import { evolutionApiKey, evolutionServerUrl } from "./config";
 
-import { evolutionServerUrl, getEvolutionApiKey } from "./config";
+// Renamed from fetchInstances and modified to check a specific instance's status
 
 /**
- * Checks the connection status of a specific WhatsApp instance
- * 
- * @param instanceId ID of the instance to check
- * @returns Object with connection state information or error
+ * Checks the connection state of a specific Evolution API instance.
+ * @param instanceName The name of the instance to check.
+ * @returns An object containing the instance state or an error object.
  */
-export default async function checkInstanceStatus(instanceId: string) {
+// Remove apiKey parameter as it's now imported
+async function checkInstanceStatus(instanceName: string) {
+  const serverUrl = evolutionServerUrl; // Use the imported server URL
+  // Assuming the endpoint to check a specific instance's state is /instance/connectionState/{instanceName}
+  // Verify this endpoint with the Evolution API documentation if issues arise.
+  const url = `${serverUrl}/instance/connectionState/${instanceName}`;
+
+  // Use the imported key
+  if (!evolutionApiKey) {
+    console.error('API key is missing from config.');
+    return { error: 'API key is required' };
+  }
+  if (!instanceName) {
+    console.error('Instance name is missing.');
+    return { error: 'Instance name is required' };
+  }
+
   try {
-    // Get API key
-    const apiKey = await getEvolutionApiKey();
-    if (!apiKey) {
-      console.error("Failed to retrieve Evolution API key for checking instance status");
-      return { error: "API key not available" };
-    }
-
-    const baseUrl = evolutionServerUrl;
-    if (!baseUrl) {
-      console.error("Evolution API base URL is not configured");
-      return { error: "API URL not configured" };
-    }
-
-    // Build URL for connection state check
-    const statusUrl = `${baseUrl}/instance/connectionState/${instanceId}`;
-    console.log(`Checking instance status at: ${statusUrl}`);
-
-    // Send request
-    const response = await fetch(statusUrl, {
+    const response = await fetch(url, {
       method: 'GET',
       headers: {
-        'apikey': apiKey
-      }
+        'apikey': evolutionApiKey, // Use imported key
+        'Content-Type': 'application/json' // Often needed, though GET might not strictly require it
+      },
     });
 
-    // Handle error responses
     if (!response.ok) {
-      const errorText = await response.text();
-      console.error(`Error checking instance status: ${response.status} - ${errorText}`);
-      return { error: `Server error: ${response.status}` };
+      // Log more details for debugging
+      const errorBody = await response.text();
+      console.error(`Error checking instance status for ${instanceName}:`, response.status, response.statusText, errorBody);
+      // Return a structured error
+      return { error: `Failed to check instance status: ${response.status} ${response.statusText}`, status: response.status };
     }
 
-    // Parse response
-    const data = await response.json();
-    console.log(`Status for instance ${instanceId}:`, data);
-
-    // Extract connection state from different possible response formats
-    const state = data.state || 
-                  data.connectionStatus || 
-                  data.status || 
-                  (data.instance && data.instance.state);
-
-    return { state };
+    const result = await response.json();
+    // The result structure might be simple like { state: 'open' } or more complex.
+    // Adjust parsing based on the actual API response.
+    console.log(`Status check result for ${instanceName}:`, result);
+    return result; // e.g., { state: 'open' } or similar
   } catch (error) {
-    console.error(`Exception checking status for instance ${instanceId}:`, error);
-    return { error: error.message };
+    console.error(`Error during instance status check for ${instanceName}:`, error);
+    return { error: `Internal server error during status check: ${(error as Error).message}` };
   }
 }
+
+export default checkInstanceStatus;

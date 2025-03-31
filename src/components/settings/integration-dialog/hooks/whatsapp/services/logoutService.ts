@@ -1,109 +1,106 @@
 
-import { evolutionServerUrl, WHATSAPP_INSTANCE, getEvolutionApiKey } from "./config";
+import { supabase } from "@/integrations/supabase/client"; // Removed getEvolutionURL
+import { useToast } from "@/hooks/use-toast";
+// Import the centralized API key and server URL
+import { evolutionApiKey, evolutionServerUrl } from "./config";
+
+type LogoutOptions = {
+  toast: ReturnType<typeof useToast>;
+};
 
 /**
- * Logs out from a WhatsApp instance
- * 
- * @param instanceName The name of the instance to log out from
+ * Logs out a WhatsApp instance
+ * @param instanceId The ID of the instance to log out
  * @param onSuccess Callback function to execute on successful logout
- * @param options Additional options 
- * @returns Boolean indicating success
+ * @param options Additional options including toast notifications
+ * @returns Promise<boolean> Whether the logout was successful
  */
-export const logoutWhatsAppInstance = async (
-  instanceName: string,
+export async function logoutWhatsAppInstance(
+  instanceId: string,
   onSuccess?: () => void,
-  options?: { toast?: any }
-) => {
-  console.log(`Attempting to logout WhatsApp instance: ${instanceName}`);
+  options?: LogoutOptions
+): Promise<boolean> {
+  const serverUrl = evolutionServerUrl; // Use imported server URL
+  // *** ASSUMPTION: Endpoint is /instance/logout/{instanceName} ***
+  // *** This needs verification with Evolution API documentation. ***
+  const url = `${serverUrl}/instance/logout/${instanceId}`; // instanceId is the instanceName here
+
+  if (!evolutionApiKey) {
+    console.error('API key is missing from config.');
+    options?.toast?.toast({ title: "Configuration Error", description: "API Key is missing.", variant: "destructive" });
+    return false;
+  }
+   if (!instanceId) {
+    console.error('Instance name/ID is missing.');
+     options?.toast?.toast({ title: "Error", description: "Instance name is required.", variant: "destructive" });
+    return false;
+  }
 
   try {
-    // Get the API key
-    const apiKey = await getEvolutionApiKey();
-    if (!apiKey) {
-      console.error("Failed to retrieve Evolution API key for logout");
-      options?.toast?.toast({
-        title: "Error",
-        description: "Could not retrieve API key for logout",
-        variant: "destructive"
-      });
-      return false;
-    }
+    console.log(`Attempting to log out WhatsApp instance: ${instanceId}`);
 
-    // Get the base URL
-    const baseUrl = evolutionServerUrl;
-    if (!baseUrl) {
-      console.error("Evolution API base URL is not configured for logout");
-      options?.toast?.toast({
-        title: "Error",
-        description: "API URL not configured",
-        variant: "destructive"
-      });
-      return false;
-    }
-
-    // Construct the logout URL
-    const logoutUrl = `${baseUrl}/instance/logout/${instanceName}`;
-    console.log(`Sending logout request to: ${logoutUrl}`);
-
-    // Send the logout request
-    const response = await fetch(logoutUrl, {
-      method: 'DELETE',
+    const response = await fetch(url, {
+      method: 'DELETE', // Assuming DELETE method for logout
       headers: {
-        'apikey': apiKey
-      }
+        'apikey': evolutionApiKey,
+      },
     });
 
-    // Handle the response
     if (!response.ok) {
-      const errorText = await response.text();
-      console.error(`Error logging out: ${response.status} - ${errorText}`);
+      // Attempt to parse error response from API
+      let errorMsg = `Failed to log out: ${response.status} ${response.statusText}`;
+      try {
+        const errorBody = await response.json();
+        errorMsg = errorBody?.message || errorBody?.error || errorMsg;
+      } catch (e) { /* Ignore parsing error */ }
+
+      console.error('Error logging out WhatsApp instance:', errorMsg);
       options?.toast?.toast({
-        title: "Logout Failed",
-        description: `Server error: ${response.status}`,
+        title: "Logout Error",
+        description: errorMsg,
         variant: "destructive"
       });
       return false;
     }
 
-    // Parse the response and check for success
-    const data = await response.json();
-    console.log("Logout response:", data);
+    // Assuming successful logout returns 200 OK with potentially minimal body
+    console.log(`WhatsApp instance ${instanceId} logout successful.`);
 
-    if (data.error) {
-      console.error("Error in logout response:", data.error);
-      options?.toast?.toast({
-        title: "Logout Failed",
-        description: data.error,
-        variant: "destructive"
-      });
-      return false;
-    }
-
-    // Handle successful logout
-    console.log("Logout successful");
+    // Clean up the integrations_config table (optional, depends on desired behavior)
+    // If logging out means the config is invalid, maybe remove or nullify instance_id
+    const { error: dbError } = await supabase
+      .from('integrations_config')
+      .update({ instance_id: null })
+      .eq('instance_id', instanceId);
     
-    // Remove the local storage item
-    localStorage.removeItem(WHATSAPP_INSTANCE);
+    if (dbError) {
+      console.error('Error updating integrations_config:', dbError);
+      options?.toast?.toast({
+        title: "Warning",
+        description: "Instance logged out but database not updated",
+        variant: "destructive"
+      });
+      // Still consider this a success since the instance was logged out
+    }
     
     // Call the success callback if provided
-    if (onSuccess) {
+    if (onSuccess && typeof onSuccess === 'function') {
       onSuccess();
     }
     
-    // Show success toast if toast is provided
     options?.toast?.toast({
-      title: "Logged Out",
-      description: `Successfully disconnected ${instanceName}`
+      title: "Success",
+      description: "WhatsApp instance disconnected successfully",
     });
     
     return true;
   } catch (error) {
-    console.error("Exception during logout:", error);
+    console.error('Exception in logoutWhatsAppInstance:', error);
     options?.toast?.toast({
-      title: "Logout Error",
-      description: error.message,
+      title: "Error",
+      description: `Failed to disconnect WhatsApp instance: ${(error as Error).message}`,
       variant: "destructive"
     });
     return false;
   }
-};
+}
