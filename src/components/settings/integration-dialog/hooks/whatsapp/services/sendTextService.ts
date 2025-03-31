@@ -1,103 +1,66 @@
-// Import the centralized API key
-import { evolutionApiKey } from "./config";
-// Assuming getEvolutionURL might be needed if serverUrl isn't always passed
-// import { getEvolutionURL } from "@/integrations/supabase/client";
 
-
-interface SendTextParams {
-  serverUrl: string; // Keep allowing specific server URL override if needed
-  instance: string;
-  // apiKey: string; // Remove apiKey from params
-  number: string; // Recipient's phone number
-  text: string; // The message text
-  // Optional parameters based on the curl example
-  delay?: number;
-  linkPreview?: boolean;
-  mentionsEveryOne?: boolean;
-  mentioned?: string[];
-  quoted?: {
-    key: { id: string };
-    message: { conversation: string };
-  };
-}
-
-interface SendTextResponse {
-  // Define the expected success response structure from the API if known
-  // Define the expected success response structure from the API if known
-  // Example:
-  // messageId?: string;
-  // status?: string;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  [key: string]: any; // Allow for other properties
-}
+import { getEvolutionApiKey, evolutionServerUrl } from "./config";
+import type { WhatsAppMessageResponse } from "../../../../../dashboard/conversations/api/messageQueries/types";
 
 /**
- * Sends a text message via the WhatsApp API.
- * @param params - The parameters for sending the text message.
- * @returns A promise that resolves with the API response.
- * @throws {Error} If the request fails.
+ * Sends a text message to a WhatsApp contact
  */
-// Update function signature to remove apiKey from destructuring
-export const sendTextService = async (params: SendTextParams): Promise<SendTextResponse> => {
-  const { serverUrl, instance, number, text, ...optionalData } = params;
-
-  // API Key check
-  if (!evolutionApiKey) {
-    console.error('API key is missing from config.');
-    throw new Error('API key is required to send messages.');
-  }
-
-  // Ensure serverUrl doesn't end with a slash to avoid double slashes
-  const cleanServerUrl = serverUrl.endsWith('/') ? serverUrl.slice(0, -1) : serverUrl;
-  const url = `${cleanServerUrl}/message/sendText/${instance}`;
-
-  const headers = {
-    'Content-Type': 'application/json',
-    'apikey': evolutionApiKey, // Use imported key
-  };
-
-  const body = JSON.stringify({
-    number,
-    text,
-    // Include optional parameters if they exist
-    ...(optionalData.delay !== undefined && { delay: optionalData.delay }),
-    ...(optionalData.linkPreview !== undefined && { linkPreview: optionalData.linkPreview }),
-    ...(optionalData.mentionsEveryOne !== undefined && { mentionsEveryOne: optionalData.mentionsEveryOne }),
-    ...(optionalData.mentioned && { mentioned: optionalData.mentioned }),
-    ...(optionalData.quoted && { quoted: optionalData.quoted }),
-  });
-
+export async function sendTextMessage(
+  instanceId: string,
+  recipient: string,
+  message: string
+): Promise<WhatsAppMessageResponse> {
   try {
+    const apiKey = await getEvolutionApiKey();
+    
+    if (!apiKey) {
+      console.error("No API key available for sending message");
+      return { success: false, error: "API key not available" };
+    }
+
+    if (!instanceId) {
+      console.error("No instance ID provided for sending message");
+      return { success: false, error: "Instance ID is required" };
+    }
+
+    // Extract phone number without the @c.us suffix if present
+    const phoneNumber = recipient.includes('@') ? recipient.split('@')[0] : recipient;
+    console.log('Phone number being sent to API:', phoneNumber);
+    
+    const endpoint = `/message/sendText/${instanceId}`;
+    const url = `${evolutionServerUrl}${endpoint}`;
+    
+    console.log("Sending message URL:", url);
+    
     const response = await fetch(url, {
-      method: 'POST',
-      headers: headers,
-      body: body,
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "apikey": apiKey,
+      },
+      body: JSON.stringify({
+        number: phoneNumber,
+        options: {
+          delay: 1200
+        },
+        textMessage: {
+          text: message
+        }
+      }),
     });
 
     if (!response.ok) {
-      let errorData;
-      try {
-        errorData = await response.json();
-      } catch (e) {
-        // Ignore JSON parsing error if response is not JSON
-      }
-      throw new Error(
-        `Failed to send text message. Status: ${response.status}. ${errorData ? JSON.stringify(errorData) : response.statusText}`
-      );
+      const errorText = await response.text();
+      console.error(`Error sending message (${response.status}):`, errorText);
+      return { success: false, error: `Error ${response.status}: ${errorText || response.statusText}` };
     }
 
-    // Assuming the API returns JSON on success
-    const responseData: SendTextResponse = await response.json();
-    return responseData;
-
+    const data = await response.json();
+    console.log("Send message response:", data);
+    
+    return { success: true, data };
   } catch (error) {
-    if (error instanceof Error && error.message.startsWith('Failed to send text message')) {
-      // Re-throw the specific error from the fetch block
-      throw error;
-    }
-    // Handle network errors or other unexpected issues
-    throw new Error(
-      `Network error or unexpected issue sending text message: ${error instanceof Error ? error.message : String(error)}`
-    );
+    console.error("Error sending WhatsApp message:", error);
+    return { success: false, error: String(error) };
   }
-};
+}
