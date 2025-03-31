@@ -2,6 +2,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
 import type { Integration } from "../../../types";
+import { evolutionApiKey } from "./services/config"; // Import the API key
 
 export function useWhatsAppConfig(selectedIntegration: Integration | null) {
   const { data: config, isLoading } = useQuery({
@@ -31,28 +32,29 @@ export function useWhatsAppConfig(selectedIntegration: Integration | null) {
         .select('id, integration_id, instance_id, user_reference_id')
         .eq('integration_id', selectedIntegration.id)
         .maybeSingle();
-      
+
       if (configError && configError.code !== 'PGRST116') {
         console.error('Error fetching config:', configError);
         throw configError;
       }
-      
+
       console.log('Configuration data:', config);
-      
+
       // If no config exists, return a default one with the integration's base_url
       if (!config) {
         console.log('No existing config found, returning default');
         return {
           integration_id: selectedIntegration.id,
           base_url: integration.base_url,
-          instance_id: ''
+          instance_id: '',
+          token: evolutionApiKey // Use imported API key from config file
         };
       }
-      
+
       // Return the merged object with data from both tables
       return {
-        ...config,
-        base_url: integration.base_url
+        ...(config ?? {}),
+        base_url: integration.base_url,
       };
     },
     enabled: !!selectedIntegration?.id,

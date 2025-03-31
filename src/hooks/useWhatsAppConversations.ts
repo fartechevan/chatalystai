@@ -35,10 +35,11 @@ export function useWhatsAppConversations(instanceId: string | null, isConnected:
       const baseUrl = integration?.base_url || 'https://api.evoapicloud.com';
       console.log('Using base URL:', baseUrl);
 
-      // Use the Edge Function to fetch conversations
-      const { data, error } = await supabase.functions.invoke('integrations/chat/findMessages', {
-        body: { instanceId }
-      });
+      // TODO: Replace with local whatsapp/services function (e.g., findMessagesService or findConversationsService)
+      // const { data, error } = await supabase.functions.invoke('integrations/chat/findMessages', {
+      //   body: { instanceId }
+      // });
+      const data: unknown = []; const error = new Error("Supabase function call commented out."); // Placeholder
       
       if (error) {
         console.error('Failed to fetch WhatsApp conversations:', error);
