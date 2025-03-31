@@ -10,8 +10,8 @@ import type { Integration } from "./types";
 import { useToast } from "@/hooks/use-toast";
 // Import the service to check a specific instance's status
 import checkInstanceStatus from "./integration-dialog/hooks/whatsapp/services/checkInstanceStatusService";
-// Import the centralized config for the API key
-import { evolutionApiKey } from "./integration-dialog/hooks/whatsapp/services/config";
+// Import the getEvolutionApiKey function instead of the hardcoded key
+import { getEvolutionApiKey } from "./integration-dialog/hooks/whatsapp/services/config";
 
 interface IntegrationsViewProps {
   isActive: boolean; // Prop to control loading
@@ -135,7 +135,8 @@ export function IntegrationsView({ isActive }: IntegrationsViewProps) {
 
     // API Key check is now implicitly handled by the service via config.ts
     // We might still want a check here to prevent unnecessary steps if the key isn't set *at all* in the config
-    if (!evolutionApiKey) {
+    const apiKey = await getEvolutionApiKey();
+    if (!apiKey) {
        toast({ title: "Configuration Error", description: "Evolution API Key is missing in the application configuration.", variant: "destructive" });
        return;
     }
@@ -194,7 +195,7 @@ export function IntegrationsView({ isActive }: IntegrationsViewProps) {
       // Store credentials (Supabase instance_id and API Key from config) - needed for dialog/polling
       console.log(`Storing credentials for connection attempt: InstanceID=${instanceId}, ApiKey=***`);
       localStorage.setItem('instanceID', instanceId);
-      localStorage.setItem('apiKey', evolutionApiKey); // Store the key from config for dialog use
+      localStorage.setItem('apiKey', apiKey); // Store the key from config for dialog use
 
       // Since we know it's not connected, open the dialog to guide the user
       toast({
