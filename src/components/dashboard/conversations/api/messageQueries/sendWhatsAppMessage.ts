@@ -27,10 +27,11 @@ export async function sendWhatsAppMessage(
     
     console.log('WhatsApp API request payload:', payload);
     
-    // Call the edge function with the correct path
-    const { data, error } = await supabase.functions.invoke('integrations/message/sendText', {
-      body: payload
-    });
+    // TODO: Replace with local whatsapp/services function (e.g., sendTextService)
+    // const { data, error } = await supabase.functions.invoke('integrations/message/sendText', {
+    //   body: payload
+    // });
+    const data: unknown = null; const error = new Error("Supabase function call commented out."); // Placeholder
 
     console.log('WhatsApp API response:', data, error);
 
@@ -43,11 +44,13 @@ export async function sendWhatsAppMessage(
       success: true,
       data: data
     };
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error invoking edge function:', error);
+    // Check if error is an instance of Error to safely access message
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     return {
       success: false,
-      error: error.message || 'Unknown error'
+      error: errorMessage
     };
   }
 }

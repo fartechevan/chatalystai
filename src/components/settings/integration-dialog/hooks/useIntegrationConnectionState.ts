@@ -15,7 +15,7 @@ export function useIntegrationConnectionState(
   const [isConnected, setIsConnected] = useState(false);
 
   const { 
-    initializeConnection, 
+    connectToInstance,
     qrCodeBase64,
     pairingCode,
     connectionState, 
@@ -83,7 +83,7 @@ export function useIntegrationConnectionState(
   };
 
   const handleIPhoneSelect = async () => {
-    const success = await initializeConnection();
+    const success = await connectToInstance();
     if (success) {
       setShowDeviceSelect(false);
       setIntegrationQRPopup(true);

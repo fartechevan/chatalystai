@@ -1,4 +1,3 @@
-
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Plus } from "lucide-react";
@@ -9,10 +8,18 @@ import { IntegrationDialog } from "./integration-dialog/IntegrationDialog";
 import { IntegrationCard } from "./integration-card/IntegrationCard";
 import type { Integration } from "./types";
 import { useToast } from "@/hooks/use-toast";
+// Import the service to check a specific instance's status
+import checkInstanceStatus from "./integration-dialog/hooks/whatsapp/services/checkInstanceStatusService";
+// Import the centralized config for the API key
+import { evolutionApiKey } from "./integration-dialog/hooks/whatsapp/services/config";
+
+interface IntegrationsViewProps {
+  isActive: boolean; // Prop to control loading
+}
 
 const tabs = ["All", "Connected"];
 
-export function IntegrationsView() {
+export function IntegrationsView({ isActive }: IntegrationsViewProps) {
   const [activeTab, setActiveTab] = useState("All");
   const [searchQuery, setSearchQuery] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
@@ -23,12 +30,12 @@ export function IntegrationsView() {
   const { data: integrations = [], isLoading, refetch } = useQuery({
     queryKey: ['integrations'],
     queryFn: async () => {
-      // Define the expected shape of raw data from Supabase
+      console.log("Fetching integrations data..."); // Log when query actually runs
       interface RawIntegrationData {
         id: string;
         name: string;
-        type?: string; // This might be missing in some records
-        configuration?: Record<string, any>;
+        type?: string;
+        configuration?: Record<string, unknown>;
         created_at?: string;
         updated_at?: string;
         base_url?: string;
@@ -45,16 +52,14 @@ export function IntegrationsView() {
         .from('integrations')
         .select('*')
         .order('name');
-      
+
       if (error) throw error;
-      
-      // Ensure every integration has the type property
+
       const typedData = (data as RawIntegrationData[]).map(item => ({
         ...item,
-        type: item.type || "messenger" // Add default type if missing
+        type: item.type || "messenger"
       })) as Integration[];
-      
-      // Add WhatsApp Cloud API integration if not already in the database
+
       const whatsappCloudApi: Integration = {
         id: "whatsapp-cloud-api",
         name: "WhatsApp Cloud API",
@@ -63,194 +68,174 @@ export function IntegrationsView() {
         status: "available",
         is_connected: false,
         base_url: "https://api.evoapicloud.com",
-        type: "messenger" // Explicitly set the type property
+        type: "messenger"
       };
-      
-      const hasWhatsAppCloudApi = typedData.some(integration => 
+
+      const hasWhatsAppCloudApi = typedData.some(integration =>
         integration.name === "WhatsApp Cloud API"
       );
-      
+
       return hasWhatsAppCloudApi ? typedData : [...typedData, whatsappCloudApi];
     },
+    enabled: isActive, // Only run query when the component is active
   });
 
-  useEffect(() => {
-    // Check connected integrations from local storage or API
-    const checkConnectionStatus = async () => {
-      try {
-        console.log('Checking connection status for integrations');
-        
-        // For WhatsApp, check the connection status
-        const { data, error } = await supabase
-          .from('integrations_config')
-          .select('id, integration_id, instance_id');
-          
-        if (error) {
-          console.error('Error fetching integration configs:', error);
-          throw error;
-        }
-        
-        console.log('Integration configs:', data);
-        
-        // Get connection states for each configuration
-        const connected: Record<string, boolean> = {};
-        
-        for (const config of data) {
-          if (!config.instance_id) {
-            console.log(`No instance_id for integration ${config.integration_id}, marking as not connected`);
-            connected[config.integration_id] = false;
-            continue;
-          }
-          
-          // Default to not connected
-          connected[config.integration_id] = false;
-          
-          try {
-            console.log(`Checking connection status for integration ${config.integration_id} with instance ${config.instance_id}`);
-            
-            // Use the supabase edge function to check status
-            const { data: instancesData, error } = await supabase.functions.invoke('integrations', {
-              method: 'GET'
-            });
-            
-            if (error) {
-              console.error('Error fetching WhatsApp connection status:', error);
-              continue;
-            }
-            
-            console.log('Instances data for connection check:', instancesData);
-            
-            if (Array.isArray(instancesData)) {
-              const isAnyInstanceConnected = instancesData.some(item => 
-                (item.connectionStatus === 'open' || 
-                 item.status === 'open' || 
-                 item.state === 'open') && 
-                item.id === config.instance_id
-              );
-              
-              if (isAnyInstanceConnected) {
-                console.log(`Integration ${config.integration_id} with instance ${config.instance_id} is connected`);
-                connected[config.integration_id] = true;
-              } else {
-                console.log(`Integration ${config.integration_id} with instance ${config.instance_id} is not connected`);
-              }
-            } else {
-              console.warn('Instances data is not an array:', instancesData);
-            }
-          } catch (fetchError) {
-            console.error('Error fetching WhatsApp connection status:', fetchError);
-          }
-        }
-        
-        console.log('Final connection statuses:', connected);
-        setConnectedIntegrations(connected);
-      } catch (error) {
-        console.error('Error checking connection status:', error);
-      }
-    };
-    
-    checkConnectionStatus();
-  }, [dialogOpen]); // Re-check when dialog is closed
+  // Function to check connection status using Supabase config and new service
+  const checkAndUpdateConnectionStatus = async (integrationId: string): Promise<boolean> => {
+    let isConnected = false;
+    try {
+      console.log(`Fetching config for integration ${integrationId} to check status...`);
+      const { data: configData, error: configError } = await supabase
+        .from('integrations_config')
+        .select('instance_id')
+        .eq('integration_id', integrationId)
+        .maybeSingle();
 
-  const handleIntegrationClick = async (integration: Integration) => {
-    // Set selected integration
-    setSelectedIntegration(integration);
-    
-    // For WhatsApp integrations, fetch instances before opening dialog
-    if (integration.name === "WhatsApp") {
-      try {
-        toast({
-          title: "Checking WhatsApp connection...",
-          description: "Fetching WhatsApp instances and checking connection status",
-        });
-        
-        console.log('Fetching WhatsApp instances for integration:', integration.id);
-        
-        // Fetch instances and save to database with integration ID
-        const { data, error } = await supabase.functions.invoke("integrations", {
-          body: { integration_id: integration.id }
-        });
-        
-        if (error) {
-          console.error('Error fetching WhatsApp instances:', error);
-          toast({
-            title: "Connection Error",
-            description: "Could not fetch WhatsApp instances: " + error.message,
-            variant: "destructive"
-          });
+      if (configError) {
+        console.error(`Error fetching config for integration ${integrationId}:`, configError);
+      } else if (configData?.instance_id) {
+        const instanceId = configData.instance_id;
+        console.log(`Checking status for instance ${instanceId} (Integration: ${integrationId})`);
+
+        // Call service without API key (it gets it from config)
+        const statusResult = await checkInstanceStatus(instanceId);
+
+        // Type check and status validation
+        if (statusResult && typeof statusResult === 'object' && 'state' in statusResult && !('error' in statusResult) && statusResult.state === 'open') {
+          console.log(`Instance ${instanceId} is connected.`);
+          isConnected = true;
         } else {
-          console.log('WhatsApp instances fetched successfully:', data);
-          
-          // Store the instance credentials in localStorage if available
-          if (Array.isArray(data) && data.length > 0) {
-            const instanceData = {
-              id: data[0].id,
-              token: data[0].token
-            };
-            localStorage.setItem('whatsapp_instance', JSON.stringify(instanceData));
-          }
-          
-          // Check if any instance is connected
-          const hasConnectedInstance = Array.isArray(data) && data.some(
-            instance => instance.connectionStatus === 'open' || instance.status === 'open' || instance.state === 'open'
-          );
-          
-          if (hasConnectedInstance) {
-            toast({
-              title: "WhatsApp Connected",
-              description: "Found connected WhatsApp instance",
-            });
-            
-            // Update connected status
-            setConnectedIntegrations(prev => ({
-              ...prev,
-              [integration.id]: true
-            }));
-          } else {
-            console.log('No connected WhatsApp instances found');
-            if (Array.isArray(data) && data.length === 0) {
-              toast({
-                title: "No WhatsApp Instances",
-                description: "No WhatsApp instances found. You can create one.",
-                variant: "default"
-              });
-            }
-          }
+          const logMessage = (statusResult && typeof statusResult === 'object' && 'error' in statusResult) ? statusResult.error : `State: ${statusResult?.state}`;
+          console.log(`Instance ${instanceId} is not connected or error occurred:`, logMessage);
+          isConnected = false;
         }
-      } catch (error) {
-        console.error('Error in handleIntegrationClick:', error);
-        toast({
-          title: "Error",
-          description: "An unexpected error occurred: " + (error as Error).message,
-          variant: "destructive"
-        });
+      } else {
+        console.log(`No instance_id configured for integration ${integrationId}. Cannot check status.`);
+        isConnected = false;
       }
-    }
-    
-    // Open the dialog
-    setDialogOpen(true);
-  };
-
-  const handleDialogClose = (connected: boolean) => {
-    setDialogOpen(false);
-    if (connected && selectedIntegration) {
-      // Update the connected status
+    } catch (error) {
+      console.error(`Error in checkAndUpdateConnectionStatus for ${integrationId}:`, error);
+      isConnected = false;
+    } finally {
       setConnectedIntegrations(prev => ({
         ...prev,
-        [selectedIntegration.id]: true
+        [integrationId]: isConnected
       }));
-      
-      // Refresh the integrations list
-      refetch();
+    }
+    return isConnected;
+  };
+
+  // REMOVED useEffect hooks that automatically checked status on load/dialog close.
+  // Status will now only be checked on click.
+
+
+  // Function to handle the connection process for WhatsApp (will now also check status)
+  const connectWhatsApp = async (integration: Integration) => {
+    setSelectedIntegration(integration);
+
+    // API Key check is now implicitly handled by the service via config.ts
+    // We might still want a check here to prevent unnecessary steps if the key isn't set *at all* in the config
+    if (!evolutionApiKey) {
+       toast({ title: "Configuration Error", description: "Evolution API Key is missing in the application configuration.", variant: "destructive" });
+       return;
+    }
+
+    // Check connection status FIRST when clicking the card
+    const isCurrentlyConnected = await checkAndUpdateConnectionStatus(integration.id);
+
+    // If already connected, just show a success toast and maybe refresh data?
+    // Or perhaps open the dialog anyway for management? Let's show a toast for now.
+    if (isCurrentlyConnected) {
+        toast({
+            title: "Already Connected",
+            description: `WhatsApp instance for ${integration.name} is already connected.`,
+        });
+        // Optionally open dialog here if management is needed even when connected
+        // setSelectedIntegration(integration);
+        // setDialogOpen(true);
+        return; // Stop further connection attempt if already connected
+    }
+
+    // If not connected, proceed with the connection/configuration flow
+    toast({
+      title: "Connecting WhatsApp...",
+      description: "Instance not connected. Attempting to fetch configuration and guide connection.",
+    });
+
+    try {
+      // Fetch instance_id from Supabase config (This part might be redundant if checkAndUpdateConnectionStatus already did it, but let's keep for clarity)
+      console.log(`Fetching config for integration ${integration.id}...`);
+      const { data: configData, error: configError } = await supabase
+        .from('integrations_config')
+        .select('instance_id')
+        .eq('integration_id', integration.id)
+        .maybeSingle();
+
+      if (configError) {
+        console.error(`Error fetching config for integration ${integration.id}:`, configError);
+        toast({ title: "Error", description: `Failed to fetch configuration: ${configError.message}`, variant: "destructive" });
+        setDialogOpen(true);
+        return;
+      }
+
+      if (!configData?.instance_id) {
+        console.log(`No instance_id configured for integration ${integration.id}.`);
+        toast({ title: "Configuration Needed", description: "WhatsApp instance name not found in configuration.", variant: "destructive" });
+        setDialogOpen(true);
+        return;
+      }
+
+      const instanceId = configData.instance_id;
+      console.log(`Found instance ID: ${instanceId}. Configuration seems present.`);
+
+      // No need to call checkInstanceStatus again here, checkAndUpdateConnectionStatus did it.
+      // We know isCurrentlyConnected is false from the check above.
+
+      // Store credentials (Supabase instance_id and API Key from config) - needed for dialog/polling
+      console.log(`Storing credentials for connection attempt: InstanceID=${instanceId}, ApiKey=***`);
+      localStorage.setItem('instanceID', instanceId);
+      localStorage.setItem('apiKey', evolutionApiKey); // Store the key from config for dialog use
+
+      // Since we know it's not connected, open the dialog to guide the user
+      toast({
+          title: "Connection Needed",
+          description: `Instance ${instanceId} found but not connected. Please follow instructions in the dialog.`,
+      });
+      setDialogOpen(true); // Open the dialog for QR/Pairing code
+
+    } catch (error) {
+      console.error('Error during WhatsApp connection process:', error);
+      toast({
+        title: "Connection Error",
+        description: `An unexpected error occurred: ${(error as Error).message}`,
+        variant: "destructive",
+      });
     }
   };
 
+  // Handles clicking on an integration card
+  const handleIntegrationClick = async (integration: Integration) => {
+    setSelectedIntegration(integration);
+    if (integration.name === "WhatsApp" || integration.name === "WhatsApp Cloud API") {
+      await connectWhatsApp(integration);
+    } else {
+      setDialogOpen(true);
+    }
+  };
+
+  // Handles closing the dialog
+  const handleDialogClose = (/* connected: boolean */) => {
+    setDialogOpen(false);
+  };
+
+  // Prepare the list for display
   const integrationsList = integrations.map(integration => ({
     ...integration,
     is_connected: connectedIntegrations[integration.id] || false,
-    type: integration.type || "messenger" // Ensure type property exists for all integrations
+    type: integration.type || "messenger"
   }));
 
+  // Filter based on search query and active tab
   const filteredIntegrations = integrationsList.filter(integration => {
     const matchesSearch = integration.name.toLowerCase().includes(searchQuery.toLowerCase());
     if (activeTab === "Connected") {
@@ -259,6 +244,7 @@ export function IntegrationsView() {
     return matchesSearch;
   });
 
+  // Render the component
   return (
     <div className="p-8 max-w-7xl mx-auto space-y-8">
       <IntegrationDialog
@@ -268,8 +254,8 @@ export function IntegrationsView() {
       />
 
       <div className="flex items-center justify-between">
-        <Input 
-          placeholder="Search" 
+        <Input
+          placeholder="Search"
           className="max-w-sm"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}

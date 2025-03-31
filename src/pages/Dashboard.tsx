@@ -3,7 +3,7 @@ import { SidebarProvider } from "@/components/ui/sidebar";
 import { DashboardSidebar } from "@/components/dashboard/Sidebar";
 import { Outlet, useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { LogOut } from "lucide-react";
+import { LogOut } from "lucide-react"; // Removed TestTubeDiagonal
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 
@@ -21,10 +21,11 @@ export default function Dashboard() {
       });
       
       navigate("/login");
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
       toast({
         title: "Error",
-        description: error.message,
+        description: errorMessage,
         variant: "destructive",
       });
     }
@@ -35,7 +36,7 @@ export default function Dashboard() {
       <div className="flex h-screen w-full bg-background">
         <DashboardSidebar />
         <main className="flex-1 pt-8 px-8 overflow-auto relative">
-          <div className="absolute top-4 right-4 z-50">
+          <div className="absolute top-4 right-4 z-50"> {/* Removed flex gap-2 */}
             <Button
               variant="outline"
               size="sm"
