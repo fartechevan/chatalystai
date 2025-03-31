@@ -1,148 +1,119 @@
 
-import { useToast } from "@/hooks/use-toast";
-import { useState, useEffect, useCallback } from "react";
-import { useWhatsAppConfig } from "./useWhatsAppConfig";
-import { checkInstanceStatus } from "./whatsAppConnectionService";
+import { useState, useCallback, useEffect } from "react";
 import { connectToInstance } from "./services/instanceConnectService";
+import { WHATSAPP_INSTANCE } from "./services/config";
+import { checkInstanceStatus } from "./services/instanceStatusService";
 import type { ConnectionState } from "./types";
 import type { Integration } from "../../../types";
 
 export function useWhatsAppConnection(selectedIntegration: Integration | null) {
-  const { toast } = useToast();
   const [qrCodeBase64, setQrCodeBase64] = useState<string | null>(null);
   const [pairingCode, setPairingCode] = useState<string | null>(null);
-  const [connectionState, setConnectionState] = useState<ConnectionState>('unknown');
-  const [pollingInterval, setPollingInterval] = useState<NodeJS.Timeout | null>(null);
-  
-  const { config, isLoading: configLoading } = useWhatsAppConfig(selectedIntegration);
+  const [connectionState, setConnectionState] = useState<ConnectionState>('idle');
+  const [isLoading, setIsLoading] = useState(false);
 
-  // Function to check the current connection state explicitly
-  const checkCurrentConnectionState = useCallback(async () => {
-    if (config) {
-      console.log('Checking current connection state with config:', config);
-      return await checkInstanceStatus(
-        setConnectionState,
-        setQrCodeBase64
-      );
-    }
-    return false;
-  }, [config]);
+  // Function to clear stored WhatsApp instance data
+  const clearWhatsAppInstance = useCallback(() => {
+    localStorage.removeItem(WHATSAPP_INSTANCE);
+    console.log('WhatsApp instance data cleared from localStorage.');
+  }, []);
 
-  const startPolling = () => {
-    // Clear any existing polling
-    if (pollingInterval) {
-      clearInterval(pollingInterval);
-    }
-
-    // Start a new polling interval
-    const intervalId = setInterval(async () => {
-      await checkInstanceStatus(
-        setConnectionState,
-        setQrCodeBase64
-      );
-      // Re-check instance status to get the accurate state
-      await checkCurrentConnectionState();
+  // Function to start polling for connection status
+  const startPolling = useCallback(() => {
+    const intervalId = setInterval(() => {
+      checkCurrentConnectionState();
     }, 5000); // Check every 5 seconds
 
-    setPollingInterval(intervalId);
+    return () => clearInterval(intervalId); // Cleanup on unmount
+  }, []);
 
-    // Cleanup interval after 2 minutes if not connected
-    setTimeout(() => {
-      if (intervalId && pollingInterval === intervalId) {
-        clearInterval(intervalId);
-        setPollingInterval(null);
-      }
-    }, 120000);
-  };
+  // Check current connection state
+  const checkCurrentConnectionState = useCallback(async () => {
+    if (!selectedIntegration?.id) {
+      console.log('No selected integration to check connection state.');
+      setConnectionState('idle');
+      return;
+    }
 
-  const connectToWhatsApp = async () => {
-    if (!config) {
-      toast({
-        title: "Configuration Error",
-        description: "Integration configuration not found",
-        variant: "destructive",
-      });
+    setIsLoading(true);
+    setConnectionState('connecting'); // Assume connecting while checking
+
+    const isConnected = await checkInstanceStatus(setConnectionState, setQrCodeBase64);
+    setIsLoading(false);
+
+    if (!isConnected) {
+      setConnectionState('idle');
+    }
+  }, [selectedIntegration, setConnectionState, setIsLoading, setQrCodeBase64]);
+
+  // Connect to WhatsApp instance
+  const connectToWhatsApp = useCallback(async () => {
+    if (!selectedIntegration) {
+      console.error("No integration selected.");
       return false;
     }
 
+    setIsLoading(true);
+    setConnectionState('connecting');
+    setQrCodeBase64(null);
+    setPairingCode(null);
+
+    // Retrieve instanceId from localStorage
+    let instanceId: string | null = null;
     try {
-    if (!config) {
-      console.warn('No WhatsApp config found');
-      return false;
-    }
-
-      console.log('Attempting to connect with instanceId:', config.instance_id, 'and baseUrl:', config.base_url);
-
-      const apiKey = config.token || '';
-      const instanceId = config.instance_id || '';
-
-       // Call connectToInstance without the apiKey argument
-       const result = await connectToInstance(
-         setQrCodeBase64,
-         setPairingCode,
-         (state: ConnectionState) => setConnectionState(state),
-         startPolling,
-         // apiKey, // Removed
-         instanceId
-       );
-
-      console.log('Result of instance connect:', result);
-      if (result && result.success) {
-        if (result.qrCodeDataUrl) {
-          console.log('QR code generated successfully:', result.qrCodeDataUrl);
-          setQrCodeBase64(result.qrCodeDataUrl);
-        }
-
-        if (result.pairingCode) {
-          console.log('Pairing code generated:', result.pairingCode);
-          setPairingCode(result.pairingCode);
-        }
-
-        setConnectionState('connecting');
-
-        // Start polling for connection status
-        startPolling();
-        return true;
+      const savedInstanceStr = localStorage.getItem(WHATSAPP_INSTANCE);
+      if (savedInstanceStr) {
+        const savedInstance = JSON.parse(savedInstanceStr);
+        instanceId = savedInstance?.id || null;
       }
-      return false;
     } catch (error) {
-      toast({
-        title: "Connection Error",
-        description: "Failed to initialize WhatsApp connection",
-        variant: "destructive",
-      });
-      console.error('WhatsApp connection error:', error);
+      console.error('Error retrieving WhatsApp instance from localStorage:', error);
+    }
+
+    if (!instanceId) {
+      console.log('No instance ID found in localStorage, generating a new one.');
+      instanceId = `instance-${Date.now()}`; // Generate a unique instance ID
+    }
+
+    const connectResult = await connectToInstance(
+      setQrCodeBase64,
+      setPairingCode,
+      setConnectionState,
+      startPolling,
+      instanceId
+    );
+
+    setIsLoading(false);
+
+    if (connectResult.success) {
+      // Store the instance ID in localStorage for persistence
+      localStorage.setItem(WHATSAPP_INSTANCE, JSON.stringify({ id: instanceId, token: localStorage.getItem('apiKey') }));
+      console.log(`WhatsApp instance ${instanceId} stored in localStorage.`);
+      return true;
+    } else {
+      console.error("Failed to connect to WhatsApp instance:", connectResult.error);
       return false;
     }
-  };
+  }, [selectedIntegration, setIsLoading, setConnectionState, setQrCodeBase64, startPolling, setPairingCode]);
 
   useEffect(() => {
-    // Check initial connection state when the component mounts or config changes
-    if (config) {
-      console.log('Initial connection state check with config:', config);
-      checkInstanceStatus(
-        setConnectionState,
-        setQrCodeBase64
-      );
+    // Initial check when the component mounts
+    if (selectedIntegration?.id) {
+      checkCurrentConnectionState();
     }
 
+    // Clear WhatsApp instance data when the component unmounts
     return () => {
-      // Cleanup polling on unmount
-      if (pollingInterval) {
-        clearInterval(pollingInterval);
-      }
-      setQrCodeBase64(null);
-      setPairingCode(null);
-      setConnectionState('unknown');
+      clearWhatsAppInstance();
     };
-  }, [config]);
+  }, [selectedIntegration, checkCurrentConnectionState, clearWhatsAppInstance]);
 
-  return { 
+  return {
     connectToInstance: connectToWhatsApp,
-    qrCodeBase64, 
+    qrCodeBase64,
     pairingCode,
     connectionState,
-    isLoading: configLoading,
+    isLoading,
     checkCurrentConnectionState
   };
-}
+};
