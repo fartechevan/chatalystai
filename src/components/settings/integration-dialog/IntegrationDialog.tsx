@@ -22,8 +22,6 @@ import { DeviceSelect } from "./components/DeviceSelect";
 import { IntegrationTabs } from "./components/IntegrationTabs";
 import { DialogMain } from "./components/DialogMain";
 import { useIntegrationConnectionState } from "./hooks/useIntegrationConnectionState";
-import { AlertCircle, Button } from "@/components/ui";
-import { supabase } from "@/lib/supabase";
 
 interface IntegrationDialogProps {
   open: boolean;
@@ -37,28 +35,6 @@ export function IntegrationDialog({
   selectedIntegration,
 }: IntegrationDialogProps) {
   const { handleConnectWithFacebook } = useFacebookSDK();
-  const [vaultError, setVaultError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (open && selectedIntegration?.name === "WhatsApp Cloud API") {
-      const checkVaultAccess = async () => {
-        try {
-          const { data, error } = await supabase.vault.list();
-          if (error) {
-            console.error("Vault access error:", error);
-            setVaultError("Could not access Supabase Vault. Please ensure you have proper permissions.");
-          } else {
-            setVaultError(null);
-          }
-        } catch (e) {
-          console.error("Vault connection error:", e);
-          setVaultError("Error connecting to Supabase Vault");
-        }
-      };
-      
-      checkVaultAccess();
-    }
-  }, [open, selectedIntegration]);
 
   const {
     showDeviceSelect,
@@ -79,41 +55,21 @@ export function IntegrationDialog({
   const handleDialogChange = (open: boolean) => {
     if (!open) {
       if (integrationQRPopup) {
+        // If on QR screen, go back to main popup
         setIntegrationQRPopup(false);
         setIntegrationMainPopup(true);
         return;
       }
       if (showDeviceSelect) {
+        // If on device select screen, go back to main popup
         setShowDeviceSelect(false);
         setIntegrationMainPopup(true);
         return;
       }
     }
+    // Otherwise, close the dialog completely and notify parent about the connection status
     onOpenChange(isConnected || connectionState === 'open');
   };
-
-  if (vaultError) {
-    return (
-      <Dialog open={open} onOpenChange={handleDialogChange}>
-        <DialogContent className="max-w-md">
-          <div className="p-6 text-center">
-            <AlertCircle className="mx-auto h-12 w-12 text-red-500 mb-4" />
-            <h3 className="text-lg font-semibold mb-2">Vault Access Error</h3>
-            <p className="text-sm text-gray-600 mb-4">{vaultError}</p>
-            <p className="text-sm text-gray-600 mb-4">
-              Please ensure the EVOLUTION_API_KEY secret is properly set in your Supabase Vault.
-            </p>
-            <Button 
-              variant="outline" 
-              onClick={() => onOpenChange(false)}
-            >
-              Close
-            </Button>
-          </div>
-        </DialogContent>
-      </Dialog>
-    );
-  }
 
   if (integrationQRPopup) {
     return (
@@ -147,6 +103,7 @@ export function IntegrationDialog({
   return (
     <Dialog open={open} onOpenChange={handleDialogChange}>
       <DialogContent className="max-w-5xl w-4/5 flex space-x-4">
+        {/* Left Column */}
         <DialogMain 
           selectedIntegration={selectedIntegration}
           connectionState={connectionState}
@@ -155,6 +112,7 @@ export function IntegrationDialog({
           onOpenChange={handleDialogChange}
         />
 
+        {/* Right Column */}
         <div className="w-1/2">
           <IntegrationTabs
             selectedIntegration={selectedIntegration}
