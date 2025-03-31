@@ -766,10 +766,6 @@ export type Database = {
           week_of_month: number
         }[]
       }
-      get_evolution_api_key: {
-        Args: Record<PropertyKey, never>
-        Returns: string
-      }
       halfvec_avg: {
         Args: {
           "": number[]
