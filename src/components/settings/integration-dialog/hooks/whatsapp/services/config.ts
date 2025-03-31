@@ -6,27 +6,27 @@ import { supabase } from "@/integrations/supabase/client";
 // API Key (Retrieved from Supabase vault)
 let EVOLUTION_API_KEY = "";
 
-// Function to fetch the API key from the vault
+// Function to fetch the API key from the vault directly
 export const getEvolutionApiKey = async (): Promise<string> => {
   try {
     if (EVOLUTION_API_KEY) return EVOLUTION_API_KEY;
     
-    // Call the database function to retrieve the API key securely
-    const { data, error } = await supabase.rpc('get_evolution_api_key');
+    // Call the vault directly to retrieve the API key securely
+    const { data, error } = await supabase.vault.get('EVOLUTION_API_KEY');
     
     if (error) {
-      console.error("Failed to retrieve Evolution API key:", error);
+      console.error("Failed to retrieve Evolution API key from vault:", error);
       throw error;
     }
     
     if (data) {
-      EVOLUTION_API_KEY = data;
-      return data;
+      EVOLUTION_API_KEY = data as string;
+      return data as string;
     }
     
     return "";
   } catch (error) {
-    console.error("Error retrieving Evolution API key:", error);
+    console.error("Error retrieving Evolution API key from vault:", error);
     return "";
   }
 };

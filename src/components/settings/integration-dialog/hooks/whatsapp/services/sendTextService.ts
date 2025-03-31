@@ -14,8 +14,8 @@ export async function sendTextMessage(
     const apiKey = await getEvolutionApiKey();
     
     if (!apiKey) {
-      console.error("No API key available for sending message");
-      return { success: false, error: "API key not available" };
+      console.error("No API key available in vault for sending message");
+      return { success: false, error: "API key not available in Supabase Vault" };
     }
 
     if (!instanceId) {

@@ -9,8 +9,8 @@ export default async function fetchInstances() {
     const apiKey = await getEvolutionApiKey();
     
     if (!apiKey) {
-      console.error("No API key available for fetching instances");
-      return { error: "No API key available" };
+      console.error("No API key available in vault for fetching instances");
+      return { error: "No API key available in Supabase Vault" };
     }
 
     const endpoint = "/instance/fetchInstances";
