@@ -2,7 +2,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
 import type { Integration } from "../../../types";
-import { evolutionApiKey } from "./services/config"; // Import the API key
+import { getEvolutionApiKey } from "./services/config"; // Changed from evolutionApiKey
 
 export function useWhatsAppConfig(selectedIntegration: Integration | null) {
   const { data: config, isLoading } = useQuery({
@@ -43,11 +43,13 @@ export function useWhatsAppConfig(selectedIntegration: Integration | null) {
       // If no config exists, return a default one with the integration's base_url
       if (!config) {
         console.log('No existing config found, returning default');
+        // Get API key from the function
+        const apiKey = await getEvolutionApiKey();
         return {
           integration_id: selectedIntegration.id,
           base_url: integration.base_url,
           instance_id: '',
-          token: evolutionApiKey // Use imported API key from config file
+          token: apiKey // Use API key from function
         };
       }
 

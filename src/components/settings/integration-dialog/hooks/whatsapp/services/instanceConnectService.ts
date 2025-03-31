@@ -21,14 +21,14 @@ export const connectToInstance = async (
     const apiKey = await getEvolutionApiKey();
     if (!apiKey) {
       console.error("Failed to retrieve Evolution API key from server");
-      setConnectionState('error');
+      setConnectionState('idle'); // Changed from 'error' to valid ConnectionState
       return { success: false, error: "API key not available" };
     }
 
     const baseUrl = evolutionServerUrl;
     if (!baseUrl) {
       console.error("Evolution API base URL is not configured.");
-      setConnectionState('error');
+      setConnectionState('idle'); // Changed from 'error' to valid ConnectionState
       return { success: false, error: "Base URL not configured" };
     }
 
@@ -45,7 +45,7 @@ export const connectToInstance = async (
 
     if (!checkResponse.ok) {
       console.error(`Error checking instance existence: ${checkResponse.status}`);
-      setConnectionState('error');
+      setConnectionState('idle'); // Changed from 'error' to valid ConnectionState
       return { success: false, error: `HTTP error ${checkResponse.status}` };
     }
 
@@ -70,7 +70,7 @@ export const connectToInstance = async (
 
       if (!createResponse.ok) {
         console.error(`Error creating instance: ${createResponse.status}`);
-        setConnectionState('error');
+        setConnectionState('idle'); // Changed from 'error' to valid ConnectionState
         return { success: false, error: `HTTP error ${createResponse.status}` };
       }
 
@@ -106,7 +106,7 @@ export const connectToInstance = async (
         };
       } else {
         console.error("Both QR code and pairing code generation failed.");
-        setConnectionState('error');
+        setConnectionState('idle'); // Changed from 'error' to valid ConnectionState
         return { 
           success: false, 
           error: "Failed to generate authentication codes" 
@@ -115,7 +115,7 @@ export const connectToInstance = async (
     }
   } catch (error) {
     console.error("Error in connectToInstance:", error);
-    setConnectionState('error');
+    setConnectionState('idle'); // Changed from 'error' to valid ConnectionState
     return { success: false, error: error.message };
   }
 };
