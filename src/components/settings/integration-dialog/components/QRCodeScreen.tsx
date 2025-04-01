@@ -6,12 +6,12 @@ interface QRCodeScreenProps {
   onClose: () => void;
   onOpenChange: (open: boolean) => void;
   qrCodeBase64?: string | null;
-  pairingCode?: string | null;
+  // pairingCode?: string | null; // Removed pairingCode prop
 }
 
-export function QRCodeScreen({ open, onClose, onOpenChange, qrCodeBase64, pairingCode }: QRCodeScreenProps) {
+export function QRCodeScreen({ open, onClose, onOpenChange, qrCodeBase64 }: QRCodeScreenProps) {
   console.log('QR Code Data:', qrCodeBase64); // Debug log
-  console.log('Pairing Code:', pairingCode); // Debug log
+  // console.log('Pairing Code:', pairingCode); // Debug log removed
 
   return (
     <BaseDialog
@@ -19,18 +19,11 @@ export function QRCodeScreen({ open, onClose, onOpenChange, qrCodeBase64, pairin
       onOpenChange={onOpenChange}
       onClose={onClose}
       title="Connect WhatsApp"
-      description="Scan the QR code or enter the pairing code in WhatsApp to connect"
+      description="Scan the QR code in WhatsApp to connect" // Updated description
     >
       <div className="space-y-6">
-        {pairingCode && (
-          <div className="p-4 bg-blue-50 border border-blue-100 rounded-lg text-center">
-            <p className="text-sm font-medium text-blue-800">Pairing Code</p>
-            <p className="text-xl font-bold tracking-wider mt-2">{pairingCode}</p>
-            <p className="text-xs text-blue-600 mt-2">
-              Enter this code in WhatsApp → Settings → Linked Devices → Link a Device
-            </p>
-          </div>
-        )}
+        {/* Pairing code display removed */}
+        {/* {pairingCode && ( ... )} */}
         
         <div className="grid grid-cols-2 gap-8">
           <div className="flex items-center justify-center">
@@ -54,7 +47,7 @@ export function QRCodeScreen({ open, onClose, onOpenChange, qrCodeBase64, pairin
                 />
               ) : (
                 <div className="w-full h-full flex items-center justify-center text-gray-400">
-                  {pairingCode ? 'Use pairing code instead' : 'Loading QR code...'}
+                  {'Loading QR code...'} {/* Simplified fallback text */}
                 </div>
               )}
             </div>
