@@ -1,4 +1,3 @@
-
 import type { ConnectionState } from "../types";
 // Import the server URL and the correct localStorage key
 // API key will come from the stored instance data

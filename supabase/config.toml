@@ -30,3 +30,6 @@ verify_jwt = false
 
 [functions.smart-chunking]
 verify_jwt = false
+
+[functions.get-evolution-key]
+verify_jwt = false
