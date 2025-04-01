@@ -1,3 +1,4 @@
+
 import { useToast } from "@/hooks/use-toast";
 import { useState, useEffect, useCallback } from "react";
 import { useWhatsAppConfig } from "./useWhatsAppConfig";
@@ -5,35 +6,20 @@ import { checkInstanceStatus } from "./whatsAppConnectionService";
 import { connectToInstance } from "./services/instanceConnectService";
 import type { ConnectionState } from "./types";
 import type { Integration } from "../../../types";
-// Import the localStorage key
-import { WHATSAPP_INSTANCE } from "./services/config";
-// Define the type for the stored instance data (matching WhatsAppBusinessSettings)
-interface InstanceData {
-  id: string;
-  name: string;
-  token: string; // API Key/Token for this instance
-  connectionStatus: string;
-  ownerJid?: string | null;
-  profileName?: string | null;
-  profilePicUrl?: string | null;
-  number?: string;
-}
 
 export function useWhatsAppConnection(selectedIntegration: Integration | null) {
   const { toast } = useToast();
   const [qrCodeBase64, setQrCodeBase64] = useState<string | null>(null);
-  // const [pairingCode, setPairingCode] = useState<string | null>(null); // Removed pairingCode state
+  const [pairingCode, setPairingCode] = useState<string | null>(null);
   const [connectionState, setConnectionState] = useState<ConnectionState>('unknown');
   const [pollingInterval, setPollingInterval] = useState<NodeJS.Timeout | null>(null);
-
+  
   const { config, isLoading: configLoading } = useWhatsAppConfig(selectedIntegration);
 
   // Function to check the current connection state explicitly
   const checkCurrentConnectionState = useCallback(async () => {
     if (config) {
       console.log('Checking current connection state with config:', config);
-      // Pass setQrCodeBase64 even if not directly used by checkInstanceStatus,
-      // as the function signature might expect it (or update checkInstanceStatus signature too if needed)
       return await checkInstanceStatus(
         setConnectionState,
         setQrCodeBase64
@@ -52,10 +38,10 @@ export function useWhatsAppConnection(selectedIntegration: Integration | null) {
     const intervalId = setInterval(async () => {
       await checkInstanceStatus(
         setConnectionState,
-        setQrCodeBase64 // Pass setQrCodeBase64 here too
+        setQrCodeBase64
       );
       // Re-check instance status to get the accurate state
-      // await checkCurrentConnectionState(); // Avoid potential infinite loop if status check triggers re-render
+      await checkCurrentConnectionState();
     }, 5000); // Check every 5 seconds
 
     setPollingInterval(intervalId);
@@ -63,79 +49,66 @@ export function useWhatsAppConnection(selectedIntegration: Integration | null) {
     // Cleanup interval after 2 minutes if not connected
     setTimeout(() => {
       if (intervalId && pollingInterval === intervalId) {
-        console.log("Polling timeout reached, clearing interval.");
         clearInterval(intervalId);
         setPollingInterval(null);
-        // Optionally set state back to idle if still connecting
-        // if (connectionState === 'connecting') {
-        //   setConnectionState('idle');
-        // }
       }
-    }, 120000); // 2 minutes
+    }, 120000);
   };
 
   const connectToWhatsApp = async () => {
-    // Reset state before attempting connection
-    setQrCodeBase64(null);
-    setConnectionState('unknown');
-    if (pollingInterval) clearInterval(pollingInterval);
-    setPollingInterval(null);
-
-
-    // Retrieve API key (token) and instance ID from localStorage
-    const storedInstanceData = localStorage.getItem(WHATSAPP_INSTANCE);
-    if (!storedInstanceData) {
-      console.error("No instance data found in localStorage for connection.");
-      toast({ title: "Error", description: "Could not find instance data to connect.", variant: "destructive" });
-      return false;
-    }
-
-    let apiKey: string | null = null;
-    let instanceId: string | null = null;
-    try {
-      const parsedData: InstanceData = JSON.parse(storedInstanceData);
-      apiKey = parsedData.token; // Get the token (API key)
-      instanceId = parsedData.id; // Get the ID
-      if (!apiKey) {
-        throw new Error("API key (token) property missing in stored instance data.");
-      }
-      if (!instanceId) {
-        throw new Error("ID property missing in stored instance data.");
-      }
-    } catch (parseError) {
-      console.error("Error parsing instance data from localStorage:", parseError);
-      toast({ title: "Error", description: "Could not read instance data for connection.", variant: "destructive" });
+    if (!config) {
+      toast({
+        title: "Configuration Error",
+        description: "Integration configuration not found",
+        variant: "destructive",
+      });
       return false;
     }
 
     try {
-       // Call connectToInstance with correct arguments (5 args)
+    if (!config) {
+      console.warn('No WhatsApp config found');
+      return false;
+    }
+
+      console.log('Attempting to connect with instanceId:', config.instance_id, 'and baseUrl:', config.base_url);
+
+      const apiKey = config.token || '';
+      const instanceId = config.instance_id || '';
+
+       // Call connectToInstance without the apiKey argument
        const result = await connectToInstance(
          setQrCodeBase64,
-         (state: ConnectionState) => setConnectionState(state), // 2nd arg
-         startPolling, // 3rd arg
-         apiKey, // 4th arg (Pass the apiKey retrieved from localStorage)
-         instanceId // 5th arg
+         setPairingCode,
+         (state: ConnectionState) => setConnectionState(state),
+         startPolling,
+         // apiKey, // Removed
+         instanceId
        );
 
       console.log('Result of instance connect:', result);
-      // The service now returns an object { success: boolean, qrCodeDataUrl: string|null, pairingCode: null }
       if (result && result.success) {
-        // QR code and state are set within connectToInstance now
-        // startPolling is also called within connectToInstance on success
-        return true; // Indicate the initiation was successful
+        if (result.qrCodeDataUrl) {
+          console.log('QR code generated successfully:', result.qrCodeDataUrl);
+          setQrCodeBase64(result.qrCodeDataUrl);
+        }
+
+        if (result.pairingCode) {
+          console.log('Pairing code generated:', result.pairingCode);
+          setPairingCode(result.pairingCode);
+        }
+
+        setConnectionState('connecting');
+
+        // Start polling for connection status
+        startPolling();
+        return true;
       }
-      // If result is false or doesn't have success: true
-      toast({
-        title: "Connection Failed",
-        description: "Could not initiate connection. Check API response in console.",
-        variant: "destructive",
-      });
       return false;
     } catch (error) {
       toast({
         title: "Connection Error",
-        description: `Failed to initialize WhatsApp connection: ${(error as Error).message}`,
+        description: "Failed to initialize WhatsApp connection",
         variant: "destructive",
       });
       console.error('WhatsApp connection error:', error);
@@ -145,13 +118,13 @@ export function useWhatsAppConnection(selectedIntegration: Integration | null) {
 
   useEffect(() => {
     // Check initial connection state when the component mounts or config changes
-    // if (config) { // config might not be needed if we rely on localStorage
-    //   console.log('Initial connection state check');
-    //   checkInstanceStatus(
-    //     setConnectionState,
-    //     setQrCodeBase64
-    //   );
-    // }
+    if (config) {
+      console.log('Initial connection state check with config:', config);
+      checkInstanceStatus(
+        setConnectionState,
+        setQrCodeBase64
+      );
+    }
 
     return () => {
       // Cleanup polling on unmount
@@ -159,18 +132,17 @@ export function useWhatsAppConnection(selectedIntegration: Integration | null) {
         clearInterval(pollingInterval);
       }
       setQrCodeBase64(null);
-      // setPairingCode(null); // Removed
+      setPairingCode(null);
       setConnectionState('unknown');
     };
-  // }, [config]); // Remove config dependency if not used
-  }, []); // Run only on mount or adjust dependencies if needed
+  }, [config]);
 
-  return {
+  return { 
     connectToInstance: connectToWhatsApp,
-    qrCodeBase64,
-    // pairingCode, // Removed from return
+    qrCodeBase64, 
+    pairingCode,
     connectionState,
-    isLoading: configLoading, // Keep configLoading if useWhatsAppConfig is still needed elsewhere
+    isLoading: configLoading,
     checkCurrentConnectionState
   };
 }
