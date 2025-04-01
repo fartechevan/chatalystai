@@ -1,6 +1,7 @@
 
 // Import the centralized API key and server URL
 import { evolutionApiKey, evolutionServerUrl, getEvolutionApiKey } from "./config";
+import { getDirectApiKey, getCurrentApiKey } from "./directKeyService";
 
 /**
  * Checks the connection state of a specific Evolution API instance.
@@ -14,15 +15,34 @@ async function checkInstanceStatus(instanceName: string) {
   let apiKey = evolutionApiKey;
   console.log('Initial API key state:', apiKey ? `${apiKey.substring(0, 5)}...` : 'empty');
   
-  // If the key is empty, try to fetch it again directly
+  // If the key is empty, try various fallback methods
   if (!apiKey) {
-    console.log('API key not loaded yet, fetching directly for status check...');
-    try {
-      apiKey = await getEvolutionApiKey();
-      console.log('Successfully fetched API key directly:', apiKey.substring(0, 5) + '...');
-    } catch (error) {
-      console.error('Failed to fetch API key directly:', error);
-      return { error: 'Could not retrieve API key from vault for status check. Please ensure EVOLUTION_API_SECRET is set in the vault.' };
+    console.log('API key not loaded yet, trying multiple fallback methods...');
+    
+    // First check if we have a temporary key in localStorage
+    const tempKey = getCurrentApiKey();
+    if (tempKey) {
+      console.log('Using temporary key from localStorage');
+      apiKey = tempKey;
+    } else {
+      // Try the original method
+      try {
+        console.log('Trying original vault method...');
+        apiKey = await getEvolutionApiKey();
+        console.log('Successfully fetched API key from vault:', apiKey.substring(0, 5) + '...');
+      } catch (vaultError) {
+        console.error('Failed with original vault method:', vaultError);
+        
+        // Try the edge function method as last resort
+        try {
+          console.log('Trying Edge Function method...');
+          apiKey = await getDirectApiKey();
+          console.log('Successfully fetched API key from Edge Function:', apiKey.substring(0, 5) + '...');
+        } catch (edgeError) {
+          console.error('Failed with Edge Function method:', edgeError);
+          return { error: 'Could not retrieve API key through any available method.' };
+        }
+      }
     }
   }
   
