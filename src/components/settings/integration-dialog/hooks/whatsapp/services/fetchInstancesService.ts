@@ -1,34 +1,16 @@
-
 // Import the centralized API key and server URL
-import { evolutionApiKey, evolutionServerUrl, getEvolutionApiKey } from "./config";
+import { evolutionApiKey, evolutionServerUrl } from "./config";
 
 async function fetchInstances() {
-  console.log('Starting fetchInstances service...');
-  
-  // Try to use the imported key first
-  let apiKey = evolutionApiKey;
-  console.log('Initial API key state:', apiKey ? `${apiKey.substring(0, 5)}...` : 'empty');
-  
-  // If the key is empty, try to fetch it again directly
-  if (!apiKey) {
-    console.log('API key not loaded yet, fetching directly...');
-    try {
-      apiKey = await getEvolutionApiKey();
-      console.log('Successfully fetched API key directly:', apiKey.substring(0, 5) + '...');
-    } catch (error) {
-      console.error('Failed to fetch API key directly:', error);
-      return { error: 'Could not retrieve API key from vault. Please ensure EVOLUTION_API_SECRET is set in the vault.' };
-    }
-  }
-  
+  // Use the imported key and URL
+  const apiKey = evolutionApiKey;
   const serverUrl = evolutionServerUrl; // Use the URL from config
   const url = `${serverUrl}/instance/fetchInstances`;
 
   if (!apiKey) {
-    console.error('API key is missing - cannot proceed with fetch operation');
-    return { error: 'API key is required and could not be retrieved' };
+    console.error('API key is missing from config.');
+    return { error: 'API key is required' };
   }
-  
   if (!serverUrl) {
     console.error('Server URL is missing from config.');
     return { error: 'Server URL is required' };
@@ -36,12 +18,10 @@ async function fetchInstances() {
 
   let response: Response; // Declare response variable here
   try {
-    console.log('Fetching instances with API key:', apiKey.substring(0, 5) + '...');
     response = await fetch(url, {
       method: 'GET',
       headers: {
         'apikey': apiKey, // Use the key from config
-        'Content-Type': 'application/json'
       },
     });
 
@@ -59,7 +39,6 @@ async function fetchInstances() {
 
       // Validate the structure - it should be an array
       if (Array.isArray(result)) {
-        console.log('Successfully fetched instances:', result.length);
         // Return the entire array as expected by the calling component
         return result; 
       } else {

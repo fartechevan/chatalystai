@@ -17,7 +17,7 @@ export function useIntegrationConnectionState(
   const { 
     connectToInstance,
     qrCodeBase64,
-    // pairingCode, // Removed
+    pairingCode,
     connectionState, 
     isLoading,
     checkCurrentConnectionState 
@@ -100,7 +100,7 @@ export function useIntegrationConnectionState(
     isConnected,
     setIsConnected,
     qrCodeBase64,
-    // pairingCode, // Removed
+    pairingCode,
     connectionState,
     isLoading,
     handleConnect,
