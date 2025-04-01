@@ -2,7 +2,7 @@
 // Central configuration for WhatsApp services
 import { supabase } from "@/integrations/supabase/client";
 
-// Function to get the API key from Supabase
+// Function to get the API key from Supabase - with better error handling
 export async function getEvolutionApiKey(): Promise<string> {
   try {
     // Use the correct argument type for the RPC function
@@ -27,16 +27,17 @@ export async function getEvolutionApiKey(): Promise<string> {
   }
 }
 
-// Set up a global API key variable that will be initialized asynchronously
+// Set up a global API key variable with an empty default
 let evolutionApiKey = "";
 
-// Initialize the API key
+// Initialize the API key immediately - add more robust error handling
 (async () => {
   try {
     evolutionApiKey = await getEvolutionApiKey();
-    console.log("Evolution API key successfully retrieved from vault.");
+    console.log("Evolution API key successfully initialized:", evolutionApiKey.substring(0, 5) + "...");
   } catch (error) {
-    console.error("CRITICAL: EVOLUTION_API_KEY could not be retrieved from vault. WhatsApp integration may not function.", error);
+    console.error("CRITICAL: EVOLUTION_API_KEY could not be retrieved from vault:", error);
+    console.error("Please ensure the key is properly set in the vault with the name 'EVOLUTION_API_SECRET'");
   }
 })();
 
