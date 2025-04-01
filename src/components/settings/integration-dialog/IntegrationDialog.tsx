@@ -45,7 +45,7 @@ export function IntegrationDialog({
     setIntegrationQRPopup,
     isConnected,
     qrCodeBase64,
-    pairingCode,
+    // pairingCode, // Removed
     connectionState,
     isLoading,
     handleConnect,
@@ -81,7 +81,7 @@ export function IntegrationDialog({
           setIntegrationMainPopup(true);
         }}
         qrCodeBase64={qrCodeBase64}
-        pairingCode={pairingCode}
+        // pairingCode={pairingCode} // Removed prop
       />
     );
   }
