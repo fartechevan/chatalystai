@@ -19,9 +19,6 @@ verify_jwt = false
 [functions.whatsapp-webhook]
 verify_jwt = false
 
-[functions.integrations]
-verify_jwt = false
-
 [functions.knowledge-base]
 verify_jwt = false
 
@@ -29,4 +26,7 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.smart-chunking]
+verify_jwt = false
+
+[functions.get-evolution-key]
 verify_jwt = false
