@@ -7,21 +7,8 @@ export async function getEvolutionApiKey(): Promise<string> {
   try {
     console.log("Attempting to fetch Evolution API key from vault with get_evolution_api_key RPC...");
     
-    // Check if the function exists first
-    const { data: functions, error: funcError } = await supabase
-      .from('pg_proc')
-      .select('proname')
-      .eq('proname', 'get_evolution_api_key')
-      .limit(1);
-    
-    if (funcError) {
-      console.error("Error checking for RPC function existence:", funcError);
-    } else {
-      console.log("RPC function check result:", functions);
-    }
-    
-    // Use the correct argument type for the RPC function
-    const { data, error } = await supabase.rpc('get_evolution_api_key', {});
+    // Use the correct approach to call the RPC function
+    const { data, error } = await supabase.rpc('get_evolution_api_key');
     
     if (error) {
       console.error("Error fetching Evolution API key:", error);
