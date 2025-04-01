@@ -5,6 +5,7 @@ import { supabase } from "@/integrations/supabase/client";
 // Function to get the API key from Supabase - with better error handling
 export async function getEvolutionApiKey(): Promise<string> {
   try {
+    console.log("Attempting to fetch Evolution API key from vault...");
     // Use the correct argument type for the RPC function
     const { data, error } = await supabase.rpc('get_evolution_api_key', {});
     
@@ -34,7 +35,7 @@ let evolutionApiKey = "";
 (async () => {
   try {
     evolutionApiKey = await getEvolutionApiKey();
-    console.log("Evolution API key successfully initialized:", evolutionApiKey.substring(0, 5) + "...");
+    console.log("Evolution API key successfully initialized:", evolutionApiKey ? `${evolutionApiKey.substring(0, 5)}...` : "EMPTY");
   } catch (error) {
     console.error("CRITICAL: EVOLUTION_API_KEY could not be retrieved from vault:", error);
     console.error("Please ensure the key is properly set in the vault with the name 'EVOLUTION_API_SECRET'");
