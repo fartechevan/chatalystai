@@ -2,27 +2,53 @@
 // Central configuration for WhatsApp services
 import { supabase } from "@/integrations/supabase/client";
 
-// Function to get the API key from Supabase - with improved error handling and debugging
+// Function to get the API key from integrations_config table
 export async function getEvolutionApiKey(): Promise<string> {
   try {
-    console.log("Attempting to fetch Evolution API key from vault with get_evolution_api_key RPC...");
+    console.log("Attempting to fetch Evolution API key from integrations_config table...");
     
-    // Use the correct approach to call the RPC function
-    const { data, error } = await supabase.rpc('get_evolution_api_key');
+    // Try to get the API key from the database first
+    const { data, error } = await supabase
+      .from('integrations_config')
+      .select('api_key')
+      .order('created_at', { ascending: false })
+      .limit(1);
     
     if (error) {
-      console.error("Error fetching Evolution API key:", error);
+      console.error("Error fetching Evolution API key from integrations_config:", error);
       throw new Error(`Failed to fetch API key: ${error.message}`);
     }
     
-    if (!data) {
-      console.error("API key is empty in vault");
-      throw new Error("API key is empty in vault");
+    // If we found a key in the database, use it
+    if (data && data.length > 0 && data[0].api_key) {
+      console.log("Successfully retrieved API key from integrations_config");
+      return data[0].api_key;
     }
     
-    console.log("Successfully retrieved API key from vault");
-    // Ensure we're returning a string
-    return data as string;
+    // If no key in database, check for the RPC function as fallback
+    console.log("No API key found in database, trying RPC function...");
+    try {
+      const { data: rpcData, error: rpcError } = await supabase.rpc('get_evolution_api_key');
+      
+      if (rpcError) {
+        console.error("Error fetching Evolution API key from RPC:", rpcError);
+        throw new Error(`Failed to fetch API key from RPC: ${rpcError.message}`);
+      }
+      
+      if (!rpcData) {
+        console.error("API key is empty from RPC");
+        throw new Error("API key is empty from RPC");
+      }
+      
+      console.log("Successfully retrieved API key from RPC");
+      return rpcData;
+    } catch (rpcException) {
+      console.error("Exception fetching Evolution API key from RPC:", rpcException);
+      // Fall through to use environment or fallback
+    }
+    
+    console.log("No API key found in database or RPC");
+    throw new Error("API key not found");
   } catch (e) {
     console.error("Exception fetching Evolution API key:", e);
     // Fallback to a temporary development key - ONLY FOR TESTING
@@ -34,15 +60,15 @@ export async function getEvolutionApiKey(): Promise<string> {
 // Set up a global API key variable with an empty default
 let evolutionApiKey = "";
 
-// Initialize the API key immediately - add more robust error handling
+// Initialize the API key immediately
 (async () => {
   try {
     console.log("Initializing Evolution API key...");
     evolutionApiKey = await getEvolutionApiKey();
     console.log("Evolution API key successfully initialized:", evolutionApiKey ? `${evolutionApiKey.substring(0, 5)}...` : "EMPTY");
   } catch (error) {
-    console.error("CRITICAL: EVOLUTION_API_KEY could not be retrieved from vault:", error);
-    console.error("Please ensure the key is properly set in the vault with the name 'EVOLUTION_API_SECRET'");
+    console.error("CRITICAL: EVOLUTION_API_KEY could not be retrieved:", error);
+    console.error("Please ensure the key is properly set in integrations_config table");
   }
 })();
 
