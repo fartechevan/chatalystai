@@ -10,27 +10,33 @@ export async function getEvolutionApiKey(): Promise<string> {
     
     if (error) {
       console.error("Error fetching Evolution API key:", error);
-      return "";
+      throw new Error(`Failed to fetch API key: ${error.message}`);
     }
     
+    if (!data) {
+      console.error("API key is empty in vault");
+      throw new Error("API key is empty in vault");
+    }
+    
+    console.log("Successfully retrieved API key from vault");
     // Ensure we're returning a string
-    return data as string || "";
+    return data as string;
   } catch (e) {
     console.error("Exception fetching Evolution API key:", e);
-    return "";
+    throw e;
   }
 }
 
-// Initially set to empty, will be populated via the getEvolutionApiKey function
+// Set up a global API key variable that will be initialized asynchronously
 let evolutionApiKey = "";
 
 // Initialize the API key
 (async () => {
-  evolutionApiKey = await getEvolutionApiKey();
-  if (!evolutionApiKey) {
-    console.error("CRITICAL: EVOLUTION_API_KEY could not be retrieved from vault. WhatsApp integration may not function.");
-  } else {
+  try {
+    evolutionApiKey = await getEvolutionApiKey();
     console.log("Evolution API key successfully retrieved from vault.");
+  } catch (error) {
+    console.error("CRITICAL: EVOLUTION_API_KEY could not be retrieved from vault. WhatsApp integration may not function.", error);
   }
 })();
 

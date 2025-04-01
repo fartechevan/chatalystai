@@ -9,16 +9,23 @@ async function fetchInstances() {
   // If the key is empty, try to fetch it again directly
   if (!apiKey) {
     console.log('API key not loaded yet, fetching directly...');
-    apiKey = await getEvolutionApiKey();
+    try {
+      apiKey = await getEvolutionApiKey();
+      console.log('Successfully fetched API key directly:', apiKey.substring(0, 5) + '...');
+    } catch (error) {
+      console.error('Failed to fetch API key directly:', error);
+      return { error: 'Could not retrieve API key from vault' };
+    }
   }
   
   const serverUrl = evolutionServerUrl; // Use the URL from config
   const url = `${serverUrl}/instance/fetchInstances`;
 
   if (!apiKey) {
-    console.error('API key is missing from config.');
+    console.error('API key is missing - cannot proceed with fetch operation');
     return { error: 'API key is required' };
   }
+  
   if (!serverUrl) {
     console.error('Server URL is missing from config.');
     return { error: 'Server URL is required' };
