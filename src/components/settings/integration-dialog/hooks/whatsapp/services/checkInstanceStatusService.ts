@@ -1,35 +1,49 @@
-// Import the centralized API key and server URL
-import { evolutionApiKey, evolutionServerUrl } from "./config";
 
-// Renamed from fetchInstances and modified to check a specific instance's status
+// Import the centralized API key and server URL
+import { evolutionApiKey, evolutionServerUrl, getEvolutionApiKey } from "./config";
 
 /**
  * Checks the connection state of a specific Evolution API instance.
  * @param instanceName The name of the instance to check.
  * @returns An object containing the instance state or an error object.
  */
-// Remove apiKey parameter as it's now imported
 async function checkInstanceStatus(instanceName: string) {
+  // Try to use the imported key first
+  let apiKey = evolutionApiKey;
+  
+  // If the key is empty, try to fetch it again directly
+  if (!apiKey) {
+    console.log('API key not loaded yet, fetching directly...');
+    try {
+      apiKey = await getEvolutionApiKey();
+      console.log('Successfully fetched API key directly:', apiKey.substring(0, 5) + '...');
+    } catch (error) {
+      console.error('Failed to fetch API key directly:', error);
+      return { error: 'Could not retrieve API key from vault' };
+    }
+  }
+  
   const serverUrl = evolutionServerUrl; // Use the imported server URL
   // Assuming the endpoint to check a specific instance's state is /instance/connectionState/{instanceName}
   // Verify this endpoint with the Evolution API documentation if issues arise.
   const url = `${serverUrl}/instance/connectionState/${instanceName}`;
 
-  // Use the imported key
-  if (!evolutionApiKey) {
-    console.error('API key is missing from config.');
+  if (!apiKey) {
+    console.error('API key is missing - cannot proceed with status check');
     return { error: 'API key is required' };
   }
+  
   if (!instanceName) {
     console.error('Instance name is missing.');
     return { error: 'Instance name is required' };
   }
 
   try {
+    console.log(`Checking status for instance ${instanceName} with API key: ${apiKey.substring(0, 5)}...`);
     const response = await fetch(url, {
       method: 'GET',
       headers: {
-        'apikey': evolutionApiKey, // Use imported key
+        'apikey': apiKey,
         'Content-Type': 'application/json' // Often needed, though GET might not strictly require it
       },
     });

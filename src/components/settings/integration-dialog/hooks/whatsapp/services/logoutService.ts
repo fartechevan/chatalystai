@@ -1,8 +1,8 @@
 
-import { supabase } from "@/integrations/supabase/client"; // Removed getEvolutionURL
+import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 // Import the centralized API key and server URL
-import { evolutionApiKey, evolutionServerUrl } from "./config";
+import { evolutionApiKey, evolutionServerUrl, getEvolutionApiKey } from "./config";
 
 type LogoutOptions = {
   toast: ReturnType<typeof useToast>;
@@ -21,12 +21,32 @@ export async function logoutWhatsAppInstance(
   options?: LogoutOptions
 ): Promise<boolean> {
   const serverUrl = evolutionServerUrl; // Use imported server URL
+  // Try to use the imported key first
+  let apiKey = evolutionApiKey;
+  
+  // If the key is empty, try to fetch it again directly
+  if (!apiKey) {
+    console.log('API key not loaded yet, fetching directly for logout...');
+    try {
+      apiKey = await getEvolutionApiKey();
+      console.log('Successfully fetched API key for logout:', apiKey.substring(0, 5) + '...');
+    } catch (error) {
+      console.error('Failed to fetch API key for logout:', error);
+      options?.toast?.toast({ 
+        title: "Error", 
+        description: "Could not retrieve API key from vault for logout operation", 
+        variant: "destructive" 
+      });
+      return false;
+    }
+  }
+  
   // *** ASSUMPTION: Endpoint is /instance/logout/{instanceName} ***
   // *** This needs verification with Evolution API documentation. ***
   const url = `${serverUrl}/instance/logout/${instanceId}`; // instanceId is the instanceName here
 
-  if (!evolutionApiKey) {
-    console.error('API key is missing from config.');
+  if (!apiKey) {
+    console.error('API key is missing - cannot proceed with logout');
     options?.toast?.toast({ title: "Configuration Error", description: "API Key is missing.", variant: "destructive" });
     return false;
   }
@@ -37,12 +57,12 @@ export async function logoutWhatsAppInstance(
   }
 
   try {
-    console.log(`Attempting to log out WhatsApp instance: ${instanceId}`);
+    console.log(`Attempting to log out WhatsApp instance: ${instanceId} with API key: ${apiKey.substring(0, 5)}...`);
 
     const response = await fetch(url, {
       method: 'DELETE', // Assuming DELETE method for logout
       headers: {
-        'apikey': evolutionApiKey,
+        'apikey': apiKey,
       },
     });
 

@@ -2,10 +2,7 @@
 import type { ConnectionState } from "../types";
 // Import the server URL and the correct localStorage key
 // API key will come from the stored instance data
-import { evolutionServerUrl, WHATSAPP_INSTANCE } from "./config"; 
-// Removed getEvolutionURL import from supabase/client
-// connectToInstance is not used here, can be removed if not needed elsewhere in this file
-// import { connectToInstance } from "./instanceConnectService";
+import { evolutionServerUrl, WHATSAPP_INSTANCE, getEvolutionApiKey } from "./config"; 
 
 /**
  * Check the status of a WhatsApp instance using stored instance ID and configured API Key.
@@ -20,7 +17,8 @@ export const checkInstanceStatus = async (
 
   try {
     const savedInstanceStr = localStorage.getItem(WHATSAPP_INSTANCE); // Use correct constant
-    console.log("AA:",savedInstanceStr);
+    console.log("Stored WhatsApp instance data:", savedInstanceStr);
+    
     if (savedInstanceStr) {
       const savedInstance = JSON.parse(savedInstanceStr);
       // Extract id (identifier) and token (API key) from the stored object
@@ -32,6 +30,13 @@ export const checkInstanceStatus = async (
       }
       if (!apiKey) {
         console.error('Parsed instance data from localStorage is missing token (API key).');
+        // If token is missing in localStorage, try to get it from config
+        try {
+          apiKey = await getEvolutionApiKey();
+          console.log('Using API key from vault as fallback');
+        } catch (error) {
+          console.error('Failed to get API key from vault as fallback:', error);
+        }
       }
     }
   } catch (error) {
@@ -46,9 +51,14 @@ export const checkInstanceStatus = async (
   }
 
   if (!apiKey) {
-    console.error('API key (token) is missing from stored instance data for status check.');
-    setConnectionState('unknown'); // Cannot check status without key
-    return false;
+    console.error('API key (token) is missing for status check. Trying to get from vault as last resort.');
+    try {
+      apiKey = await getEvolutionApiKey();
+    } catch (error) {
+      console.error('Final attempt to get API key failed:', error);
+      setConnectionState('unknown'); // Cannot check status without key
+      return false;
+    }
   }
 
   const baseUrl = evolutionServerUrl; // Use imported server URL
@@ -63,10 +73,11 @@ export const checkInstanceStatus = async (
   console.log(`Checking instance status via API: ${apiUrl}`);
 
   try {
+    console.log(`Making request with API key: ${apiKey.substring(0, 5)}...`);
     const response = await fetch(apiUrl, {
       method: 'GET',
       headers: {
-        'apikey': apiKey // Use the key from the stored instance data
+        'apikey': apiKey // Use the key from the stored instance data or vault
       }
     });
 
