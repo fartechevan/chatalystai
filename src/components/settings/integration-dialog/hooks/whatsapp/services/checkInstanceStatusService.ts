@@ -1,6 +1,6 @@
 
 // Import the centralized API key and server URL
-import { evolutionApiKey, evolutionServerUrl, getEvolutionApiKey } from "./config";
+import { evolutionApiKey, evolutionServerUrl } from "./config";
 import { getDirectApiKey, getCurrentApiKey } from "./directKeyService";
 
 /**
@@ -25,23 +25,14 @@ async function checkInstanceStatus(instanceName: string) {
       console.log('Using temporary key from localStorage');
       apiKey = tempKey;
     } else {
-      // Try the original method
+      // Try the edge function method as last resort
       try {
-        console.log('Trying original vault method...');
-        apiKey = await getEvolutionApiKey();
-        console.log('Successfully fetched API key from vault:', apiKey.substring(0, 5) + '...');
-      } catch (vaultError) {
-        console.error('Failed with original vault method:', vaultError);
-        
-        // Try the edge function method as last resort
-        try {
-          console.log('Trying Edge Function method...');
-          apiKey = await getDirectApiKey();
-          console.log('Successfully fetched API key from Edge Function:', apiKey.substring(0, 5) + '...');
-        } catch (edgeError) {
-          console.error('Failed with Edge Function method:', edgeError);
-          return { error: 'Could not retrieve API key through any available method.' };
-        }
+        console.log('Trying Edge Function method...');
+        apiKey = await getDirectApiKey();
+        console.log('Successfully fetched API key from Edge Function:', apiKey.substring(0, 5) + '...');
+      } catch (edgeError) {
+        console.error('Failed with Edge Function method:', edgeError);
+        return { error: 'Could not retrieve API key through any available method.' };
       }
     }
   }
