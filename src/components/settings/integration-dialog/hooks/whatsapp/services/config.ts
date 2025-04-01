@@ -3,16 +3,18 @@
 import { supabase } from "@/integrations/supabase/client";
 
 // Function to get the API key from Supabase
-async function getEvolutionApiKey(): Promise<string> {
+export async function getEvolutionApiKey(): Promise<string> {
   try {
-    const { data, error } = await supabase.rpc('get_evolution_api_key');
+    // Use the correct argument type for the RPC function
+    const { data, error } = await supabase.rpc('get_evolution_api_key', {});
     
     if (error) {
       console.error("Error fetching Evolution API key:", error);
       return "";
     }
     
-    return data || "";
+    // Ensure we're returning a string
+    return data as string || "";
   } catch (e) {
     console.error("Exception fetching Evolution API key:", e);
     return "";

@@ -1,9 +1,17 @@
+
 // Import the centralized API key and server URL
-import { evolutionApiKey, evolutionServerUrl } from "./config";
+import { evolutionApiKey, evolutionServerUrl, getEvolutionApiKey } from "./config";
 
 async function fetchInstances() {
-  // Use the imported key and URL
-  const apiKey = evolutionApiKey;
+  // Try to use the imported key first
+  let apiKey = evolutionApiKey;
+  
+  // If the key is empty, try to fetch it again directly
+  if (!apiKey) {
+    console.log('API key not loaded yet, fetching directly...');
+    apiKey = await getEvolutionApiKey();
+  }
+  
   const serverUrl = evolutionServerUrl; // Use the URL from config
   const url = `${serverUrl}/instance/fetchInstances`;
 
@@ -18,6 +26,7 @@ async function fetchInstances() {
 
   let response: Response; // Declare response variable here
   try {
+    console.log('Fetching instances with API key:', apiKey.substring(0, 5) + '...');
     response = await fetch(url, {
       method: 'GET',
       headers: {
