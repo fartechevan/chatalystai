@@ -8,18 +8,21 @@ import { evolutionApiKey, evolutionServerUrl, getEvolutionApiKey } from "./confi
  * @returns An object containing the instance state or an error object.
  */
 async function checkInstanceStatus(instanceName: string) {
+  console.log(`Starting status check for instance: ${instanceName}`);
+  
   // Try to use the imported key first
   let apiKey = evolutionApiKey;
+  console.log('Initial API key state:', apiKey ? `${apiKey.substring(0, 5)}...` : 'empty');
   
   // If the key is empty, try to fetch it again directly
   if (!apiKey) {
-    console.log('API key not loaded yet, fetching directly...');
+    console.log('API key not loaded yet, fetching directly for status check...');
     try {
       apiKey = await getEvolutionApiKey();
       console.log('Successfully fetched API key directly:', apiKey.substring(0, 5) + '...');
     } catch (error) {
       console.error('Failed to fetch API key directly:', error);
-      return { error: 'Could not retrieve API key from vault' };
+      return { error: 'Could not retrieve API key from vault for status check. Please ensure EVOLUTION_API_SECRET is set in the vault.' };
     }
   }
   
@@ -30,7 +33,7 @@ async function checkInstanceStatus(instanceName: string) {
 
   if (!apiKey) {
     console.error('API key is missing - cannot proceed with status check');
-    return { error: 'API key is required' };
+    return { error: 'API key is required and could not be retrieved' };
   }
   
   if (!instanceName) {

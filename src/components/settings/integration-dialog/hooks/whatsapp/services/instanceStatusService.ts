@@ -11,6 +11,7 @@ export const checkInstanceStatus = async (
   setConnectionState: (state: ConnectionState) => void,
   setQrCodeBase64: (qrCode: string | null) => void // Keep this param even if not used directly, as the hook expects it
 ) => {
+  console.log('Starting instanceStatusService...');
 
   let instanceId: string | null = null; // Use 'id' from the stored object
   let apiKey: string | null = null; // Use 'token' from the stored object
@@ -54,6 +55,7 @@ export const checkInstanceStatus = async (
     console.error('API key (token) is missing for status check. Trying to get from vault as last resort.');
     try {
       apiKey = await getEvolutionApiKey();
+      console.log('Retrieved API key from vault as last resort');
     } catch (error) {
       console.error('Final attempt to get API key failed:', error);
       setConnectionState('unknown'); // Cannot check status without key
@@ -77,7 +79,8 @@ export const checkInstanceStatus = async (
     const response = await fetch(apiUrl, {
       method: 'GET',
       headers: {
-        'apikey': apiKey // Use the key from the stored instance data or vault
+        'apikey': apiKey, // Use the key from the stored instance data or vault
+        'Content-Type': 'application/json'
       }
     });
 
