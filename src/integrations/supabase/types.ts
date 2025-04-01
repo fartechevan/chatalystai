@@ -223,6 +223,7 @@ export type Database = {
       }
       integrations_config: {
         Row: {
+          api_key: string | null
           created_at: string
           id: string
           instance_id: string | null
@@ -231,6 +232,7 @@ export type Database = {
           user_reference_id: string | null
         }
         Insert: {
+          api_key?: string | null
           created_at?: string
           id?: string
           instance_id?: string | null
@@ -239,6 +241,7 @@ export type Database = {
           user_reference_id?: string | null
         }
         Update: {
+          api_key?: string | null
           created_at?: string
           id?: string
           instance_id?: string | null
@@ -765,6 +768,10 @@ export type Database = {
           today_date: string
           week_of_month: number
         }[]
+      }
+      get_evolution_api_key: {
+        Args: Record<PropertyKey, never>
+        Returns: string
       }
       halfvec_avg: {
         Args: {

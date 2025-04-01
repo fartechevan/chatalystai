@@ -1,7 +1,6 @@
+
 // Import the centralized API key and server URL
 import { evolutionApiKey, evolutionServerUrl } from "./config";
-
-// Renamed from fetchInstances and modified to check a specific instance's status
 
 /**
  * Checks the connection state of a specific Evolution API instance.

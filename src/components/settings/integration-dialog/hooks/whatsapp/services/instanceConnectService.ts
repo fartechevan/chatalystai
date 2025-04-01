@@ -1,4 +1,5 @@
-import { supabase } from "@/integrations/supabase/client"; // Removed getEvolutionURL
+
+import { supabase } from "@/integrations/supabase/client";
 // Import the centralized API key and server URL
 import { evolutionApiKey, evolutionServerUrl } from "./config";
 
@@ -27,12 +28,6 @@ export async function connectToInstance(
     throw new Error('API key is required for connection.');
   }
 
-  // Get current session token for auth (if still needed by API)
-  // Note: Often, API key is sufficient, and session token might not be required for this endpoint.
-  // Verify if Authorization header is truly needed for the /instance/connect endpoint.
-  // const { data: sessionData } = await supabase.auth.getSession();
-  // const accessToken = sessionData?.session?.access_token || '';
-
   // Create full URL for API call
   const apiUrl = `${baseUrl}/instance/connect/${instanceId}`;
 
@@ -43,7 +38,6 @@ export async function connectToInstance(
     headers: {
       'Content-Type': 'application/json',
       'apikey': evolutionApiKey, // Use imported key
-      // 'Authorization': `Bearer ${accessToken}` // Remove if not needed
     }
   });
   
