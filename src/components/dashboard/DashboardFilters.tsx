@@ -11,7 +11,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { useState } from "react";
 
 interface DashboardFiltersProps {
   selectedTime: 'today' | 'yesterday' | 'week' | 'month';
@@ -37,86 +36,86 @@ export function DashboardFilters({
   });
 
   return (
-    <div className="max-w-3xl mx-auto mt-4 bg-white/10 backdrop-blur-sm rounded-full overflow-hidden flex">
-      <div className="flex-1 flex">
-        <Tabs defaultValue={selectedTime} onValueChange={(value) => onTimeChange(value as any)} className="flex-1">
-          <TabsList className="w-full bg-transparent h-10 rounded-none">
-            <TabsTrigger 
-              value="today" 
-              className="flex-1 rounded-none border-0 text-white/90 h-10 data-[state=active]:bg-white/20 data-[state=active]:text-white"
-            >
-              Today
-            </TabsTrigger>
-            <TabsTrigger 
-              value="yesterday" 
-              className="flex-1 rounded-none border-0 text-white/90 h-10 data-[state=active]:bg-white/20 data-[state=active]:text-white"
-            >
-              Yesterday
-            </TabsTrigger>
-            <TabsTrigger 
-              value="week" 
-              className="flex-1 rounded-none border-0 text-white/90 h-10 data-[state=active]:bg-white/20 data-[state=active]:text-white"
-            >
-              Week
-            </TabsTrigger>
-            <TabsTrigger 
-              value="month" 
-              className="flex-1 rounded-none border-0 text-white/90 h-10 data-[state=active]:bg-white/20 data-[state=active]:text-white"
-            >
-              Month
-            </TabsTrigger>
-          </TabsList>
-        </Tabs>
+    <div className="max-w-full mx-auto mt-4">
+      <div className="flex flex-col sm:flex-row gap-2 justify-center">
+        <div className="flex bg-white/10 backdrop-blur-sm rounded-full overflow-hidden">
+          <Tabs defaultValue={selectedTime} onValueChange={(value) => onTimeChange(value as any)} className="flex-1">
+            <TabsList className="w-full bg-transparent h-10 rounded-none">
+              <TabsTrigger 
+                value="today" 
+                className="flex-1 rounded-none border-0 text-white/90 h-10 data-[state=active]:bg-white/20 data-[state=active]:text-white"
+              >
+                Today
+              </TabsTrigger>
+              <TabsTrigger 
+                value="yesterday" 
+                className="flex-1 rounded-none border-0 text-white/90 h-10 data-[state=active]:bg-white/20 data-[state=active]:text-white"
+              >
+                Yesterday
+              </TabsTrigger>
+              <TabsTrigger 
+                value="week" 
+                className="flex-1 rounded-none border-0 text-white/90 h-10 data-[state=active]:bg-white/20 data-[state=active]:text-white"
+              >
+                Week
+              </TabsTrigger>
+              <TabsTrigger 
+                value="month" 
+                className="flex-1 rounded-none border-0 text-white/90 h-10 data-[state=active]:bg-white/20 data-[state=active]:text-white"
+              >
+                Month
+              </TabsTrigger>
+            </TabsList>
+          </Tabs>
+          
+          <Button 
+            variant="ghost"
+            className="rounded-none border-0 text-white/90 h-10 gap-2"
+          >
+            <Clock className="h-4 w-4" />
+            Time
+          </Button>
+        </div>
+        
+        <div className="flex bg-white/10 backdrop-blur-sm rounded-full overflow-hidden">
+          <Select
+            defaultValue={selectedUser}
+            onValueChange={onUserChange}
+          >
+            <SelectTrigger className="min-w-[180px] border-0 bg-transparent text-white/90 h-10 focus:ring-0 rounded-full">
+              <SelectValue placeholder="Select user">
+                {selectedUser === 'all' ? (
+                  'All'
+                ) : (
+                  <div className="flex items-center">
+                    <User className="h-4 w-4 mr-2" />
+                    {profiles?.find(p => p.id === selectedUser)?.name || 'User'}
+                  </div>
+                )}
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All</SelectItem>
+              {profiles?.map((profile) => (
+                <SelectItem key={profile.id} value={profile.id}>
+                  <div className="flex items-center">
+                    <User className="h-4 w-4 mr-2" />
+                    {profile.name || profile.email}
+                  </div>
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
         
         <Button 
           variant="ghost"
-          className="rounded-none border-0 text-white/90 h-10 gap-2"
+          className="rounded-full border-0 text-white/90 h-10 bg-white/10 backdrop-blur-sm"
         >
-          <Clock className="h-4 w-4" />
-          Time
+          <Settings className="h-4 w-4 mr-2" />
+          Setup
         </Button>
       </div>
-      
-      <div className="h-full flex">
-        <div className="border-l border-white/20"></div>
-        <Select
-          defaultValue={selectedUser}
-          onValueChange={onUserChange}
-        >
-          <SelectTrigger className="w-[180px] border-0 bg-transparent text-white/90 h-10 focus:ring-0">
-            <SelectValue placeholder="Select user">
-              {selectedUser === 'all' ? (
-                'All Users'
-              ) : (
-                <div className="flex items-center">
-                  <User className="h-4 w-4 mr-2" />
-                  {profiles?.find(p => p.id === selectedUser)?.name || 'Evan Bch'}
-                </div>
-              )}
-            </SelectValue>
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">All Users</SelectItem>
-            {profiles?.map((profile) => (
-              <SelectItem key={profile.id} value={profile.id}>
-                <div className="flex items-center">
-                  <User className="h-4 w-4 mr-2" />
-                  {profile.name || profile.email}
-                </div>
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-      
-      <div className="border-l border-white/20"></div>
-      <Button 
-        variant="ghost"
-        className="rounded-none border-0 text-white/90 h-10"
-      >
-        <Settings className="h-4 w-4 mr-2" />
-        Setup
-      </Button>
     </div>
   );
 }

@@ -29,9 +29,9 @@ export function StatsCard({
         {value}
       </div>
       {subValue !== undefined && (
-        <div className="flex items-center gap-1 text-xs text-green-400 mt-1">
+        <div className="flex items-center gap-1 text-xs text-white/70 mt-1">
           <span>{subValue}</span>
-          {subLabel && <span className="text-white/50">{subLabel}</span>}
+          {subLabel && <span>{subLabel}</span>}
         </div>
       )}
       <div className="h-px bg-white/10 my-3"></div>

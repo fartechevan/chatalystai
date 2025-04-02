@@ -12,7 +12,7 @@ function MessageSource({ icon, label, count }: MessageSourceProps) {
         <span>{icon}</span>
         <span>{label}</span>
       </div>
-      <span className="text-white/70 text-sm">{count}</span>
+      <span className="text-green-400 text-sm">{count}</span>
     </div>
   );
 }
