@@ -10,9 +10,6 @@ export function DashboardHeader() {
 
   return (
     <div className="flex justify-between items-center py-4 w-full">
-      <div>
-        <img src="/lovable-uploads/da0276ac-84ce-40bf-94fd-f3c49f732c94.png" alt="Kommo Logo" className="h-8" />
-      </div>
       <div className="text-3xl font-bold text-white/90 text-center flex-1">
         {displayName}
       </div>
