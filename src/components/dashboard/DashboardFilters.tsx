@@ -1,6 +1,6 @@
 
 import { Button } from "@/components/ui/button";
-import { Clock, ChevronDown, Settings } from "lucide-react";
+import { Clock, ChevronDown, Settings, User } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -10,6 +10,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useState } from "react";
 
 interface DashboardFiltersProps {
   selectedTime: 'today' | 'yesterday' | 'week' | 'month';
@@ -37,34 +39,35 @@ export function DashboardFilters({
   return (
     <div className="max-w-3xl mx-auto mt-4 bg-white/10 backdrop-blur-sm rounded-full overflow-hidden flex">
       <div className="flex-1 flex">
-        <Button 
-          variant={selectedTime === 'today' ? "secondary" : "ghost"}
-          onClick={() => onTimeChange('today')}
-          className="rounded-none border-0 text-white/90 h-10"
-        >
-          Today
-        </Button>
-        <Button 
-          variant={selectedTime === 'yesterday' ? "secondary" : "ghost"}
-          onClick={() => onTimeChange('yesterday')}
-          className="rounded-none border-0 text-white/90 h-10"
-        >
-          Yesterday
-        </Button>
-        <Button 
-          variant={selectedTime === 'week' ? "secondary" : "ghost"}
-          onClick={() => onTimeChange('week')}
-          className="rounded-none border-0 text-white/90 h-10"
-        >
-          Week
-        </Button>
-        <Button 
-          variant={selectedTime === 'month' ? "secondary" : "ghost"}
-          onClick={() => onTimeChange('month')}
-          className="rounded-none border-0 text-white/90 h-10"
-        >
-          Month
-        </Button>
+        <Tabs defaultValue={selectedTime} onValueChange={(value) => onTimeChange(value as any)} className="flex-1">
+          <TabsList className="w-full bg-transparent h-10 rounded-none">
+            <TabsTrigger 
+              value="today" 
+              className="flex-1 rounded-none border-0 text-white/90 h-10 data-[state=active]:bg-white/20 data-[state=active]:text-white"
+            >
+              Today
+            </TabsTrigger>
+            <TabsTrigger 
+              value="yesterday" 
+              className="flex-1 rounded-none border-0 text-white/90 h-10 data-[state=active]:bg-white/20 data-[state=active]:text-white"
+            >
+              Yesterday
+            </TabsTrigger>
+            <TabsTrigger 
+              value="week" 
+              className="flex-1 rounded-none border-0 text-white/90 h-10 data-[state=active]:bg-white/20 data-[state=active]:text-white"
+            >
+              Week
+            </TabsTrigger>
+            <TabsTrigger 
+              value="month" 
+              className="flex-1 rounded-none border-0 text-white/90 h-10 data-[state=active]:bg-white/20 data-[state=active]:text-white"
+            >
+              Month
+            </TabsTrigger>
+          </TabsList>
+        </Tabs>
+        
         <Button 
           variant="ghost"
           className="rounded-none border-0 text-white/90 h-10 gap-2"
@@ -76,21 +79,34 @@ export function DashboardFilters({
       
       <div className="h-full flex">
         <div className="border-l border-white/20"></div>
-        <Button 
-          variant={selectedUser === 'all' ? "secondary" : "ghost"}
-          onClick={() => onUserChange('all')}
-          className="rounded-none border-0 text-white/90 h-10"
+        <Select
+          defaultValue={selectedUser}
+          onValueChange={onUserChange}
         >
-          All
-        </Button>
-        {profiles?.length > 0 && (
-          <div className="flex items-center px-4">
-            <span className="text-white/90 flex items-center">
-              Evan Bch
-              <ChevronDown className="ml-1 h-3 w-3 opacity-60" />
-            </span>
-          </div>
-        )}
+          <SelectTrigger className="w-[180px] border-0 bg-transparent text-white/90 h-10 focus:ring-0">
+            <SelectValue placeholder="Select user">
+              {selectedUser === 'all' ? (
+                'All Users'
+              ) : (
+                <div className="flex items-center">
+                  <User className="h-4 w-4 mr-2" />
+                  {profiles?.find(p => p.id === selectedUser)?.full_name || 'Evan Bch'}
+                </div>
+              )}
+            </SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Users</SelectItem>
+            {profiles?.map((profile) => (
+              <SelectItem key={profile.id} value={profile.id}>
+                <div className="flex items-center">
+                  <User className="h-4 w-4 mr-2" />
+                  {profile.full_name || profile.email}
+                </div>
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
       </div>
       
       <div className="border-l border-white/20"></div>
@@ -98,7 +114,7 @@ export function DashboardFilters({
         variant="ghost"
         className="rounded-none border-0 text-white/90 h-10"
       >
-        <Settings className="h-4 w-4" />
+        <Settings className="h-4 w-4 mr-2" />
         Setup
       </Button>
     </div>
