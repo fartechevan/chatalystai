@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 export function DashboardHeader() {
   return (
     <div className="flex justify-between items-center py-4">
-      <div className="text-3xl font-bold text-white/90">
+      <div className="text-3xl font-bold text-white/90 text-center w-full">
         imexlight
       </div>
       <div className="flex items-center gap-4">

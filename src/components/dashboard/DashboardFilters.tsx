@@ -1,8 +1,15 @@
 
 import { Button } from "@/components/ui/button";
-import { Clock } from "lucide-react";
+import { Clock, ChevronDown, Settings } from "lucide-react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface DashboardFiltersProps {
   selectedTime: 'today' | 'yesterday' | 'week' | 'month';
@@ -28,68 +35,72 @@ export function DashboardFilters({
   });
 
   return (
-    <div className="flex justify-between mt-4">
-      <div className="flex gap-2">
+    <div className="max-w-3xl mx-auto mt-4 bg-white/10 backdrop-blur-sm rounded-full overflow-hidden flex">
+      <div className="flex-1 flex">
         <Button 
-          variant={selectedTime === 'today' ? "secondary" : "outline"}
+          variant={selectedTime === 'today' ? "secondary" : "ghost"}
           onClick={() => onTimeChange('today')}
-          className="bg-white/10 hover:bg-white/20 text-white/90 border-white/10"
+          className="rounded-none border-0 text-white/90 h-10"
         >
           Today
         </Button>
         <Button 
-          variant={selectedTime === 'yesterday' ? "secondary" : "outline"}
+          variant={selectedTime === 'yesterday' ? "secondary" : "ghost"}
           onClick={() => onTimeChange('yesterday')}
-          className="bg-white/10 hover:bg-white/20 text-white/90 border-white/10"
+          className="rounded-none border-0 text-white/90 h-10"
         >
           Yesterday
         </Button>
         <Button 
-          variant={selectedTime === 'week' ? "secondary" : "outline"}
+          variant={selectedTime === 'week' ? "secondary" : "ghost"}
           onClick={() => onTimeChange('week')}
-          className="bg-white/10 hover:bg-white/20 text-white/90 border-white/10"
+          className="rounded-none border-0 text-white/90 h-10"
         >
           Week
         </Button>
         <Button 
-          variant={selectedTime === 'month' ? "secondary" : "outline"}
+          variant={selectedTime === 'month' ? "secondary" : "ghost"}
           onClick={() => onTimeChange('month')}
-          className="bg-white/10 hover:bg-white/20 text-white/90 border-white/10"
+          className="rounded-none border-0 text-white/90 h-10"
         >
           Month
         </Button>
         <Button 
-          variant="outline"
-          className="bg-white/10 hover:bg-white/20 text-white/90 border-white/10 gap-2"
+          variant="ghost"
+          className="rounded-none border-0 text-white/90 h-10 gap-2"
         >
           <Clock className="h-4 w-4" />
           Time
         </Button>
       </div>
-      <div className="flex gap-2">
+      
+      <div className="h-full flex">
+        <div className="border-l border-white/20"></div>
         <Button 
-          variant={selectedUser === 'all' ? "secondary" : "outline"}
+          variant={selectedUser === 'all' ? "secondary" : "ghost"}
           onClick={() => onUserChange('all')}
-          className="bg-white/10 hover:bg-white/20 text-white/90 border-white/10"
+          className="rounded-none border-0 text-white/90 h-10"
         >
           All
         </Button>
         {profiles?.length > 0 && (
-          <Button 
-            variant="outline"
-            className="bg-white/10 hover:bg-white/20 text-white/90 border-white/10 gap-2"
-          >
-            Evan Sch
-            <span className="text-xs opacity-60">▼</span>
-          </Button>
+          <div className="flex items-center px-4">
+            <span className="text-white/90 flex items-center">
+              Evan Bch
+              <ChevronDown className="ml-1 h-3 w-3 opacity-60" />
+            </span>
+          </div>
         )}
-        <Button 
-          variant="outline"
-          className="ml-2 bg-white/20 hover:bg-white/30 text-white border-white/10"
-        >
-          Setup
-        </Button>
       </div>
+      
+      <div className="border-l border-white/20"></div>
+      <Button 
+        variant="ghost"
+        className="rounded-none border-0 text-white/90 h-10"
+      >
+        <Settings className="h-4 w-4" />
+        Setup
+      </Button>
     </div>
   );
 }
