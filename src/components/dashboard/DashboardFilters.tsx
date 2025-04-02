@@ -90,7 +90,7 @@ export function DashboardFilters({
               ) : (
                 <div className="flex items-center">
                   <User className="h-4 w-4 mr-2" />
-                  {profiles?.find(p => p.id === selectedUser)?.full_name || 'Evan Bch'}
+                  {profiles?.find(p => p.id === selectedUser)?.name || 'Evan Bch'}
                 </div>
               )}
             </SelectValue>
@@ -101,7 +101,7 @@ export function DashboardFilters({
               <SelectItem key={profile.id} value={profile.id}>
                 <div className="flex items-center">
                   <User className="h-4 w-4 mr-2" />
-                  {profile.full_name || profile.email}
+                  {profile.name || profile.email}
                 </div>
               </SelectItem>
             ))}
