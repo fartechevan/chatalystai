@@ -3,12 +3,14 @@ import { useState } from "react";
 import { DashboardStats } from "@/components/dashboard/DashboardStats";
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 import { DashboardFilters } from "@/components/dashboard/DashboardFilters";
+import { DateRangeFilter } from "@/components/dashboard/DateRangeFilter";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 
 export default function Main() {
   const [timeFilter, setTimeFilter] = useState<'today' | 'yesterday' | 'week' | 'month'>('today');
   const [userFilter, setUserFilter] = useState<string>('all');
+  const [dateRange, setDateRange] = useState<string>('day');
   
   const { data: userData } = useQuery({
     queryKey: ["auth-user"],
@@ -36,6 +38,10 @@ export default function Main() {
       </div>
       <div className="flex-1 bg-transparent -mt-4 pb-6">
         <div className="container mx-auto px-8">
+          <DateRangeFilter 
+            selectedRange={dateRange}
+            onRangeChange={setDateRange}
+          />
           <DashboardStats timeFilter={timeFilter} userFilter={userFilter} />
         </div>
       </div>
