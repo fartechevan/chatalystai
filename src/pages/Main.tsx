@@ -65,7 +65,7 @@ export default function Main() {
   
   return (
     <div className="flex-1 flex flex-col -mt-8 -mx-8">
-      <div className="bg-blue-950/70 py-6">
+      <div className="bg-blue-950/80 py-6">
         <div className="container mx-auto px-8 flex flex-col items-center">
           <DashboardHeader />
           <div className="mt-8 w-full">
