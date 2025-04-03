@@ -38,30 +38,30 @@ export function DashboardFilters({
   return (
     <div className="max-w-full mx-auto mt-4">
       <div className="flex flex-col sm:flex-row gap-2 justify-center">
-        <div className="flex bg-white/10 backdrop-blur-sm rounded-full overflow-hidden">
+        <div className="flex bg-blue-800/80 backdrop-blur-sm rounded-full overflow-hidden">
           <Tabs defaultValue={selectedTime} onValueChange={(value) => onTimeChange(value as any)} className="flex-1">
             <TabsList className="w-full bg-transparent h-10 rounded-none">
               <TabsTrigger 
                 value="today" 
-                className="flex-1 rounded-none border-0 text-white/90 h-10 data-[state=active]:bg-white/20 data-[state=active]:text-white"
+                className="flex-1 rounded-none border-0 text-white/90 h-10 data-[state=active]:bg-blue-600 data-[state=active]:text-white"
               >
                 Today
               </TabsTrigger>
               <TabsTrigger 
                 value="yesterday" 
-                className="flex-1 rounded-none border-0 text-white/90 h-10 data-[state=active]:bg-white/20 data-[state=active]:text-white"
+                className="flex-1 rounded-none border-0 text-white/90 h-10 data-[state=active]:bg-blue-600 data-[state=active]:text-white"
               >
                 Yesterday
               </TabsTrigger>
               <TabsTrigger 
                 value="week" 
-                className="flex-1 rounded-none border-0 text-white/90 h-10 data-[state=active]:bg-white/20 data-[state=active]:text-white"
+                className="flex-1 rounded-none border-0 text-white/90 h-10 data-[state=active]:bg-blue-600 data-[state=active]:text-white"
               >
                 Week
               </TabsTrigger>
               <TabsTrigger 
                 value="month" 
-                className="flex-1 rounded-none border-0 text-white/90 h-10 data-[state=active]:bg-white/20 data-[state=active]:text-white"
+                className="flex-1 rounded-none border-0 text-white/90 h-10 data-[state=active]:bg-blue-600 data-[state=active]:text-white"
               >
                 Month
               </TabsTrigger>
@@ -70,14 +70,14 @@ export function DashboardFilters({
           
           <Button 
             variant="ghost"
-            className="rounded-none border-0 text-white/90 h-10 gap-2"
+            className="rounded-none border-0 text-white/90 h-10 gap-2 hover:bg-blue-700"
           >
             <Clock className="h-4 w-4" />
             Time
           </Button>
         </div>
         
-        <div className="flex bg-white/10 backdrop-blur-sm rounded-full overflow-hidden">
+        <div className="flex bg-blue-800/80 backdrop-blur-sm rounded-full overflow-hidden">
           <Select
             defaultValue={selectedUser}
             onValueChange={onUserChange}
@@ -110,7 +110,7 @@ export function DashboardFilters({
         
         <Button 
           variant="ghost"
-          className="rounded-full border-0 text-white/90 h-10 bg-white/10 backdrop-blur-sm"
+          className="rounded-full border-0 text-white/90 h-10 bg-blue-800/80 backdrop-blur-sm hover:bg-blue-700"
         >
           <Settings className="h-4 w-4 mr-2" />
           Setup

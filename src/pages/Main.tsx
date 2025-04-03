@@ -65,8 +65,8 @@ export default function Main() {
   
   return (
     <div className="flex-1 flex flex-col -mt-8 -mx-8">
-      <div className="h-[50vh] bg-gradient-to-b from-blue-950/30 to-slate-900/30">
-        <div className="container mx-auto px-8 py-6 flex flex-col items-center">
+      <div className="bg-blue-950/70 py-6">
+        <div className="container mx-auto px-8 flex flex-col items-center">
           <DashboardHeader />
           <div className="mt-8 w-full">
             <DashboardFilters 
@@ -78,8 +78,8 @@ export default function Main() {
           </div>
         </div>
       </div>
-      <div className="flex-1 bg-transparent -mt-4 pb-6">
-        <div className="container mx-auto px-8">
+      <div className="flex-1 pb-6">
+        <div className="container mx-auto px-8 -mt-4">
           <DashboardStats 
             timeFilter={timeFilter} 
             userFilter={userFilter}
