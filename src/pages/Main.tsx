@@ -19,46 +19,123 @@ export default function Main() {
     },
   });
   
-  // Fetch leads data
-  const { data: leads = [] } = useQuery({
+  // Get date range based on time filter
+  const getDateRange = () => {
+    const now = new Date();
+    let startDate = new Date();
+    
+    switch (timeFilter) {
+      case 'today':
+        startDate.setHours(0, 0, 0, 0);
+        break;
+      case 'yesterday':
+        startDate.setDate(now.getDate() - 1);
+        startDate.setHours(0, 0, 0, 0);
+        now.setDate(now.getDate() - 1);
+        now.setHours(23, 59, 59, 999);
+        break;
+      case 'week':
+        startDate.setDate(now.getDate() - 7);
+        break;
+      case 'month':
+        startDate.setMonth(now.getMonth() - 1);
+        break;
+    }
+    
+    return { startDate, endDate: now };
+  };
+  
+  const { startDate, endDate } = getDateRange();
+  
+  // Fetch leads data with filters
+  const { data: leads = [], isLoading: isLeadsLoading } = useQuery({
     queryKey: ["leads", timeFilter, userFilter],
     queryFn: async () => {
-      const { data } = await supabase
+      let query = supabase
         .from("leads")
-        .select("*");
+        .select("*")
+        .gte("created_at", startDate.toISOString())
+        .lte("created_at", endDate.toISOString());
+      
+      if (userFilter !== 'all') {
+        query = query.eq("user_id", userFilter);
+      }
+      
+      const { data, error } = await query;
+      
+      if (error) {
+        console.error("Error fetching leads:", error);
+        return [];
+      }
       return data || [];
     },
   });
 
-  // Fetch conversations data
-  const { data: conversations = [] } = useQuery({
+  // Fetch conversations data with filters
+  const { data: conversations = [], isLoading: isConversationsLoading } = useQuery({
     queryKey: ["conversations", timeFilter, userFilter],
     queryFn: async () => {
-      const { data } = await supabase
+      let query = supabase
         .from("conversations")
-        .select("*");
+        .select("*")
+        .gte("created_at", startDate.toISOString())
+        .lte("created_at", endDate.toISOString());
+      
+      // For conversations, we'd need to check user_id through related tables
+      // This is simplified here - in real implementation, you might need to join tables
+      
+      const { data, error } = await query;
+      
+      if (error) {
+        console.error("Error fetching conversations:", error);
+        return [];
+      }
       return data || [];
     },
   });
 
-  // Fetch messages data
-  const { data: messages = [] } = useQuery({
+  // Fetch messages data with filters
+  const { data: messages = [], isLoading: isMessagesLoading } = useQuery({
     queryKey: ["messages", timeFilter, userFilter],
     queryFn: async () => {
-      const { data } = await supabase
+      let query = supabase
         .from("messages")
-        .select("*");
+        .select("*")
+        .gte("created_at", startDate.toISOString())
+        .lte("created_at", endDate.toISOString());
+      
+      // If needed, add filtering for user
+      
+      const { data, error } = await query;
+      
+      if (error) {
+        console.error("Error fetching messages:", error);
+        return [];
+      }
       return data || [];
     },
   });
 
-  // Fetch tasks data
-  const { data: tasks = [] } = useQuery({
+  // Fetch tasks data with filters
+  const { data: tasks = [], isLoading: isTasksLoading } = useQuery({
     queryKey: ["tasks", timeFilter, userFilter],
     queryFn: async () => {
-      const { data } = await supabase
+      let query = supabase
         .from("tasks")
-        .select("*");
+        .select("*")
+        .gte("created_at", startDate.toISOString())
+        .lte("created_at", endDate.toISOString());
+      
+      if (userFilter !== 'all') {
+        query = query.eq("assignee_id", userFilter);
+      }
+      
+      const { data, error } = await query;
+      
+      if (error) {
+        console.error("Error fetching tasks:", error);
+        return [];
+      }
       return data || [];
     },
   });
@@ -87,6 +164,7 @@ export default function Main() {
             conversations={conversations}
             messages={messages}
             tasks={tasks}
+            isLoading={isLeadsLoading || isConversationsLoading || isMessagesLoading || isTasksLoading}
           />
         </div>
       </div>

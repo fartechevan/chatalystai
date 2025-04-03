@@ -33,11 +33,11 @@ interface TasksSectionProps {
 
 export function TasksSection({ className = "", tasks = [] }: TasksSectionProps) {
   // Count tasks by type
-  const followUpTasks = tasks.filter(t => t.type === "follow-up").length || 2;
-  const meetingTasks = tasks.filter(t => t.type === "meeting").length || 1;
-  const otherTasks = tasks.filter(t => !t.type || (t.type !== "follow-up" && t.type !== "meeting")).length || 0;
+  const followUpTasks = tasks.filter(t => t.type === "follow-up").length;
+  const meetingTasks = tasks.filter(t => t.type === "meeting").length;
+  const otherTasks = tasks.filter(t => !t.type || (t.type !== "follow-up" && t.type !== "meeting")).length;
   
-  const totalTasks = followUpTasks + meetingTasks + otherTasks;
+  const totalTasks = tasks.length;
   
   return (
     <div className={`rounded-lg bg-blue-950/80 p-4 flex flex-col h-full ${className}`}>
