@@ -42,22 +42,13 @@ export function DashboardStats({
     !tasks.some(task => task.lead_id === lead.id)
   ).length;
   
+  // Get ongoing conversations directly from conversations table
   const ongoingConversations = conversations.length;
   
-  // Count unanswered conversations (for this example, we'll count conversations 
-  // with no messages or where last message wasn't from user)
+  // Set unanswered conversations - these will come from the conversations table
   const unansweredConversations = conversations.filter(conv => {
-    const conversationMessages = messages.filter(msg => msg.conversation_id === conv.conversation_id);
-    if (conversationMessages.length === 0) return true;
-    
-    // Sort messages by created_at to find the last one
-    const sortedMessages = [...conversationMessages].sort(
-      (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime()
-    );
-    
-    // Check if the last message was from a customer/lead
-    // This is simplified - you'd need to adjust based on your data model
-    return sortedMessages[0].sender_participant_id.includes('customer');
+    // In a real app, this would be based on a status field or similar
+    return conv.status === 'unanswered';
   }).length;
   
   // Count won and lost leads (in a real app, these would be filtered by lead status)
@@ -65,20 +56,8 @@ export function DashboardStats({
   const wonLeads = leads.filter(lead => lead.status === 'won').length;
   const lostLeads = leads.filter(lead => lead.status === 'lost').length;
   
-  // Calculate longestAwaitingReplyDays from messages
-  let longestAwaitingReplyDays = 0;
-  if (messages.length > 0) {
-    const oldestUnansweredMessage = messages
-      .filter(msg => !msg.is_read)
-      .sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())[0];
-    
-    if (oldestUnansweredMessage) {
-      const messageDate = new Date(oldestUnansweredMessage.created_at);
-      const now = new Date();
-      const diffTime = Math.abs(now.getTime() - messageDate.getTime());
-      longestAwaitingReplyDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-    }
-  }
+  // Set longest awaiting reply days to 0 as requested
+  const longestAwaitingReplyDays = 0;
   
   return (
     <div className="grid grid-cols-12 gap-4">
