@@ -92,12 +92,26 @@ export function ConversationHeader({ conversation }: ConversationHeaderProps) {
     );
   }
 
-  // Get contact information from various sources
-  const contactName = getContactName(customerData, conversation);
-  const phoneNumber = getPhoneNumber(customerData, conversation);
+  // Determine the contact name to display based on available data
+  const contactName = 
+    // First priority: Customer data from database
+    customerData?.name || 
+    // Second priority: conversation.customer_name (from ConversationView processing)
+    conversation.customer_name || 
+    // Third priority: Try to get name from participants
+    getContactNameFromParticipants(conversation) ||
+    "Unknown Contact";
   
   // Get the first letter for the avatar
-  const avatarInitial = contactName.charAt(0).toUpperCase();
+  const avatarInitial = contactName.charAt(0);
+  
+  // Get customer phone number from various sources
+  const phoneNumber = 
+    // First priority: Customer data from database
+    customerData?.phone_number || 
+    // Second priority: Try to get phone from participants
+    getPhoneNumberFromParticipants(conversation) || 
+    "No phone number";
 
   return (
     <div className="flex items-center justify-between p-3 border-b">
@@ -106,7 +120,7 @@ export function ConversationHeader({ conversation }: ConversationHeaderProps) {
           <div className="w-10 h-10 overflow-hidden rounded-full bg-gray-200 flex items-center justify-center">
             {avatarInitial ? (
               <span className="text-lg font-medium text-gray-700">
-                {avatarInitial}
+                {avatarInitial.toUpperCase()}
               </span>
             ) : (
               <User className="w-6 h-6 text-gray-500" />
@@ -189,54 +203,26 @@ export function ConversationHeader({ conversation }: ConversationHeaderProps) {
   );
 }
 
-// Function to get contact name from various sources
-function getContactName(customerData: Customer | null, conversation: Conversation): string {
-  // First priority: Customer data from database with non-empty name
-  if (customerData?.name && customerData.name.trim() !== '') {
-    return customerData.name;
+// Helper function to extract contact name from participants
+function getContactNameFromParticipants(conversation: Conversation): string | null {
+  if (!conversation.participants) return null;
+  
+  const memberParticipant = conversation.participants.find(p => p.role === 'member');
+  if (memberParticipant && memberParticipant.external_user_identifier) {
+    return memberParticipant.external_user_identifier;
   }
   
-  // If customer exists but name is empty, use phone number
-  if (customerData?.phone_number) {
-    return customerData.phone_number;
-  }
-  
-  // Second priority: conversation.customer_name from ConversationView processing
-  if (conversation.customer_name && conversation.customer_name.trim() !== '') {
-    return conversation.customer_name;
-  }
-  
-  // Third priority: Try to get name from participants
-  if (conversation.participants) {
-    const memberParticipant = conversation.participants.find(
-      p => p.role === 'member' && p.external_user_identifier
-    );
-    
-    if (memberParticipant?.external_user_identifier) {
-      return memberParticipant.external_user_identifier;
-    }
-  }
-
-  return 'Unknown Contact';
+  return null;
 }
 
-// Function to get phone number from various sources
-function getPhoneNumber(customerData: Customer | null, conversation: Conversation): string {
-  // First priority: Customer data from database
-  if (customerData?.phone_number) {
-    return customerData.phone_number;
+// Helper function to extract phone number from participants
+function getPhoneNumberFromParticipants(conversation: Conversation): string | null {
+  if (!conversation.participants) return null;
+  
+  const memberParticipant = conversation.participants.find(p => p.role === 'member');
+  if (memberParticipant && memberParticipant.external_user_identifier) {
+    return memberParticipant.external_user_identifier;
   }
   
-  // Second priority: Try to get phone from participants
-  if (conversation.participants) {
-    const memberParticipant = conversation.participants.find(
-      p => p.role === 'member' && p.external_user_identifier
-    );
-    
-    if (memberParticipant?.external_user_identifier) {
-      return memberParticipant.external_user_identifier;
-    }
-  }
-
-  return 'No phone number';
+  return null;
 }

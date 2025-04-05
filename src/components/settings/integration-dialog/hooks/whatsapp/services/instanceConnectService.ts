@@ -11,6 +11,7 @@ export async function connectToInstance(
   setPairingCode: (code: string | null) => void,
   setConnectionState: (state: string) => void,
   startPolling: () => void,
+  // Remove apiKey parameter
   instanceId: string
 ) {
 
@@ -25,25 +26,6 @@ export async function connectToInstance(
   if (!evolutionApiKey) {
     console.error('API key is missing from config.');
     throw new Error('API key is required for connection.');
-  }
-
-  try {
-    // First, log the connection attempt using our Edge Function
-    const { data: logData, error: logError } = await supabase.functions.invoke('get_integration_access', {
-      body: { 
-        action: 'connectToInstance', 
-        instanceId 
-      }
-    });
-    
-    if (logError) {
-      console.error('Failed to log connection attempt:', logError);
-    } else {
-      console.log('Connection attempt logged:', logData);
-    }
-  } catch (err) {
-    console.error('Error logging connection attempt:', err);
-    // Continue with connection attempt even if logging fails
   }
 
   // Create full URL for API call
