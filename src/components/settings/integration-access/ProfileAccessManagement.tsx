@@ -8,29 +8,55 @@ import { Loader2 } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { IntegrationAccessDialog } from "./IntegrationAccessDialog";
 
+interface IntegrationConfig {
+  id: string;
+  integrations: {
+    id: string;
+    name: string;
+  } | null;
+  access: Array<{
+    id: string;
+    profile_id: string;
+    profiles: {
+      name: string | null;
+      email: string | null;
+    } | null;
+  }> | null;
+}
+
 export function ProfileAccessManagement() {
   const [selectedConfigId, setSelectedConfigId] = useState<string | null>(null);
   const [selectedIntegrationName, setSelectedIntegrationName] = useState<string>("");
   const [dialogOpen, setDialogOpen] = useState(false);
 
   // Fetch all integrations with their configs
-  const { data: integrationConfigs = [], isLoading } = useQuery({
+  const { data: integrationConfigs = [], isLoading } = useQuery<IntegrationConfig[]>({
     queryKey: ["integration-configs-with-access"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("integrations_config")
-        .select(`
-          id,
-          integrations:integration_id (id, name),
-          access:profile_integration_access (
-            id,
-            profile_id,
-            profiles:profile_id (name, email)
-          )
-        `);
+      // Using rpc function to get properly typed data
+      const { data, error } = await supabase.rpc('get_integration_configs_with_access');
 
-      if (error) throw error;
-      return data;
+      if (error) {
+        console.error("Error fetching integration configs:", error);
+        
+        // Fallback to direct query
+        const { data: fallbackData, error: fallbackError } = await supabase
+          .from("integrations_config")
+          .select(`
+            id,
+            integrations:integration_id (id, name),
+            access:profile_integration_access (
+              id,
+              profile_id,
+              profiles:profile_id (name, email)
+            )
+          `);
+
+        if (fallbackError) throw fallbackError;
+        return fallbackData || [];
+      }
+
+      return data || [];
     },
   });
 

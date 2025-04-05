@@ -47,7 +47,6 @@ export function SettingsContent({ section }: SettingsContentProps) {
   }
 
   if (section === 'integrations') {
-    // Pass isActive prop, only true when this section is selected
     return <IntegrationsView isActive={section === 'integrations'} />;
   }
 
