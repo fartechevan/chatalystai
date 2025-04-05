@@ -17,6 +17,25 @@ interface IntegrationAccessDialogProps {
   integrationName: string;
 }
 
+// Define types for our data
+interface Profile {
+  id: string;
+  name: string | null;
+  email: string;
+  role: string;
+}
+
+interface AccessRecord {
+  id: string;
+  profile_id: string;
+  profiles: {
+    id: string;
+    name: string | null;
+    email: string;
+    role: string;
+  };
+}
+
 export function IntegrationAccessDialog({
   open,
   onOpenChange,
@@ -28,7 +47,7 @@ export function IntegrationAccessDialog({
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Fetch all user profiles (admin only)
-  const { data: profiles = [], isLoading: isLoadingProfiles } = useQuery({
+  const { data: profiles = [], isLoading: isLoadingProfiles } = useQuery<Profile[]>({
     queryKey: ["profiles"],
     queryFn: async () => {
       const { data, error } = await supabase
@@ -43,22 +62,34 @@ export function IntegrationAccessDialog({
   });
 
   // Fetch profiles that already have access to this integration
-  const { data: accessList = [], isLoading: isLoadingAccess, refetch: refetchAccess } = useQuery({
+  const { data: accessList = [], isLoading: isLoadingAccess, refetch: refetchAccess } = useQuery<AccessRecord[]>({
     queryKey: ["integration-access", integrationConfigId],
     queryFn: async () => {
       if (!integrationConfigId) return [];
 
-      const { data, error } = await supabase
-        .from("profile_integration_access")
-        .select(`
-          id,
-          profile_id,
-          profiles:profile_id (id, name, email, role)
-        `)
-        .eq("integration_config_id", integrationConfigId);
+      // Using raw SQL query via rpc to overcome type limitations
+      const { data, error } = await supabase.rpc('get_integration_access_with_profiles', {
+        config_id: integrationConfigId
+      });
 
-      if (error) throw error;
-      return data;
+      if (error) {
+        console.error("Error fetching access list:", error);
+        
+        // Fallback to a direct query with explicit casting
+        const { data: fallbackData, error: fallbackError } = await supabase
+          .from("profile_integration_access")
+          .select(`
+            id,
+            profile_id,
+            profiles:profile_id (id, name, email, role)
+          `)
+          .eq("integration_config_id", integrationConfigId);
+          
+        if (fallbackError) throw fallbackError;
+        return fallbackData || [];
+      }
+
+      return data || [];
     },
     enabled: !!integrationConfigId && open,
   });
@@ -70,13 +101,11 @@ export function IntegrationAccessDialog({
     setIsSubmitting(true);
 
     try {
-      const { error } = await supabase
-        .from("profile_integration_access")
-        .insert({
-          profile_id: selectedProfileId,
-          integration_config_id: integrationConfigId,
-          created_by: (await supabase.auth.getUser()).data.user?.id,
-        });
+      // Using rpc call to insert record
+      const { error } = await supabase.rpc('grant_integration_access', {
+        profile_id_param: selectedProfileId,
+        config_id_param: integrationConfigId
+      });
 
       if (error) {
         if (error.code === "23505") {
@@ -115,10 +144,10 @@ export function IntegrationAccessDialog({
     setIsSubmitting(true);
 
     try {
-      const { error } = await supabase
-        .from("profile_integration_access")
-        .delete()
-        .eq("id", accessId);
+      // Using rpc call to delete record
+      const { error } = await supabase.rpc('revoke_integration_access', {
+        access_id_param: accessId
+      });
 
       if (error) throw error;
 
