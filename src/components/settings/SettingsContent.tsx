@@ -5,6 +5,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { BillingStats } from "./BillingStats";
 import { IntegrationsView } from "./IntegrationsView";
+import { ProfileAccessManagement } from "./integration-access/ProfileAccessManagement";
 
 interface SettingsContentProps {
   section: string;
@@ -48,6 +49,14 @@ export function SettingsContent({ section }: SettingsContentProps) {
   if (section === 'integrations') {
     // Pass isActive prop, only true when this section is selected
     return <IntegrationsView isActive={section === 'integrations'} />;
+  }
+
+  if (section === 'access') {
+    return (
+      <div className="p-4">
+        <ProfileAccessManagement />
+      </div>
+    );
   }
 
   return (
