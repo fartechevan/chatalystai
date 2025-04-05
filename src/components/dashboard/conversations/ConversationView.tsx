@@ -39,7 +39,7 @@ export function ConversationView() {
       try {
         const { data, error } = await supabase
           .from('conversation_participants')
-          .select('id, conversation_id, role, external_user_identifier');
+          .select('id, conversation_id, role, external_user_identifier, customer_id');
         
         if (error) {
           console.error('Error loading participants:', error);
@@ -106,7 +106,7 @@ export function ConversationView() {
     if (conv.lead?.customer_id && customersData[conv.lead.customer_id]) {
       processedConv.customer_name = customersData[conv.lead.customer_id].name;
     } 
-    // Only fall back to participant data if we don't have customer name from the customers table
+    // Second priority: Look for customer_id in participant data
     else {
       const conversationParticipants = participantsData[conv.conversation_id] || [];
       // Find member participant (customer)
@@ -114,7 +114,12 @@ export function ConversationView() {
         (p: any) => p.role === 'member'
       );
       
-      if (memberParticipant && memberParticipant.external_user_identifier) {
+      if (memberParticipant && memberParticipant.customer_id && customersData[memberParticipant.customer_id]) {
+        // If participant has customer_id, use that customer's name
+        processedConv.customer_name = customersData[memberParticipant.customer_id].name;
+      } 
+      // Third priority: Fall back to external_user_identifier (phone number)
+      else if (memberParticipant && memberParticipant.external_user_identifier) {
         processedConv.customer_name = memberParticipant.external_user_identifier;
       }
     }
@@ -123,7 +128,18 @@ export function ConversationView() {
   });
 
   const filteredConversations = processedConversations.filter(conv => {
+    if (!searchQuery.trim()) {
+      return true; // Show all when no search query
+    }
+    
     const searchLower = searchQuery.toLowerCase();
+    
+    // Search in customer name if it exists
+    if (conv.customer_name && 
+        typeof conv.customer_name === 'string' && 
+        conv.customer_name.toLowerCase().includes(searchLower)) {
+      return true;
+    }
     
     // Search in customer data if lead has customer_id
     if (conv.lead?.customer_id && customersData[conv.lead.customer_id]) {
@@ -133,13 +149,12 @@ export function ConversationView() {
           customer.name.toLowerCase().includes(searchLower)) {
         return true;
       }
-    }
-    
-    // Search in customer_name if it exists
-    if (conv.customer_name && 
-        typeof conv.customer_name === 'string' && 
-        conv.customer_name.toLowerCase().includes(searchLower)) {
-      return true;
+      
+      if (customer.phone_number && 
+          typeof customer.phone_number === 'string' && 
+          customer.phone_number.toLowerCase().includes(searchLower)) {
+        return true;
+      }
     }
     
     // Search in lead_id

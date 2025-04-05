@@ -1,3 +1,4 @@
+
 import { X, Menu, Search, Settings } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -38,25 +39,23 @@ export function ConversationLeftPanel({
   };
 
   const getConversationName = (conversation: Conversation) => {
+    // First priority: Use customer_name if it exists
     if (conversation.customer_name) {
       return conversation.customer_name;
     }
 
+    // Second priority: Use lead name or company name if available
     if (conversation.lead) {
-      return conversation.lead.name || conversation.lead.company_name || `Lead #${conversation.lead_id?.slice(0, 6)}`;
+      if (conversation.lead.name) return conversation.lead.name;
+      if (conversation.lead.company_name) return conversation.lead.company_name;
+      return `Lead #${conversation.lead_id?.slice(0, 6)}`;
     }
     
+    // Last resort: Check for participants with external_user_identifier (phone number)
     if (conversation.participants && conversation.participants.length > 0) {
-      const firstMember = conversation.participants[0];
-      if (firstMember.profiles?.email) {
-        return firstMember.profiles.email;
-      }
-    }
-
-    if (conversation.participants && conversation.participants.length > 0) {
-      const firstMember = conversation.participants[0];
-      if (firstMember.profiles?.email) {
-        return firstMember.profiles.email;
+      const memberParticipant = conversation.participants.find(p => p.role === 'member');
+      if (memberParticipant && memberParticipant.external_user_identifier) {
+        return memberParticipant.external_user_identifier;
       }
     }
 

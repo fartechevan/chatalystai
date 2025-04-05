@@ -18,9 +18,14 @@ export async function fetchConversationsWithParticipants() {
       updated_at,
       lead_id,
       integrations_config_id,
-      lead:lead_id(*),
-      customer:conversation_participants(
-        customer:customer_id(id, name)
+      lead:lead_id(
+        id,
+        customer_id,
+        value,
+        user_id,
+        created_at,
+        updated_at,
+        pipeline_stage_id
       )
     `
     )
@@ -39,7 +44,7 @@ export async function fetchConversationsWithParticipants() {
       const { data: participants, error: participantsError } = await supabase
         .from("conversation_participants")
         .select("id, conversation_id, role, external_user_identifier, customer_id")
-        .eq("conversation_id", conv.conversation_id); // Using conversation_id instead of id
+        .eq("conversation_id", conv.conversation_id);
 
       if (participantsError) {
         console.error(`Error fetching participants for conversation ${conv.conversation_id}:`, participantsError);
@@ -49,20 +54,25 @@ export async function fetchConversationsWithParticipants() {
         };
       }
 
+      // If the conversation has a lead with customer_id, fetch customer data
+      let customer = null;
+      if (conv.lead?.customer_id) {
+        const { data: customerData, error: customerError } = await supabase
+          .from('customers')
+          .select('id, name, phone_number')
+          .eq('id', conv.lead.customer_id)
+          .maybeSingle();
+        
+        if (!customerError && customerData) {
+          customer = customerData;
+        }
+      }
+
       return {
         ...conv,
-        participants: participants.map((participant) => {
-          const customer =
-            Array.isArray(conv.customer) && conv.customer.length > 0
-              ? conv.customer.find((c) => c?.customer?.id === participant.customer_id)?.customer
-              : null;
-
-          return {
-            ...participant,
-            customer: customer || null,
-            customer_id: undefined, // Remove customer_id as it's now inside the customer object
-          };
-        }),
+        participants,
+        // Add customer directly to the conversation object
+        customer: customer,
       };
     })
   );

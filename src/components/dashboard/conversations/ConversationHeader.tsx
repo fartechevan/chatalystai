@@ -1,3 +1,4 @@
+
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -38,54 +39,45 @@ export function ConversationHeader({ conversation }: ConversationHeaderProps) {
     const fetchCustomerData = async () => {
       setCustomerData(null); // Reset customerData before fetching new data
 
-      if (!conversation?.lead?.customer_id) {
-        // If no customer_id in lead, try to find from participants
-        if (conversation?.participants) {
-          const memberParticipant = conversation.participants.find(
-            p => p.role === 'member'
-          );
-          
-          if (memberParticipant?.customer_id) {
-            try {
-              const { data, error } = await supabase
-                .from('customers')
-                .select('*')
-                .eq('id', memberParticipant.customer_id)
-                .maybeSingle();
-              
-              if (error) {
-                console.error('Error fetching customer data:', error);
-                return;
-              }
-              
-              if (data) {
-                setCustomerData(data);
-              }
-            } catch (err) {
-              console.error('Error processing customer data:', err);
-            }
-          }
+      if (!conversation) return;
+      
+      let customerId: string | null = null;
+      
+      // First priority: Get customer_id from lead
+      if (conversation.lead?.customer_id) {
+        customerId = conversation.lead.customer_id;
+      } 
+      // Second priority: Get customer_id from participant
+      else if (conversation.participants) {
+        const memberParticipant = conversation.participants.find(
+          p => p.role === 'member' && p.customer_id
+        );
+        
+        if (memberParticipant?.customer_id) {
+          customerId = memberParticipant.customer_id;
         }
-        return;
       }
       
-      try {
-        const { data, error } = await supabase
-          .from('customers')
-          .select('*')
-          .eq('id', conversation.lead.customer_id)
-          .maybeSingle();
-        
-        if (error) {
-          console.error('Error fetching customer data:', error);
-          return;
+      // If we found a customer ID, fetch the customer data
+      if (customerId) {
+        try {
+          const { data, error } = await supabase
+            .from('customers')
+            .select('*')
+            .eq('id', customerId)
+            .maybeSingle();
+          
+          if (error) {
+            console.error('Error fetching customer data:', error);
+            return;
+          }
+          
+          if (data) {
+            setCustomerData(data);
+          }
+        } catch (err) {
+          console.error('Error processing customer data:', err);
         }
-        
-        if (data) {
-          setCustomerData(data);
-        }
-      } catch (err) {
-        console.error('Error processing customer data:', err);
       }
     };
     
@@ -101,18 +93,25 @@ export function ConversationHeader({ conversation }: ConversationHeaderProps) {
   }
 
   // Determine the contact name to display based on available data
-  const contactName = customerData?.name || 
-                      conversation.customer_name || 
-                      getContactNameFromParticipants(conversation) ||
-                      "Unknown Contact";
+  const contactName = 
+    // First priority: Customer data from database
+    customerData?.name || 
+    // Second priority: conversation.customer_name (from ConversationView processing)
+    conversation.customer_name || 
+    // Third priority: Try to get name from participants
+    getContactNameFromParticipants(conversation) ||
+    "Unknown Contact";
   
   // Get the first letter for the avatar
   const avatarInitial = contactName.charAt(0);
   
-  // Get customer phone number
-  const phoneNumber = customerData?.phone_number || 
-                      getPhoneNumberFromParticipants(conversation) || 
-                      "No phone number";
+  // Get customer phone number from various sources
+  const phoneNumber = 
+    // First priority: Customer data from database
+    customerData?.phone_number || 
+    // Second priority: Try to get phone from participants
+    getPhoneNumberFromParticipants(conversation) || 
+    "No phone number";
 
   return (
     <div className="flex items-center justify-between p-3 border-b">
