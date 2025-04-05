@@ -3,8 +3,8 @@ import { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 /**
  * Finds an existing customer or creates a new one
  */
-export async function findOrCreateCustomer(supabaseClient: SupabaseClient, phoneNumber: string, contactName: string, fromMe: boolean): Promise<string | null> {
-  console.log(`Finding or creating customer with phone: ${phoneNumber}, contactName: ${contactName}, fromMe: ${fromMe}`);
+export async function findOrCreateCustomer(supabaseClient: SupabaseClient, phoneNumber: string, contactName: string): Promise<string | null> {
+  console.log(`Finding or creating customer with phone: ${phoneNumber}, contactName: ${contactName}`);
 
   // Ensure phone number includes country code (+60 for Malaysia)
   let formattedPhoneNumber = phoneNumber;
@@ -15,7 +15,7 @@ export async function findOrCreateCustomer(supabaseClient: SupabaseClient, phone
   // Try to find existing customer
   const { data: existingCustomer, error: customerError } = await supabaseClient
     .from('customers')
-    .select('id, name')
+    .select('id')
     .eq('phone_number', formattedPhoneNumber)
     .maybeSingle();
   
@@ -24,35 +24,20 @@ export async function findOrCreateCustomer(supabaseClient: SupabaseClient, phone
     return null;
   }
   
-  // If customer exists
+  // If customer exists, return their ID
   if (existingCustomer) {
     console.log(`Found existing customer with ID: ${existingCustomer.id}`);
-    
-    // Only update name if message is from customer (not from Me) AND we have a contact name AND 
-    // either the existing customer has no name or the name is the phone number
-    if (!fromMe && contactName && 
-        (!existingCustomer.name || existingCustomer.name === formattedPhoneNumber)) {
-      console.log(`Updating existing customer name from ${existingCustomer.name} to ${contactName}`);
-      await supabaseClient
-        .from('customers')
-        .update({ name: contactName })
-        .eq('id', existingCustomer.id);
-    }
-    
     return existingCustomer.id;
   }
   
   // Otherwise create new customer
-  console.log(`Creating new customer with phone: ${formattedPhoneNumber}`);
-  
-  // When creating a new customer, only use the contactName if the message is from the customer
-  const customerName = !fromMe && contactName ? contactName : "";
+  console.log(`Creating new customer with phone: ${formattedPhoneNumber}, name: ${contactName}`);
   
   const { data: newCustomer, error: createCustomerError } = await supabaseClient
     .from('customers')
     .insert({
       phone_number: formattedPhoneNumber,
-      name: customerName, // Only set name if message is from customer
+      name: contactName || formattedPhoneNumber, // Use contactName if available, otherwise phone number
     })
     .select()
     .single();
