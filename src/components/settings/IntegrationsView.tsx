@@ -8,9 +8,7 @@ import { IntegrationDialog } from "./integration-dialog/IntegrationDialog";
 import { IntegrationCard } from "./integration-card/IntegrationCard";
 import type { Integration } from "./types";
 import { useToast } from "@/hooks/use-toast";
-// Import the service to check a specific instance's status
 import checkInstanceStatus from "./integration-dialog/hooks/whatsapp/services/checkInstanceStatusService";
-// Import the centralized config for the API key
 import { evolutionApiKey } from "./integration-dialog/hooks/whatsapp/services/config";
 
 interface IntegrationsViewProps {
@@ -80,7 +78,6 @@ export function IntegrationsView({ isActive }: IntegrationsViewProps) {
     enabled: isActive, // Only run query when the component is active
   });
 
-  // Function to check connection status using Supabase config and new service
   const checkAndUpdateConnectionStatus = async (integrationId: string): Promise<boolean> => {
     let isConnected = false;
     try {
@@ -97,10 +94,8 @@ export function IntegrationsView({ isActive }: IntegrationsViewProps) {
         const instanceId = configData.instance_id;
         console.log(`Checking status for instance ${instanceId} (Integration: ${integrationId})`);
 
-        // Call service without API key (it gets it from config)
         const statusResult = await checkInstanceStatus(instanceId);
 
-        // Type check and status validation
         if (statusResult && typeof statusResult === 'object' && 'state' in statusResult && !('error' in statusResult) && statusResult.state === 'open') {
           console.log(`Instance ${instanceId} is connected.`);
           isConnected = true;
@@ -125,45 +120,30 @@ export function IntegrationsView({ isActive }: IntegrationsViewProps) {
     return isConnected;
   };
 
-  // REMOVED useEffect hooks that automatically checked status on load/dialog close.
-  // Status will now only be checked on click.
-
-
-  // Function to handle the connection process for WhatsApp (will now also check status)
   const connectWhatsApp = async (integration: Integration) => {
     setSelectedIntegration(integration);
 
-    // API Key check is now implicitly handled by the service via config.ts
-    // We might still want a check here to prevent unnecessary steps if the key isn't set *at all* in the config
     if (!evolutionApiKey) {
        toast({ title: "Configuration Error", description: "Evolution API Key is missing in the application configuration.", variant: "destructive" });
        return;
     }
 
-    // Check connection status FIRST when clicking the card
     const isCurrentlyConnected = await checkAndUpdateConnectionStatus(integration.id);
 
-    // If already connected, just show a success toast and maybe refresh data?
-    // Or perhaps open the dialog anyway for management? Let's show a toast for now.
     if (isCurrentlyConnected) {
         toast({
             title: "Already Connected",
             description: `WhatsApp instance for ${integration.name} is already connected.`,
         });
-        // Optionally open dialog here if management is needed even when connected
-        // setSelectedIntegration(integration);
-        // setDialogOpen(true);
-        return; // Stop further connection attempt if already connected
+        return;
     }
 
-    // If not connected, proceed with the connection/configuration flow
     toast({
       title: "Connecting WhatsApp...",
       description: "Instance not connected. Attempting to fetch configuration and guide connection.",
     });
 
     try {
-      // Fetch instance_id from Supabase config (This part might be redundant if checkAndUpdateConnectionStatus already did it, but let's keep for clarity)
       console.log(`Fetching config for integration ${integration.id}...`);
       const { data: configData, error: configError } = await supabase
         .from('integrations_config')
@@ -188,21 +168,15 @@ export function IntegrationsView({ isActive }: IntegrationsViewProps) {
       const instanceId = configData.instance_id;
       console.log(`Found instance ID: ${instanceId}. Configuration seems present.`);
 
-      // No need to call checkInstanceStatus again here, checkAndUpdateConnectionStatus did it.
-      // We know isCurrentlyConnected is false from the check above.
-
-      // Store credentials (Supabase instance_id and API Key from config) - needed for dialog/polling
       console.log(`Storing credentials for connection attempt: InstanceID=${instanceId}, ApiKey=***`);
       localStorage.setItem('instanceID', instanceId);
-      localStorage.setItem('apiKey', evolutionApiKey); // Store the key from config for dialog use
+      localStorage.setItem('apiKey', evolutionApiKey);
 
-      // Since we know it's not connected, open the dialog to guide the user
       toast({
           title: "Connection Needed",
           description: `Instance ${instanceId} found but not connected. Please follow instructions in the dialog.`,
       });
-      setDialogOpen(true); // Open the dialog for QR/Pairing code
-
+      setDialogOpen(true);
     } catch (error) {
       console.error('Error during WhatsApp connection process:', error);
       toast({
@@ -213,7 +187,6 @@ export function IntegrationsView({ isActive }: IntegrationsViewProps) {
     }
   };
 
-  // Handles clicking on an integration card
   const handleIntegrationClick = async (integration: Integration) => {
     setSelectedIntegration(integration);
     if (integration.name === "WhatsApp" || integration.name === "WhatsApp Cloud API") {
@@ -223,19 +196,16 @@ export function IntegrationsView({ isActive }: IntegrationsViewProps) {
     }
   };
 
-  // Handles closing the dialog
   const handleDialogClose = (/* connected: boolean */) => {
     setDialogOpen(false);
   };
 
-  // Prepare the list for display
   const integrationsList = integrations.map(integration => ({
     ...integration,
     is_connected: connectedIntegrations[integration.id] || false,
     type: integration.type || "messenger"
   }));
 
-  // Filter based on search query and active tab
   const filteredIntegrations = integrationsList.filter(integration => {
     const matchesSearch = integration.name.toLowerCase().includes(searchQuery.toLowerCase());
     if (activeTab === "Connected") {
@@ -244,7 +214,6 @@ export function IntegrationsView({ isActive }: IntegrationsViewProps) {
     return matchesSearch;
   });
 
-  // Render the component
   return (
     <div className="p-8 max-w-7xl mx-auto space-y-8">
       <IntegrationDialog
