@@ -38,7 +38,9 @@ serve(async (req) => {
 
     // Parse request body
     const requestData = await req.json()
-    const { action, configId, profileId, accessId } = requestData
+    const { action, configId, profileId, accessId, instanceId } = requestData
+
+    console.log(`Integration access request: action=${action}, user=${user.id}, configId=${configId}, profileId=${profileId}, instanceId=${instanceId || 'N/A'}`)
 
     if (action === 'fetchAccess') {
       const { data, error } = await supabaseClient
@@ -51,6 +53,7 @@ serve(async (req) => {
         .eq('integration_config_id', configId)
 
       if (error) throw error
+      console.log(`Fetched ${data?.length || 0} access records for config ${configId}`)
       return new Response(JSON.stringify({ data }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
@@ -65,6 +68,7 @@ serve(async (req) => {
 
       if (error) {
         if (error.code === '23505') {
+          console.log(`Access already granted for profile ${profileId} to config ${configId}`)
           return new Response(JSON.stringify({ error: 'Access already granted' }), {
             status: 409,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -73,6 +77,7 @@ serve(async (req) => {
         throw error
       }
 
+      console.log(`Access granted for profile ${profileId} to config ${configId} by ${user.id}`)
       return new Response(JSON.stringify({ success: true }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
@@ -84,16 +89,66 @@ serve(async (req) => {
 
       if (error) throw error
 
+      console.log(`Access revoked for access record ${accessId} by ${user.id}`)
       return new Response(JSON.stringify({ success: true }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
+    } else if (action === 'connectToInstance') {
+      if (!instanceId) {
+        return new Response(JSON.stringify({ error: 'Instance ID is required' }), {
+          status: 400, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+      
+      // Log the connection attempt
+      console.log(`Connecting to Evolution API instance: ${instanceId}`)
+      
+      // Get the integration config for the apiKey
+      const { data: config, error: configError } = await supabaseClient
+        .from('integrations_config')
+        .select('integration_id, base_url')
+        .eq('instance_id', instanceId)
+        .single()
+        
+      if (configError) {
+        console.error(`Error fetching config for instance ${instanceId}:`, configError)
+        throw configError
+      }
+      
+      // Get the base_url from the integration
+      const { data: integration, error: integrationError } = await supabaseClient
+        .from('integrations')
+        .select('base_url')
+        .eq('id', config.integration_id)
+        .single()
+      
+      if (integrationError) {
+        console.error(`Error fetching integration for config ${config.integration_id}:`, integrationError)
+        throw integrationError
+      }
+      
+      const baseUrl = integration.base_url || 'https://api.evoapicloud.com'
+      const apiUrl = `${baseUrl}/instance/connect/${instanceId}`
+      
+      console.log(`Connecting to instance via Evolution API: ${apiUrl}`)
+      
+      // Return success response for logging purposes
+      return new Response(JSON.stringify({ 
+        success: true,
+        message: `Connecting to instance ${instanceId} via ${apiUrl}`
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
     } else {
+      console.log(`Invalid action requested: ${action}`)
       return new Response(JSON.stringify({ error: 'Invalid action' }), {
         status: 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     }
   } catch (error) {
+    console.error('Error in get_integration_access function:', error)
     return new Response(JSON.stringify({ error: error.message }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
