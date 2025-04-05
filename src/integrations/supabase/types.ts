@@ -576,6 +576,52 @@ export type Database = {
         }
         Relationships: []
       }
+      profile_integration_access: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          integration_config_id: string
+          profile_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          integration_config_id: string
+          profile_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          integration_config_id?: string
+          profile_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "profile_integration_access_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "profile_integration_access_integration_config_id_fkey"
+            columns: ["integration_config_id"]
+            isOneToOne: false
+            referencedRelation: "integrations_config"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "profile_integration_access_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           created_at: string
@@ -897,6 +943,13 @@ export type Database = {
           content: string
           similarity: number
         }[]
+      }
+      profile_has_integration_access: {
+        Args: {
+          _profile_id: string
+          _integration_config_id: string
+        }
+        Returns: boolean
       }
       sparsevec_out: {
         Args: {
