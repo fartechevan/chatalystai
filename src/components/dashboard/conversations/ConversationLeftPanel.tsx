@@ -31,16 +31,13 @@ export function ConversationLeftPanel({
 }: ConversationLeftPanelProps) {
 
   const getAvatarInitial = (conversation: Conversation) => {
-    if (conversation.customer_name && conversation.customer_name.length > 0) {
-      return conversation.customer_name[0].toUpperCase();
-    }
-    
-    return 'U';
+    const displayName = getConversationName(conversation);
+    return displayName.charAt(0).toUpperCase();
   };
 
   const getConversationName = (conversation: Conversation) => {
-    // First priority: Use customer_name if it exists
-    if (conversation.customer_name) {
+    // First priority: Use customer_name if it exists and is not empty
+    if (conversation.customer_name && conversation.customer_name.trim() !== '') {
       return conversation.customer_name;
     }
 
@@ -51,7 +48,7 @@ export function ConversationLeftPanel({
       return `Lead #${conversation.lead_id?.slice(0, 6)}`;
     }
     
-    // Last resort: Check for participants with external_user_identifier (phone number)
+    // Third priority: Check for participants with external_user_identifier (phone number)
     if (conversation.participants && conversation.participants.length > 0) {
       const memberParticipant = conversation.participants.find(p => p.role === 'member');
       if (memberParticipant && memberParticipant.external_user_identifier) {

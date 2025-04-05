@@ -52,10 +52,10 @@ export async function handleMessageEvent(supabaseClient: SupabaseClient, data: a
   console.log(`Extracted phone number: ${phoneNumber}`);
 
   // Customer handling
-  // Call findOrCreateCustomer regardless of fromMe value
+  // Call findOrCreateCustomer regardless of fromMe value, but pass the fromMe flag
   let customerId: string | null = null;
   try {
-    customerId = await findOrCreateCustomer(supabaseClient, phoneNumber, contactName);
+    customerId = await findOrCreateCustomer(supabaseClient, phoneNumber, contactName, fromMe);
     console.log(`[MessageHandler] Customer ID: ${customerId}`);
     if (!customerId) return false;
   } catch (error) {
