@@ -1,5 +1,5 @@
 
-import { supabase } from "@/integrations/supabase/client"; // Removed getEvolutionURL
+import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 // Import the centralized API key and server URL
 import { evolutionApiKey, evolutionServerUrl } from "./config";
@@ -21,28 +21,30 @@ export async function logoutWhatsAppInstance(
   options?: LogoutOptions
 ): Promise<boolean> {
   const serverUrl = evolutionServerUrl; // Use imported server URL
-  // *** ASSUMPTION: Endpoint is /instance/logout/{instanceName} ***
-  // *** This needs verification with Evolution API documentation. ***
-  const url = `${serverUrl}/instance/logout/${instanceId}`; // instanceId is the instanceName here
-
-  if (!evolutionApiKey) {
-    console.error('API key is missing from config.');
-    options?.toast?.toast({ title: "Configuration Error", description: "API Key is missing.", variant: "destructive" });
-    return false;
-  }
-   if (!instanceId) {
-    console.error('Instance name/ID is missing.');
-     options?.toast?.toast({ title: "Error", description: "Instance name is required.", variant: "destructive" });
-    return false;
-  }
+  const url = `${serverUrl}/instance/logout/${instanceId}`;
 
   try {
     console.log(`Attempting to log out WhatsApp instance: ${instanceId}`);
+    
+    // Check for API key from the centralized config
+    const apiKey = evolutionApiKey;
+    
+    if (!apiKey) {
+      console.error('API key is missing from config.');
+      options?.toast?.toast({ title: "Configuration Error", description: "API Key is missing.", variant: "destructive" });
+      return false;
+    }
+    
+    if (!instanceId) {
+      console.error('Instance name/ID is missing.');
+      options?.toast?.toast({ title: "Error", description: "Instance name is required.", variant: "destructive" });
+      return false;
+    }
 
     const response = await fetch(url, {
-      method: 'DELETE', // Assuming DELETE method for logout
+      method: 'DELETE',
       headers: {
-        'apikey': evolutionApiKey,
+        'apikey': apiKey,
       },
     });
 
