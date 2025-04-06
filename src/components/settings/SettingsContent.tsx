@@ -32,7 +32,7 @@ export function SettingsContent({ section }: SettingsContentProps) {
 
   if (section === 'billing') {
     return (
-      <div className="p-8">
+      <div className="p-6 max-w-5xl mx-auto">
         <BillingStats />
       </div>
     );
@@ -40,7 +40,7 @@ export function SettingsContent({ section }: SettingsContentProps) {
 
   if (section === 'users') {
     return (
-      <div className="p-4">
+      <div className="p-6 max-w-5xl mx-auto">
         <DataTable columns={columns} data={users} />
       </div>
     );
@@ -52,14 +52,14 @@ export function SettingsContent({ section }: SettingsContentProps) {
 
   if (section === 'access') {
     return (
-      <div className="p-4">
+      <div className="p-6 max-w-5xl mx-auto">
         <ProfileAccessManagement />
       </div>
     );
   }
 
   return (
-    <div className="p-8">
+    <div className="p-6 max-w-5xl mx-auto">
       <h2 className="text-lg font-semibold">{section.charAt(0).toUpperCase() + section.slice(1)}</h2>
       <p className="text-muted-foreground">This section is under development.</p>
     </div>
