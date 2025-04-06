@@ -2,10 +2,16 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Plus, Settings2 } from "lucide-react";
+import { Plus, Settings2, Send, Printer, List, FileImport, FileExport, Search } from "lucide-react";
 import { AddLeadDialog } from "./AddLeadDialog";
 import { supabase } from "@/integrations/supabase/client";
 import { PipelineSetupDialog } from "./PipelineSetupDialog";
+import { 
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger
+} from "@/components/ui/dropdown-menu";
 
 interface LeadsHeaderProps {
   selectedPipelineId: string;
@@ -47,13 +53,44 @@ export function LeadsHeader({ selectedPipelineId }: LeadsHeaderProps) {
           <Input placeholder="Search leads..." className="w-[300px] pl-8" />
         </div>
         <div className="flex items-center gap-2">
-          <Button 
-            variant="outline"
-            onClick={() => setIsEditPipelineOpen(true)}
-          >
-            <Settings2 className="h-4 w-4 mr-2" />
-            Edit Pipeline
-          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline">
+                <Settings2 className="h-4 w-4 mr-2" />
+                Options
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56">
+              <DropdownMenuItem onClick={() => setIsAddLeadOpen(true)}>
+                <Send className="h-4 w-4 mr-2 text-blue-500" />
+                <span>New broadcast</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => setIsEditPipelineOpen(true)}>
+                <Settings2 className="h-4 w-4 mr-2 text-blue-500" />
+                <span>Edit pipeline</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem>
+                <Printer className="h-4 w-4 mr-2 text-gray-500" />
+                <span>Print</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem>
+                <List className="h-4 w-4 mr-2 text-gray-500" />
+                <span>List settings</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem>
+                <FileImport className="h-4 w-4 mr-2 text-gray-500" />
+                <span>Import</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem>
+                <FileExport className="h-4 w-4 mr-2 text-gray-500" />
+                <span>Export</span>
+              </DropdownMenuItem>
+              <DropdownMenuItem>
+                <Search className="h-4 w-4 mr-2 text-gray-500" />
+                <span>Find duplicates</span>
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
           <Button 
             onClick={() => setIsAddLeadOpen(true)}
             disabled={!initialStageId}
