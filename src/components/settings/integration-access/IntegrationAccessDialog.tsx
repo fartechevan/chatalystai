@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -67,18 +67,18 @@ export function IntegrationAccessDialog({
     queryFn: async () => {
       if (!integrationConfigId) return [];
 
-      // Explicitly join the profiles to fix the typecast issue
+      // We need to specify the exact column to use for the join
       const { data, error } = await supabase
         .from("profile_integration_access")
         .select(`
           id,
           profile_id,
-          profiles:profiles!inner(id, name, email, role)
+          profiles(id, name, email, role)
         `)
         .eq("integration_config_id", integrationConfigId);
           
       if (error) throw error;
-      return (data || []) as AccessRecord[];
+      return data as AccessRecord[];
     },
     enabled: !!integrationConfigId && open,
   });
@@ -162,7 +162,7 @@ export function IntegrationAccessDialog({
 
   // Filter out profiles that already have access
   const availableProfiles = profiles.filter(
-    profile => !accessList.some(access => access.profile_id === profile.id)
+    profile => !accessList?.some(access => access.profile_id === profile.id)
   );
 
   return (
@@ -218,12 +218,12 @@ export function IntegrationAccessDialog({
               <div className="flex items-center justify-center py-4">
                 <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
               </div>
-            ) : accessList.length === 0 ? (
+            ) : accessList?.length === 0 ? (
               <p className="text-sm text-muted-foreground py-2">No users have been granted access yet.</p>
             ) : (
               <ScrollArea className="h-[200px] pr-4">
                 <div className="space-y-2">
-                  {accessList.map(access => (
+                  {accessList?.map(access => (
                     <div
                       key={access.id}
                       className="flex items-center justify-between p-2 border rounded-md"

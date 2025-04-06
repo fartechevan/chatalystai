@@ -33,7 +33,7 @@ export function ProfileAccessManagement() {
   const { data: integrationConfigs = [], isLoading } = useQuery<IntegrationConfig[]>({
     queryKey: ["integration-configs-with-access"],
     queryFn: async () => {
-      // Explicitly join to profiles with the correct path
+      // Fix the join relationship by explicitly specifying the column
       const { data, error } = await supabase
         .from("integrations_config")
         .select(`
@@ -42,7 +42,7 @@ export function ProfileAccessManagement() {
           access:profile_integration_access (
             id,
             profile_id,
-            profiles:profiles!profile_id (name, email)
+            profiles (name, email)
           )
         `);
 
@@ -78,14 +78,14 @@ export function ProfileAccessManagement() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {integrationConfigs.length === 0 ? (
+                {integrationConfigs?.length === 0 ? (
                   <TableRow>
                     <TableCell colSpan={3} className="text-center py-4 text-muted-foreground">
                       No integrations configured
                     </TableCell>
                   </TableRow>
                 ) : (
-                  integrationConfigs.map((config) => (
+                  integrationConfigs?.map((config) => (
                     <TableRow key={config.id}>
                       <TableCell className="font-medium">
                         {config.integrations?.name || "Unknown Integration"}
