@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useQuery } from "@tanstack/react-query";
@@ -33,29 +32,20 @@ export function ProfileAccessManagement() {
   const { data: integrationConfigs = [], isLoading } = useQuery<IntegrationConfig[]>({
     queryKey: ["integration-configs-with-access"],
     queryFn: async () => {
-      // Using rpc function to get properly typed data
-      const { data, error } = await supabase.rpc('get_integration_configs_with_access');
-
-      if (error) {
-        console.error("Error fetching integration configs:", error);
-        
-        // Fallback to direct query
-        const { data: fallbackData, error: fallbackError } = await supabase
-          .from("integrations_config")
-          .select(`
+      // Using direct query instead of RPC
+      const { data, error } = await supabase
+        .from("integrations_config")
+        .select(`
+          id,
+          integrations:integration_id (id, name),
+          access:profile_integration_access (
             id,
-            integrations:integration_id (id, name),
-            access:profile_integration_access (
-              id,
-              profile_id,
-              profiles:profile_id (name, email)
-            )
-          `);
+            profile_id,
+            profiles:profile_id (name, email)
+          )
+        `);
 
-        if (fallbackError) throw fallbackError;
-        return fallbackData || [];
-      }
-
+      if (error) throw error;
       return data || [];
     },
   });

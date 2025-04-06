@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { useQuery } from "@tanstack/react-query";
@@ -67,28 +66,17 @@ export function IntegrationAccessDialog({
     queryFn: async () => {
       if (!integrationConfigId) return [];
 
-      // Using raw SQL query via rpc to overcome type limitations
-      const { data, error } = await supabase.rpc('get_integration_access_with_profiles', {
-        config_id: integrationConfigId
-      });
-
-      if (error) {
-        console.error("Error fetching access list:", error);
-        
-        // Fallback to a direct query with explicit casting
-        const { data: fallbackData, error: fallbackError } = await supabase
-          .from("profile_integration_access")
-          .select(`
-            id,
-            profile_id,
-            profiles:profile_id (id, name, email, role)
-          `)
-          .eq("integration_config_id", integrationConfigId);
+      // Direct query instead of RPC call
+      const { data, error } = await supabase
+        .from("profile_integration_access")
+        .select(`
+          id,
+          profile_id,
+          profiles:profile_id (id, name, email, role)
+        `)
+        .eq("integration_config_id", integrationConfigId);
           
-        if (fallbackError) throw fallbackError;
-        return fallbackData || [];
-      }
-
+      if (error) throw error;
       return data || [];
     },
     enabled: !!integrationConfigId && open,
@@ -101,11 +89,13 @@ export function IntegrationAccessDialog({
     setIsSubmitting(true);
 
     try {
-      // Using rpc call to insert record
-      const { error } = await supabase.rpc('grant_integration_access', {
-        profile_id_param: selectedProfileId,
-        config_id_param: integrationConfigId
-      });
+      // Direct insert instead of RPC call
+      const { error } = await supabase
+        .from('profile_integration_access')
+        .insert({
+          profile_id: selectedProfileId,
+          integration_config_id: integrationConfigId
+        });
 
       if (error) {
         if (error.code === "23505") {
@@ -144,10 +134,11 @@ export function IntegrationAccessDialog({
     setIsSubmitting(true);
 
     try {
-      // Using rpc call to delete record
-      const { error } = await supabase.rpc('revoke_integration_access', {
-        access_id_param: accessId
-      });
+      // Direct delete instead of RPC call
+      const { error } = await supabase
+        .from('profile_integration_access')
+        .delete()
+        .eq('id', accessId);
 
       if (error) throw error;
 
