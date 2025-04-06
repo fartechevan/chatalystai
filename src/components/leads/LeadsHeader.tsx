@@ -2,7 +2,7 @@
 import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Plus, Settings2, Send, Printer, List, FileImport, FileExport, Search } from "lucide-react";
+import { Plus, Settings2, Send, Printer, List, FileText, Search } from "lucide-react";
 import { AddLeadDialog } from "./AddLeadDialog";
 import { supabase } from "@/integrations/supabase/client";
 import { PipelineSetupDialog } from "./PipelineSetupDialog";
@@ -78,11 +78,11 @@ export function LeadsHeader({ selectedPipelineId }: LeadsHeaderProps) {
                 <span>List settings</span>
               </DropdownMenuItem>
               <DropdownMenuItem>
-                <FileImport className="h-4 w-4 mr-2 text-gray-500" />
+                <FileText className="h-4 w-4 mr-2 text-gray-500" />
                 <span>Import</span>
               </DropdownMenuItem>
               <DropdownMenuItem>
-                <FileExport className="h-4 w-4 mr-2 text-gray-500" />
+                <FileText className="h-4 w-4 mr-2 text-gray-500" />
                 <span>Export</span>
               </DropdownMenuItem>
               <DropdownMenuItem>
