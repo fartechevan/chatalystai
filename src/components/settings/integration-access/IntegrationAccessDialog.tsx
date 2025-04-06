@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { useQuery } from "@tanstack/react-query";
@@ -55,7 +56,7 @@ export function IntegrationAccessDialog({
         .order("name");
 
       if (error) throw error;
-      return data;
+      return data || [];
     },
     enabled: open,
   });
@@ -66,18 +67,18 @@ export function IntegrationAccessDialog({
     queryFn: async () => {
       if (!integrationConfigId) return [];
 
-      // Direct query instead of RPC call
+      // Explicitly join the profiles to fix the typecast issue
       const { data, error } = await supabase
         .from("profile_integration_access")
         .select(`
           id,
           profile_id,
-          profiles:profile_id (id, name, email, role)
+          profiles:profiles!inner(id, name, email, role)
         `)
         .eq("integration_config_id", integrationConfigId);
           
       if (error) throw error;
-      return data || [];
+      return (data || []) as AccessRecord[];
     },
     enabled: !!integrationConfigId && open,
   });

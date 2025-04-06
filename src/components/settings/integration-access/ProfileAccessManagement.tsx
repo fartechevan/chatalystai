@@ -1,3 +1,4 @@
+
 import React, { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useQuery } from "@tanstack/react-query";
@@ -32,7 +33,7 @@ export function ProfileAccessManagement() {
   const { data: integrationConfigs = [], isLoading } = useQuery<IntegrationConfig[]>({
     queryKey: ["integration-configs-with-access"],
     queryFn: async () => {
-      // Using direct query instead of RPC
+      // Explicitly join to profiles with the correct path
       const { data, error } = await supabase
         .from("integrations_config")
         .select(`
@@ -41,12 +42,12 @@ export function ProfileAccessManagement() {
           access:profile_integration_access (
             id,
             profile_id,
-            profiles:profile_id (name, email)
+            profiles:profiles!profile_id (name, email)
           )
         `);
 
       if (error) throw error;
-      return data || [];
+      return data as IntegrationConfig[] || [];
     },
   });
 
