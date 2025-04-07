@@ -1,9 +1,9 @@
 
 import { useState, useEffect } from "react";
 import { Integration } from "../../types";
-import { useWhatsAppConnection } from "./whatsapp/useWhatsAppConnection";
+import { useEvolutionApiConnection } from "@/integrations/evolution-api/hooks/useEvolutionApiConnection"; // Updated import path and hook name
 import { supabase } from "@/integrations/supabase/client";
-import { ConnectionState } from "./whatsapp/types";
+import { ConnectionState } from "@/integrations/evolution-api/types"; // Updated import path
 
 export function useIntegrationConnectionState(
   selectedIntegration: Integration | null, 
@@ -21,7 +21,7 @@ export function useIntegrationConnectionState(
     connectionState, 
     isLoading,
     checkCurrentConnectionState 
-  } = useWhatsAppConnection(selectedIntegration);
+  } = useEvolutionApiConnection(selectedIntegration); // Use updated hook name
 
   // Check connection status when the dialog is opened
   useEffect(() => {

@@ -8,8 +8,9 @@ import { IntegrationDialog } from "./integration-dialog/IntegrationDialog";
 import { IntegrationCard } from "./integration-card/IntegrationCard";
 import type { Integration } from "./types";
 import { useToast } from "@/hooks/use-toast";
-import checkInstanceStatus from "./integration-dialog/hooks/whatsapp/services/checkInstanceStatusService";
-import { evolutionApiKey } from "./integration-dialog/hooks/whatsapp/services/config";
+// Updated import path for checkInstanceStatus
+import { checkInstanceStatus } from "@/integrations/evolution-api/services/instanceStatusService"; 
+// Removed evolutionApiKey import as it's handled server-side
 
 interface IntegrationsViewProps {
   isActive: boolean; // Prop to control loading
@@ -94,14 +95,16 @@ export function IntegrationsView({ isActive }: IntegrationsViewProps) {
         const instanceId = configData.instance_id;
         console.log(`Checking status for instance ${instanceId} (Integration: ${integrationId})`);
 
-        const statusResult = await checkInstanceStatus(instanceId);
+        // Call the refactored service which returns the state directly
+        const connectionStateResult = await checkInstanceStatus(instanceId); 
 
-        if (statusResult && typeof statusResult === 'object' && 'state' in statusResult && !('error' in statusResult) && statusResult.state === 'open') {
+        console.log(`Status check result for ${instanceId}: ${connectionStateResult}`);
+
+        if (connectionStateResult === 'open') {
           console.log(`Instance ${instanceId} is connected.`);
           isConnected = true;
         } else {
-          const logMessage = (statusResult && typeof statusResult === 'object' && 'error' in statusResult) ? statusResult.error : `State: ${statusResult?.state}`;
-          console.log(`Instance ${instanceId} is not connected or error occurred:`, logMessage);
+          console.log(`Instance ${instanceId} is not connected (State: ${connectionStateResult}).`);
           isConnected = false;
         }
       } else {
@@ -123,10 +126,8 @@ export function IntegrationsView({ isActive }: IntegrationsViewProps) {
   const connectWhatsApp = async (integration: Integration) => {
     setSelectedIntegration(integration);
 
-    if (!evolutionApiKey) {
-       toast({ title: "Configuration Error", description: "Evolution API Key is missing in the application configuration.", variant: "destructive" });
-       return;
-    }
+    // Removed API key check as it's handled server-side
+    // if (!evolutionApiKey) { ... }
 
     const isCurrentlyConnected = await checkAndUpdateConnectionStatus(integration.id);
 
@@ -168,9 +169,10 @@ export function IntegrationsView({ isActive }: IntegrationsViewProps) {
       const instanceId = configData.instance_id;
       console.log(`Found instance ID: ${instanceId}. Configuration seems present.`);
 
-      console.log(`Storing credentials for connection attempt: InstanceID=${instanceId}, ApiKey=***`);
-      localStorage.setItem('instanceID', instanceId);
-      localStorage.setItem('apiKey', evolutionApiKey);
+      // Store only the instance ID locally if needed, API key is handled server-side
+      console.log(`Storing instance ID for connection attempt: InstanceID=${instanceId}`);
+      localStorage.setItem('instanceID', instanceId); 
+      // localStorage.setItem('apiKey', evolutionApiKey); // Removed API key storage
 
       toast({
           title: "Connection Needed",

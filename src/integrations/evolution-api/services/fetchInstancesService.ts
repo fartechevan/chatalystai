@@ -1,9 +1,47 @@
-
-// Import the centralized API key and server URL
-import { evolutionApiKey, evolutionServerUrl } from "./config";
+import { supabase } from "@/integrations/supabase/client"; // Import supabase client
 
 async function fetchInstances() {
-  // Use the imported key and URL
+  console.log("Fetching instances via Supabase function...");
+
+  try {
+    // Call the Supabase function 'fetch-whatsapp-instances'
+    const { data, error } = await supabase.functions.invoke('fetch-whatsapp-instances');
+
+    if (error) {
+      console.error('Error invoking Supabase function fetch-whatsapp-instances:', error);
+      // Type guard for Supabase Function error structure
+      let errorDetails = error.message;
+      if (typeof error === 'object' && error !== null && 'context' in error && typeof (error as { context: unknown }).context === 'object' && (error as { context: unknown }).context !== null && 'details' in (error as { context: { details: unknown } }).context) {
+          errorDetails = (error as { context: { details: string } }).context.details || error.message;
+      }
+      console.error("Function invocation error details:", errorDetails);
+      // Return an error object compatible with how the original function handled errors
+      return { error: `Failed to fetch instances via Supabase function: ${errorDetails}` };
+    }
+
+    console.log('Instances response from Supabase function:', data);
+
+    // Check if the function returned an error structure from the Evolution API call
+    if (data && data.error) {
+        console.error(`Evolution API returned an error via Supabase function: ${data.error}`, data);
+        return { error: `Evolution API error: ${data.error}`, details: data.details };
+    }
+
+    // Validate the structure - it should be an array based on original logic
+    if (Array.isArray(data)) {
+      return data; // Return the array of instances
+    } else {
+      console.error('Unexpected response format from Supabase function. Expected an array:', data);
+      return { error: 'Unexpected response format from server (expected array).' };
+    }
+
+  } catch (err) {
+    console.error('Error during fetchInstances service call:', err);
+    return { error: `Internal server error during fetch operation: ${(err as Error).message}` };
+  }
+
+  /* --- Original direct fetch logic (to be removed/refactored) --- */
+  /*
   const apiKey = evolutionApiKey;
   const serverUrl = evolutionServerUrl; // Use the URL from config
   const url = `${serverUrl}/instance/fetchInstances`;
@@ -70,6 +108,7 @@ async function fetchInstances() {
     // Generic fallback error
     return { error: 'Internal server error during fetch operation.' };
   }
+  */
 }
 
 // Ensure the function is exported as default

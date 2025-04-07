@@ -1,8 +1,7 @@
-
 /**
  * Local storage utilities for WhatsApp instances
  */
-import { WHATSAPP_INSTANCE } from "./config"; // Import the renamed key constant
+import { WHATSAPP_INSTANCE } from "./config"; // Correct path now
 
 /**
  * Get saved instance data from localStorage
