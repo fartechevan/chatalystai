@@ -50,6 +50,10 @@ serve(async (req: Request) => {
     // Construct the Evolution API URL
     const apiUrl = `${evolutionServerUrl}/instance/connect/${instanceId}`;
     console.log(`Supabase Function: Connecting to Evolution API: ${apiUrl}`);
+    // --- DEBUG LOGGING: Remove after troubleshooting ---
+    console.log(`Supabase Function: Using API Key: ${evolutionApiKey}`);
+    console.log(`Supabase Function: Using Instance ID: ${instanceId}`);
+    // --- END DEBUG LOGGING ---
 
     // Make the request to the Evolution API using the retrieved key
     const evoResponse = await fetch(apiUrl, {
@@ -63,8 +67,13 @@ serve(async (req: Request) => {
     // Check if the Evolution API request was successful
     if (!evoResponse.ok) {
       const errorText = await evoResponse.text();
-      console.error(`Evolution API error (${evoResponse.status}): ${errorText}`);
-      throw new Error(`Failed to connect to Evolution instance: ${evoResponse.statusText}`);
+      // Log the actual response body from Evolution API for better debugging
+      console.error(`Evolution API request failed with status ${evoResponse.status}. Response body: ${errorText}`);
+      // Return the specific error from Evolution API back to the frontend
+      return new Response(JSON.stringify({ error: `Evolution API Error (${evoResponse.status}): ${errorText}` }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+        status: evoResponse.status, // Use the status code from Evolution API
+      });
     }
 
     // Parse the JSON response from Evolution API
@@ -78,10 +87,12 @@ serve(async (req: Request) => {
     });
 
   } catch (error) {
-    console.error("Error in Supabase function:", error);
-    return new Response(JSON.stringify({ error: error.message }), {
+    // Catch errors like failing to fetch the API key or other unexpected issues
+    console.error("Error within Supabase function (connect-whatsapp):", error);
+    const errorMessage = error instanceof Error ? error.message : "Unknown internal server error.";
+    return new Response(JSON.stringify({ error: `Supabase Function Error: ${errorMessage}` }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
-      status: 500,
+      status: 500, // Internal server error for issues within the function itself
     });
   }
 });

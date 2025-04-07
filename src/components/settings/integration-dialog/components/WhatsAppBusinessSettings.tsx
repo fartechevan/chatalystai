@@ -1,4 +1,3 @@
-
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table";
@@ -93,15 +92,28 @@ export function WhatsAppBusinessSettings({ selectedIntegration, onConnect }: Wha
         // 2. Fetch all instances
         const allInstancesResult = await fetchInstances();
 
-        // Check if the result is NOT an array (indicating an error object was returned)
+        // Check if the result is NOT an array (indicating an error object was returned or unexpected type)
         if (!Array.isArray(allInstancesResult)) {
-          // Type assertion to help TypeScript understand it's the error object now
-          const errorResult = allInstancesResult as { error: string }; 
-          console.error('Error fetching instances list:', errorResult.error);
-          throw new Error(errorResult.error || 'Failed to fetch instances list.');
+            // Check if it's a non-null object first
+            if (allInstancesResult !== null && typeof allInstancesResult === 'object') {
+                // Now check if it has the 'error' property
+                if ('error' in allInstancesResult) {
+                    const errorResult = allInstancesResult as { error: string; details?: string };
+                    console.error('Error fetching instances list:', errorResult.error, errorResult.details);
+                    throw new Error(errorResult.error || 'Failed to fetch instances list.');
+                } else {
+                    // Handle object without 'error' property
+                    console.error('Received unexpected object format from fetchInstances:', allInstancesResult);
+                    throw new Error('Received unexpected object format when fetching instances.');
+                }
+            } else {
+                // Handle null, undefined, or other non-object types
+                console.error('Unexpected non-array/non-object response from fetchInstances:', allInstancesResult);
+                throw new Error('Received unexpected data format when fetching instances.');
+            }
         }
         
-        // If we reach here, allInstancesResult is confirmed to be an array
+        // If we reach here, allInstancesResult is confirmed to be a valid array
         console.log("Successfully fetched instances array:", allInstancesResult);
         
         // Log all IDs received from the API for debugging
@@ -267,14 +279,9 @@ export function WhatsAppBusinessSettings({ selectedIntegration, onConnect }: Wha
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {/* Render the single instance using the correct state structure */}
-                  <TableRow key={instanceDetails.id}> {/* Use instance id as key */}
-                    {/* Use profileName or name as Name */}
+                  <TableRow key={instanceDetails.id}>
                     <TableCell className="font-medium">{instanceDetails.profileName || instanceDetails.name}</TableCell>
-                    {/* Add Number cell if data exists */}
-                    {/* <TableCell>{instanceDetails.number || 'N/A'}</TableCell> */}
                     <TableCell>
-                      {/* Pipeline selection - functionality might need review */}
                       <select className="border rounded-md px-2 py-1">
                         <option>Default Pipeline</option>
                         {/* Add other pipeline options */}
