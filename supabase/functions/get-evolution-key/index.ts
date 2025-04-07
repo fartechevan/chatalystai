@@ -1,7 +1,8 @@
 
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
-import { corsHeaders } from "../_shared/cors.ts"
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+// Import SupabaseClient type along with createClient
+import { createClient, SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { corsHeaders } from "../_shared/cors.ts";
 
 serve(async (req) => {
   // Handle CORS
@@ -53,7 +54,8 @@ serve(async (req) => {
 });
 
 // Function to get API key from various sources with fallbacks
-async function getApiKey(supabaseClient: any): Promise<string | null> {
+// Use the imported SupabaseClient type
+async function getApiKey(supabaseClient: SupabaseClient): Promise<string | null> {
   // Try environment variable first (edge function secrets)
   const envApiKey = Deno.env.get("EVOLUTION_API_KEY");
   if (envApiKey) {
@@ -92,8 +94,7 @@ async function getApiKey(supabaseClient: any): Promise<string | null> {
     console.error("Vault access error:", vaultError);
   }
   
-  // Fallback to hard-coded API key
-  const DEFAULT_API_KEY = "d20770d7-312f-499a-b841-4b64a243f24c";
-  console.log("Using fallback default API key");
-  return DEFAULT_API_KEY;
+  // If key not found in any source, return null
+  console.error("API key not found in environment, database, or vault.");
+  return null; 
 }

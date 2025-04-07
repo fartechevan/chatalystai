@@ -71,6 +71,32 @@ export async function connectToInstance(
     console.error('Error during connectToInstance service call:', err);
     setConnectionState('close'); // Set state to closed on error
     // Rethrow or handle the error appropriately for the UI
-    throw err; // Propagate error to the calling hook
+    // Attempt to parse the detailed error from the Supabase function response
+    let detailedError = 'Unknown error during connection service call.';
+    if (err instanceof Error) {
+      detailedError = err.message; // Default to the basic error message
+      // Supabase function errors often have context or originalError properties
+      // Let's try to access the underlying error details if they exist
+      const functionError = (err as any).context || (err as any).originalError || err;
+      if (functionError?.message) {
+        detailedError = functionError.message;
+      }
+      // Sometimes the error message might be JSON stringified in the message
+      try {
+        const parsedMessage = JSON.parse(detailedError);
+        if (parsedMessage.error) {
+          detailedError = parsedMessage.error;
+        }
+      } catch (parseError) {
+        // Ignore if it's not JSON
+      }
+    }
+    
+    // Log the potentially more detailed error to the browser console
+    console.error('Detailed error from connectToInstance service:', detailedError, err); 
+    
+    setConnectionState('close'); // Set state to closed on error
+    // Rethrow the original error to maintain existing error handling flow in hooks
+    throw err; 
   }
 }
