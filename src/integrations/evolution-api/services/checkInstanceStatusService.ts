@@ -1,4 +1,3 @@
-
 // Import the centralized API key and server URL
 import { evolutionApiKey, evolutionServerUrl } from "./config";
 

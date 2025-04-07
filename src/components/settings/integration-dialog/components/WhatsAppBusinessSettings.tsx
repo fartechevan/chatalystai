@@ -7,11 +7,11 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import type { Integration } from "../../types";
-import { logoutWhatsAppInstance } from "../hooks/whatsapp/services/logoutService";
+import { logoutWhatsAppInstance } from "@/integrations/evolution-api/services/logoutService"; // Updated path
 // Import the service to fetch all instances
-import fetchInstances from "../hooks/whatsapp/services/fetchInstancesService";
-import { useWhatsAppConfig } from "../hooks/whatsapp/useWhatsAppConfig";
-import { WHATSAPP_INSTANCE } from "../hooks/whatsapp/services/config"; // Import the correct key constant
+import fetchInstances from "@/integrations/evolution-api/services/fetchInstancesService"; // Updated path
+import { useEvolutionApiConfig } from "@/integrations/evolution-api/hooks/useEvolutionApiConfig"; // Updated path and hook name
+import { WHATSAPP_INSTANCE } from "@/integrations/evolution-api/services/config"; // Updated path
 
 
 interface WhatsAppBusinessSettingsProps {
@@ -47,7 +47,7 @@ export function WhatsAppBusinessSettings({ selectedIntegration, onConnect }: Wha
   // Capture the full return object from useToast
   const toastUtils = useToast();
   const { toast } = toastUtils; // Keep destructuring for convenience if needed elsewhere
-  const { config } = useWhatsAppConfig(selectedIntegration); // Keep using this if needed for other config
+  const { config } = useEvolutionApiConfig(selectedIntegration); // Use updated hook name
 
   // Fetch configured WhatsApp instance details
   useEffect(() => {

@@ -1,11 +1,11 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
-import type { Integration } from "../../../types";
-import { evolutionApiKey } from "./services/config"; // Import the API key
+import type { Integration } from "@/components/settings/types"; // Correct path
+// Config import no longer needed as API key is handled server-side
+import type { EvolutionApiConfig } from "../types"; // Correct path
 
-export function useWhatsAppConfig(selectedIntegration: Integration | null) {
-  const { data: config, isLoading } = useQuery({
+export function useEvolutionApiConfig(selectedIntegration: Integration | null) {
+  const { data: config, isLoading } = useQuery<EvolutionApiConfig | null>({ // Use specific type
     queryKey: ['integration-config', selectedIntegration?.id],
     queryFn: async () => {
       if (!selectedIntegration?.id) return null;
@@ -27,33 +27,34 @@ export function useWhatsAppConfig(selectedIntegration: Integration | null) {
       console.log('Integration data:', integration);
       
       // Then fetch the configuration
-      const { data: config, error: configError } = await supabase
+      const { data: configData, error: configError } = await supabase
         .from('integrations_config')
         .select('id, integration_id, instance_id, user_reference_id')
         .eq('integration_id', selectedIntegration.id)
         .maybeSingle();
 
-      if (configError && configError.code !== 'PGRST116') {
+      if (configError && configError.code !== 'PGRST116') { // PGRST116: No rows found, which is okay
         console.error('Error fetching config:', configError);
         throw configError;
       }
 
-      console.log('Configuration data:', config);
+      console.log('Configuration data:', configData);
 
-      // If no config exists, return a default one with the integration's base_url
-      if (!config) {
+      // If no config exists, return a default one with the integration's base_url and API key
+      if (!configData) {
         console.log('No existing config found, returning default');
         return {
           integration_id: selectedIntegration.id,
           base_url: integration.base_url,
-          instance_id: '',
-          token: evolutionApiKey // Use imported API key from config file
+          instance_id: '', // Default empty instance_id
+          // token: evolutionApiKey // Token is handled server-side
         };
       }
 
       // Return the merged object with data from both tables
+      // Token is not included here as it's managed server-side
       return {
-        ...(config ?? {}),
+        ...(configData ?? {}),
         base_url: integration.base_url,
       };
     },
