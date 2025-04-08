@@ -1,46 +1,60 @@
-import { supabase } from "@/integrations/supabase/client";
 import type { ConnectionState } from "../types";
 
 /**
- * Check the status of a WhatsApp instance via the Supabase proxy function.
+ * Check the status of a WhatsApp instance directly using its token.
  * @param instanceId The ID of the instance to check.
+ * @param instanceToken The specific token for this instance.
+ * @param baseUrl The base URL for the Evolution API.
  * @returns Promise<ConnectionState> The connection state ('open', 'close', 'connecting', 'unknown').
  */
 export const checkInstanceStatus = async (
-  instanceId: string | null
+  instanceId: string | null,
+  instanceToken: string | null, // Token to use
+  baseUrl: string | null
 ): Promise<ConnectionState> => {
 
-  if (!instanceId) {
-    console.log('No valid instance ID provided for status check.');
+  // Token is now always required
+  if (!instanceId || !instanceToken || !baseUrl) {
+    console.log('Instance ID, Instance Token, and Base URL are required for status check.');
     return 'unknown';
   }
 
-  console.log(`Checking instance status for ${instanceId} via Supabase function 'check-whatsapp-status'...`);
+  console.log(`Checking instance status for ${instanceId}...`); // Removed integrationId log
 
   try {
-    // 1. Invoke the Supabase function, passing instanceId in the body
-    const { data, error } = await supabase.functions.invoke('check-whatsapp-status', {
-      body: { instanceId }, // Pass instanceId in the body
+    // 1. Construct the Evolution API URL
+    const apiUrl = `${baseUrl}/instance/connectionState/${instanceId}`;
+    console.log(`Frontend: Checking status directly via Evolution API: ${apiUrl}`);
+
+    // 2. Build headers using the provided token
+    const headers: HeadersInit = {
+      "Content-Type": "application/json",
+      "apikey": instanceToken, // Always use the provided token
+    };
+    console.log(`Frontend: Using provided token for status check.`);
+
+
+    // 3. Make the direct request to the Evolution API
+    const evoResponse = await fetch(apiUrl, {
+      method: "GET",
+      headers: headers,
     });
 
-    // 2. Handle errors from the function invocation itself
-    if (error) {
-      console.error('Error invoking check-whatsapp-status function:', error);
-      return 'unknown'; // Return 'unknown' on invocation error
+    // 4. Check if the Evolution API request was successful
+    if (!evoResponse.ok) {
+      // Log specific errors but return 'unknown' or 'close' based on status
+      const errorText = await evoResponse.text();
+      console.error(`Frontend: Evolution API status check failed (${evoResponse.status}): ${errorText}`);
+      // If 404 maybe instance deleted? Treat as 'close'. Otherwise 'unknown'.
+      return evoResponse.status === 404 ? 'close' : 'unknown';
     }
 
-    // 3. Check for errors returned *within* the function's response data
-    //    (e.g., if the function couldn't reach Evolution API or had config issues)
-    if (data && data.error) {
-        console.error('Error returned from check-whatsapp-status function:', data.error, data.details);
-        // Consider returning 'close' if the error indicates a connection issue,
-        // otherwise 'unknown' might be safer. Let's stick with 'unknown' for now.
-        return 'unknown';
-    }
+    // 5. Parse the JSON response from Evolution API
+    const result = await evoResponse.json();
+    console.log(`Status check response for ${instanceId}:`, result);
 
-    // 4. Determine connection state from the successful response data
-    const connectionStatus = data?.state; // Assuming response has a 'state' field
-    console.log(`Status check response via Supabase for ${instanceId}:`, data);
+    // 6. Determine connection state from the successful response data (nested under 'instance')
+    const connectionStatus = result?.instance?.state; // Access nested state
     console.log('Connection status detected:', connectionStatus);
 
     if (connectionStatus === 'open') {
@@ -53,8 +67,8 @@ export const checkInstanceStatus = async (
     }
 
   } catch (error) {
-    // Catch unexpected errors during the invocation process
-    console.error('Error during checkInstanceStatus service call (invoking Supabase function):', error);
+    // Catch errors from credential fetching or fetch itself
+    console.error(`Error during checkInstanceStatus service call for instance ${instanceId}:`, error);
     return 'unknown'; // Return 'unknown' on any exception
   }
 };

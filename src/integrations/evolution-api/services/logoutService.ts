@@ -1,6 +1,6 @@
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from "@/integrations/supabase/client"; // Keep for DB update
 import { useToast } from "@/hooks/use-toast";
-// Config import is no longer needed here as this will use a Supabase function
+import { getEvolutionCredentials } from "../utils/credentials"; // Import credential utility
 
 type LogoutOptions = {
   toast: ReturnType<typeof useToast>;
@@ -14,46 +14,47 @@ type LogoutOptions = {
  * @returns Promise<boolean> Whether the logout was successful
  */
 export async function logoutWhatsAppInstance(
-  instanceId: string,
+  instanceId: string | null, // Allow null for safety, check below
+  integrationId: string | null, // Add integrationId
   onSuccess?: () => void,
   options?: LogoutOptions
 ): Promise<boolean> {
-  // TODO: Refactor this service to call a Supabase function
-  // The Supabase function will handle fetching the API key and calling the Evolution API.
-  console.warn("logoutWhatsAppInstance needs refactoring to use a Supabase function.");
 
-  if (!instanceId) {
-      console.error('Instance name/ID is missing.');
-      options?.toast?.toast({ title: "Error", description: "Instance name is required.", variant: "destructive" });
+  if (!instanceId || !integrationId) {
+      console.error('Instance ID and Integration ID are required for logout.');
+      options?.toast?.toast({ title: "Error", description: "Instance and Integration ID are required.", variant: "destructive" });
       return false;
   }
 
-  // Placeholder implementation removed, now calling the actual function
+  console.log(`Attempting to log out instance ${instanceId} (Integration: ${integrationId})...`);
+
   try {
-    // Call the Supabase function 'logout-whatsapp'
-    const { data, error: funcError } = await supabase.functions.invoke('logout-whatsapp', {
-      body: { instanceId }
+    // 1. Fetch credentials
+    const { apiKey, baseUrl } = await getEvolutionCredentials(integrationId);
+
+    // 2. Construct the Evolution API URL
+    const apiUrl = `${baseUrl}/instance/logout/${instanceId}`;
+    console.log(`Frontend: Logging out directly via Evolution API: ${apiUrl}`);
+
+    // 3. Make the direct request to the Evolution API
+    const evoResponse = await fetch(apiUrl, {
+      method: "DELETE", // Use DELETE method for logout
+      headers: {
+        "apikey": apiKey,
+      },
     });
 
-    if (funcError) {
-        console.error('Error invoking Supabase function logout-whatsapp:', funcError);
-        // Type guard for Supabase Function error structure
-        let errorDetails = funcError.message;
-        if (typeof funcError === 'object' && funcError !== null && 'context' in funcError && typeof (funcError as { context: unknown }).context === 'object' && (funcError as { context: unknown }).context !== null && 'details' in (funcError as { context: { details: unknown } }).context) {
-            errorDetails = (funcError as { context: { details: string } }).context.details || funcError.message;
-        }
-        throw new Error(`Failed to invoke logout function: ${errorDetails}`);
-    }
-    
-    // Check if the function itself indicated an issue (e.g., Evolution API error)
-    if (data && data.error) {
-        console.error(`Logout function reported an error: ${data.error}`, data);
-        throw new Error(data.error);
+    // 4. Check if the Evolution API request was successful
+    if (!evoResponse.ok) {
+      const errorText = await evoResponse.text();
+      console.error(`Frontend: Evolution API logout failed (${evoResponse.status}): ${errorText}`);
+      throw new Error(`Evolution API Logout Error (${evoResponse.status}): ${errorText}`);
     }
 
-    console.log(`Logout successful for WhatsApp instance ${instanceId}.`);
+    // 5. Logout successful - API call succeeded
+    console.log(`Logout API call successful for WhatsApp instance ${instanceId}.`);
 
-    // Clean up the integrations_config table
+    // 6. Clean up the integrations_config table (Keep this logic)
     const { error: dbError } = await supabase
       .from('integrations_config')
       .update({ instance_id: null }) // Assuming nullifying is the desired action

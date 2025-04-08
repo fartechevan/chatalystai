@@ -6,8 +6,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { ConnectionState } from "@/integrations/evolution-api/types"; // Updated import path
 
 export function useIntegrationConnectionState(
-  selectedIntegration: Integration | null, 
-  open: boolean
+  selectedIntegration: Integration | null,
+  open: boolean,
+  // Add the new callback parameter
+  onConnectionEstablished?: () => void // Make it optional for safety
 ) {
   const [showDeviceSelect, setShowDeviceSelect] = useState(false);
   const [integrationMainPopup, setIntegrationMainPopup] = useState(true);
@@ -31,18 +33,30 @@ export function useIntegrationConnectionState(
   }, [open, selectedIntegration, checkCurrentConnectionState]);
 
   useEffect(() => {
+    // Log whenever this effect runs due to dependency changes
+    console.log(`[useIntegrationConnectionState Effect] connectionState: ${connectionState}, integrationQRPopup: ${integrationQRPopup}`);
+
     if (connectionState === 'open' && integrationQRPopup) {
       // Close QR popup when connection is established
+      console.log("--> Condition met: Closing QR popup and setting main popup."); // Add specific log
       setIntegrationQRPopup(false);
       setIntegrationMainPopup(true);
       setIsConnected(true);
+
+      // Call the callback function passed from IntegrationDialog
+      if (onConnectionEstablished) {
+        console.log("--> Calling onConnectionEstablished callback.");
+        onConnectionEstablished(); // This should trigger handleDialogChange(false) indirectly
+      }
       
       // Update the integration connection status in the database
       if (selectedIntegration) {
         updateIntegrationStatus(selectedIntegration.id);
       }
     }
-  }, [connectionState, integrationQRPopup, selectedIntegration]);
+    // Add onConnectionEstablished to dependency array if it's expected to change,
+    // but handleDialogChange is likely stable. Let's omit it for now.
+  }, [connectionState, integrationQRPopup, selectedIntegration, onConnectionEstablished]);
   
   const updateIntegrationStatus = async (integrationId: string) => {
     try {
@@ -82,7 +96,7 @@ export function useIntegrationConnectionState(
     setIntegrationMainPopup(false);
   };
 
-  const handleIPhoneSelect = async () => {
+  const handleDeviceSelect = async () => { // Renamed function
     const success = await connectToInstance();
     if (success) {
       setShowDeviceSelect(false);
@@ -104,6 +118,6 @@ export function useIntegrationConnectionState(
     connectionState,
     isLoading,
     handleConnect,
-    handleIPhoneSelect
+    handleDeviceSelect // Renamed in return object
   };
 }
