@@ -49,8 +49,9 @@ export function IntegrationDialog({
     connectionState,
     isLoading,
     handleConnect,
-    handleIPhoneSelect
-  } = useIntegrationConnectionState(selectedIntegration, open);
+    handleDeviceSelect // Renamed destructured function
+    // Note: handleDialogChange is defined below, so we pass it here
+  } = useIntegrationConnectionState(selectedIntegration, open, () => handleDialogChange(false)); // Pass a callback that calls handleDialogChange
 
   const handleDialogChange = (open: boolean) => {
     if (!open) {
@@ -95,7 +96,7 @@ export function IntegrationDialog({
           setShowDeviceSelect(false);
           setIntegrationMainPopup(true);
         }}
-        onIPhoneSelect={handleIPhoneSelect}
+        onDeviceSelect={handleDeviceSelect} // Renamed prop name to match definition
       />
     );
   }

@@ -6,14 +6,14 @@ interface DeviceSelectProps {
   open: boolean;
   onClose: () => void;
   onOpenChange: (open: boolean) => void;
-  onIPhoneSelect: () => void;
+  onDeviceSelect: () => void; // Renamed prop
 }
 
 export function DeviceSelect({ 
   open, 
   onClose, 
   onOpenChange, 
-  onIPhoneSelect 
+  onDeviceSelect // Renamed prop
 }: DeviceSelectProps) {
   return (
     <BaseDialog
@@ -36,7 +36,7 @@ export function DeviceSelect({
             variant="outline" 
             size="lg"
             className="w-full py-8 text-lg"
-            onClick={onIPhoneSelect}
+            onClick={onDeviceSelect} // Use renamed prop
           >
             Android
           </Button>
@@ -44,7 +44,7 @@ export function DeviceSelect({
             variant="outline" 
             size="lg"
             className="w-full py-8 text-lg"
-            onClick={onIPhoneSelect}
+            onClick={onDeviceSelect} // Use renamed prop
           >
             iPhone
           </Button>

@@ -1,13 +1,13 @@
-import { supabase } from "@/integrations/supabase/client"; // Import supabase client
 // Config import is no longer needed here as this will use a Supabase function
 // Assuming getEvolutionURL might be needed if serverUrl isn't always passed
 // import { getEvolutionURL } from "@/integrations/supabase/client";
+import { getEvolutionCredentials } from "../utils/credentials"; // Import credential utility
 
 
 interface SendTextParams {
-  serverUrl: string; // Keep allowing specific server URL override if needed
+  // serverUrl: string; // Remove serverUrl, will be fetched via credentials
   instance: string;
-  // apiKey: string; // Remove apiKey from params
+  integrationId: string; // Add integrationId to fetch credentials
   number: string; // Recipient's phone number
   text: string; // The message text
   // Optional parameters based on the curl example
@@ -37,20 +37,27 @@ interface SendTextResponse {
  * @returns A promise that resolves with the API response.
  * @throws {Error} If the request fails.
  */
-// Update function signature to remove apiKey from destructuring
 export const sendTextService = async (params: SendTextParams): Promise<SendTextResponse> => {
-  const { instance, number, text, ...optionalData } = params; // Removed serverUrl from destructuring
+  // Destructure all params including integrationId
+  const { instance, integrationId, number, text, ...optionalData } = params;
 
   // TODO: Refactor this service to call a Supabase function
   // The Supabase function will handle fetching the API key and server URL,
   // and calling the Evolution API.
   console.warn("sendTextService needs refactoring to use a Supabase function.");
 
-  // Placeholder implementation removed, now calling the actual function
   try {
-     const payload = {
-       number,
-       text,
+    // 1. Fetch credentials
+    const { apiKey, baseUrl } = await getEvolutionCredentials(integrationId);
+
+    // 2. Construct the Evolution API URL
+    const apiUrl = `${baseUrl}/message/sendText/${instance}`;
+    console.log(`Frontend: Sending text directly via Evolution API: ${apiUrl}`);
+
+    // 3. Construct the payload (keeping existing logic for options)
+    const payload = {
+      number,
+      text,
        // Construct options object based on Evolution API structure if optional params exist
        options: {
          ...(optionalData.delay !== undefined && { delay: optionalData.delay }),
@@ -65,38 +72,44 @@ export const sendTextService = async (params: SendTextParams): Promise<SendTextR
          ...(optionalData.quoted && { quoted: optionalData.quoted }),
        }
      };
-     // Remove options if it's empty after construction
-     if (Object.keys(payload.options).length === 0) {
-         delete payload.options;
-     }
-
-    // Call the Supabase function 'send-whatsapp-text'
-    const { data: responseData, error } = await supabase.functions.invoke('send-whatsapp-text', {
-      body: { instanceId: instance, payload: payload } // Pass instanceId and the constructed payload
-    });
-
-    if (error) {
-      console.error('Error invoking Supabase function send-whatsapp-text:', error);
-      let errorDetails = error.message;
-       if (typeof error === 'object' && error !== null && 'context' in error && typeof (error as { context: unknown }).context === 'object' && (error as { context: unknown }).context !== null && 'details' in (error as { context: { details: unknown } }).context) {
-           errorDetails = (error as { context: { details: string } }).context.details || error.message;
-       }
-      throw new Error(`Failed to invoke send text function: ${errorDetails}`);
+    // Remove options if it's empty
+    if (Object.keys(payload.options).length === 0) {
+        delete payload.options;
     }
 
-     // Check if the function returned an error structure from the Evolution API call
-     if (responseData && responseData.error) {
-         console.error(`Send text function reported an error: ${responseData.error}`, responseData);
-         throw new Error(responseData.error);
-     }
+    // 4. Make the direct request to the Evolution API
+    const evoResponse = await fetch(apiUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "apikey": apiKey,
+      },
+      body: JSON.stringify(payload),
+    });
 
-    console.log(`Send text successful for ${number} via instance ${instance}`);
-    return responseData as SendTextResponse; // Cast as the expected response type
+    // 5. Check if the Evolution API request was successful
+    if (!evoResponse.ok) {
+      const errorText = await evoResponse.text();
+      console.error(`Frontend: Evolution API send text failed (${evoResponse.status}): ${errorText}`);
+      // Try to parse error details if JSON
+      let details = errorText;
+      try {
+        const jsonError = JSON.parse(errorText);
+        details = jsonError.message || jsonError.error || details;
+      } catch (e) { /* Ignore parsing error */ }
+      throw new Error(`Evolution API Send Text Error (${evoResponse.status}): ${details}`);
+    }
+
+    // 6. Parse and return the successful response
+    const result = await evoResponse.json() as SendTextResponse;
+    console.log(`Frontend: Send text successful for ${number} via instance ${instance}. Response:`, result);
+    return result;
 
   } catch (error) {
-     throw new Error(
-       `Error sending text message: ${error instanceof Error ? error.message : String(error)}`
-     );
+    // Catch errors from credential fetching or fetch itself
+    console.error(`Error during sendTextService call for instance ${instance}:`, error);
+    // Rethrow the error to be handled by the caller
+    throw error;
   }
   /* --- Original direct fetch logic (to be removed/refactored) --- */
   /*

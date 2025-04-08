@@ -1,43 +1,64 @@
-import { supabase } from "@/integrations/supabase/client"; 
+import { EvolutionInstance } from '../types'; // Corrected import path
+import { getEvolutionCredentials } from '../utils/credentials'; // Import the shared utility
 
-async function fetchInstances() {
-  console.log("Fetching instances via Supabase function 'fetch-whatsapp-instances'...");
+/**
+ * Fetches the list of Evolution API instances for a given integration.
+ * @param integrationId - The ID of the Evolution API integration.
+ * @returns A promise that resolves to an array of Evolution instances.
+ * @throws If fetching credentials or calling the Evolution API fails.
+ */
+export async function fetchEvolutionInstances(integrationId: string): Promise<EvolutionInstance[]> {
+  console.log(`--- fetchEvolutionInstances: Starting for integration ${integrationId} ---`);
+
+  if (!integrationId) {
+    throw new Error("Integration ID is required to fetch instances.");
+  }
 
   try {
-    // 1. Invoke the Supabase function
-    const { data, error } = await supabase.functions.invoke('fetch-whatsapp-instances');
+    // 1. Get Evolution API credentials from the database (via Supabase client)
+    const { apiKey, baseUrl } = await getEvolutionCredentials(integrationId);
 
-    // 2. Handle errors from the function invocation itself
-    if (error) {
-      console.error('Error invoking fetch-whatsapp-instances function:', error);
-      // Return an error object compatible with how the component expects errors
-      return { error: `Failed to invoke Supabase function: ${error.message}` };
+    // 2. Construct the Evolution API URL
+    const fetchUrl = `${baseUrl}/instance/fetchInstances`;
+    console.log(`--- fetchEvolutionInstances: Fetching from Evolution API: ${fetchUrl} ---`);
+
+    // 3. Make the request to the Evolution API
+    const response = await fetch(fetchUrl, {
+      method: 'GET',
+      headers: {
+        'apikey': apiKey,
+        'Content-Type': 'application/json',
+      },
+    });
+
+    console.log(`--- fetchEvolutionInstances: Evolution API response status: ${response.status} ---`);
+
+    // 4. Handle potential errors from the Evolution API
+    if (!response.ok) {
+      let errorText = `Status: ${response.status} ${response.statusText}`;
+      try {
+        const errorJson = await response.json();
+        // Check for common Evolution API error structures
+        const detail = errorJson.message || errorJson.error || JSON.stringify(errorJson);
+        errorText += ` - ${detail}`;
+      } catch (e) {
+        // Fallback if response is not JSON
+        errorText += ` - ${await response.text()}`;
+      }
+      console.error(`--- fetchEvolutionInstances: Error from Evolution API: ${errorText} ---`);
+      throw new Error(`Failed to fetch instances from Evolution API: ${errorText}`);
     }
 
-    // 3. Check for errors returned *within* the function's response data
-    //    (e.g., if the function couldn't reach Evolution API or had config issues)
-    if (data && data.error) {
-        console.error('Error returned from fetch-whatsapp-instances function:', data.error);
-        return { error: `Server-side error: ${data.error}` };
-    }
+    // 5. Parse the JSON response
+    const instances: EvolutionInstance[] = await response.json();
+    console.log(`--- fetchEvolutionInstances: Successfully fetched ${instances.length} instances ---`);
 
-    // 4. Validate the structure - it should be an array (or handle the case where it's not)
-    if (Array.isArray(data)) {
-      console.log("Successfully fetched instances array via Supabase function:", data);
-      return data; // Return the array of instances
-    } else {
-      // This case might indicate an unexpected successful response format from the function
-      console.error('Unexpected response format from Supabase function. Expected an array:', data);
-      return { error: 'Unexpected response format received from server (expected array).' };
-    }
+    // 6. Return the result
+    return instances;
 
   } catch (error) {
-    // Catch unexpected errors during the invocation process
-    console.error('Error during fetchInstances service call (invoking Supabase function):', error);
-    const errorMessage = (error instanceof Error) ? error.message : 'An unknown error occurred';
-    return { error: `Internal error during Supabase function invocation: ${errorMessage}` };
+    console.error(`--- fetchEvolutionInstances: Error during execution for integration ${integrationId} ---`, error);
+    // Re-throw the error to be handled by the caller
+    throw error;
   }
 }
-
-// Ensure the function is exported as default
-export default fetchInstances;
