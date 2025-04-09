@@ -1,6 +1,28 @@
 
-import { SupabaseClient, createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { findOrCreateCustomer } from "./customerHandler.ts";
+
+// Define minimal types for Supabase query results within this function
+type ConversationQueryResult = {
+  conversation_id: string;
+  lead_id: string | null;
+  integrations_id: string | null;
+};
+
+type ParticipantQueryResult = {
+  id: string;
+  role: 'admin' | 'member';
+  conversation_id: string;
+  external_user_identifier: string | null;
+  customer_id: string | null;
+};
+
+// Define a type for the config object based on usage
+interface WebhookConfig {
+  id: string; // Still seems to be used for logging
+  integration_id: string;
+  user_reference_id?: string;
+}
 
 /**
  * Finds an existing conversation or creates a new one with its participants
@@ -8,7 +30,7 @@ import { findOrCreateCustomer } from "./customerHandler.ts";
 export async function findOrCreateConversation(
   supabaseClient: SupabaseClient,
   remoteJid: string,
-  config: any,
+  config: WebhookConfig,
   fromMe: boolean,
   customerId: string | null
 ): Promise<{ appConversationId: string | null; participantId: string | null }> {
@@ -27,12 +49,16 @@ export async function findOrCreateConversation(
     // 1. Check if a conversation exists for this specific remoteJid and integration config
     const { data: existingConversations, error: conversationError } = await supabaseClient
       .from('conversations')
-      .select(`
+      .select<`
         conversation_id,
         lead_id,
-        integrations_config_id
+        integrations_id
+      `, ConversationQueryResult[]>(`
+        conversation_id,
+        lead_id,
+        integrations_id
       `)
-      .eq('integrations_config_id', config.id);
+      .eq('integrations_id', config.integration_id); // Assuming config now holds integration_id
 
     if (conversationError) {
       console.error('Error finding existing conversations:', conversationError);
@@ -42,13 +68,13 @@ export async function findOrCreateConversation(
     console.log(`Found ${existingConversations?.length || 0} potential conversations for config ID ${config.id}`);
 
     // Find conversation with a member participant matching this remoteJid/phoneNumber
-    let matchingConversation = null;
+    let matchingConversation: ConversationQueryResult | null = null; // Explicitly type here
     if (existingConversations && existingConversations.length > 0) {
       for (const conv of existingConversations) {
         // Query conversation participants to find a matching member
         const { data: conversationParticipants, error: participantsError } = await supabaseClient
           .from('conversation_participants')
-          .select('*')
+          .select<`*`, ParticipantQueryResult[]>(`*`)
           .eq('conversation_id', conv.conversation_id)
           .eq('role', 'member')
           .eq('external_user_identifier', phoneNumber);
@@ -71,12 +97,12 @@ export async function findOrCreateConversation(
       console.log(`Using existing conversation ${appConversationId} for ${remoteJid}`);
 
       // Determine participant ID based on message sender
-      let participantRole = fromMe ? 'admin' : 'member';
+      const participantRole = fromMe ? 'admin' : 'member';
       
       // Query conversation participants to find the appropriate participant ID
       const { data: participants, error: participantError } = await supabaseClient
         .from('conversation_participants')
-        .select('id, role')
+        .select<'id, role', { id: string; role: 'admin' | 'member' }[]>('id, role')
         .eq('conversation_id', matchingConversation.conversation_id)
         .eq('role', participantRole);
 
@@ -103,9 +129,9 @@ export async function findOrCreateConversation(
     const { data: appConversation, error: appConversationError } = await supabaseClient
       .from('conversations')
       .insert({
-        integrations_config_id: config.id,
+        integrations_id: config.integration_id, // Assuming config now holds integration_id
       })
-      .select();
+      .select<"conversation_id, lead_id, integrations_id", ConversationQueryResult[]>("conversation_id, lead_id, integrations_id"); // Explicit columns in select
 
     if (appConversationError) {
       console.error('Error creating app conversation:', appConversationError);
@@ -130,7 +156,7 @@ export async function findOrCreateConversation(
           role: 'admin',
           external_user_identifier: config.user_reference_id, // Use external_user_identifier for admin
         })
-        .select();
+        .select<"id, role, conversation_id, external_user_identifier, customer_id", ParticipantQueryResult[]>("id, role, conversation_id, external_user_identifier, customer_id"); // Explicit columns
 
       if (adminParticipantError) {
         console.error('Error creating admin participant:', adminParticipantError);
@@ -143,15 +169,15 @@ export async function findOrCreateConversation(
     }
 
     // 2.3 Create member participant (the WhatsApp contact)
-    const { data: memberParticipant, error: memberParticipantError } = await supabaseClient
-      .from('conversation_participants')
-      .insert({
+      const { data: memberParticipant, error: memberParticipantError } = await supabaseClient
+        .from('conversation_participants')
+        .insert({
         conversation_id: appConversationId,
         role: 'member',
         external_user_identifier: phoneNumber,
-        customer_id: customerId,
-      })
-      .select();
+          customer_id: customerId,
+        })
+        .select<"id, role, conversation_id, external_user_identifier, customer_id", ParticipantQueryResult[]>("id, role, conversation_id, external_user_identifier, customer_id"); // Explicit columns
 
     if (memberParticipantError) {
       console.error('Error creating member participant:', memberParticipantError);

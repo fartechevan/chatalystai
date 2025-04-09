@@ -1,53 +1,52 @@
 
-import { supabase } from "@/integrations/supabase/client";
-import type { WhatsAppMessageRequest, WhatsAppMessageResponse } from "./types";
+// Removed unused supabase import
+import { sendTextService, SendTextParams, SendTextResponse } from "@/integrations/evolution-api/services/sendTextService"; // Import service and types
+import type { WhatsAppMessageResponse } from "./types"; // Keep response type if still relevant
 
 /**
- * Sends a WhatsApp message through the integrations edge function
+ * Sends a WhatsApp message using the Evolution API sendTextService.
  */
 export async function sendWhatsAppMessage(
   instanceId: string,
   recipient: string,
   message: string,
-  integrationsConfigId: string
+  integrationsId: string // Changed parameter name
 ): Promise<WhatsAppMessageResponse> {
   try {
-    console.log(`Sending WhatsApp message via edge function. InstanceId: ${instanceId}, Recipient: ${recipient}, integrationsConfigId: ${integrationsConfigId}`);
+    console.log(`Sending WhatsApp message via sendTextService. InstanceId: ${instanceId}, Recipient: ${recipient}, IntegrationId: ${integrationsId}`);
 
     // Extract phone number without the @c.us suffix if present
     const phoneNumber = recipient.includes('@') ? recipient.split('@')[0] : recipient;
 
-    console.log('Phone number being sent to edge function:', phoneNumber);
-    
-    const payload: WhatsAppMessageRequest = {
-      instanceId: instanceId,
+    console.log('Phone number being sent to service:', phoneNumber);
+
+    // Prepare payload for the sendTextService
+    const servicePayload: SendTextParams = {
+      instance: instanceId,
+      integrationId: integrationsId, // Use the new integrationsId
       number: phoneNumber,
-      text: message
+      text: message,
+      // Add any other optional params from SendTextParams if needed later
     };
-    
-    console.log('WhatsApp API request payload:', payload);
-    
-    // TODO: Replace with local whatsapp/services function (e.g., sendTextService)
-    // const { data, error } = await supabase.functions.invoke('integrations/message/sendText', {
-    //   body: payload
-    // });
-    const data: unknown = null; const error = new Error("Supabase function call commented out."); // Placeholder
 
-    console.log('WhatsApp API response:', data, error);
+    console.log('sendTextService request payload:', servicePayload);
 
-    if (error) {
-      console.error('Error sending WhatsApp message:', error);
-      throw new Error(error.message || 'Failed to send WhatsApp message');
-    }
+    // Call the local service function
+    const responseData: SendTextResponse = await sendTextService(servicePayload);
 
+    console.log('sendTextService response:', responseData);
+
+    // Assuming sendTextService throws on error, we just need to return success format
+    // If sendTextService returns an error object, adjust handling here
     return {
       success: true,
-      data: data
+      data: responseData // Pass the response data from the service
     };
+
   } catch (error: unknown) {
-    console.error('Error invoking edge function:', error);
+    console.error('Error calling sendTextService:', error);
     // Check if error is an instance of Error to safely access message
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error sending message';
     return {
       success: false,
       error: errorMessage

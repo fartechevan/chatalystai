@@ -1,6 +1,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { Loader2 } from "lucide-react";
+import { UseMutationResult } from "@tanstack/react-query";
 
 import type { Conversation, Message as MessageType } from "./types";
 import { ConversationHeader } from "./ConversationHeader";
@@ -14,8 +15,8 @@ interface ConversationMainAreaProps {
   newMessage: string;  // Changed to string type
   setNewMessage: (message: string) => void; // Kept as function
   handleSendMessage: () => void;
-  sendMessageMutation: any;
-  summarizeMutation: any;
+  sendMessageMutation: UseMutationResult<void, Error, string, unknown>; // Assuming string input, void result
+  summarizeMutation: UseMutationResult<void, Error, string, unknown>; // Assuming string (conversationId) input, void result
   summary: string | undefined;
   summaryTimestamp: string | undefined;
 }
@@ -35,7 +36,7 @@ export function ConversationMainArea({
   const [isSummarized, setIsSummarized] = useState(!!summary);
 
   // Determine if this conversation is a WhatsApp conversation
-  const isWhatsAppConversation = selectedConversation?.integrations_config_id ? true : false;
+  const isWhatsAppConversation = selectedConversation?.integrations_id ? true : false;
 
   return (
     <div className={`flex-1 flex flex-col min-h-0 border-r border-l relative ${!selectedConversation ? 'items-center justify-center' : ''}`}>

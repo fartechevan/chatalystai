@@ -4,7 +4,7 @@
 import { getEvolutionCredentials } from "../utils/credentials"; // Import credential utility
 
 
-interface SendTextParams {
+export interface SendTextParams { // Add export
   // serverUrl: string; // Remove serverUrl, will be fetched via credentials
   instance: string;
   integrationId: string; // Add integrationId to fetch credentials
@@ -21,7 +21,7 @@ interface SendTextParams {
   };
 }
 
-interface SendTextResponse {
+export interface SendTextResponse { // Add export
   // Define the expected success response structure from the API if known
   // Define the expected success response structure from the API if known
   // Example:
@@ -41,10 +41,7 @@ export const sendTextService = async (params: SendTextParams): Promise<SendTextR
   // Destructure all params including integrationId
   const { instance, integrationId, number, text, ...optionalData } = params;
 
-  // TODO: Refactor this service to call a Supabase function
-  // The Supabase function will handle fetching the API key and server URL,
-  // and calling the Evolution API.
-  console.warn("sendTextService needs refactoring to use a Supabase function.");
+  // Removed warning about refactoring as direct call is intended.
 
   try {
     // 1. Fetch credentials
@@ -54,28 +51,52 @@ export const sendTextService = async (params: SendTextParams): Promise<SendTextR
     const apiUrl = `${baseUrl}/message/sendText/${instance}`;
     console.log(`Frontend: Sending text directly via Evolution API: ${apiUrl}`);
 
-    // 3. Construct the payload (keeping existing logic for options)
-    const payload = {
-      number,
-      text,
-       // Construct options object based on Evolution API structure if optional params exist
-       options: {
-         ...(optionalData.delay !== undefined && { delay: optionalData.delay }),
-         ...(optionalData.linkPreview !== undefined && { linkPreview: optionalData.linkPreview }),
-         // Construct mentions object only if needed
-         ...((optionalData.mentionsEveryOne || optionalData.mentioned) && {
-             mentions: {
-                 ...(optionalData.mentionsEveryOne && { everyOne: true }),
-                 ...(optionalData.mentioned && { mentioned: optionalData.mentioned }),
-             }
-         }),
-         ...(optionalData.quoted && { quoted: optionalData.quoted }),
-       }
-     };
-    // Remove options if it's empty
-    if (Object.keys(payload.options).length === 0) {
-        delete payload.options;
+    // 3. Construct the payload using logic similar to the edge function
+    // Define a type for the payload structure locally if needed, or use 'any' carefully
+    const evolutionPayload: {
+        number: string;
+        text: string;
+        options?: {
+            delay?: number;
+            linkPreview?: boolean;
+            mentions?: {
+                everyOne?: boolean;
+                mentioned?: string[];
+            };
+            quoted?: { key: { id: string }; message: { conversation: string } };
+        };
+    } = {
+        number,
+        text,
+        // Construct options object only if optional params exist
+        ...(Object.keys(optionalData).length > 0 && {
+            options: {
+                ...(optionalData.delay !== undefined && { delay: optionalData.delay }),
+                ...(optionalData.linkPreview !== undefined && { linkPreview: optionalData.linkPreview }),
+                // Construct mentions object only if needed and correctly structured
+                ...((optionalData.mentionsEveryOne || optionalData.mentioned) && {
+                    mentions: {
+                        ...(optionalData.mentionsEveryOne === true && { everyOne: true }), // Ensure boolean check
+                        ...(optionalData.mentioned && optionalData.mentioned.length > 0 && { mentioned: optionalData.mentioned }), // Ensure array has items
+                    }
+                }),
+                ...(optionalData.quoted && { quoted: optionalData.quoted }),
+            }
+        })
+    };
+
+    // Remove options if it's empty or contains only an empty mentions object
+     if (evolutionPayload.options) {
+        if (evolutionPayload.options.mentions && Object.keys(evolutionPayload.options.mentions).length === 0) {
+            delete evolutionPayload.options.mentions; // Clean up empty mentions
+        }
+        if (Object.keys(evolutionPayload.options).length === 0) {
+            delete evolutionPayload.options; // Remove options if completely empty
+        }
     }
+
+
+    console.log("Frontend: Sending payload:", JSON.stringify(evolutionPayload, null, 2));
 
     // 4. Make the direct request to the Evolution API
     const evoResponse = await fetch(apiUrl, {
@@ -84,7 +105,7 @@ export const sendTextService = async (params: SendTextParams): Promise<SendTextR
         "Content-Type": "application/json",
         "apikey": apiKey,
       },
-      body: JSON.stringify(payload),
+      body: JSON.stringify(evolutionPayload), // Use the correctly constructed payload
     });
 
     // 5. Check if the Evolution API request was successful

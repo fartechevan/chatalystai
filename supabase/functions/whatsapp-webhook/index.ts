@@ -1,7 +1,8 @@
 
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2"
-import { corsHeaders } from "../_shared/cors.ts"
+// @deno-types="https://esm.sh/@supabase/functions-js/src/edge-runtime.d.ts"
+import { serve } from "std/http/server.ts"; // Use import map alias
+import { createClient } from "@supabase/supabase-js"; // Use import map alias
+import { corsHeaders } from "../_shared/cors.ts";
 import { handleMessageEvent } from "./messageHandler.ts"
 import { createErrorResponse } from "./utils.ts"
 
@@ -77,19 +78,29 @@ serve(async (req) => {
       }
       
       // If this is a message event, handle conversation linking
-      let processingResult = false;
+      let processingResult: true | string = true; // Default to success for non-message events
       if (event === 'messages.upsert' && data) {
         console.log(`[${requestId}] Processing messages.upsert event`);
-        processingResult = await handleMessageEvent(supabaseClient, data, instance);
-        console.log(`[${requestId}] Message event processing result: ${processingResult}`);
+        processingResult = await handleMessageEvent(supabaseClient, data, instance); // Returns true or error string
+        console.log(`[${requestId}] Message event processing result:`, processingResult);
       } else {
         console.log(`[${requestId}] Skipping event handling for non-message event: ${event}`);
+        // For non-message events, consider processing successful by default
+        processingResult = true; 
       }
 
-      // Return success response
-      const responseBody = { success: true, processed: processingResult };
+      // Construct response body based on processing result
+      let responseBody: { success: boolean; processed: boolean; error?: string };
+      if (processingResult === true) {
+        responseBody = { success: true, processed: true };
+      } else {
+        // processingResult is an error string
+        responseBody = { success: true, processed: false, error: processingResult };
+      }
+
       console.log(`[${requestId}] Webhook processing completed. Response:`, JSON.stringify(responseBody));
       
+      // Return response (still 200 OK, but body contains error details if processing failed)
       return new Response(
         JSON.stringify(responseBody),
         { 

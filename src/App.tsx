@@ -19,7 +19,6 @@ import ComingSoon from "@/pages/ComingSoon";
 import KnowledgeBase from "./pages/KnowledgeBase";
 import { ChunkView } from "./components/knowledge/ChunkView";
 import Profile from "./pages/Profile";
-import { EdgeFunctionTestButton } from "./components/debug/EdgeFunctionTestButton"; // Import the test button
 
 const App = () => {
   const queryClient = new QueryClient({
@@ -65,7 +64,6 @@ const App = () => {
                   </Route>
                 </Routes>
               </BrowserRouter>
-              <EdgeFunctionTestButton /> {/* Add the test button here */}
             </div>
           </SidebarProvider>
         </TooltipProvider>

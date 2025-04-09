@@ -51,13 +51,13 @@ export function useConversationData(selectedConversation?: Conversation | null) 
       }
 
       // If this conversation is linked to a WhatsApp integration, first send via WhatsApp
-      if (selectedConversation.integrations_config_id) {
+      if (selectedConversation.integrations_id) {
         try {
           // Get instance_id from integrations_config table
           const { data: integrationConfigData, error: integrationConfigError } = await supabase
-            .from('integrations_config')
+            .from('integrations_config') // TODO: Should this table name also change? Assuming not for now.
             .select('instance_id')
-            .eq('id', selectedConversation.integrations_config_id)
+            .eq('integration_id', selectedConversation.integrations_id) // Assuming the column to match on integrations_config is integration_id
             .single();
 
           if (integrationConfigError || !integrationConfigData?.instance_id) {
@@ -103,7 +103,7 @@ export function useConversationData(selectedConversation?: Conversation | null) 
             instanceId,
             customerPhoneNumber,
             content,
-            integrationConfigId: selectedConversation.integrations_config_id
+            integrationId: selectedConversation.integrations_id // Renamed property for clarity
           });
 
           // Send the message via WhatsApp
@@ -111,7 +111,7 @@ export function useConversationData(selectedConversation?: Conversation | null) 
             instanceId,
             customerPhoneNumber,
             content,
-            selectedConversation.integrations_config_id
+            selectedConversation.integrations_id
           );
 
           console.log("WhatsApp result:", whatsappResult);
