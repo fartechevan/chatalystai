@@ -1,3 +1,4 @@
+
 import { Button } from "@/components/ui/button";
 import { BaseDialog } from "./BaseDialog";
 
@@ -37,7 +38,7 @@ export function DeviceSelect({
             variant="outline" 
             size="lg"
             className="w-full py-8 text-lg"
-            onClick={handleDeviceSelect}
+            onClick={handleConnect}
           >
             Android
           </Button>
@@ -45,7 +46,7 @@ export function DeviceSelect({
             variant="outline" 
             size="lg"
             className="w-full py-8 text-lg"
-            onClick={handleDeviceSelect}
+            onClick={handleConnect}
           >
             iPhone
           </Button>
