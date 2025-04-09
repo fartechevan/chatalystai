@@ -52,6 +52,7 @@ export async function fetchEvolutionInstances(integrationId: string): Promise<Ev
     // 5. Parse the JSON response
     const instances: EvolutionInstance[] = await response.json();
     console.log(`--- fetchEvolutionInstances: Successfully fetched ${instances.length} instances ---`);
+    console.log(`--- fetchEvolutionInstances: API Response: ${JSON.stringify(instances)} ---`);
 
     // 6. Return the result
     return instances;

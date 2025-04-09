@@ -16,6 +16,8 @@ import { logoutWhatsAppInstance } from "@/integrations/evolution-api/services/lo
 import { fetchEvolutionInstances } from "@/integrations/evolution-api/services/fetchInstancesService";
 import { deleteEvolutionInstance } from "@/integrations/evolution-api/services/deleteInstanceService";
 import { useEvolutionApiConfig } from "@/integrations/evolution-api/hooks/useEvolutionApiConfig";
+// Import only the function, InstanceMetadata is no longer exported/used here
+import { createEvolutionInstance } from "@/integrations/evolution-api/services/createInstanceService";
 // import { WHATSAPP_INSTANCE } from "@/integrations/evolution-api/services/config"; // Unused
 
 
@@ -64,6 +66,8 @@ export function WhatsAppBusinessSettings({ selectedIntegration, onConnect }: Wha
   const [loadError, setLoadError] = useState<string | null>(null);
   // State to indicate if the initial fetch found no instances on the server
   const [noInstanceFoundFromServer, setNoInstanceFoundFromServer] = useState(false);
+  // Loading state for the create action
+  const [isCreating, setIsCreating] = useState<boolean>(false);
 
 
   // Fetch configured WhatsApp instance details (primarily for live status and initial setup/config save)
@@ -231,6 +235,73 @@ export function WhatsAppBusinessSettings({ selectedIntegration, onConnect }: Wha
     }
   };
 
+  // Handle creation of a new WhatsApp instance
+  const handleCreateInstance = async () => {
+    // Only check for selectedIntegration and its ID, as configuration might not exist yet
+    if (!selectedIntegration?.id) {
+      toast({
+        title: "Error",
+        description: "Integration details are missing.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Construct the metadata needed for the API call from selectedIntegration properties
+    const instanceName = selectedIntegration.name || `Instance_${selectedIntegration.id.substring(0, 8)}`; // Default name if needed
+    // Explicitly set the integration type expected by the API
+    const integrationType = "WHATSAPP-BAILEYS"; // Use the specific type from API example
+
+    // Validate the constructed/derived values
+    if (!instanceName || !integrationType) {
+       toast({
+         title: "Error",
+         description: "Required integration details (name) could not be determined.", // Updated error message
+         variant: "destructive",
+       });
+       return;
+    }
+
+    // Construct the metadata object for the service call using the correct integration type
+    // No specific type annotation needed as createEvolutionInstance now accepts Record<string, any>
+    const metadataToCreate = {
+        instanceName: instanceName,
+        integration: integrationType, // Use the explicitly set type
+        qrcode: true, // Default based on API example
+    };
+
+
+    setIsCreating(true);
+    try {
+      // Call the creation service with integration ID and the constructed metadata
+      const creationResponse = await createEvolutionInstance(selectedIntegration.id, metadataToCreate);
+
+      toast({
+        title: "Instance Creation Initiated",
+        // Adjust message based on whether QR code is expected/returned
+        description: `Instance ${creationResponse.instance?.instanceName || 'new instance'} is being created. ${creationResponse.qrcode?.base64 || creationResponse.qrcode?.pairingCode || creationResponse.pairingCode ? 'Scan the QR code if prompted.' : ''}`,
+      });
+
+      // Invalidate queries to refetch config and potentially instance list/status
+      await queryClient.invalidateQueries({ queryKey: ['integration-config', selectedIntegration.id] });
+      await queryClient.invalidateQueries({ queryKey: ['evolution-instances', selectedIntegration.id] }); // Assuming this key is used elsewhere
+
+      // TODO: Handle QR code display if necessary based on creationResponse.qrcode
+      // This might involve calling the original onConnect prop to signal the parent dialog
+      // onConnect(); // Call original onConnect if it handles QR display/dialog state
+
+    } catch (error) {
+      console.error("--- handleCreateInstance: Error creating instance:", error);
+      toast({
+        title: "Instance Creation Failed",
+        description: `Could not create instance: ${error instanceof Error ? error.message : String(error)}`,
+        variant: "destructive",
+      });
+    } finally {
+      setIsCreating(false);
+    }
+  };
+
   // Handle deletion of WhatsApp instance
   const handleDelete = async () => {
       // Get the actual instanceId (UUID) from the loaded config
@@ -323,7 +394,11 @@ export function WhatsAppBusinessSettings({ selectedIntegration, onConnect }: Wha
          <p className="text-muted-foreground text-center max-w-md">
            No active WhatsApp instance was found on the server for this integration.
          </p>
-         <Button onClick={onConnect} variant="default">Connect New Instance</Button>
+         {/* This button should now trigger the creation process */}
+         <Button onClick={handleCreateInstance} variant="default" disabled={isCreating}>
+           {isCreating ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+           Create New Instance
+         </Button>
        </div>
      );
    }
@@ -400,15 +475,17 @@ export function WhatsAppBusinessSettings({ selectedIntegration, onConnect }: Wha
                           <Button
                             variant="outline" // Or default
                             size="sm"
-                            onClick={onConnect} // Use the passed onConnect prop
-                            // Add disabled state if needed, e.g., while deleting
+                            // Revert onClick to call the original onConnect prop
+                            onClick={onConnect}
+                            // Disable only if deleting
                             disabled={isDeleteLoading}
                             title="Connect Instance"
                           >
-                            Connect
-                          </Button>
-                          <Button
-                            variant="destructive"
+                             {/* Remove spinner logic related to creation */}
+                             Connect
+                           </Button>
+                           <Button
+                             variant="destructive"
                             size="sm"
                             onClick={handleDelete} // Correct handler
                             disabled={isDeleteLoading}

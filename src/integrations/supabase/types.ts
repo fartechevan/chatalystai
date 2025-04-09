@@ -194,6 +194,7 @@ export type Database = {
           icon_url: string | null
           id: string
           is_connected: boolean | null
+          metadata: Json | null
           name: string
           status: Database["public"]["Enums"]["integration_status"]
           updated_at: string | null
@@ -206,6 +207,7 @@ export type Database = {
           icon_url?: string | null
           id?: string
           is_connected?: boolean | null
+          metadata?: Json | null
           name: string
           status?: Database["public"]["Enums"]["integration_status"]
           updated_at?: string | null
@@ -218,6 +220,7 @@ export type Database = {
           icon_url?: string | null
           id?: string
           is_connected?: boolean | null
+          metadata?: Json | null
           name?: string
           status?: Database["public"]["Enums"]["integration_status"]
           updated_at?: string | null
@@ -228,24 +231,33 @@ export type Database = {
         Row: {
           created_at: string
           id: string
+          instance_display_name: string | null
           instance_id: string | null
           integration_id: string
+          owner_id: string | null
+          token: string | null
           updated_at: string
           user_reference_id: string | null
         }
         Insert: {
           created_at?: string
           id?: string
+          instance_display_name?: string | null
           instance_id?: string | null
           integration_id: string
+          owner_id?: string | null
+          token?: string | null
           updated_at?: string
           user_reference_id?: string | null
         }
         Update: {
           created_at?: string
           id?: string
+          instance_display_name?: string | null
           instance_id?: string | null
           integration_id?: string
+          owner_id?: string | null
+          token?: string | null
           updated_at?: string
           user_reference_id?: string | null
         }

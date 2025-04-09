@@ -1,4 +1,3 @@
-
 import { Button } from "@/components/ui/button";
 import { BaseDialog } from "./BaseDialog";
 
@@ -6,14 +5,16 @@ interface DeviceSelectProps {
   open: boolean;
   onClose: () => void;
   onOpenChange: (open: boolean) => void;
-  onDeviceSelect: () => void; // Renamed prop
+  handleDeviceSelect: () => void;
+  handleConnect: () => void;
 }
 
-export function DeviceSelect({ 
-  open, 
-  onClose, 
-  onOpenChange, 
-  onDeviceSelect // Renamed prop
+export function DeviceSelect({
+  open,
+  onClose,
+  onOpenChange,
+  handleDeviceSelect,
+  handleConnect
 }: DeviceSelectProps) {
   return (
     <BaseDialog
@@ -36,7 +37,7 @@ export function DeviceSelect({
             variant="outline" 
             size="lg"
             className="w-full py-8 text-lg"
-            onClick={onDeviceSelect} // Use renamed prop
+            onClick={handleDeviceSelect}
           >
             Android
           </Button>
@@ -44,7 +45,7 @@ export function DeviceSelect({
             variant="outline" 
             size="lg"
             className="w-full py-8 text-lg"
-            onClick={onDeviceSelect} // Use renamed prop
+            onClick={handleDeviceSelect}
           >
             iPhone
           </Button>

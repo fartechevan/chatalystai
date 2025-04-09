@@ -10,10 +10,8 @@ declare global {
   };
 }
 
-import {
-  Dialog,
-  DialogContent,
-} from "@/components/ui/dialog";
+// --- Rewritten Import Block ---
+import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { useState } from "react";
 import type { Integration } from "../types";
 import { useFacebookSDK } from "./hooks/useFacebookSDK";
@@ -22,6 +20,7 @@ import { DeviceSelect } from "./components/DeviceSelect";
 import { IntegrationTabs } from "./components/IntegrationTabs";
 import { DialogMain } from "./components/DialogMain";
 import { useIntegrationConnectionState } from "./hooks/useIntegrationConnectionState";
+// --- End Rewritten Import Block ---
 
 interface IntegrationDialogProps {
   open: boolean;
@@ -44,38 +43,35 @@ export function IntegrationDialog({
     integrationQRPopup,
     setIntegrationQRPopup,
     isConnected,
-    qrCodeBase64,
-    pairingCode,
     connectionState,
     isLoading,
+    checkCurrentConnectionState,
+    qrCodeBase64,
+    pairingCode,
     handleConnect,
-    handleDeviceSelect // Renamed destructured function
-    // Note: handleDialogChange is defined below, so we pass it here
-  } = useIntegrationConnectionState(selectedIntegration, open, () => handleDialogChange(false)); // Pass a callback that calls handleDialogChange
+    handleDeviceSelect
+  } = useIntegrationConnectionState(selectedIntegration, open, () => handleDialogChange(false));
 
   const handleDialogChange = (open: boolean) => {
     if (!open) {
       if (integrationQRPopup) {
-        // If on QR screen, go back to main popup
         setIntegrationQRPopup(false);
         setIntegrationMainPopup(true);
         return;
       }
       if (showDeviceSelect) {
-        // If on device select screen, go back to main popup
         setShowDeviceSelect(false);
         setIntegrationMainPopup(true);
         return;
       }
     }
-    // Otherwise, close the dialog completely and notify parent about the connection status
     onOpenChange(isConnected || connectionState === 'open');
   };
 
   if (integrationQRPopup) {
     return (
-      <QRCodeScreen 
-        open={open} 
+      <QRCodeScreen
+        open={open}
         onOpenChange={handleDialogChange}
         onClose={() => {
           setIntegrationQRPopup(false);
@@ -89,14 +85,15 @@ export function IntegrationDialog({
 
   if (showDeviceSelect) {
     return (
-      <DeviceSelect 
+      <DeviceSelect
         open={open}
         onOpenChange={handleDialogChange}
         onClose={() => {
           setShowDeviceSelect(false);
           setIntegrationMainPopup(true);
         }}
-        onDeviceSelect={handleDeviceSelect} // Renamed prop name to match definition
+        handleConnect={handleConnect}
+        handleDeviceSelect={handleDeviceSelect}
       />
     );
   }
@@ -105,7 +102,7 @@ export function IntegrationDialog({
     <Dialog open={open} onOpenChange={handleDialogChange}>
       <DialogContent className="max-w-5xl w-4/5 flex space-x-4">
         {/* Left Column */}
-        <DialogMain 
+        <DialogMain
           selectedIntegration={selectedIntegration}
           connectionState={connectionState}
           isLoading={isLoading}
@@ -122,7 +119,7 @@ export function IntegrationDialog({
             onConnect={handleConnect}
           />
         </div>
-        
+
         <button
           onClick={() => handleDialogChange(false)}
           className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground"
