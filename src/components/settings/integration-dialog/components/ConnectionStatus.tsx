@@ -1,7 +1,7 @@
 
 import { Button } from "@/components/ui/button";
 import { Loader2, CheckCircle, Plus, AlertCircle, X } from "lucide-react";
-import type { ConnectionState } from "../hooks/whatsapp/types";
+import type { ConnectionState } from "../hooks/useWhatsAppConversations/types";
 import type { Integration } from "../../types";
 
 interface ConnectionStatusProps {
@@ -72,7 +72,7 @@ export function ConnectionStatus({
         Connect multiple WhatsApp numbers to send important conversations straight to your inbox.
       </p>
       <Button className="w-full" size="lg" onClick={onConnect}>
-        Connect
+        Create New Instance
       </Button>
     </div>
   );

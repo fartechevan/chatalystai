@@ -47,6 +47,7 @@ export function IntegrationsView({ isActive }: IntegrationsViewProps) {
         is_connected?: boolean;
       }
 
+      // Revert back to select('*') as explicit columns caused errors
       const { data, error } = await supabase
         .from('integrations')
         .select('*')
@@ -81,22 +82,49 @@ export function IntegrationsView({ isActive }: IntegrationsViewProps) {
 
   const checkAndUpdateConnectionStatus = async (integrationId: string): Promise<boolean> => {
     let isConnected = false;
+    let instanceToken: string | null = null;
+    let baseUrl: string | null = null;
+    let instanceId: string | null = null;
+
     try {
-      console.log(`Fetching config for integration ${integrationId} to check status...`);
+      // Fetch instance_id and token from integrations_config
+      console.log(`Fetching config (instance_id, token) for integration ${integrationId}...`);
       const { data: configData, error: configError } = await supabase
         .from('integrations_config')
-        .select('instance_id')
+        .select('instance_id, token') // Fetch token as well
         .eq('integration_id', integrationId)
         .maybeSingle();
 
       if (configError) {
         console.error(`Error fetching config for integration ${integrationId}:`, configError);
       } else if (configData?.instance_id) {
-        const instanceId = configData.instance_id;
-        console.log(`Checking status for instance ${instanceId} (Integration: ${integrationId})`);
+        instanceId = configData.instance_id;
+        instanceToken = configData.token; // Store the token
+        console.log(`Found instance_id: ${instanceId}, token: ${instanceToken ? 'present' : 'missing'}`);
 
-        // Call the refactored service which returns the state directly
-        const connectionStateResult = await checkInstanceStatus(instanceId); 
+        // Fetch base_url from integrations table
+        console.log(`Fetching base_url for integration ${integrationId}...`);
+        const { data: integrationData, error: integrationError } = await supabase
+          .from('integrations')
+          .select('base_url')
+          .eq('id', integrationId)
+          .single(); // Use single() as ID is unique
+
+        if (integrationError) {
+          console.error(`Error fetching base_url for integration ${integrationId}:`, integrationError);
+        } else {
+          baseUrl = integrationData?.base_url;
+          console.log(`Found base_url: ${baseUrl}`);
+        }
+      } else {
+         console.log(`No instance_id configured for integration ${integrationId}.`);
+      }
+
+      // Proceed only if we have all necessary info from both queries
+      if (instanceId && instanceToken && baseUrl) {
+        console.log(`Checking status for instance ${instanceId} (Integration: ${integrationId}) using its token and base URL.`);
+        // Call the service with all three arguments
+        const connectionStateResult = await checkInstanceStatus(instanceId, instanceToken, baseUrl);
 
         console.log(`Status check result for ${instanceId}: ${connectionStateResult}`);
 
@@ -108,11 +136,14 @@ export function IntegrationsView({ isActive }: IntegrationsViewProps) {
           isConnected = false;
         }
       } else {
-        console.log(`No instance_id configured for integration ${integrationId}. Cannot check status.`);
-        isConnected = false;
+        // This else block should correspond to the outer check for configData?.instance_id
+        // If instance_id wasn't found initially, or if token/baseUrl fetch failed, we land here.
+        console.log(`Cannot check status for integration ${integrationId}. Missing instanceId, token, or baseUrl.`);
+        isConnected = false; // Cannot determine status if info is missing
       }
+      // Removed the misplaced 'if (configError)' block here
     } catch (error) {
-      console.error(`Error in checkAndUpdateConnectionStatus for ${integrationId}:`, error);
+      console.error(`Error during checkAndUpdateConnectionStatus for ${integrationId}:`, error);
       isConnected = false;
     } finally {
       setConnectedIntegrations(prev => ({

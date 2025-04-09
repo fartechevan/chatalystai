@@ -22,6 +22,8 @@ export interface EvolutionInstance {
     instanceName: string;
     status: 'open' | 'connecting' | 'close' | 'qrcode' | 'syncing'; // Common statuses
     owner?: string; // Typically the phone number
+    ownerJid?: string; // Added ownerJid based on API response and usage
+    instanceId?: string; // Added instanceId based on API response and usage
     profileName?: string;
     profilePictureUrl?: string;
     // Add other relevant fields as needed based on actual API response

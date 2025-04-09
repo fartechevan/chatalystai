@@ -37,51 +37,39 @@ interface CreateInstanceResponse {
  * @param integrationId - The ID of the integration to fetch credentials for.
  * @param metadata - The metadata object containing instance configuration.
  * @returns A promise that resolves to the creation response data, including instance details and potentially QR/token.
- * @throws If fetching credentials, metadata validation fails, or calling the Evolution API fails.
+ * @throws If fetching credentials or calling the Evolution API fails.
  */
 
-// Define the expected structure of the metadata object (matching the database)
-interface InstanceMetadata {
-  instanceName: string;
-  integration: string;
-  customerId: string;
-  projectId: string;
-  qrcode?: boolean; // Added qrcode based on new metadata
-  webhook?: { // Nested webhook object
+// Removed the specific InstanceMetadata interface definition from this file.
+// The function now accepts a more flexible object for metadata,
+// but we define and export a base type for common properties to improve type safety.
+export interface BaseMetadata { // Export the interface
+  instanceName?: string;
+  webhook?: {
     url?: string;
-    events?: string[];
-    ByEvents?: boolean; // Note the capitalization 'B'
+    events?: (string | null)[]; // Allow nulls initially
+    ByEvents?: boolean;
   };
-  // Add any other relevant fields from metadata if needed
+  // Allow any other properties using 'unknown' for better type safety than 'any'
+  [key: string]: unknown;
 }
 
 export async function createEvolutionInstance(
   integrationId: string,
-  metadata: InstanceMetadata
+  metadata: BaseMetadata // Use the BaseMetadata type
 ): Promise<CreateInstanceResponse> {
 
-  // Validate required metadata fields
+  // Basic validation
   if (!metadata) {
     throw new Error("Metadata object is required for instance creation.");
   }
-  const {
-    instanceName,
-    integration: integrationType, // Rename for consistency within the function
-    customerId,
-    projectId,
-    qrcode: qrcodeFromMeta, // Extract qrcode
-    webhook: webhookObject // Extract the nested webhook object
-  } = metadata;
-
   if (!integrationId) throw new Error("Integration ID is required.");
-  if (!instanceName) throw new Error("instanceName is missing in metadata.");
-  if (!integrationType) throw new Error("integration type is missing in metadata.");
-  if (!customerId) throw new Error("customerId is missing in metadata.");
-  if (!projectId) throw new Error("projectId is missing in metadata.");
-  // qrcode, webhook object and its contents are optional
 
-  console.log(`--- createEvolutionInstance: Starting creation for instance ${instanceName} (Integration ID: ${integrationId}, Type: ${integrationType}) ---`);
-  console.log(`--- createEvolutionInstance: Metadata Webhook Object:`, webhookObject);
+  // Access instanceName directly for logging, assuming it exists in metadata
+  const instanceName = metadata.instanceName || 'Unknown Instance';
+
+  console.log(`--- createEvolutionInstance: Starting creation for instance ${instanceName} (Integration ID: ${integrationId}) ---`);
+  console.log(`--- createEvolutionInstance: Received Metadata:`, metadata);
 
 
   try {
@@ -102,32 +90,30 @@ export async function createEvolutionInstance(
       token: string;
       qrcode: boolean;
       integration: string;
-      webhook?: { // Expect nested object matching metadata
+      webhook?: {
         url?: string;
         events?: string[];
-        ByEvents?: boolean; // Note capitalization
+        ByEvents?: boolean;
       };
-      customerId: string;
-      projectId: string;
-      // Add other potential optional fields if known, otherwise keep it minimal
+      // No specific payload interface needed here as we spread the generic metadata.
     }
 
-    // 4. Prepare the request body using values from the metadata object, mapping nested webhook data
-    const requestBody: CreateInstanceApiPayload = {
-      instanceName: instanceName, // From metadata
-      token: generatedToken,
-      // Use qrcode from metadata if available, otherwise default to true
-      qrcode: typeof qrcodeFromMeta === 'boolean' ? qrcodeFromMeta : true,
-      integration: integrationType, // From metadata
-      customerId: customerId, // From metadata
-      projectId: projectId, // From metadata
-      // Directly assign the nested webhook object from metadata if it exists
-      webhook: webhookObject
+    // 4. Prepare the request body by spreading the received metadata and adding the generated token
+    // Ensure the generated token takes precedence if metadata somehow contains a 'token' field
+    const requestBody = {
+      ...metadata, // Spread all properties from the input metadata
+      token: generatedToken, // Add/overwrite with the generated token
     };
+    // Note: If the Evolution API strictly rejects unknown fields,
+    // you might need to selectively pick known fields from metadata instead of spreading.
+    // However, based on the request, we'll spread the entire metadata object.
+    // delete requestBody.projectId; // Example if API rejects unknown fields
 
     // Clean up potential nulls within the nested events array if it exists
-    if (requestBody.webhook?.events) {
-        requestBody.webhook.events = requestBody.webhook.events.filter(e => e !== null);
+    // Use the defined BaseMetadata structure for safer access
+    if (requestBody.webhook && Array.isArray(requestBody.webhook.events)) {
+        // Filter out nulls, the result will be string[]
+        requestBody.webhook.events = requestBody.webhook.events.filter((e): e is string => e !== null);
     }
 
     const body = JSON.stringify(requestBody);
