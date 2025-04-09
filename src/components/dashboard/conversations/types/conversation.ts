@@ -23,6 +23,6 @@ export interface Conversation {
   participants?: ConversationParticipant[];
   customer_name?: string;
   messages?: Message[];
-  integrations_config_id?: string;
+  integrations_id?: string;
   customer?: { customer: { id?: string; name: string } }[];
 }

@@ -87,30 +87,30 @@ export type Database = {
         Row: {
           conversation_id: string
           created_at: string
-          integrations_config_id: string | null
+          integrations_id: string | null
           lead_id: string | null
           updated_at: string
         }
         Insert: {
           conversation_id?: string
           created_at?: string
-          integrations_config_id?: string | null
+          integrations_id?: string | null
           lead_id?: string | null
           updated_at?: string
         }
         Update: {
           conversation_id?: string
           created_at?: string
-          integrations_config_id?: string | null
+          integrations_id?: string | null
           lead_id?: string | null
           updated_at?: string
         }
         Relationships: [
           {
-            foreignKeyName: "conversations_integrations_config_id_fkey"
-            columns: ["integrations_config_id"]
+            foreignKeyName: "conversations_integrations_id_fkey"
+            columns: ["integrations_id"]
             isOneToOne: false
-            referencedRelation: "integrations_config"
+            referencedRelation: "integrations"
             referencedColumns: ["id"]
           },
           {

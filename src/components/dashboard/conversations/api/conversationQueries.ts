@@ -17,7 +17,7 @@ export async function fetchConversationsWithParticipants() {
       created_at,
       updated_at,
       lead_id,
-      integrations_config_id,
+      integrations_id,
       lead:lead_id(
         id,
         customer_id,
