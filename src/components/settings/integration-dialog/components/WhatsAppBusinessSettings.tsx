@@ -1,4 +1,3 @@
-
 // UI Imports
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -149,7 +148,7 @@ export function WhatsAppBusinessSettings({ selectedIntegration, onConnect }: Wha
                 instance_id: fetchedInstanceId,
                 token: fetchedToken,
                 instance_display_name: displayName,
-                status: connectionStatus // Use the mapped status
+                connection_status: connectionStatus // Use connection_status instead of status
               },
               { onConflict: 'integration_id' }
             );
@@ -171,7 +170,7 @@ export function WhatsAppBusinessSettings({ selectedIntegration, onConnect }: Wha
            console.log(`Attempting to update status to '${connectionStatus}' for integration ${selectedIntegration.id} (Instance ID: ${configuredInstanceId})`);
            const { error: updateStatusError } = await supabase
              .from('integrations_config')
-             .update({ status: connectionStatus as string }) // Add cast here
+             .update({ connection_status: connectionStatus as string }) // Use connection_status instead of status
              .eq('integration_id', selectedIntegration.id);
 
            if (updateStatusError) {
@@ -198,7 +197,7 @@ export function WhatsAppBusinessSettings({ selectedIntegration, onConnect }: Wha
     };
 
     fetchAndConfigureInstance();
-  }, [selectedIntegration?.id, config, queryClient, toast]); // Added missing dependencies
+  }, [selectedIntegration?.id, config, queryClient, toast]);
 
   const handleLogout = async (instanceName: string) => {
     if (!selectedIntegration?.id || !instanceName) return;
@@ -324,7 +323,7 @@ export function WhatsAppBusinessSettings({ selectedIntegration, onConnect }: Wha
                 instance_id: fetchedInstanceId,
                 token: fetchedToken,
                 instance_display_name: displayName,
-                status: 'unknown' // Set initial status
+                connection_status: 'unknown' // Set initial status
               },
               { onConflict: 'integration_id' }
             );

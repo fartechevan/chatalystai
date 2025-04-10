@@ -12,11 +12,11 @@ interface ConversationMainAreaProps {
   selectedConversation: Conversation | null;
   isLoading: boolean;
   messages: MessageType[];
-  newMessage: string;  // Changed to string type
-  setNewMessage: (message: string) => void; // Kept as function
+  newMessage: string;
+  setNewMessage: (message: string) => void;
   handleSendMessage: () => void;
-  sendMessageMutation: UseMutationResult<void, Error, string, unknown>; // Assuming string input, void result
-  summarizeMutation: UseMutationResult<void, Error, string, unknown>; // Assuming string (conversationId) input, void result
+  sendMessageMutation: UseMutationResult<any, Error, string, unknown>; // Changed to be more permissive with any
+  summarizeMutation: UseMutationResult<any, Error, any, unknown>; // Changed to be more permissive
   summary: string | undefined;
   summaryTimestamp: string | undefined;
 }

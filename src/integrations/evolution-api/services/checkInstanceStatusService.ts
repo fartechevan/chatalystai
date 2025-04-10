@@ -1,34 +1,43 @@
-// Import the centralized API key and server URL
-import { evolutionApiKey, evolutionServerUrl } from "./config";
+
+// Import services from the correct location, not from config
+import { getEvolutionCredentials } from "./utils/credentials";
+import { ConnectionState } from "@/components/settings/types";
 
 /**
  * Checks the connection state of a specific Evolution API instance.
  * @param instanceName The name of the instance to check.
- * @returns An object containing the instance state or an error object.
+ * @param apiKey The API key for authentication.
+ * @param serverUrl The server URL to make the request to.
+ * @returns Connection state as a string.
  */
-// Remove apiKey parameter as it's now imported
-async function checkInstanceStatus(instanceName: string) {
-  const serverUrl = evolutionServerUrl; // Use the imported server URL
-  // Assuming the endpoint to check a specific instance's state is /instance/connectionState/{instanceName}
-  // Verify this endpoint with the Evolution API documentation if issues arise.
-  const url = `${serverUrl}/instance/connectionState/${instanceName}`;
-
-  // Use the imported key
-  if (!evolutionApiKey) {
-    console.error('API key is missing from config.');
-    return { error: 'API key is required' };
+async function checkInstanceStatus(
+  instanceName: string,
+  apiKey: string,
+  serverUrl: string
+): Promise<ConnectionState> {
+  // Verify essential parameters
+  if (!apiKey) {
+    console.error('API key is missing.');
+    return 'unknown';
   }
   if (!instanceName) {
     console.error('Instance name is missing.');
-    return { error: 'Instance name is required' };
+    return 'unknown';
   }
+  if (!serverUrl) {
+    console.error('Server URL is missing.');
+    return 'unknown';
+  }
+
+  // Construct the URL for the status check endpoint
+  const url = `${serverUrl}/instance/connectionState/${instanceName}`;
 
   try {
     const response = await fetch(url, {
       method: 'GET',
       headers: {
-        'apikey': evolutionApiKey, // Use imported key
-        'Content-Type': 'application/json' // Often needed, though GET might not strictly require it
+        'apikey': apiKey,
+        'Content-Type': 'application/json'
       },
     });
 
@@ -36,18 +45,29 @@ async function checkInstanceStatus(instanceName: string) {
       // Log more details for debugging
       const errorBody = await response.text();
       console.error(`Error checking instance status for ${instanceName}:`, response.status, response.statusText, errorBody);
-      // Return a structured error
-      return { error: `Failed to check instance status: ${response.status} ${response.statusText}`, status: response.status };
+      return 'close';
     }
 
     const result = await response.json();
-    // The result structure might be simple like { state: 'open' } or more complex.
-    // Adjust parsing based on the actual API response.
-    console.log(`Status check result for ${instanceName}:`, result);
-    return result; // e.g., { state: 'open' } or similar
+    // The API might return different formats, but we want to extract the state
+    const state = result.state || 
+                 (result.instance && result.instance.state) || 
+                 (result.connection && result.connection.state) || 
+                 'unknown';
+    
+    console.log(`Status check result for ${instanceName}:`, result, 'Extracted state:', state);
+    
+    // Map API response to our ConnectionState type
+    if (state === 'open') return 'open';
+    if (state === 'close' || state === 'closed') return 'close';
+    if (state === 'connecting') return 'connecting';
+    if (state === 'qrcode' || state === 'qr') return 'qrcode';
+    
+    // Default fallback
+    return 'unknown';
   } catch (error) {
     console.error(`Error during instance status check for ${instanceName}:`, error);
-    return { error: `Internal server error during status check: ${(error as Error).message}` };
+    return 'unknown';
   }
 }
 
