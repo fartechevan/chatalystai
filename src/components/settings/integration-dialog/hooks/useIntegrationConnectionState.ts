@@ -158,40 +158,32 @@ export function useIntegrationConnectionState(
     }
   };
 
-  const handleConnect = async () => {
-    console.log("[handleConnect] Function called.");
+  // Modify handleConnect to accept the instance display name
+  const handleConnect = async (instanceDisplayName: string | null | undefined) => {
+    console.log("[handleConnect] Function called with instanceDisplayName:", instanceDisplayName);
     setLocalConnectionState('connecting'); // Set state immediately
     setQrCodeBase64(null); // Clear previous QR/pairing codes
     setPairingCode(null);
 
+    // Check if necessary info is provided
     if (!selectedIntegration?.id) {
       console.error("[handleConnect] Exiting: Integration ID is missing.");
       toast({ variant: "destructive", title: "Error", description: "Integration ID is missing." });
       setLocalConnectionState('close');
       return;
     }
-
-    console.log(`[handleConnect] Checking config... configLoading: ${configLoading}, config:`, config);
-    if (configLoading) {
-        console.log("[handleConnect] Path taken: Config still loading, waiting.");
-        toast({ variant: "default", title: "Loading...", description: "Checking instance configuration..." });
-        // Keep state as 'connecting' while config loads
-        return;
+    if (!instanceDisplayName) {
+       console.error("[handleConnect] Exiting: Instance display name not provided.");
+       toast({ variant: "destructive", title: "Configuration Error", description: "Instance name is missing. Cannot connect." });
+       setLocalConnectionState('close');
+       return;
     }
 
-    // Ensure config is loaded before proceeding
-    if (!config?.instance_display_name) {
-        console.error("[handleConnect] Config loaded but instance_display_name is missing.");
-        toast({ variant: "destructive", title: "Configuration Error", description: "Instance configuration is incomplete or missing display name." });
-        setLocalConnectionState('close');
-        return;
-    }
-
-    // --- Connect to EXISTING instance ---
-    console.log(`[handleConnect] Path taken: Connect to EXISTING instance (${config.instance_display_name}).`);
+    // --- Connect to EXISTING instance using the PROVIDED name ---
+    console.log(`[handleConnect] Path taken: Connect to EXISTING instance (${instanceDisplayName}).`);
     try {
       // Cast the response type to allow checking for flat properties potentially
-      const connectResponse = await evolutionConnectToInstance(config.instance_display_name, selectedIntegration.id) as ConnectInstanceResponse | (ConnectInstanceResponse & { base64?: string, pairingCode?: string | null });
+      const connectResponse = await evolutionConnectToInstance(instanceDisplayName, selectedIntegration.id) as ConnectInstanceResponse | (ConnectInstanceResponse & { base64?: string, pairingCode?: string | null });
 
       let useBase64: string | null = null;
       let usePairingCode: string | null = null;
