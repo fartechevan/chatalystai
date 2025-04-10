@@ -1,6 +1,5 @@
 
 // Import services from the correct location, not from config
-import { getEvolutionCredentials } from "./utils/credentials";
 import { ConnectionState } from "@/components/settings/types";
 
 /**

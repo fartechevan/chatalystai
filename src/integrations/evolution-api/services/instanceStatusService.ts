@@ -1,6 +1,7 @@
 
 import checkInstanceStatus from "./checkInstanceStatusService";
 import { ConnectionState } from "@/components/settings/types";
+import { getEvolutionCredentials } from "./utils/credentials";
 
 export { checkInstanceStatus };
 
@@ -25,6 +26,3 @@ export async function checkInstanceConnectionStatus(
     return 'unknown';
   }
 }
-
-// Import the credentials utility to make the wrapper function work
-import { getEvolutionCredentials } from "./utils/credentials";
