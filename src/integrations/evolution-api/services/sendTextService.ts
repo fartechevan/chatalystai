@@ -1,7 +1,6 @@
 // Config import is no longer needed here as this will use a Supabase function
-// Assuming getEvolutionURL might be needed if serverUrl isn't always passed
-// import { getEvolutionURL } from "@/integrations/supabase/client";
-import { getEvolutionCredentials } from "../utils/credentials"; // Import credential utility
+import { apiServiceInstance } from "@/services/api/apiService"; // Import ApiService
+import { getEvolutionCredentials } from "../utils/credentials";
 
 
 export interface SendTextParams { // Add export
@@ -34,8 +33,8 @@ export interface SendTextResponse { // Add export
 /**
  * Sends a text message via the WhatsApp API.
  * @param params - The parameters for sending the text message.
- * @returns A promise that resolves with the API response.
- * @throws {Error} If the request fails.
+ * @returns A promise that resolves with the API response on success.
+ * @throws If fetching credentials or the API request fails.
  */
 export const sendTextService = async (params: SendTextParams): Promise<SendTextResponse> => {
   // Destructure all params including integrationId
@@ -43,13 +42,11 @@ export const sendTextService = async (params: SendTextParams): Promise<SendTextR
 
   // Removed warning about refactoring as direct call is intended.
 
-  try {
-    // 1. Fetch credentials
-    const { apiKey, baseUrl } = await getEvolutionCredentials(integrationId);
-
+  // 1. Fetch credentials (Errors will propagate up)
+  const { apiKey, baseUrl } = await getEvolutionCredentials(integrationId);
     // 2. Construct the Evolution API URL
     const apiUrl = `${baseUrl}/message/sendText/${instance}`;
-    console.log(`Frontend: Sending text directly via Evolution API: ${apiUrl}`);
+    // console.log(`Frontend: Sending text directly via Evolution API: ${apiUrl}`); // Removed log
 
     // 3. Construct the payload using logic similar to the edge function
     // Define a type for the payload structure locally if needed, or use 'any' carefully
@@ -96,92 +93,44 @@ export const sendTextService = async (params: SendTextParams): Promise<SendTextR
     }
 
 
-    console.log("Frontend: Sending payload:", JSON.stringify(evolutionPayload, null, 2));
+    // console.log("sendTextService: Sending payload:", JSON.stringify(evolutionPayload, null, 2)); // Removed log
 
-    // 4. Make the direct request to the Evolution API
-    const evoResponse = await fetch(apiUrl, {
+    // 4. Make the request using ApiService
+    const result = await apiServiceInstance.request<SendTextResponse>(apiUrl, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         "apikey": apiKey,
       },
-      body: JSON.stringify(evolutionPayload), // Use the correctly constructed payload
+      body: JSON.stringify(evolutionPayload),
     });
 
-    // 5. Check if the Evolution API request was successful
-    if (!evoResponse.ok) {
-      const errorText = await evoResponse.text();
-      console.error(`Frontend: Evolution API send text failed (${evoResponse.status}): ${errorText}`);
-      // Try to parse error details if JSON
-      let details = errorText;
-      try {
-        const jsonError = JSON.parse(errorText);
-        details = jsonError.message || jsonError.error || details;
-      } catch (e) { /* Ignore parsing error */ }
-      throw new Error(`Evolution API Send Text Error (${evoResponse.status}): ${details}`);
-    }
-
-    // 6. Parse and return the successful response
-    const result = await evoResponse.json() as SendTextResponse;
-    console.log(`Frontend: Send text successful for ${number} via instance ${instance}. Response:`, result);
+    // 5. Return the successful response (error handling done by ApiService)
+    // Logging handled by ApiService if enabled.
+    // console.log(`sendTextService: Send text successful for ${number} via instance ${instance}.`); // Removed log
     return result;
-
-  } catch (error) {
-    // Catch errors from credential fetching or fetch itself
-    console.error(`Error during sendTextService call for instance ${instance}:`, error);
-    // Rethrow the error to be handled by the caller
-    throw error;
-  }
-  /* --- Original direct fetch logic (to be removed/refactored) --- */
+  /* --- Remove the old commented-out fetch logic --- */
   /*
   const headers = {
     'Content-Type': 'application/json',
-    'apikey': evolutionApiKey, // Use imported key
+    'apikey': evolutionApiKey,
   };
 
   const body = JSON.stringify({
-    number,
-    text,
-    // Include optional parameters if they exist
-    ...(optionalData.delay !== undefined && { delay: optionalData.delay }),
-    ...(optionalData.linkPreview !== undefined && { linkPreview: optionalData.linkPreview }),
-    ...(optionalData.mentionsEveryOne !== undefined && { mentionsEveryOne: optionalData.mentionsEveryOne }),
-    ...(optionalData.mentioned && { mentioned: optionalData.mentioned }),
-    ...(optionalData.quoted && { quoted: optionalData.quoted }),
+    number, // Ensure these are defined
+    text,   // Ensure these are defined
+    // Include optional parameters
+    ...(optionalData.delay !== undefined && { delay: optionalData.delay }), // Check optionalData exists
+    ...(optionalData.linkPreview !== undefined && { linkPreview: optionalData.linkPreview }), // Check optionalData exists
+    ...(optionalData.mentionsEveryOne !== undefined && { mentionsEveryOne: optionalData.mentionsEveryOne }), // Check optionalData exists
+    ...(optionalData.mentioned && { mentioned: optionalData.mentioned }), // Check optionalData exists
+    ...(optionalData.quoted && { quoted: optionalData.quoted }), // Check optionalData exists
   });
 
   try {
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: headers,
-      body: body,
-    });
-
-    if (!response.ok) {
-      let errorData;
-      try {
-        errorData = await response.json();
-      } catch (e) {
-        // Ignore JSON parsing error if response is not JSON
-      }
-      throw new Error(
-        `Failed to send text message. Status: ${response.status}. ${errorData ? JSON.stringify(errorData) : response.statusText}`
-      );
-    }
-
-    // Assuming the API returns JSON on success
-    const responseData: SendTextResponse = await response.json();
-    return responseData;
-
+    // ... (rest of the old fetch logic) ...
   } catch (error) {
-    if (error instanceof Error && error.message.startsWith('Failed to send text message')) {
-      // Re-throw the specific error from the fetch block
-      throw error;
-    }
-    // Handle network errors or other unexpected issues
-    throw new Error(
-      `Network error or unexpected issue sending text message: ${error instanceof Error ? error.message : String(error)}`
-    );
+    // ... (old error handling) ...
   }
   */
 };

@@ -1,7 +1,8 @@
+import { apiServiceInstance } from "@/services/api/apiService"; // Import ApiService
 import { getEvolutionCredentials } from "../utils/credentials";
 
 interface SendTextPayload {
-  number: string;
+  number: string; // Recipient phone number
   text: string;
   // Add other optional fields from Evolution API docs if needed (e.g., quotedMsgId)
 }
@@ -26,36 +27,31 @@ interface EvolutionSendResponse {
  * @param instanceId The ID of the instance to send from.
  * @param integrationId The ID of the integration to fetch credentials for.
  * @param payload The message payload (number, text).
- * @returns Promise<EvolutionSendResponse> The response from the Evolution API.
- * @throws If fetching credentials or calling the Evolution API fails.
+ * @returns Promise<EvolutionSendResponse> The response from the Evolution API on success.
+ * @throws If fetching credentials or the API request fails.
  */
 export const sendTextMessage = async (
   instanceId: string | null,
   integrationId: string | null,
-  payload: SendTextPayload
-): Promise<EvolutionSendResponse> => { // Use specific return type
-
+  payload: SendTextPayload,
+): Promise<EvolutionSendResponse> => {
+  // Input validation remains the same
   if (!instanceId || !integrationId) {
-    console.error('Instance ID and Integration ID are required for sending messages.');
-    throw new Error('Instance ID and Integration ID are required.');
+    // console.error("sendTextMessage: Instance ID and Integration ID are required."); // Removed log
+    throw new Error("Instance ID and Integration ID are required for sending messages.");
   }
   if (!payload || !payload.number || !payload.text) {
-    console.error('Payload with number and text is required.');
-    throw new Error('Payload with number and text is required.');
+    // console.error("sendTextMessage: Payload with number and text is required."); // Removed log
+    throw new Error("Payload with number and text is required.");
   }
 
-  console.log(`Attempting to send text message from instance ${instanceId} (Integration: ${integrationId})...`);
-
-  try {
-    // 1. Fetch credentials
-    const { apiKey, baseUrl } = await getEvolutionCredentials(integrationId);
-
+  // 1. Fetch credentials (Errors will propagate up)
+  const { apiKey, baseUrl } = await getEvolutionCredentials(integrationId);
     // 2. Construct the Evolution API URL
     const apiUrl = `${baseUrl}/message/sendText/${instanceId}`;
-    console.log(`Frontend: Sending text directly via Evolution API: ${apiUrl}`);
 
-    // 3. Make the direct request to the Evolution API
-    const evoResponse = await fetch(apiUrl, {
+    // 3. Make the request using ApiService
+    const result = await apiServiceInstance.request<EvolutionSendResponse>(apiUrl, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -64,28 +60,8 @@ export const sendTextMessage = async (
       body: JSON.stringify(payload),
     });
 
-    // 4. Check if the Evolution API request was successful
-    if (!evoResponse.ok) {
-      const errorText = await evoResponse.text();
-      console.error(`Frontend: Evolution API send text failed (${evoResponse.status}): ${errorText}`);
-      // Try to parse error details if JSON
-      let details = errorText;
-      try {
-        const jsonError = JSON.parse(errorText);
-        details = jsonError.message || jsonError.error || details;
-      } catch (e) { /* Ignore parsing error */ }
-      throw new Error(`Evolution API Send Text Error (${evoResponse.status}): ${details}`);
-    }
-
-    // 5. Parse and return the successful response with type assertion
-    const result = await evoResponse.json() as EvolutionSendResponse;
-    console.log(`Frontend: Send text successful for instance ${instanceId}. Response:`, result);
+    // 4. Return the successful response (error handling done by ApiService)
+    // Logging handled by ApiService if enabled.
+    // console.log(`sendTextMessage: Send text successful for instance ${instanceId}.`); // Removed log
     return result;
-
-  } catch (error) {
-    // Catch errors from credential fetching or fetch itself
-    console.error(`Error during sendTextMessage service call for instance ${instanceId}:`, error);
-    // Rethrow the error to be handled by the caller
-    throw error;
-  }
 };

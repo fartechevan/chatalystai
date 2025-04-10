@@ -2,16 +2,13 @@ import { useState, useEffect, useCallback } from "react";
 import { Integration } from "../../types";
 import { useEvolutionApiConnection } from "@/integrations/evolution-api/hooks/useEvolutionApiConnection"; // Updated import path and hook name
 import { supabase } from "@/integrations/supabase/client";
-import { ConnectionState, EvolutionInstance } from "@/integrations/evolution-api/types"; // Removed CreateInstancePayload
+import { ConnectionState, EvolutionInstance, ConnectInstanceResponse } from "@/integrations/evolution-api/types"; // Added ConnectInstanceResponse import
 import { fetchEvolutionInstances } from "@/integrations/evolution-api/services/fetchInstancesService";
 import { getEvolutionCredentials } from "@/integrations/evolution-api/utils/credentials"; // Import getEvolutionCredentials
 import { useEvolutionApiConfig } from "@/integrations/evolution-api/hooks/useEvolutionApiConfig";
 import { connectToInstance as evolutionConnectToInstance } from "@/integrations/evolution-api/services/instanceConnectService";
-// Import createEvolutionInstance and the BaseMetadata type
-import { createEvolutionInstance, type BaseMetadata } from "@/integrations/evolution-api/services/createInstanceService";
+// createEvolutionInstance removed
 import { toast } from "@/components/ui/use-toast"; // Import toast for error handling
-
-// Removed local InstanceMetadata definition. BaseMetadata is imported.
 
 
 export function useIntegrationConnectionState(
@@ -23,61 +20,75 @@ export function useIntegrationConnectionState(
   // Removed showDeviceSelect state and its setter
   const [integrationMainPopup, setIntegrationMainPopup] = useState(true);
   const [integrationQRPopup, setIntegrationQRPopup] = useState(false);
+  const [showDeviceSelect, setShowDeviceSelect] = useState(false); // Re-add state for device select
   const [isConnected, setIsConnected] = useState(false);
   const [qrCodeBase64, setQrCodeBase64] = useState<string | null>(null);
   const [pairingCode, setPairingCode] = useState<string | null>(null);
 
   const { config, isLoading: configLoading } = useEvolutionApiConfig(selectedIntegration);
 
+  // Note: The useEvolutionApiConnection hook seems to be primarily for status checking now,
+  // the actual connection initiation happens in handleConnect below.
   const {
-    connectionState,
-    isLoading,
+    connectionState: evolutionHookConnectionState, // Rename to avoid conflict
+    isLoading: evolutionHookIsLoading, // Rename to avoid conflict
     checkCurrentConnectionState
-  } = useEvolutionApiConnection(selectedIntegration); // Use updated hook name
+  } = useEvolutionApiConnection(selectedIntegration);
+
+  // Local connection state, potentially updated by both hooks/actions
+  const [localConnectionState, setLocalConnectionState] = useState<ConnectionState>('unknown');
+
+  // Update local state based on the evolution hook's state
+  useEffect(() => {
+    setLocalConnectionState(evolutionHookConnectionState);
+  }, [evolutionHookConnectionState]);
+
 
   // Check connection status when the dialog is opened
   useEffect(() => {
     if (open && selectedIntegration && selectedIntegration.name === "WhatsApp" && config) {
-      checkCurrentConnectionState();
+      checkCurrentConnectionState().then(success => {
+        if (success) {
+          // Update local state after check completes if needed, though useEvolutionApiConnection should handle it
+        } else {
+          setLocalConnectionState('close'); // Assume closed if check fails initially
+        }
+      });
+    } else if (!open) {
+       setLocalConnectionState('unknown'); // Reset state when dialog closes
+       setQrCodeBase64(null);
+       setPairingCode(null);
+       setIntegrationQRPopup(false);
+       setIntegrationMainPopup(true);
     }
   }, [open, selectedIntegration, checkCurrentConnectionState, config]);
 
-  useEffect(() => {
-    // Log whenever this effect runs due to dependency changes
-    console.log(`[useIntegrationConnectionState Effect] connectionState: ${connectionState}, integrationQRPopup: ${integrationQRPopup}`);
-
-    if (connectionState === 'open' && integrationQRPopup) {
-      // Close QR popup when connection is established
-      console.log("--> Condition met: Closing QR popup and setting main popup."); // Add specific log
+  // Effect to handle closing QR popup when connection becomes 'open'
+   useEffect(() => {
+    console.log(`[useIntegrationConnectionState Effect] localConnectionState: ${localConnectionState}, integrationQRPopup: ${integrationQRPopup}`);
+    if (localConnectionState === 'open' && integrationQRPopup) {
+      console.log("--> Condition met: Closing QR popup and setting main popup.");
       setIntegrationQRPopup(false);
       setIntegrationMainPopup(true);
       setIsConnected(true);
-
-      // Call the callback function passed from IntegrationDialog
       if (onConnectionEstablished) {
         console.log("--> Calling onConnectionEstablished callback.");
-        onConnectionEstablished(); // This should trigger handleDialogChange(false) indirectly
+        onConnectionEstablished();
       }
-
-      // Fetch latest instance details and update DB
       if (selectedIntegration) {
-        // Call the function to fetch and update details
         fetchAndUpdateDetails(selectedIntegration.id);
       }
     }
-  }, [connectionState, integrationQRPopup, selectedIntegration, onConnectionEstablished]);
+   }, [localConnectionState, integrationQRPopup, selectedIntegration, onConnectionEstablished]);
+
 
   const fetchAndUpdateDetails = async (integrationId: string) => {
     console.log(`[fetchAndUpdateDetails] Starting for integration ${integrationId}`);
     try {
-      // Log the integration ID
       console.log(`[fetchAndUpdateDetails] Integration ID: ${integrationId}`);
-
-      // 1. Get Evolution API credentials from the database (via Supabase client)
       const { apiKey, baseUrl } = await getEvolutionCredentials(integrationId);
-      console.log(`[fetchAndUpdateDetails] apiKey: ${apiKey}, baseUrl: ${baseUrl}`);
+      console.log(`[fetchAndUpdateDetails] apiKey: ${apiKey ? 'Exists' : 'Missing'}, baseUrl: ${baseUrl}`); // Avoid logging key
 
-      // 2. Get the stored instance_id for this integration
       const { data: configData, error: configError } = await supabase
         .from('integrations_config')
         .select('instance_id')
@@ -86,19 +97,15 @@ export function useIntegrationConnectionState(
 
       if (configError || !configData?.instance_id) {
         console.error(`[fetchAndUpdateDetails] Error fetching config or instance_id missing for ${integrationId}:`, configError);
-        // Optionally call updateIntegrationStatus here to ensure a record exists?
-        await updateIntegrationStatus(integrationId); // Ensure record exists before trying update again maybe?
-        return; // Exit if we can't get the instance_id
+        await updateIntegrationStatus(integrationId);
+        return;
       }
       const storedInstanceId = configData.instance_id;
       console.log(`[fetchAndUpdateDetails] Found stored instance_id: ${storedInstanceId}`);
 
-      // 2. Fetch all instances from Evolution API
       const fetchedInstances = await fetchEvolutionInstances(integrationId);
       console.log(`[fetchAndUpdateDetails] Fetched ${fetchedInstances.length} instances from API.`);
 
-      // 3. Find the matching instance in the response
-      // Assuming the response structure matches EvolutionInstance[]
       const matchingInstance = fetchedInstances.find(
         (inst: EvolutionInstance) => inst.instance?.instanceId === storedInstanceId
       );
@@ -107,213 +114,163 @@ export function useIntegrationConnectionState(
         const { instanceName, ownerJid } = matchingInstance.instance;
         console.log(`[fetchAndUpdateDetails] Found matching instance: Name=${instanceName}, OwnerJid=${ownerJid}`);
 
-        // 4. Update the database record
         const { error: updateError } = await supabase
           .from('integrations_config')
           .update({
-            instance_display_name: instanceName, // Map API's instanceName to DB's instance_display_name
-            owner_id: ownerJid // Map API's ownerJid to DB's owner_id
+            instance_display_name: instanceName,
+            owner_id: ownerJid
           })
           .eq('integration_id', integrationId);
 
         if (updateError) {
           console.error(`[fetchAndUpdateDetails] Error updating integrations_config for ${integrationId}:`, updateError);
         } else {
-          console.log(`[fetchAndUpdateDetails] Successfully updated integrations_config for ${integrationId} with display name and owner_id.`);
+          console.log(`[fetchAndUpdateDetails] Successfully updated integrations_config for ${integrationId}.`);
         }
       } else {
-        console.warn(`[fetchAndUpdateDetails] Could not find matching instance with ID ${storedInstanceId} in fetched data for integration ${integrationId}.`);
+        console.warn(`[fetchAndUpdateDetails] Could not find matching instance with ID ${storedInstanceId}.`);
       }
     } catch (error) {
       console.error(`[fetchAndUpdateDetails] Error during fetch/update process for ${integrationId}:`, error);
     }
   };
 
-  // This function ensures a basic config record exists, might be redundant now?
-  // Or keep it as a fallback called from fetchAndUpdateDetails if config is missing.
   const updateIntegrationStatus = async (integrationId: string) => {
+     // Simplified: just ensures record exists, might need more logic
     try {
-      // We don't have an is_connected field, so let's just ensure there's a record
       const { data: existingConfig, error: checkError } = await supabase
         .from('integrations_config')
         .select('id')
         .eq('integration_id', integrationId)
         .maybeSingle();
 
-      if (checkError) {
-        console.error('Error checking integration config:', checkError);
-        return;
-      }
+      if (checkError) throw checkError;
 
       if (!existingConfig) {
-        // Create a new config if one doesn't exist
+        console.log(`[updateIntegrationStatus] No config found for ${integrationId}, inserting default.`);
         const { error: insertError } = await supabase
           .from('integrations_config')
-          .insert({
-            integration_id: integrationId,
-            // Add default values for required fields
-            base_url: 'https://api.evoapicloud.com'
-          });
-
-        if (insertError) {
-          console.error('Error inserting integration config:', insertError);
-        }
+          .insert({ integration_id: integrationId, base_url: 'https://api.evoapicloud.com' }); // Example default
+        if (insertError) throw insertError;
       }
     } catch (error) {
-      console.error('Error updating integration status:', error);
+      console.error('Error ensuring integration status record:', error);
     }
   };
 
-  // --- Internal function to handle NEW instance creation and connection ---
-  const _createNewInstanceAndConnect = async () => {
-    if (!selectedIntegration?.id) {
-      console.error("Integration ID is missing for create flow."); // Simplified error message
-      toast({ variant: "destructive", title: "Error", description: "Integration ID is missing." });
-      return;
-    }
-
-    // --- 1. Fetch metadata from the 'integrations' table ---
-    console.log(`[_createNewInstanceAndConnect] Fetching metadata for integration ID: ${selectedIntegration.id}`); // Changed log prefix
-    const { data: integrationData, error: integrationError } = await supabase
-      .from('integrations') // Query the 'integrations' table
-      .select('metadata') // Select the metadata JSON field
-      .eq('id', selectedIntegration.id) // Use the selected integration's ID
-      .single();
-
-    if (integrationError) {
-      console.error("Failed to fetch integration metadata:", integrationError);
-      toast({ variant: "destructive", title: "Error", description: "Could not retrieve integration metadata. Please try again." });
-      return;
-    }
-
-    if (!integrationData || !integrationData.metadata) {
-      console.error("Integration metadata is missing or empty.");
-      toast({ variant: "destructive", title: "Error", description: "Integration metadata is missing. Please check integration settings." });
-      return;
-    }
-
-    // --- 2. Validate and Use Fetched Metadata Directly ---
-    // Ensure metadata is a valid object before proceeding
-    if (typeof integrationData.metadata !== 'object' || integrationData.metadata === null) {
-      console.error("Fetched metadata is not a valid object:", integrationData.metadata);
-      toast({ variant: "destructive", title: "Error", description: "Invalid metadata format received. Please check integration settings." });
-      return;
-    }
-
-    // The fetched metadata object will be passed directly.
-    // The createEvolutionInstance service expects BaseMetadata, which allows extra properties.
-    const metadataFromDb = integrationData.metadata as BaseMetadata;
-
-    // Basic check for essential fields expected by the API (based on user example)
-    if (!metadataFromDb.instanceName || !metadataFromDb.integration) {
-       console.error("Fetched metadata is missing required fields (instanceName or integration):", metadataFromDb);
-       toast({ variant: "destructive", title: "Error", description: "Metadata from database is missing required fields (instanceName or integration)." });
-       return;
-    }
-
-    console.log(`[_createNewInstanceAndConnect] Attempting to create instance using metadata from DB:`, metadataFromDb);
-    // Pass integrationId and the *directly fetched* metadata object
-    const createResponse = await createEvolutionInstance(selectedIntegration.id, metadataFromDb);
-
-    // Use the instanceName from the *original* metadata for logging consistency if creation fails early
-    const instanceNameForLogs = metadataFromDb.instanceName || 'Unknown Instance';
-
-    if (!createResponse || !createResponse.instance?.instanceName) {
-      console.error(`Failed to create Evolution instance (${instanceNameForLogs}):`, createResponse);
-      toast({ variant: "destructive", title: "Error", description: "Failed to create WhatsApp instance. Please try again." });
-      // Optionally navigate back or reset state
-      setIntegrationMainPopup(true); // Show main popup again on error
-      return;
-    }
-
-    const newInstanceName = createResponse.instance.instanceName; // Use the name returned by API
-    console.log(`[_createNewInstanceAndConnect] Instance created successfully: ${newInstanceName}`); // Changed log prefix
-
-    // --- 3. Create new instance ---
-    console.log(`[_createNewInstanceAndConnect] Attempting to connect to new instance: ${newInstanceName}`); // Changed log prefix
-    // Pass the instance name returned by the create API and the integration ID
-    const connectResponse = await evolutionConnectToInstance(newInstanceName, selectedIntegration.id);
-
-    // Use direct properties based on last fix for connectResponse structure
-    if (connectResponse && (connectResponse.base64 || connectResponse.pairingCode)) {
-      console.log("[_createNewInstanceAndConnect] Connection successful, showing QR screen."); // Changed log prefix
-      setIntegrationMainPopup(false); // Hide main popup
-      setIntegrationQRPopup(true);    // Show QR screen
-
-      if (connectResponse.base64) {
-        const qrCodeDataUrl = connectResponse.base64.startsWith('data:image/png;base64,') ? connectResponse.base64 : `data:image/png;base64,${connectResponse.base64}`;
-        setQrCodeBase64(qrCodeDataUrl);
-      }
-      if (connectResponse.pairingCode) {
-        setPairingCode(connectResponse.pairingCode);
-      }
-    } else {
-      console.error("Failed to connect to instance.");
-      // Handle error appropriately, e.g., show a toast
-      setIntegrationMainPopup(true); // Show main popup again on error
-    }
-  };
-
-  // Modified handleConnect: Check for existing instance first
   const handleConnect = async () => {
+    console.log("[handleConnect] Function called.");
+    setLocalConnectionState('connecting'); // Set state immediately
+    setQrCodeBase64(null); // Clear previous QR/pairing codes
+    setPairingCode(null);
+
     if (!selectedIntegration?.id) {
-      console.error("Integration ID is missing for handleConnect.");
+      console.error("[handleConnect] Exiting: Integration ID is missing.");
       toast({ variant: "destructive", title: "Error", description: "Integration ID is missing." });
+      setLocalConnectionState('close');
       return;
     }
 
-    // Check if config is loaded and has an instance name
-    if (config?.instance_display_name) {
-      // --- Connect to EXISTING instance ---
-      console.log(`[handleConnect] Existing instance found: ${config.instance_display_name}. Attempting to connect directly.`);
-      try {
-        const connectResponse = await evolutionConnectToInstance(config.instance_display_name, selectedIntegration.id);
+    console.log(`[handleConnect] Checking config... configLoading: ${configLoading}, config:`, config);
+    if (configLoading) {
+        console.log("[handleConnect] Path taken: Config still loading, waiting.");
+        toast({ variant: "default", title: "Loading...", description: "Checking instance configuration..." });
+        // Keep state as 'connecting' while config loads
+        return;
+    }
 
-        // Revert: Check for QR code data within the nested 'qrcode' object based on logs
-        if (connectResponse?.qrcode && (connectResponse.qrcode.base64 || connectResponse.qrcode.pairingCode)) {
-          console.log("[handleConnect] Direct connection successful, showing QR screen.");
-          // Revert: Use nested properties for state update
-          if (connectResponse.qrcode.base64) {
-            const qrCodeDataUrl = connectResponse.qrcode.base64.startsWith('data:image/png;base64,') ? connectResponse.qrcode.base64 : `data:image/png;base64,${connectResponse.qrcode.base64}`;
-            setQrCodeBase64(qrCodeDataUrl);
-          }
-          if (connectResponse.qrcode.pairingCode) {
-            setPairingCode(connectResponse.qrcode.pairingCode);
-          }
-          setIntegrationMainPopup(false); // Hide main dialog content
-          setIntegrationQRPopup(true);    // Show QR screen
-        } else {
-          // Log the actual response if the structure is unexpected or lacks QR data
-          console.error("[handleConnect] Failed to get QR data from existing instance connection:", connectResponse);
-          toast({ variant: "destructive", title: "Connection Error", description: "Failed to retrieve QR code for the existing instance. Please try again or check configuration." });
-          // Optionally: Fallback to device select/creation? Or just show error? For now, just error.
+    // Ensure config is loaded before proceeding
+    if (!config?.instance_display_name) {
+        console.error("[handleConnect] Config loaded but instance_display_name is missing.");
+        toast({ variant: "destructive", title: "Configuration Error", description: "Instance configuration is incomplete or missing display name." });
+        setLocalConnectionState('close');
+        return;
+    }
+
+    // --- Connect to EXISTING instance ---
+    console.log(`[handleConnect] Path taken: Connect to EXISTING instance (${config.instance_display_name}).`);
+    try {
+      // Cast the response type to allow checking for flat properties potentially
+      const connectResponse = await evolutionConnectToInstance(config.instance_display_name, selectedIntegration.id) as ConnectInstanceResponse | (ConnectInstanceResponse & { base64?: string, pairingCode?: string | null });
+
+      let useBase64: string | null = null;
+      let usePairingCode: string | null = null;
+
+      // --- Start Refined Check ---
+      if (connectResponse) {
+        // Check for base64 first (nested or flat)
+        const nestedBase64 = connectResponse.qrcode?.base64;
+        // Check if 'base64' exists directly and is a string
+        const flatBase64 = ('base64' in connectResponse && typeof connectResponse.base64 === 'string') ? connectResponse.base64 : undefined;
+
+        if (nestedBase64 && typeof nestedBase64 === 'string' && nestedBase64.startsWith('data:image')) {
+          useBase64 = nestedBase64;
+        } else if (flatBase64 && flatBase64.startsWith('data:image')) { // Already checked it's a string
+          useBase64 = flatBase64;
         }
-      } catch (error) {
-        console.error("[handleConnect] Error connecting to existing instance:", error);
-        toast({ variant: "destructive", title: "Connection Error", description: "An error occurred while connecting to the existing instance." });
+
+        // If no valid base64 found, check for pairing code (nested or flat)
+        if (!useBase64) {
+          const nestedPairing = connectResponse.qrcode?.pairingCode;
+           // Check if 'pairingCode' exists directly and is a string or null
+          const flatPairing = ('pairingCode' in connectResponse && (typeof connectResponse.pairingCode === 'string' || connectResponse.pairingCode === null)) ? connectResponse.pairingCode : undefined;
+
+          if (nestedPairing && typeof nestedPairing === 'string' && nestedPairing.length > 0) {
+            usePairingCode = nestedPairing;
+          } else if (flatPairing && typeof flatPairing === 'string' && flatPairing.length > 0) { // Check specifically for non-empty string here
+            usePairingCode = flatPairing;
+          }
+        }
       }
-    } else {
-      // No existing instance found, proceed to create and connect directly
-      console.log("[handleConnect] No existing instance found in config. Proceeding to create and connect.");
-      await _createNewInstanceAndConnect(); // Call the creation/connection logic directly
+      // --- End Refined Check ---
+
+      // Now act based on what valid data was found
+      if (useBase64) {
+        console.log("[handleConnect] Using valid base64 QR code.");
+        const qrCodeDataUrl = useBase64.startsWith('data:image/png;base64,') ? useBase64 : `data:image/png;base64,${useBase64}`;
+        setQrCodeBase64(qrCodeDataUrl);
+        setPairingCode(null);
+        setLocalConnectionState('qrcode');
+        setIntegrationMainPopup(false);
+        setIntegrationQRPopup(true);
+        toast({ title: "Scan QR Code", description: "Scan the QR code with your WhatsApp." });
+      } else if (usePairingCode) {
+         console.log("[handleConnect] Using valid pairing code.");
+         setPairingCode(usePairingCode);
+         setQrCodeBase64(null);
+         setLocalConnectionState('pairingCode');
+         setIntegrationMainPopup(false);
+         setIntegrationQRPopup(true);
+         toast({ title: "Enter Pairing Code", description: "Enter the code shown on your WhatsApp." });
+      } else {
+        // Neither valid base64 nor valid pairing code found
+        const instanceStatus = connectResponse?.instance?.status;
+        console.error(`[handleConnect] Failed to get valid QR/Pairing data. Status: ${instanceStatus}. Response:`, connectResponse);
+        toast({ variant: "destructive", title: "Connection Error", description: `Failed to retrieve QR code or pairing code. Status: ${instanceStatus || 'No Status'}. Please try again.` });
+        setLocalConnectionState('close');
+      }
+    } catch (error) {
+      console.error("[handleConnect] Error connecting to existing instance:", error);
+      toast({ variant: "destructive", title: "Connection Error", description: `An error occurred while connecting: ${(error as Error).message}` });
+      setLocalConnectionState('close');
     }
   };
 
-  // Removed handleDeviceSelect function entirely
 
   return {
-    // Removed showDeviceSelect, setShowDeviceSelect, handleDeviceSelect
     integrationMainPopup,
     setIntegrationMainPopup,
     integrationQRPopup,
     setIntegrationQRPopup,
+    showDeviceSelect,
+    setShowDeviceSelect,
     isConnected,
     setIsConnected,
-    connectionState,
-    isLoading: configLoading,
+    connectionState: localConnectionState, // Return the local state
+    isLoading: configLoading || evolutionHookIsLoading, // Combine loading states if needed
     checkCurrentConnectionState,
     qrCodeBase64,
     pairingCode,
-    handleConnect, // Keep handleConnect
+    handleConnect,
   };
 }

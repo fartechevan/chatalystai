@@ -1,7 +1,18 @@
+import { apiServiceInstance } from "@/services/api/apiService";
 import type { ConnectionState } from "../types";
 
+// Interface for the expected response structure from the status endpoint
+interface InstanceStatusResponse {
+  instance?: {
+    state?: string; // The connection state string (e.g., 'open', 'close', 'connecting')
+    // other potential fields...
+  };
+  // other potential top-level fields...
+}
+
+
 /**
- * Check the status of a WhatsApp instance directly using its token.
+ * Check the status of a WhatsApp instance using ApiService.
  * @param instanceId The ID of the instance to check.
  * @param instanceToken The specific token for this instance.
  * @param baseUrl The base URL for the Evolution API.
@@ -10,65 +21,50 @@ import type { ConnectionState } from "../types";
 export const checkInstanceStatus = async (
   instanceId: string | null,
   instanceToken: string | null, // Token to use
-  baseUrl: string | null
+  baseUrl: string | null,
 ): Promise<ConnectionState> => {
-
-  // Token is now always required
   if (!instanceId || !instanceToken || !baseUrl) {
-    console.log('Instance ID, Instance Token, and Base URL are required for status check.');
-    return 'unknown';
+    // console.error("checkInstanceStatus: Instance ID, Instance Token, and Base URL are required."); // Removed log
+    return 'unknown'; // Return 'unknown' as per original logic
   }
-
-  console.log(`Checking instance status for ${instanceId}...`); // Removed integrationId log
 
   try {
     // 1. Construct the Evolution API URL
     const apiUrl = `${baseUrl}/instance/connectionState/${instanceId}`;
-    console.log(`Frontend: Checking status directly via Evolution API: ${apiUrl}`);
 
-    // 2. Build headers using the provided token
-    const headers: HeadersInit = {
-      "Content-Type": "application/json",
-      "apikey": instanceToken, // Always use the provided token
-    };
-    console.log(`Frontend: Using provided token for status check.`);
-
-
-    // 3. Make the direct request to the Evolution API
-    const evoResponse = await fetch(apiUrl, {
+    // 2. Make the request using ApiService
+    const result = await apiServiceInstance.request<InstanceStatusResponse>(apiUrl, {
       method: "GET",
-      headers: headers,
+      headers: {
+        "Content-Type": "application/json",
+        "apikey": instanceToken, // Use the provided instance token
+      },
     });
 
-    // 4. Check if the Evolution API request was successful
-    if (!evoResponse.ok) {
-      // Log specific errors but return 'unknown' or 'close' based on status
-      const errorText = await evoResponse.text();
-      console.error(`Frontend: Evolution API status check failed (${evoResponse.status}): ${errorText}`);
-      // If 404 maybe instance deleted? Treat as 'close'. Otherwise 'unknown'.
-      return evoResponse.status === 404 ? 'close' : 'unknown';
-    }
-
-    // 5. Parse the JSON response from Evolution API
-    const result = await evoResponse.json();
-    console.log(`Status check response for ${instanceId}:`, result);
-
-    // 6. Determine connection state from the successful response data (nested under 'instance')
-    const connectionStatus = result?.instance?.state; // Access nested state
-    console.log('Connection status detected:', connectionStatus);
+    // 3. Determine connection state from the successful response data
+    const connectionStatus = result?.instance?.state;
+    // console.log(`checkInstanceStatus: Connection status detected for ${instanceId}:`, connectionStatus); // Removed log
 
     if (connectionStatus === 'open') {
       return 'open';
-    } else if (connectionStatus === 'connecting') {
+    } else if (['connecting', 'qrcode', 'syncing'].includes(connectionStatus ?? '')) { // Handle potential null/undefined
       return 'connecting';
-    } else {
-      // Includes 'close' and any other unexpected states
+    } else if (connectionStatus === 'close') {
       return 'close';
+    } else {
+      // console.warn(`checkInstanceStatus: Unexpected connection status '${connectionStatus}' for instance ${instanceId}. Returning 'unknown'.`); // Removed log
+      return 'unknown';
     }
 
   } catch (error) {
-    // Catch errors from credential fetching or fetch itself
-    console.error(`Error during checkInstanceStatus service call for instance ${instanceId}:`, error);
-    return 'unknown'; // Return 'unknown' on any exception
+     // Check if the error is a 404 from the ApiService
+     if (error instanceof Error && error.message.includes('Status: 404')) {
+       // console.warn(`checkInstanceStatus: Instance ID ${instanceId} not found (Status: 404). Returning 'close'.`); // Removed log
+       return 'close'; // Treat 404 as 'close' as per original logic
+     }
+
+    // Log the specific service error context before returning 'unknown'
+    // console.error(`checkInstanceStatus: Error checking status for instance ${instanceId}:`, error); // Removed log
+    return 'unknown'; // Return 'unknown' on any other exception
   }
 };
