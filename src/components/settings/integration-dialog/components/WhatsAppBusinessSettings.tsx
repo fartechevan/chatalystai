@@ -122,12 +122,31 @@ export function WhatsAppBusinessSettings({ selectedIntegration, onConnect }: Wha
         if (allInstancesResult.length === 0) {
           console.log("No instances found on the server for this integration.");
           setNoInstanceFoundFromServer(true);
-          // If config existed but no live instance, update status
+          // If config existed but no live instance, clear the stale config
           if (configuredInstanceId) {
-             // This line still had the incorrect 'status' field. Removing it.
-             // console.log(`No live instances found, but config exists for ${configuredInstanceId}. Updating status to 'close'.`);
-             // await supabase.from('integrations_config').update({ status: 'close' }).eq('integration_id', selectedIntegration.id);
-             console.log(`No live instances found, but config exists for ${configuredInstanceId}. No DB update needed.`);
+             console.log(`No live instances found, but config exists for ${configuredInstanceId}. Clearing stored config.`);
+             // Clear the stale configuration from the database
+             const { error: clearConfigError } = await supabase
+               .from('integrations_config')
+               .update({
+                 instance_id: null,
+                 token: null,
+                 instance_display_name: null
+               })
+               .eq('integration_id', selectedIntegration.id);
+
+             if (clearConfigError) {
+               console.error(`Error clearing stale config for integration ${selectedIntegration.id} (no live instances):`, clearConfigError);
+               toast({
+                 title: "Config Sync Warning",
+                 description: `Could not clear stale configuration for missing instance ${configuredInstanceId}.`,
+                 variant: "destructive"
+               });
+             } else {
+               console.log(`Successfully cleared stale config for missing live instance ${configuredInstanceId} (no live instances).`);
+               // Invalidate the config query to reflect the cleared state
+               await queryClient.invalidateQueries({ queryKey: ['integration-config', selectedIntegration.id] });
+             }
           }
           setIsFetchingLive(false);
           return;
@@ -200,28 +219,38 @@ export function WhatsAppBusinessSettings({ selectedIntegration, onConnect }: Wha
           // Update the UI state with the live instance details
           console.log("Setting LIVE instance details state:", targetInstance);
           setInstanceDetails(targetInstance);
+          // Invalidate config query in case display name/token was updated
+          await queryClient.invalidateQueries({ queryKey: ['integration-config', selectedIntegration.id] });
 
-        } else {
+        } else if (configuredInstanceId) { // Only run this block if a config ID *existed* but wasn't found live
            // Configured instance ID exists in DB, but no matching live instance found
-           console.log(`Latest configured instance ID ${configuredInstanceId} not found in live results. Assuming disconnected/deleted.`);
+           console.log(`Latest configured instance ID ${configuredInstanceId} not found in live results. Clearing stored config.`);
            connectionStatus = 'close'; // Keep this for UI logic
 
-           // Configured instance not found live. We don't need to update the DB config here,
-           // as the absence of a live match implies it's disconnected.
-           // The UI state `instanceDetails` being set to null handles the display.
-           console.log(`Latest configured instance ID ${configuredInstanceId} not found live. No DB update needed for integrations_config.`);
-           // const { error: updateStatusError } = await supabase
-           //   .from('integrations_config')
-           //   .update({ status: connectionStatus }) // REMOVED - status not in integrations_config
-           //   .eq('integration_id', selectedIntegration.id);
+           // Clear the stale configuration from the database
+           const { error: clearConfigError } = await supabase
+             .from('integrations_config')
+             .update({
+               instance_id: null,
+               token: null,
+               instance_display_name: null
+             })
+             .eq('integration_id', selectedIntegration.id);
 
-           // if (updateStatusError) {
-           //   console.error(`Error updating status to '${connectionStatus}' for integration ${selectedIntegration.id}:`, updateStatusError);
-           //   // Don't necessarily toast here, might be expected if instance was deleted
-           // } else {
-           //   // This log message was incorrect as no update happened.
-           //   // console.log(`Successfully updated status to '${connectionStatus}' for missing live instance ${configuredInstanceId}.`);
-           // }
+           if (clearConfigError) {
+             console.error(`Error clearing stale config for integration ${selectedIntegration.id}:`, clearConfigError);
+             // Optionally toast or throw, but clearing is best effort here
+             toast({
+               title: "Config Sync Warning",
+               description: `Could not clear stale configuration for missing instance ${configuredInstanceId}.`,
+               variant: "destructive" // Use destructive for errors
+             });
+           } else {
+             console.log(`Successfully cleared stale config for missing live instance ${configuredInstanceId}.`);
+             // Invalidate the config query to reflect the cleared state
+             await queryClient.invalidateQueries({ queryKey: ['integration-config', selectedIntegration.id] });
+           }
+
            // Clear the UI state as the configured instance isn't live
            setInstanceDetails(null);
         }
