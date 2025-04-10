@@ -24,6 +24,7 @@ export function useIntegrationConnectionState(
   const [isConnected, setIsConnected] = useState(false);
   const [qrCodeBase64, setQrCodeBase64] = useState<string | null>(null);
   const [pairingCode, setPairingCode] = useState<string | null>(null);
+  const [qrPollingInterval, setQrPollingInterval] = useState<NodeJS.Timeout | null>(null); // State for polling interval
 
   const { config, isLoading: configLoading } = useEvolutionApiConfig(selectedIntegration);
 
@@ -63,23 +64,65 @@ export function useIntegrationConnectionState(
     }
   }, [open, selectedIntegration, checkCurrentConnectionState, config]);
 
-  // Effect to handle closing QR popup when connection becomes 'open'
+  // Effect to handle state changes when connection becomes 'open' while QR popup is active
    useEffect(() => {
-    console.log(`[useIntegrationConnectionState Effect] localConnectionState: ${localConnectionState}, integrationQRPopup: ${integrationQRPopup}`);
+    // Only proceed if the state is 'open' and the QR popup is currently shown
     if (localConnectionState === 'open' && integrationQRPopup) {
-      console.log("--> Condition met: Closing QR popup and setting main popup.");
+      console.log("[Connection Open Effect] State is 'open' and QR popup is active. Updating state...");
+
+      // Update internal states first to switch the view
       setIntegrationQRPopup(false);
       setIntegrationMainPopup(true);
-      setIsConnected(true);
+      setIsConnected(true); // Mark as connected
+
+      // Call the callback *after* setting state. This callback should handle
+      // notifying the parent component (e.g., closing the dialog).
       if (onConnectionEstablished) {
-        console.log("--> Calling onConnectionEstablished callback.");
+        console.log("[Connection Open Effect] Calling onConnectionEstablished callback.");
         onConnectionEstablished();
       }
+
+      // Fetch details in the background after triggering the UI change
       if (selectedIntegration) {
+        // Intentionally not awaiting this, let it run in background
         fetchAndUpdateDetails(selectedIntegration.id);
       }
     }
-   }, [localConnectionState, integrationQRPopup, selectedIntegration, onConnectionEstablished]);
+    // No else needed, this effect only acts when the specific condition is met
+   }, [localConnectionState, integrationQRPopup, selectedIntegration, onConnectionEstablished]); // Dependencies seem correct
+
+  // Effect for polling during QR code/pairing code phase
+  useEffect(() => {
+    // Clear any existing interval first
+    if (qrPollingInterval) {
+      clearInterval(qrPollingInterval);
+      setQrPollingInterval(null);
+    }
+
+    // Start polling only if in qrcode or pairingCode state
+    if (localConnectionState === 'qrcode' || localConnectionState === 'pairingCode') {
+      console.log(`[Polling Effect] Starting polling for state: ${localConnectionState}`);
+      const intervalId = setInterval(async () => {
+        console.log(`[Polling Interval] Checking connection state (current: ${localConnectionState})...`);
+        // Call the check function. The state update will be handled by useEvolutionApiConnection's effect
+        // which updates localConnectionState, triggering the outer effect's cleanup/check.
+        await checkCurrentConnectionState();
+      }, 3000); // Poll every 3 seconds
+      setQrPollingInterval(intervalId);
+    } else {
+       console.log(`[Polling Effect] State is ${localConnectionState}, not starting/clearing polling.`);
+    }
+
+    // Cleanup function to clear interval on unmount or state change
+    return () => {
+      if (qrPollingInterval) {
+        console.log("[Polling Cleanup] Clearing interval.");
+        clearInterval(qrPollingInterval);
+        setQrPollingInterval(null);
+      }
+    };
+  // Depend only on the state that triggers polling and the check function itself
+  }, [localConnectionState, checkCurrentConnectionState]);
 
 
   const fetchAndUpdateDetails = async (integrationId: string) => {
