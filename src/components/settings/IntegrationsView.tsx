@@ -9,6 +9,7 @@ import { IntegrationCard } from "./integration-card/IntegrationCard";
 import type { Integration, ConnectionState } from "./types";
 import { useToast } from "@/hooks/use-toast";
 import { checkInstanceStatus } from "@/integrations/evolution-api/services/instanceStatusService";
+// Removed evolutionApiKey import as it's handled server-side
 
 interface IntegrationsViewProps {
   isActive: boolean; // Prop to control loading
@@ -16,31 +17,23 @@ interface IntegrationsViewProps {
 
 const tabs = ["All", "Connected"];
 
-// Define the proper structure for joined integration data
-interface JoinedIntegrationData extends Integration {
-  integrations_config?: {
-    instance_id?: string;
-    token?: string;
-    connection_status?: string;
-  } | null | Array<{
-    instance_id?: string;
-    token?: string;
-    connection_status?: string;
-  }>;
-}
-
 export function IntegrationsView({ isActive }: IntegrationsViewProps) {
   const [activeTab, setActiveTab] = useState("All");
   const [searchQuery, setSearchQuery] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedIntegration, setSelectedIntegration] = useState<Integration | null>(null);
+  // Remove integrationStatuses state, status comes from query
+  // const [integrationStatuses, setIntegrationStatuses] = useState<Record<string, ConnectionState>>({});
   const { toast } = useToast();
 
-  // Fetch integrations joined with config, including the new connection_status field
+  // Fetch integrations joined with config, including the new status field
   const { data: integrations = [], isLoading, refetch } = useQuery({
-    queryKey: ['integrationsWithConfig'],
+    queryKey: ['integrationsWithConfig'], // Changed queryKey to reflect joined data
     queryFn: async () => {
       console.log("Fetching integrations joined with config...");
+      // Fetch data by joining integrations and integrations_config
+      // Assuming 'integrations_config' has 'integration_id', 'instance_id', 'token', 'status'
+      // Assuming 'integrations' has 'id', 'name', 'base_url', etc.
       const { data, error } = await supabase
         .from('integrations')
         .select(`
@@ -48,7 +41,7 @@ export function IntegrationsView({ isActive }: IntegrationsViewProps) {
           integrations_config (
             instance_id,
             token,
-            connection_status
+            connection_status: status
           )
         `)
         .order('name');
@@ -58,39 +51,56 @@ export function IntegrationsView({ isActive }: IntegrationsViewProps) {
         throw error;
       }
 
+      // Define a type for the joined data structure
+      // Include original 'status' (availability) and aliased 'connection_status'
+      type JoinedIntegrationData = Omit<Integration, 'type' | 'status' | 'connectionStatus'> & {
+        type?: string;
+        status?: 'available' | 'coming_soon' | string; // Availability status from integrations table
+        integrations_config: {
+          instance_id?: string;
+          token?: string;
+          connection_status?: string; // Connection status from integrations_config table
+        } | null | Array<{
+          instance_id?: string;
+          token?: string;
+          connection_status?: string;
+        }>;
+      };
+
       // Process the data: flatten the structure and ensure types
-      const processedData = data.map((item: JoinedIntegrationData) => {
-        // Handle array or single object or null
+      const processedData = data.map((item: JoinedIntegrationData) => { // Use the specific type
         const config = Array.isArray(item.integrations_config)
-          ? item.integrations_config[0]
+          ? item.integrations_config[0] // Supabase might return an array
           : item.integrations_config;
 
         return {
-          ...item,
+          ...item, // Spread integration fields
           instance_id: config?.instance_id,
           token: config?.token,
-          status: item.status || 'unknown',
+          status: item.status || 'unknown', // Keep original availability status
+          // Assign the connection status from the config table
           connectionStatus: (config?.connection_status as ConnectionState) || 'unknown',
-          integrations_config: undefined,
+          integrations_config: undefined, // Remove the nested object
           type: item.type || "messenger",
-        } as Integration & { instance_id?: string; token?: string };
+        } as Integration & { instance_id?: string; token?: string }; // Assert the final type
       });
 
-      // Manually add WhatsApp Cloud API if not present
-      const whatsappCloudApi: Integration = {
-        id: "whatsapp-cloud-api",
-        name: "WhatsApp Cloud API",
-        description: "Connect your WhatsApp Business account through Facebook.",
-        icon_url: "/lovable-uploads/8d699109-6446-4dd5-b026-f2f32a953f05.png",
-        status: "unknown",
-        base_url: "https://api.evoapicloud.com",
-        type: "messenger"
-      };
+      // Manually add WhatsApp Cloud API if not present (consider fetching this differently)
+       const whatsappCloudApi: Integration = {
+         id: "whatsapp-cloud-api",
+         name: "WhatsApp Cloud API",
+         description: "Connect your WhatsApp Business account through Facebook.",
+         icon_url: "/lovable-uploads/8d699109-6446-4dd5-b026-f2f32a953f05.png",
+         status: "unknown", // Default status
+         base_url: "https://api.evoapicloud.com",
+         type: "messenger"
+       };
 
       const hasWhatsAppCloudApi = processedData.some(integration =>
         integration.name === "WhatsApp Cloud API"
       );
 
+      // Add manual entry if it doesn't exist in the DB result
       return hasWhatsAppCloudApi ? processedData : [...processedData, whatsappCloudApi];
     },
     enabled: isActive,
@@ -117,26 +127,30 @@ export function IntegrationsView({ isActive }: IntegrationsViewProps) {
       }
 
       // Update the status in the integrations_config table
-      console.log(`Updating connection_status in DB for integration ${integrationId} to ${finalStatus}...`);
-      // Update the 'connection_status' column
+      console.log(`Updating status in DB for integration ${integrationId} to ${finalStatus}...`);
+      // Update the 'status' column in the database using the finalStatus
       const { error: updateError } = await supabase
         .from('integrations_config')
-        .update({ connection_status: finalStatus as string })
+        .update({ status: finalStatus as string }) // Update the actual 'status' column
         .eq('integration_id', integrationId);
 
       if (updateError) {
-        console.error(`Error updating connection_status in DB for ${integrationId}:`, updateError);
+        console.error(`Error updating status in DB for ${integrationId}:`, updateError);
         toast({ title: "DB Update Error", description: `Failed to save status: ${updateError.message}`, variant: "destructive" });
       } else {
-        console.log(`Successfully updated connection_status in DB for ${integrationId}.`);
+        console.log(`Successfully updated status in DB for ${integrationId}.`);
+        // Trigger refetch to get the updated status from DB
         refetch();
       }
 
     } catch (error) {
       console.error(`Error during updateAndRefreshStatus for ${integrationId}:`, error);
-      finalStatus = 'unknown';
+      finalStatus = 'unknown'; // Keep status as unknown on error
+       // Optionally update DB to 'unknown' on error? Depends on desired behavior.
+       // For now, we just log and don't update DB on check *failure*
     }
   };
+
 
   const connectWhatsApp = async (integration: Integration & { instance_id?: string; token?: string }) => {
     setSelectedIntegration(integration);
@@ -219,12 +233,16 @@ export function IntegrationsView({ isActive }: IntegrationsViewProps) {
   // Map integrations and merge with dynamic status from state
   const integrationsList = integrations.map(integration => ({
     ...integration,
+    // Status now comes directly from the fetched data (already defaulted to 'unknown')
+    // status: integrationStatuses[integration.id] || integration.status || 'unknown',
     type: integration.type || "messenger"
+    // Removed is_connected field
   }));
 
   const filteredIntegrations = integrationsList.filter(integration => {
     const matchesSearch = integration.name.toLowerCase().includes(searchQuery.toLowerCase());
     if (activeTab === "Connected") {
+      // Filter based on connectionStatus being 'open'
       return matchesSearch && integration.connectionStatus === 'open';
     }
     return matchesSearch;

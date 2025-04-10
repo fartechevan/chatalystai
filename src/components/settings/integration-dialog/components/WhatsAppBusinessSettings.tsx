@@ -139,7 +139,7 @@ export function WhatsAppBusinessSettings({ selectedIntegration, onConnect }: Wha
           }
           console.log(`Mapped fetched status '${fetchedStatus}' to connectionStatus '${connectionStatus}'`);
 
-          console.log(`Attempting to upsert config for integration ${selectedIntegration.id} (Instance: ${fetchedInstanceId}) with connection_status: ${connectionStatus}`);
+          console.log(`Attempting to upsert config for integration ${selectedIntegration.id} (Instance: ${fetchedInstanceId}) with status: ${connectionStatus}`);
           const { error: upsertError } = await supabase
             .from('integrations_config')
             .upsert(
@@ -148,7 +148,7 @@ export function WhatsAppBusinessSettings({ selectedIntegration, onConnect }: Wha
                 instance_id: fetchedInstanceId,
                 token: fetchedToken,
                 instance_display_name: displayName,
-                connection_status: connectionStatus
+                status: connectionStatus // Use the mapped status
               },
               { onConflict: 'integration_id' }
             );
@@ -167,17 +167,17 @@ export function WhatsAppBusinessSettings({ selectedIntegration, onConnect }: Wha
            console.log(`Configured instance ID ${configuredInstanceId} not found in fetch results. Assuming disconnected/deleted.`);
            connectionStatus = 'close';
 
-           console.log(`Attempting to update connection_status to '${connectionStatus}' for integration ${selectedIntegration.id} (Instance ID: ${configuredInstanceId})`);
+           console.log(`Attempting to update status to '${connectionStatus}' for integration ${selectedIntegration.id} (Instance ID: ${configuredInstanceId})`);
            const { error: updateStatusError } = await supabase
              .from('integrations_config')
-             .update({ connection_status: connectionStatus as string })
+             .update({ status: connectionStatus as string }) // Add cast here
              .eq('integration_id', selectedIntegration.id);
 
            if (updateStatusError) {
-             console.error(`Error updating connection_status to '${connectionStatus}' for integration ${selectedIntegration.id}:`, updateStatusError);
+             console.error(`Error updating status to '${connectionStatus}' for integration ${selectedIntegration.id}:`, updateStatusError);
              toast({ title: "Status Update Failed", description: `Could not update status for missing instance: ${updateStatusError.message}`, variant: "destructive" });
            } else {
-             console.log(`Successfully updated connection_status to '${connectionStatus}' for missing instance ${configuredInstanceId}.`);
+             console.log(`Successfully updated status to '${connectionStatus}' for missing instance ${configuredInstanceId}.`);
            }
            setInstanceDetails(null);
         }
@@ -197,7 +197,7 @@ export function WhatsAppBusinessSettings({ selectedIntegration, onConnect }: Wha
     };
 
     fetchAndConfigureInstance();
-  }, [selectedIntegration?.id, config, queryClient, toast]);
+  }, [selectedIntegration?.id, config, queryClient, toast]); // Added missing dependencies
 
   const handleLogout = async (instanceName: string) => {
     if (!selectedIntegration?.id || !instanceName) return;
@@ -323,7 +323,7 @@ export function WhatsAppBusinessSettings({ selectedIntegration, onConnect }: Wha
                 instance_id: fetchedInstanceId,
                 token: fetchedToken,
                 instance_display_name: displayName,
-                connection_status: 'unknown'
+                status: 'unknown' // Set initial status
               },
               { onConflict: 'integration_id' }
             );
@@ -456,77 +456,73 @@ export function WhatsAppBusinessSettings({ selectedIntegration, onConnect }: Wha
 
           <div className="mt-8">
             {config?.instance_id ? (
-              <div className="border rounded-md">
-                <ScrollArea className="h-[200px]">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Configured Name</TableHead>
-                        <TableHead>Pipeline</TableHead>
-                        <TableHead>Live Status</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      <TableRow key={config.instance_id}>
-                        <TableCell className="font-medium">{config.instance_display_name || config.instance_id || 'N/A'}</TableCell>
-                        <TableCell>
-                          <select className="border rounded-md px-2 py-1">
-                            <option>Default Pipeline</option>
-                          </select>
-                        </TableCell>
-                        <TableCell>
-                          {isConnected(instanceDetails) ? (
-                            <div className="flex items-center justify-between">
-                              <CheckCircle className="h-5 w-5 text-green-500" />
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-6 w-6 p-0"
-                                onClick={() => instanceDetails?.instance?.instanceName && handleLogout(instanceDetails.instance.instanceName)}
-                                disabled={!instanceDetails?.instance?.instanceName || isLogoutLoading === instanceDetails.instance.instanceName}
-                                title="Disconnect"
-                              >
-                                {isLogoutLoading === instanceDetails?.instance?.instanceName ? (
-                                  <Loader2 className="h-4 w-4 animate-spin" />
-                                ) : (
-                                  <X className="h-4 w-4 text-gray-400 hover:text-red-500" />
-                                )}
-                              </Button>
-                            </div>
-                          ) : (
-                            <div className="flex items-center justify-end space-x-2">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={onConnect}
-                                disabled={isDeleteLoading}
-                                title="Connect Instance"
-                              >
-                                 Connect
-                               </Button>
-                               <Button
-                                 variant="destructive"
-                                size="sm"
-                                onClick={handleDelete}
-                                disabled={isDeleteLoading}
-                                title="Delete Instance"
-                                className="h-6 w-6 p-0"
-                              >
-                                {isDeleteLoading ? (
-                                  <Loader2 className="h-4 w-4 animate-spin" />
-                                ) : (
-                                  <Trash2 className="h-4 w-4" />
-                                )}
-                                <span className="sr-only">Delete Instance</span>
-                              </Button>
-                            </div>
-                          )}
-                        </TableCell>
-                      </TableRow>
-                    </TableBody>
-                  </Table>
-                </ScrollArea>
-              </div>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Configured Name</TableHead>
+                    <TableHead>Pipeline</TableHead>
+                    <TableHead>Live Status</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  <TableRow key={config.instance_id}>
+                    <TableCell className="font-medium">{config.instance_display_name || config.instance_id || 'N/A'}</TableCell>
+                    <TableCell>
+                      <select className="border rounded-md px-2 py-1">
+                        <option>Default Pipeline</option>
+                      </select>
+                    </TableCell>
+                    <TableCell>
+                      {isConnected(instanceDetails) ? (
+                        <div className="flex items-center justify-between">
+                          <CheckCircle className="h-5 w-5 text-green-500" />
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-6 w-6 p-0"
+                            onClick={() => instanceDetails?.instance?.instanceName && handleLogout(instanceDetails.instance.instanceName)}
+                            disabled={!instanceDetails?.instance?.instanceName || isLogoutLoading === instanceDetails.instance.instanceName}
+                            title="Disconnect"
+                          >
+                            {isLogoutLoading === instanceDetails?.instance?.instanceName ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <X className="h-4 w-4 text-gray-400 hover:text-red-500" />
+                            )}
+                          </Button>
+                        </div>
+                      ) : (
+                        <div className="flex items-center justify-end space-x-2">
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={onConnect}
+                            disabled={isDeleteLoading}
+                            title="Connect Instance"
+                          >
+                             Connect
+                           </Button>
+                           <Button
+                             variant="destructive"
+                            size="sm"
+                            onClick={handleDelete}
+                            disabled={isDeleteLoading}
+                            title="Delete Instance"
+                            className="h-6 w-6 p-0"
+                          >
+                            {isDeleteLoading ? (
+                              <Loader2 className="h-4 w-4 animate-spin" />
+                            ) : (
+                              <Trash2 className="h-4 w-4" />
+                            )}
+                            <span className="sr-only">Delete Instance</span>
+                          </Button>
+                        </div>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                </TableBody>
+              </Table>
             ) : (
                <p className="text-muted-foreground">Instance configuration not found.</p>
             )}

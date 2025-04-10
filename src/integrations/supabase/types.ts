@@ -235,7 +235,6 @@ export type Database = {
           instance_id: string | null
           integration_id: string
           owner_id: string | null
-          status: string | null
           token: string | null
           updated_at: string
           user_reference_id: string | null
@@ -247,7 +246,6 @@ export type Database = {
           instance_id?: string | null
           integration_id: string
           owner_id?: string | null
-          status?: string | null
           token?: string | null
           updated_at?: string
           user_reference_id?: string | null
@@ -259,7 +257,6 @@ export type Database = {
           instance_id?: string | null
           integration_id?: string
           owner_id?: string | null
-          status?: string | null
           token?: string | null
           updated_at?: string
           user_reference_id?: string | null

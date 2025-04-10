@@ -1,28 +1,24 @@
 
 import { Send, Smile } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
 import { useState } from "react";
-import { UseMutationResult } from "@tanstack/react-query";
+import { Textarea } from "@/components/ui/textarea";
 
 interface MessageInputProps {
   newMessage: string;
   setNewMessage: (message: string) => void;
   handleSendMessage: () => void;
-  sendMessageMutation: UseMutationResult<any, Error, string, unknown>;  // Use 'any' to handle different return types
-  isWhatsAppConversation?: boolean;
-  isLoading?: boolean;
-  selectedConversation?: boolean;
+  isLoading: boolean;
+  selectedConversation: boolean;
 }
 
 export function MessageInput({
   newMessage,
   setNewMessage,
   handleSendMessage,
-  sendMessageMutation,
-  isWhatsAppConversation = false,
-  isLoading = false,
-  selectedConversation = true
+  isLoading,
+  selectedConversation
 }: MessageInputProps) {
   const [rows, setRows] = useState(1);
 
@@ -57,7 +53,7 @@ export function MessageInput({
         <Button 
           size="icon"
           onClick={handleSendMessage}
-          disabled={!selectedConversation || !newMessage.trim() || sendMessageMutation.isPending}
+          disabled={!selectedConversation || !newMessage.trim() || isLoading}
         >
           <Send className="h-5 w-5" />
         </Button>
