@@ -1,26 +1,22 @@
 
-import React, { useState } from "react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
+import { useParams } from "react-router-dom";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { useToast } from "@/hooks/use-toast";
+import { Plus, Search, X } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Button } from "@/components/ui/button";
-import { Check, Loader2, Plus, Trash2 } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
-import { ScrollArea } from "@/components/ui/scroll-area";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
-interface IntegrationAccessDialogProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  integrationConfigId: string | null;
-  integrationName: string;
-}
-
-// Define types for our data
+// Define types for the access record and profile
 interface Profile {
   id: string;
-  name: string | null;
+  name: string;
   email: string;
   role: string;
 }
@@ -28,229 +24,275 @@ interface Profile {
 interface AccessRecord {
   id: string;
   profile_id: string;
-  profiles: {
-    id: string;
-    name: string | null;
-    email: string;
-    role: string;
-  };
+  profiles: Profile; // This should match the structure we'll get from our modified query
 }
 
 export function IntegrationAccessDialog({
   open,
-  onOpenChange,
+  setOpen,
   integrationConfigId,
-  integrationName,
-}: IntegrationAccessDialogProps) {
+}: {
+  open: boolean;
+  setOpen: (open: boolean) => void;
+  integrationConfigId: string;
+}) {
   const { toast } = useToast();
-  const [selectedProfileId, setSelectedProfileId] = useState<string | null>(null);
-  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedProfiles, setSelectedProfiles] = useState<string[]>([]);
 
-  // Fetch all user profiles (admin only)
-  const { data: profiles = [], isLoading: isLoadingProfiles } = useQuery<Profile[]>({
-    queryKey: ["profiles"],
+  // Fetch existing access records for this integration config
+  const { data: existingAccess, isLoading, refetch } = useQuery({
+    queryKey: ['integration-access', integrationConfigId],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("profiles")
-        .select("id, name, email, role")
-        .order("name");
+      // First fetch access records
+      const { data: accessData, error: accessError } = await supabase
+        .from('profile_integration_access')
+        .select('id, profile_id')
+        .eq('integration_config_id', integrationConfigId);
 
-      if (error) throw error;
-      return data || [];
-    },
-    enabled: open,
-  });
+      if (accessError) throw new Error(accessError.message);
 
-  // Fetch profiles that already have access to this integration
-  const { data: accessList = [], isLoading: isLoadingAccess, refetch: refetchAccess } = useQuery<AccessRecord[]>({
-    queryKey: ["integration-access", integrationConfigId],
-    queryFn: async () => {
-      if (!integrationConfigId) return [];
-
-      // We need to specify the exact column to use for the join
-      const { data, error } = await supabase
-        .from("profile_integration_access")
-        .select(`
-          id,
-          profile_id,
-          profiles(id, name, email, role)
-        `)
-        .eq("integration_config_id", integrationConfigId);
+      // Then fetch profile details for each access record
+      const profileData: AccessRecord[] = [];
+      
+      if (accessData && accessData.length > 0) {
+        for (const record of accessData) {
+          const { data: profileInfo, error: profileError } = await supabase
+            .from('profiles')
+            .select('id, name, email, role')
+            .eq('id', record.profile_id)
+            .single();
           
-      if (error) throw error;
-      return data as AccessRecord[];
+          if (!profileError && profileInfo) {
+            profileData.push({
+              id: record.id,
+              profile_id: record.profile_id,
+              profiles: profileInfo
+            });
+          }
+        }
+      }
+      
+      return profileData;
     },
-    enabled: !!integrationConfigId && open,
+    enabled: open && !!integrationConfigId
   });
 
-  // Function to grant access to a profile
-  const grantAccess = async () => {
-    if (!selectedProfileId || !integrationConfigId) return;
+  // Fetch available profiles that could be granted access
+  const { data: availableProfiles, isLoading: loadingProfiles } = useQuery({
+    queryKey: ['profiles'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, name, email, role');
 
-    setIsSubmitting(true);
+      if (error) throw error;
+      return data;
+    },
+    enabled: open
+  });
 
+  // Filter profiles that don't already have access
+  const filteredProfiles = availableProfiles?.filter(profile => {
+    // Only show profiles that don't already have access
+    const hasAccess = existingAccess?.some(access => access.profile_id === profile.id);
+    // And match the search query (if any)
+    const matchesSearch = !searchQuery || 
+      profile.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+      profile.email.toLowerCase().includes(searchQuery.toLowerCase());
+    
+    return !hasAccess && matchesSearch;
+  });
+
+  // Handle granting access to selected profiles
+  const handleGrantAccess = async () => {
+    if (selectedProfiles.length === 0) return;
+    
     try {
-      // Direct insert instead of RPC call
+      const newAccessRecords = selectedProfiles.map(profileId => ({
+        profile_id: profileId,
+        integration_config_id: integrationConfigId
+      }));
+      
       const { error } = await supabase
         .from('profile_integration_access')
-        .insert({
-          profile_id: selectedProfileId,
-          integration_config_id: integrationConfigId
-        });
-
-      if (error) {
-        if (error.code === "23505") {
-          toast({
-            title: "Access already granted",
-            description: "This user already has access to this integration.",
-            variant: "destructive",
-          });
-        } else {
-          throw error;
-        }
-      } else {
-        toast({
-          title: "Access granted",
-          description: "The selected user now has access to this integration.",
-        });
-        refetchAccess();
-      }
-    } catch (error) {
-      console.error("Error granting access:", error);
+        .insert(newAccessRecords);
+        
+      if (error) throw error;
+      
       toast({
-        title: "Error",
-        description: `Failed to grant access: ${(error as Error).message}`,
-        variant: "destructive",
+        title: "Access granted",
+        description: `Added ${selectedProfiles.length} users to this integration.`
       });
-    } finally {
-      setIsSubmitting(false);
-      setSelectedProfileId(null);
+      
+      setSelectedProfiles([]);
+      refetch();
+    } catch (error) {
+      console.error('Failed to grant access:', error);
+      toast({
+        variant: "destructive",
+        title: "Failed to grant access",
+        description: (error as Error).message,
+      });
     }
   };
 
-  // Function to revoke access from a profile
-  const revokeAccess = async (accessId: string) => {
-    if (!accessId) return;
-
-    setIsSubmitting(true);
-
+  // Handle revoking access for a profile
+  const handleRevokeAccess = async (accessId: string, profileName: string) => {
     try {
-      // Direct delete instead of RPC call
       const { error } = await supabase
         .from('profile_integration_access')
         .delete()
         .eq('id', accessId);
-
+        
       if (error) throw error;
-
+      
       toast({
         title: "Access revoked",
-        description: "The user no longer has access to this integration.",
+        description: `Removed ${profileName} from this integration.`
       });
-      refetchAccess();
+      
+      refetch();
     } catch (error) {
-      console.error("Error revoking access:", error);
+      console.error('Failed to revoke access:', error);
       toast({
-        title: "Error",
-        description: `Failed to revoke access: ${(error as Error).message}`,
         variant: "destructive",
+        title: "Failed to revoke access",
+        description: (error as Error).message,
       });
-    } finally {
-      setIsSubmitting(false);
     }
   };
 
-  // Filter out profiles that already have access
-  const availableProfiles = profiles.filter(
-    profile => !accessList?.some(access => access.profile_id === profile.id)
-  );
-
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-md">
+    <Dialog open={open} onOpenChange={setOpen}>
+      <DialogContent className="max-w-xl">
         <DialogHeader>
-          <DialogTitle>Integration Access</DialogTitle>
+          <DialogTitle>Manage Access</DialogTitle>
           <DialogDescription>
-            Manage who can access the {integrationName} integration.
+            Control who has access to this integration.
           </DialogDescription>
         </DialogHeader>
-
-        <div className="flex flex-col gap-4 py-4">
-          <div className="flex flex-col gap-2">
-            <h4 className="text-sm font-medium">Add Access</h4>
-            <div className="flex items-center gap-2">
-              <div className="flex-1">
-                <Select
-                  value={selectedProfileId || ""}
-                  onValueChange={setSelectedProfileId}
-                  disabled={isSubmitting}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select user" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {availableProfiles.map(profile => (
-                      <SelectItem key={profile.id} value={profile.id}>
-                        {profile.name || profile.email}
-                      </SelectItem>
+        
+        <div className="flex flex-col gap-6">
+          {/* Current Access List */}
+          <div>
+            <h3 className="text-sm font-medium mb-2">Current Access</h3>
+            <div className="border rounded-md">
+              {isLoading ? (
+                <div className="p-4 space-y-3">
+                  <Skeleton className="h-6 w-full" />
+                  <Skeleton className="h-6 w-full" />
+                </div>
+              ) : existingAccess && existingAccess.length > 0 ? (
+                <ScrollArea className="h-[200px]">
+                  <div className="p-4 space-y-2">
+                    {existingAccess.map((access) => (
+                      <div 
+                        key={access.id}
+                        className="flex items-center justify-between py-2 px-3 rounded-md hover:bg-muted/50"
+                      >
+                        <div className="flex items-center gap-2">
+                          <Avatar className="h-8 w-8">
+                            <AvatarFallback>{access.profiles?.name?.substring(0, 2) || 'U'}</AvatarFallback>
+                          </Avatar>
+                          <div className="flex flex-col">
+                            <span className="font-medium">{access.profiles?.name || 'Unknown User'}</span>
+                            <span className="text-xs text-muted-foreground">{access.profiles?.email || 'No email'}</span>
+                          </div>
+                        </div>
+                        <Button 
+                          size="icon" 
+                          variant="ghost" 
+                          onClick={() => handleRevokeAccess(access.id, access.profiles?.name || 'User')}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
                     ))}
-                  </SelectContent>
-                </Select>
-              </div>
-              <Button 
-                size="sm"
-                onClick={grantAccess}
-                disabled={!selectedProfileId || isSubmitting}
-              >
-                {isSubmitting ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Plus className="h-4 w-4 mr-2" />
-                )}
-                Add
-              </Button>
+                  </div>
+                </ScrollArea>
+              ) : (
+                <div className="p-6 text-center text-muted-foreground">
+                  No users have access to this integration yet.
+                </div>
+              )}
             </div>
           </div>
-
-          <div className="flex flex-col gap-2">
-            <h4 className="text-sm font-medium">Current Access</h4>
-            {isLoadingAccess ? (
-              <div className="flex items-center justify-center py-4">
-                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+          
+          {/* Grant Access Section */}
+          <div>
+            <h3 className="text-sm font-medium mb-2">Grant Access</h3>
+            
+            <div className="border rounded-md">
+              <div className="p-4 border-b">
+                <div className="flex items-center gap-2">
+                  <Search className="h-4 w-4 text-muted-foreground" />
+                  <Input 
+                    placeholder="Search for users..." 
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="border-0 shadow-none focus-visible:ring-0 h-8"
+                  />
+                </div>
               </div>
-            ) : accessList?.length === 0 ? (
-              <p className="text-sm text-muted-foreground py-2">No users have been granted access yet.</p>
-            ) : (
-              <ScrollArea className="h-[200px] pr-4">
-                <div className="space-y-2">
-                  {accessList?.map(access => (
-                    <div
-                      key={access.id}
-                      className="flex items-center justify-between p-2 border rounded-md"
-                    >
-                      <div className="truncate">
-                        <p className="text-sm font-medium">
-                          {access.profiles?.name || access.profiles?.email || "Unknown user"}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {access.profiles?.role || "user"}
-                        </p>
-                      </div>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => revokeAccess(access.id)}
-                        disabled={isSubmitting}
-                      >
-                        <Trash2 className="h-4 w-4 text-destructive" />
-                      </Button>
+              
+              <ScrollArea className="h-[200px]">
+                <div className="p-4 space-y-2">
+                  {loadingProfiles ? (
+                    <div className="space-y-3">
+                      <Skeleton className="h-6 w-full" />
+                      <Skeleton className="h-6 w-full" />
+                      <Skeleton className="h-6 w-full" />
                     </div>
-                  ))}
+                  ) : filteredProfiles && filteredProfiles.length > 0 ? (
+                    filteredProfiles.map((profile) => (
+                      <div 
+                        key={profile.id}
+                        className="flex items-center justify-between py-2 px-3 rounded-md hover:bg-muted/50"
+                      >
+                        <div className="flex items-center gap-2">
+                          <Checkbox 
+                            id={`profile-${profile.id}`}
+                            checked={selectedProfiles.includes(profile.id)}
+                            onCheckedChange={(checked) => {
+                              if (checked) {
+                                setSelectedProfiles([...selectedProfiles, profile.id]);
+                              } else {
+                                setSelectedProfiles(selectedProfiles.filter(id => id !== profile.id));
+                              }
+                            }}
+                          />
+                          <Avatar className="h-8 w-8">
+                            <AvatarFallback>{profile.name.substring(0, 2)}</AvatarFallback>
+                          </Avatar>
+                          <div className="flex flex-col">
+                            <span className="font-medium">{profile.name}</span>
+                            <span className="text-xs text-muted-foreground">{profile.email}</span>
+                          </div>
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="p-6 text-center text-muted-foreground">
+                      No available users found.
+                    </div>
+                  )}
                 </div>
               </ScrollArea>
-            )}
+            </div>
           </div>
         </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
+          <Button 
+            onClick={handleGrantAccess} 
+            disabled={selectedProfiles.length === 0}
+          >
+            <Plus className="h-4 w-4 mr-2" />
+            Grant Access
+          </Button>
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   );
