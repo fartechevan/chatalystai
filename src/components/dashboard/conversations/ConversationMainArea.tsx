@@ -1,23 +1,24 @@
 
-import React from "react";
-import { MessageInput } from "./MessageInput";
-import { MessageList } from "./MessageList";
-import { Button } from "@/components/ui/button";
-import { RefreshCcw } from "lucide-react";
+import { useState, useRef, useEffect } from "react";
+import { Loader2 } from "lucide-react";
 import { UseMutationResult } from "@tanstack/react-query";
-import type { Conversation, Message } from "./types";
+
+import type { Conversation, Message as MessageType } from "./types";
+import { ConversationHeader } from "./ConversationHeader";
+import { MessageList } from "./components/MessageList";
+import { MessageInput } from "./components/MessageInput";
 
 interface ConversationMainAreaProps {
   selectedConversation: Conversation | null;
   isLoading: boolean;
-  messages: Message[];
-  newMessage: string;
-  setNewMessage: (message: string) => void;
+  messages: MessageType[];
+  newMessage: string;  // Changed to string type
+  setNewMessage: (message: string) => void; // Kept as function
   handleSendMessage: () => void;
-  sendMessageMutation: UseMutationResult<any, Error, string, unknown>; // Make this generic
-  summarizeMutation: UseMutationResult<any, Error, any, unknown>; // Make this generic
-  summary?: string | null;
-  summaryTimestamp?: string | null;
+  sendMessageMutation: UseMutationResult<void, Error, string, unknown>; // Assuming string input, void result
+  summarizeMutation: UseMutationResult<void, Error, string, unknown>; // Assuming string (conversationId) input, void result
+  summary: string | undefined;
+  summaryTimestamp: string | undefined;
 }
 
 export function ConversationMainArea({
@@ -32,65 +33,46 @@ export function ConversationMainArea({
   summary,
   summaryTimestamp
 }: ConversationMainAreaProps) {
-  // Handle the case when no conversation is selected
-  if (!selectedConversation) {
-    return (
-      <div className="flex-1 flex flex-col">
-        <div className="flex-1 flex items-center justify-center p-8 text-muted-foreground">
-          Select a conversation to view messages
-        </div>
-      </div>
-    );
-  }
+  const [isSummarized, setIsSummarized] = useState(!!summary);
 
-  const isSummarizing = summarizeMutation.isPending;
-  const hasMessages = messages && messages.length > 0;
+  // Determine if this conversation is a WhatsApp conversation
+  const isWhatsAppConversation = selectedConversation?.integrations_id ? true : false;
 
   return (
-    <div className="flex-1 flex flex-col border-l">
-      {/* Header */}
-      <div className="p-4 border-b flex items-center justify-between bg-muted/30">
-        <h2 className="font-medium truncate">
-          {selectedConversation?.customer_name || "Conversation"}
-        </h2>
-        {hasMessages && (
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => summarizeMutation.mutate()}
-            disabled={isSummarizing}
-          >
-            {isSummarizing ? (
-              <>
-                <RefreshCcw className="mr-2 h-4 w-4 animate-spin" />
-                Summarizing...
-              </>
-            ) : (
-              <>
-                <RefreshCcw className="mr-2 h-4 w-4" />
-                Generate Summary
-              </>
-            )}
-          </Button>
-        )}
-      </div>
-
-      {/* Messages area */}
-      <MessageList
-        messages={messages}
-        isLoading={isLoading}
-        summary={summary}
-        summaryTimestamp={summaryTimestamp}
-      />
-
-      {/* Input area */}
-      <MessageInput
-        newMessage={newMessage}
-        setNewMessage={setNewMessage}
-        handleSendMessage={handleSendMessage}
-        sendMessageMutation={sendMessageMutation}
-        selectedConversation={!!selectedConversation}
-      />
+    <div className={`flex-1 flex flex-col min-h-0 border-r border-l relative ${!selectedConversation ? 'items-center justify-center' : ''}`}>
+      {selectedConversation ? (
+        <>
+          <ConversationHeader conversation={selectedConversation} />
+          
+          <MessageList 
+            messages={messages} 
+            isLoading={isLoading} 
+            conversation={selectedConversation}
+          />
+          
+          <MessageInput
+            newMessage={newMessage}
+            setNewMessage={setNewMessage}
+            handleSendMessage={handleSendMessage}
+            sendMessageMutation={sendMessageMutation}
+            isWhatsAppConversation={isWhatsAppConversation}
+          />
+          
+          {summarizeMutation.isPending && (
+            <div className="absolute inset-0 bg-background/80 flex items-center justify-center">
+              <div className="flex flex-col items-center gap-2">
+                <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full"></div>
+                <p>Summarizing conversation...</p>
+              </div>
+            </div>
+          )}
+        </>
+      ) : (
+        <div className="text-center p-6">
+          <h2 className="text-xl font-semibold mb-2">Select a conversation</h2>
+          <p className="text-muted-foreground">Choose a conversation from the list to start chatting</p>
+        </div>
+      )}
     </div>
   );
 }

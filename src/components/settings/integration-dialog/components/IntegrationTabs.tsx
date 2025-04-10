@@ -7,7 +7,6 @@ import { WhatsAppCloudApiContent } from "./WhatsAppCloudApiContent";
 import { WhatsAppAuthorizationContent } from "./WhatsAppAuthorizationContent";
 import { WhatsAppBusinessSettings } from "./WhatsAppBusinessSettings";
 import { WhatsAppBusinessAuthorization } from "./WhatsAppBusinessAuthorization";
-import { ScrollArea } from "@/components/ui/scroll-area";
 
 interface IntegrationTabsProps {
   selectedIntegration: Integration | null;
@@ -34,33 +33,25 @@ export function IntegrationTabs({
       {/* Render the content based on selected integration */}
       {selectedIntegration?.name === "WhatsApp Cloud API" ? (
         <>
-          <TabsContent value="settings" className="space-y-6">
-            <ScrollArea className="h-96">
-              <WhatsAppCloudApiContent handleConnectWithFacebook={handleConnectWithFacebook} />
-            </ScrollArea>
+          <TabsContent value="settings" className="space-y-6 h-96">
+            <WhatsAppCloudApiContent handleConnectWithFacebook={handleConnectWithFacebook} />
           </TabsContent>
           
           <TabsContent value="authorization">
-            <ScrollArea className="h-96">
-              <WhatsAppAuthorizationContent />
-            </ScrollArea>
+            <WhatsAppAuthorizationContent />
           </TabsContent>
         </>
       ) : (
         <>
-          <TabsContent value="settings" className="space-y-6">
-            <ScrollArea className="h-96">
-              <WhatsAppBusinessSettings 
-                selectedIntegration={selectedIntegration}
-                onConnect={onConnect || (() => {})}
-              />
-            </ScrollArea>
+          <TabsContent value="settings" className="space-y-6 h-96">
+            <WhatsAppBusinessSettings 
+              selectedIntegration={selectedIntegration}
+              onConnect={onConnect || (() => {})}
+            />
           </TabsContent>
           
-          <TabsContent value="authorization" className="space-y-6">
-            <ScrollArea className="h-96">
-              <WhatsAppBusinessAuthorization selectedIntegration={selectedIntegration} />
-            </ScrollArea>
+          <TabsContent value="authorization" className="space-y-6 h-96">
+            <WhatsAppBusinessAuthorization selectedIntegration={selectedIntegration} />
           </TabsContent>
         </>
       )}
