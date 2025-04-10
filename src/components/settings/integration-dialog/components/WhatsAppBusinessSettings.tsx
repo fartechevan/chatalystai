@@ -1,3 +1,4 @@
+
 // UI Imports
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -456,73 +457,77 @@ export function WhatsAppBusinessSettings({ selectedIntegration, onConnect }: Wha
 
           <div className="mt-8">
             {config?.instance_id ? (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Configured Name</TableHead>
-                    <TableHead>Pipeline</TableHead>
-                    <TableHead>Live Status</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  <TableRow key={config.instance_id}>
-                    <TableCell className="font-medium">{config.instance_display_name || config.instance_id || 'N/A'}</TableCell>
-                    <TableCell>
-                      <select className="border rounded-md px-2 py-1">
-                        <option>Default Pipeline</option>
-                      </select>
-                    </TableCell>
-                    <TableCell>
-                      {isConnected(instanceDetails) ? (
-                        <div className="flex items-center justify-between">
-                          <CheckCircle className="h-5 w-5 text-green-500" />
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            className="h-6 w-6 p-0"
-                            onClick={() => instanceDetails?.instance?.instanceName && handleLogout(instanceDetails.instance.instanceName)}
-                            disabled={!instanceDetails?.instance?.instanceName || isLogoutLoading === instanceDetails.instance.instanceName}
-                            title="Disconnect"
-                          >
-                            {isLogoutLoading === instanceDetails?.instance?.instanceName ? (
-                              <Loader2 className="h-4 w-4 animate-spin" />
-                            ) : (
-                              <X className="h-4 w-4 text-gray-400 hover:text-red-500" />
-                            )}
-                          </Button>
-                        </div>
-                      ) : (
-                        <div className="flex items-center justify-end space-x-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={onConnect}
-                            disabled={isDeleteLoading}
-                            title="Connect Instance"
-                          >
-                             Connect
-                           </Button>
-                           <Button
-                             variant="destructive"
-                            size="sm"
-                            onClick={handleDelete}
-                            disabled={isDeleteLoading}
-                            title="Delete Instance"
-                            className="h-6 w-6 p-0"
-                          >
-                            {isDeleteLoading ? (
-                              <Loader2 className="h-4 w-4 animate-spin" />
-                            ) : (
-                              <Trash2 className="h-4 w-4" />
-                            )}
-                            <span className="sr-only">Delete Instance</span>
-                          </Button>
-                        </div>
-                      )}
-                    </TableCell>
-                  </TableRow>
-                </TableBody>
-              </Table>
+              <div className="border rounded-md">
+                <ScrollArea className="h-[200px]">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Configured Name</TableHead>
+                        <TableHead>Pipeline</TableHead>
+                        <TableHead>Live Status</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      <TableRow key={config.instance_id}>
+                        <TableCell className="font-medium">{config.instance_display_name || config.instance_id || 'N/A'}</TableCell>
+                        <TableCell>
+                          <select className="border rounded-md px-2 py-1">
+                            <option>Default Pipeline</option>
+                          </select>
+                        </TableCell>
+                        <TableCell>
+                          {isConnected(instanceDetails) ? (
+                            <div className="flex items-center justify-between">
+                              <CheckCircle className="h-5 w-5 text-green-500" />
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                className="h-6 w-6 p-0"
+                                onClick={() => instanceDetails?.instance?.instanceName && handleLogout(instanceDetails.instance.instanceName)}
+                                disabled={!instanceDetails?.instance?.instanceName || isLogoutLoading === instanceDetails.instance.instanceName}
+                                title="Disconnect"
+                              >
+                                {isLogoutLoading === instanceDetails?.instance?.instanceName ? (
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : (
+                                  <X className="h-4 w-4 text-gray-400 hover:text-red-500" />
+                                )}
+                              </Button>
+                            </div>
+                          ) : (
+                            <div className="flex items-center justify-end space-x-2">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={onConnect}
+                                disabled={isDeleteLoading}
+                                title="Connect Instance"
+                              >
+                                 Connect
+                               </Button>
+                               <Button
+                                 variant="destructive"
+                                size="sm"
+                                onClick={handleDelete}
+                                disabled={isDeleteLoading}
+                                title="Delete Instance"
+                                className="h-6 w-6 p-0"
+                              >
+                                {isDeleteLoading ? (
+                                  <Loader2 className="h-4 w-4 animate-spin" />
+                                ) : (
+                                  <Trash2 className="h-4 w-4" />
+                                )}
+                                <span className="sr-only">Delete Instance</span>
+                              </Button>
+                            </div>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    </TableBody>
+                  </Table>
+                </ScrollArea>
+              </div>
             ) : (
                <p className="text-muted-foreground">Instance configuration not found.</p>
             )}
