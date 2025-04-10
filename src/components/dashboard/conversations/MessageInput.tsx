@@ -4,21 +4,26 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useState } from "react";
 import { Textarea } from "@/components/ui/textarea";
+import { UseMutationResult } from "@tanstack/react-query";
 
 interface MessageInputProps {
   newMessage: string;
   setNewMessage: (message: string) => void;
   handleSendMessage: () => void;
-  isLoading: boolean;
-  selectedConversation: boolean;
+  sendMessageMutation: UseMutationResult<any, Error, string, unknown>;  // Updated to accept any return type
+  isWhatsAppConversation?: boolean;
+  isLoading?: boolean;
+  selectedConversation?: boolean;
 }
 
 export function MessageInput({
   newMessage,
   setNewMessage,
   handleSendMessage,
-  isLoading,
-  selectedConversation
+  sendMessageMutation,
+  isWhatsAppConversation = false,
+  isLoading = false,
+  selectedConversation = true
 }: MessageInputProps) {
   const [rows, setRows] = useState(1);
 
@@ -53,7 +58,7 @@ export function MessageInput({
         <Button 
           size="icon"
           onClick={handleSendMessage}
-          disabled={!selectedConversation || !newMessage.trim() || isLoading}
+          disabled={!selectedConversation || !newMessage.trim() || sendMessageMutation.isPending}
         >
           <Send className="h-5 w-5" />
         </Button>
