@@ -51,7 +51,7 @@ export function IntegrationTabs({
           </TabsContent>
           
           <TabsContent value="authorization" className="space-y-6 h-96">
-            <WhatsAppBusinessAuthorization />
+            <WhatsAppBusinessAuthorization selectedIntegration={selectedIntegration} />
           </TabsContent>
         </>
       )}
