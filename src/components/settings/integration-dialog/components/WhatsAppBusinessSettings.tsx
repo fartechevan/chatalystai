@@ -5,7 +5,7 @@ import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@
 import { CheckCircle, AlertCircle, X, Loader2, PhoneCall, Trash2 } from "lucide-react"; // Icons
 
 // React & Tanstack Query Imports
-import { useEffect, useState } from "react";
+import { useEffect, useState } from "react"; // Keep useState
 import { useQueryClient } from "@tanstack/react-query"; // Import queryClient
 
 // Project Imports
@@ -15,13 +15,15 @@ import type { Integration } from "../../types";
 import { logoutWhatsAppInstance } from "@/integrations/evolution-api/services/logoutService";
 import { fetchEvolutionInstances } from "@/integrations/evolution-api/services/fetchInstancesService";
 import { deleteEvolutionInstance } from "@/integrations/evolution-api/services/deleteInstanceService";
+// Import useEvolutionApiConfig to get refetchConfig
 import { useEvolutionApiConfig } from "@/integrations/evolution-api/hooks/useEvolutionApiConfig";
 import { getEvolutionCredentials } from "@/integrations/evolution-api/utils/credentials";
 import type { ConnectionState } from "../../types"; // Import ConnectionState
 
 interface WhatsAppBusinessSettingsProps {
   selectedIntegration: Integration | null;
-  onConnect: () => void;
+  // Modify onConnect prop to accept the display name
+  onConnect: (instanceDisplayName: string | null | undefined) => void;
 }
 
 interface InstanceData {
@@ -55,10 +57,13 @@ export function WhatsAppBusinessSettings({ selectedIntegration, onConnect }: Wha
   const queryClient = useQueryClient();
   const toastUtils = useToast();
   const { toast } = toastUtils;
-  const { config, isLoading: isConfigLoading } = useEvolutionApiConfig(selectedIntegration);
+  // Get refetchConfig from the hook
+  const { config, isLoading: isConfigLoading, refetchConfig } = useEvolutionApiConfig(selectedIntegration);
 
   const [instanceDetails, setInstanceDetails] = useState<DisplayInstance | null>(null);
   const [isFetchingLive, setIsFetchingLive] = useState(true);
+  // Add state for refetching before connect
+  const [isRefetching, setIsRefetching] = useState(false);
   const [isLogoutLoading, setIsLogoutLoading] = useState<string | null>(null);
   const [isDeleteLoading, setIsDeleteLoading] = useState<boolean>(false);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -67,6 +72,7 @@ export function WhatsAppBusinessSettings({ selectedIntegration, onConnect }: Wha
 
   useEffect(() => {
     const fetchAndConfigureInstance = async () => {
+      // config is removed from dependencies, fetch fresh config inside
       if (!selectedIntegration?.id) {
         setIsFetchingLive(false);
         setLoadError("No integration selected.");
@@ -79,9 +85,11 @@ export function WhatsAppBusinessSettings({ selectedIntegration, onConnect }: Wha
       setNoInstanceFoundFromServer(false);
 
       try {
+        // Fetch live instances first
         console.log(`Fetching all instances for integration ${selectedIntegration.id}...`);
         const allInstancesResult = await fetchEvolutionInstances(selectedIntegration.id);
 
+        // --- Error handling for fetchInstances ---
         if (!Array.isArray(allInstancesResult)) {
           if (allInstancesResult !== null && typeof allInstancesResult === 'object' && 'error' in allInstancesResult) {
             const errorResult = allInstancesResult as { error: string; details?: string };
@@ -93,114 +101,168 @@ export function WhatsAppBusinessSettings({ selectedIntegration, onConnect }: Wha
           }
         }
         console.log("Successfully fetched instances array:", allInstancesResult);
+        // --- End Error handling ---
 
+        // Fetch the LATEST config directly from Supabase NOW
+        console.log(`Fetching latest config directly for integration ${selectedIntegration.id}...`);
+        const { data: latestConfigData, error: latestConfigError } = await supabase
+          .from('integrations_config')
+          .select('instance_id, token, instance_display_name') // Select necessary fields
+          .eq('integration_id', selectedIntegration.id)
+          .maybeSingle();
+
+        if (latestConfigError && latestConfigError.code !== 'PGRST116') { // Ignore 'No rows found' error
+          console.error('Error fetching latest config directly:', latestConfigError);
+          throw new Error(`Failed to fetch latest configuration: ${latestConfigError.message}`);
+        }
+        console.log("Latest config data fetched directly:", latestConfigData);
+        const configuredInstanceId = latestConfigData?.instance_id; // Use ID from the direct fetch
+
+        // Handle case where no live instances exist
         if (allInstancesResult.length === 0) {
           console.log("No instances found on the server for this integration.");
           setNoInstanceFoundFromServer(true);
+          // If config existed but no live instance, update status
+          if (configuredInstanceId) {
+             // This line still had the incorrect 'status' field. Removing it.
+             // console.log(`No live instances found, but config exists for ${configuredInstanceId}. Updating status to 'close'.`);
+             // await supabase.from('integrations_config').update({ status: 'close' }).eq('integration_id', selectedIntegration.id);
+             console.log(`No live instances found, but config exists for ${configuredInstanceId}. No DB update needed.`);
+          }
           setIsFetchingLive(false);
           return;
         }
 
-        const configuredInstanceId = config?.instance_id;
+        // Now proceed with comparison using the freshly fetched configuredInstanceId
         let targetInstance: InstanceData | undefined = undefined;
         let connectionStatus: ConnectionState = 'unknown';
 
         if (configuredInstanceId) {
-           console.log(`Looking for configured instance ID ${configuredInstanceId} in fetched results...`);
+           console.log(`Comparing live instances against latest configured ID: ${configuredInstanceId}`);
            targetInstance = (allInstancesResult as InstanceData[]).find(inst => inst.id === configuredInstanceId);
         } else {
+           // Handle case where DB config is missing/empty, but live instances exist
            if (allInstancesResult.length === 1) {
-               console.log("Config empty, but found one instance in fetch results. Selecting it for initial config.");
+               console.log("DB Config empty/missing, but found one live instance. Selecting it for initial config.");
                targetInstance = (allInstancesResult as InstanceData[])[0];
            } else {
-               setLoadError("Configuration needed: Multiple instances found, but none specifically configured.");
+               console.log("DB Config empty/missing and multiple live instances found. Configuration needed.");
+               setLoadError("Configuration needed: Multiple instances found, but none specifically configured in the database.");
                setIsFetchingLive(false);
-               return;
+               return; // Stop processing, user needs to configure
            }
         }
 
+        // --- Logic for handling found/not found targetInstance ---
         if (targetInstance && targetInstance.id) {
+          // Instance found live that matches the latest config ID (or is the only live one)
           const fetchedInstanceId = targetInstance.id;
-          const fetchedToken = targetInstance.token;
-          console.log(`Found matching instance ID: ${fetchedInstanceId}. Determining display name and status...`);
+          const fetchedToken = targetInstance.token; // Use token from the live instance data
+          console.log(`Found matching live instance ID: ${fetchedInstanceId}. Determining display name and status...`);
 
+          // Determine display name (prioritize profile name from live data)
           const displayName = targetInstance.instance?.profileName || targetInstance.instance?.instanceName || fetchedInstanceId || 'Unnamed Instance';
           console.log(`Determined display name: ${displayName}`);
 
-          const fetchedStatus = targetInstance.instance?.status;
-          if (fetchedStatus === 'open') {
-            connectionStatus = 'open';
-          } else if (fetchedStatus === 'close') {
-            connectionStatus = 'close';
-          } else if (['connecting', 'qrcode', 'syncing'].includes(fetchedStatus)) {
-            connectionStatus = 'connecting';
-          } else {
-            connectionStatus = 'unknown';
-          }
-          console.log(`Mapped fetched status '${fetchedStatus}' to connectionStatus '${connectionStatus}'`);
+          // Determine connection status from live data
 
-          console.log(`Attempting to upsert config for integration ${selectedIntegration.id} (Instance: ${fetchedInstanceId}) with status: ${connectionStatus}`);
+          const fetchedStatus = targetInstance.instance?.status;
+          if (fetchedStatus === 'open') connectionStatus = 'open';
+          else if (fetchedStatus === 'close') connectionStatus = 'close';
+          else if (['connecting', 'qrcode', 'syncing'].includes(fetchedStatus)) connectionStatus = 'connecting';
+          else connectionStatus = 'unknown';
+          console.log(`Mapped live status '${fetchedStatus}' to connectionStatus '${connectionStatus}'`);
+
+          // Upsert the config with potentially updated token and display name (status is NOT part of integrations_config)
+          console.log(`Attempting to upsert config for integration ${selectedIntegration.id} (Instance: ${fetchedInstanceId}), name: ${displayName}`);
           const { error: upsertError } = await supabase
             .from('integrations_config')
             .upsert(
               {
                 integration_id: selectedIntegration.id,
-                instance_id: fetchedInstanceId,
-                token: fetchedToken,
-                instance_display_name: displayName,
-                status: connectionStatus // Use the mapped status
+                instance_id: fetchedInstanceId, // The ID of the matched/selected live instance
+                token: fetchedToken, // The token from the live instance data
+                instance_display_name: displayName, // The determined display name
+                // status: connectionStatus // REMOVED - Not in integrations_config table
               },
-              { onConflict: 'integration_id' }
+              { onConflict: 'integration_id' } // Upsert based on integration_id
             );
 
           if (upsertError) {
             console.error(`Error upserting config for integration ${selectedIntegration.id}:`, upsertError);
             throw new Error(`Failed to save instance configuration: ${upsertError.message}`);
           } else {
-             console.log(`Successfully upserted config for integration ${selectedIntegration.id} with status ${connectionStatus}.`);
+             // The log message here was incorrect, status is not saved.
+             // console.log(`Successfully upserted config for integration ${selectedIntegration.id} with status ${connectionStatus}.`);
+             console.log(`Successfully upserted config for integration ${selectedIntegration.id}.`);
           }
 
+          // Update the UI state with the live instance details
           console.log("Setting LIVE instance details state:", targetInstance);
           setInstanceDetails(targetInstance);
 
         } else {
-           console.log(`Configured instance ID ${configuredInstanceId} not found in fetch results. Assuming disconnected/deleted.`);
-           connectionStatus = 'close';
+           // Configured instance ID exists in DB, but no matching live instance found
+           console.log(`Latest configured instance ID ${configuredInstanceId} not found in live results. Assuming disconnected/deleted.`);
+           connectionStatus = 'close'; // Keep this for UI logic
 
-           console.log(`Attempting to update status to '${connectionStatus}' for integration ${selectedIntegration.id} (Instance ID: ${configuredInstanceId})`);
-           const { error: updateStatusError } = await supabase
-             .from('integrations_config')
-             .update({ status: connectionStatus as string }) // Add cast here
-             .eq('integration_id', selectedIntegration.id);
+           // Configured instance not found live. We don't need to update the DB config here,
+           // as the absence of a live match implies it's disconnected.
+           // The UI state `instanceDetails` being set to null handles the display.
+           console.log(`Latest configured instance ID ${configuredInstanceId} not found live. No DB update needed for integrations_config.`);
+           // const { error: updateStatusError } = await supabase
+           //   .from('integrations_config')
+           //   .update({ status: connectionStatus }) // REMOVED - status not in integrations_config
+           //   .eq('integration_id', selectedIntegration.id);
 
-           if (updateStatusError) {
-             console.error(`Error updating status to '${connectionStatus}' for integration ${selectedIntegration.id}:`, updateStatusError);
-             toast({ title: "Status Update Failed", description: `Could not update status for missing instance: ${updateStatusError.message}`, variant: "destructive" });
-           } else {
-             console.log(`Successfully updated status to '${connectionStatus}' for missing instance ${configuredInstanceId}.`);
-           }
+           // if (updateStatusError) {
+           //   console.error(`Error updating status to '${connectionStatus}' for integration ${selectedIntegration.id}:`, updateStatusError);
+           //   // Don't necessarily toast here, might be expected if instance was deleted
+           // } else {
+           //   // This log message was incorrect as no update happened.
+           //   // console.log(`Successfully updated status to '${connectionStatus}' for missing live instance ${configuredInstanceId}.`);
+           // }
+           // Clear the UI state as the configured instance isn't live
            setInstanceDetails(null);
         }
+        // --- End Logic ---
 
       } catch (error) {
-        console.error('Error processing instance:', error);
-        const errorMessage = (error as Error).message || "An unexpected error occurred";
+        console.error('Error during fetch/configure instance process:', error);
+        const errorMessage = error instanceof Error ? error.message : "An unexpected error occurred";
         setLoadError(`Could not load WhatsApp instance details: ${errorMessage}`);
-        toast({
-          title: "Error Loading Instance",
-          description: errorMessage,
-          variant: "destructive"
-        });
+        // Avoid redundant toast if specific errors were already handled
+        if (!errorMessage.startsWith("Failed to fetch") && !errorMessage.startsWith("Configuration needed")) {
+            toast({
+              title: "Error Loading Instance",
+              description: errorMessage,
+              variant: "destructive"
+            });
+        }
       } finally {
         setIsFetchingLive(false);
       }
-    };
+    }; // <-- This closing brace was missing for fetchAndConfigureInstance
 
-    fetchAndConfigureInstance();
-  }, [selectedIntegration?.id, config, queryClient, toast]); // Added missing dependencies
+    // Run the effect only when the selected integration ID changes
+    if (selectedIntegration?.id) {
+        fetchAndConfigureInstance();
+    }
+    // Dependencies: only integration ID and queryClient for invalidation awareness
+  }, [selectedIntegration?.id, queryClient, toast]); // <-- This closing parenthesis and brace were missing for useEffect
 
   const handleLogout = async (instanceName: string) => {
-    if (!selectedIntegration?.id || !instanceName) return;
+    // Ensure we use the LATEST config for logout, especially the instance_id
+    const { data: currentConfig } = await supabase
+        .from('integrations_config')
+        .select('instance_id')
+        .eq('integration_id', selectedIntegration?.id ?? '')
+        .single();
+
+    if (!selectedIntegration?.id || !instanceName || !currentConfig?.instance_id) {
+        toast({ title: "Logout Error", description: "Missing required information to logout.", variant: "destructive" });
+        return;
+    }
     setIsLogoutLoading(instanceName);
     try {
       const success = await logoutWhatsAppInstance(
@@ -323,7 +385,7 @@ export function WhatsAppBusinessSettings({ selectedIntegration, onConnect }: Wha
                 instance_id: fetchedInstanceId,
                 token: fetchedToken,
                 instance_display_name: displayName,
-                status: 'unknown' // Set initial status
+                // status: 'unknown' // REMOVED - status not in integrations_config table
               },
               { onConflict: 'integration_id' }
             );
@@ -335,7 +397,9 @@ export function WhatsAppBusinessSettings({ selectedIntegration, onConnect }: Wha
           console.log("Successfully saved configuration immediately after creation.");
           toast({ title: "Configuration Saved", description: `Instance ${displayName} configured.` });
 
+          // Invalidate both list and specific config queries
           await queryClient.invalidateQueries({ queryKey: ['integrationsWithConfig'] });
+          await queryClient.invalidateQueries({ queryKey: ['integration-config', selectedIntegration.id] });
           setNoInstanceFoundFromServer(false);
 
         } catch (fetchUpsertError) {
@@ -393,6 +457,43 @@ export function WhatsAppBusinessSettings({ selectedIntegration, onConnect }: Wha
       }
   };
 
+  // Handler to refetch config and then call onConnect
+  const handleRefetchAndConnect = async () => {
+    setIsRefetching(true);
+    console.log("[handleRefetchAndConnect] Refetching config...");
+    try {
+      const { data: latestConfig, error: refetchError } = await refetchConfig();
+
+      if (refetchError) {
+        console.error("[handleRefetchAndConnect] Error refetching config:", refetchError);
+        toast({ variant: "destructive", title: "Error", description: `Failed to refresh configuration: ${refetchError.message}` });
+        setIsRefetching(false);
+        return;
+      }
+
+      const latestInstanceDisplayName = latestConfig?.instance_display_name;
+      console.log("[handleRefetchAndConnect] Refetch complete. Display Name:", latestInstanceDisplayName);
+
+      if (!latestInstanceDisplayName) {
+         console.error("[handleRefetchAndConnect] Refetched config missing instance_display_name.");
+         toast({ variant: "destructive", title: "Configuration Error", description: "Instance name is missing after refresh. Cannot connect." });
+         setIsRefetching(false);
+         return;
+      }
+
+      // Call the onConnect prop (which is handleConnect from the parent hook) with the fresh name
+      onConnect(latestInstanceDisplayName);
+
+    } catch (error) {
+       console.error("[handleRefetchAndConnect] Unexpected error:", error);
+       toast({ variant: "destructive", title: "Error", description: "An unexpected error occurred while preparing to connect." });
+    } finally {
+       // Ensure loading state is turned off, connect logic will handle its own loading state
+       setIsRefetching(false);
+    }
+  };
+
+
   const isConnected = (details: DisplayInstance | null) => {
     return details?.instance?.status === 'open';
   };
@@ -437,10 +538,18 @@ export function WhatsAppBusinessSettings({ selectedIntegration, onConnect }: Wha
       <div className="flex flex-col items-center justify-center h-64 space-y-4 p-4 text-center">
         <AlertCircle className="h-10 w-10 text-orange-500" />
         <p className="text-lg font-medium">Configuration Issue</p>
-        <p className="text-muted-foreground text-center max-w-md">
-          Could not load instance configuration from the database. Try reconnecting.
-        </p>
-         <Button onClick={onConnect} variant="outline">Reconnect Instance</Button>
+         <p className="text-muted-foreground text-center max-w-md">
+           Could not load instance configuration from the database. Try reconnecting.
+         </p>
+         {/* Use handleRefetchAndConnect here as well */}
+         <Button
+            onClick={handleRefetchAndConnect}
+            variant="outline"
+            disabled={isRefetching} // Add disabled state
+          >
+            {isRefetching ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+            Reconnect Instance
+          </Button>
       </div>
     );
   }
@@ -496,10 +605,13 @@ export function WhatsAppBusinessSettings({ selectedIntegration, onConnect }: Wha
                           <Button
                             variant="outline"
                             size="sm"
-                            onClick={onConnect}
-                            disabled={isDeleteLoading}
+                            // Use the new handler
+                            onClick={handleRefetchAndConnect}
+                            // Disable if deleting OR refetching
+                            disabled={isDeleteLoading || isRefetching}
                             title="Connect Instance"
                           >
+                             {isRefetching ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                              Connect
                            </Button>
                            <Button

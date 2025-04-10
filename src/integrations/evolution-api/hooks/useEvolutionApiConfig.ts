@@ -5,7 +5,8 @@ import type { Integration } from "@/components/settings/types"; // Correct path
 import type { EvolutionApiConfig } from "../types"; // Correct path
 
 export function useEvolutionApiConfig(selectedIntegration: Integration | null) {
-  const { data: config, isLoading } = useQuery<EvolutionApiConfig | null>({ // Use specific type
+  // Destructure refetch from useQuery result
+  const { data: config, isLoading, refetch } = useQuery<EvolutionApiConfig | null>({ // Use specific type
     queryKey: ['integration-config', selectedIntegration?.id],
     queryFn: async () => {
       if (!selectedIntegration?.id) return null;
@@ -81,8 +82,13 @@ export function useEvolutionApiConfig(selectedIntegration: Integration | null) {
         return finalConfig;
       }
     },
+    // Keep staleTime low or 0 if immediate refetching is critical after invalidation
+    staleTime: 0,
+    // Keep cacheTime reasonable
+    // cacheTime: 5 * 60 * 1000, // 5 minutes (default)
     enabled: !!selectedIntegration?.id,
   });
 
-  return { config, isLoading };
+  // Return refetch along with config and isLoading
+  return { config, isLoading, refetchConfig: refetch };
 }
