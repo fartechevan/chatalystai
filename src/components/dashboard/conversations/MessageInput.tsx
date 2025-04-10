@@ -1,16 +1,15 @@
 
 import { Send, Smile } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { useState } from "react";
 import { Textarea } from "@/components/ui/textarea";
+import { useState } from "react";
 import { UseMutationResult } from "@tanstack/react-query";
 
 interface MessageInputProps {
   newMessage: string;
   setNewMessage: (message: string) => void;
   handleSendMessage: () => void;
-  sendMessageMutation: UseMutationResult<any, Error, string, unknown>;  // Updated to accept any return type
+  sendMessageMutation: UseMutationResult<any, Error, string, unknown>;  // Use 'any' to handle different return types
   isWhatsAppConversation?: boolean;
   isLoading?: boolean;
   selectedConversation?: boolean;

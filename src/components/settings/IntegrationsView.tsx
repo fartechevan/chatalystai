@@ -16,6 +16,19 @@ interface IntegrationsViewProps {
 
 const tabs = ["All", "Connected"];
 
+// Define the proper structure for joined integration data
+interface JoinedIntegrationData extends Integration {
+  integrations_config?: {
+    instance_id?: string;
+    token?: string;
+    connection_status?: string;
+  } | null | Array<{
+    instance_id?: string;
+    token?: string;
+    connection_status?: string;
+  }>;
+}
+
 export function IntegrationsView({ isActive }: IntegrationsViewProps) {
   const [activeTab, setActiveTab] = useState("All");
   const [searchQuery, setSearchQuery] = useState("");
@@ -23,7 +36,7 @@ export function IntegrationsView({ isActive }: IntegrationsViewProps) {
   const [selectedIntegration, setSelectedIntegration] = useState<Integration | null>(null);
   const { toast } = useToast();
 
-  // Fetch integrations joined with config, including the new status field
+  // Fetch integrations joined with config, including the new connection_status field
   const { data: integrations = [], isLoading, refetch } = useQuery({
     queryKey: ['integrationsWithConfig'],
     queryFn: async () => {
@@ -45,22 +58,9 @@ export function IntegrationsView({ isActive }: IntegrationsViewProps) {
         throw error;
       }
 
-      // Define a type for the joined data structure
-      type JoinedIntegrationData = Integration & {
-        integrations_config?: {
-          instance_id?: string;
-          token?: string;
-          connection_status?: string;
-        } | null | Array<{
-          instance_id?: string;
-          token?: string;
-          connection_status?: string;
-        }>;
-      };
-
       // Process the data: flatten the structure and ensure types
-      const processedData = data.map((item: any) => {
-        // Cast item to any to avoid type conflicts
+      const processedData = data.map((item: JoinedIntegrationData) => {
+        // Handle array or single object or null
         const config = Array.isArray(item.integrations_config)
           ? item.integrations_config[0]
           : item.integrations_config;
@@ -117,18 +117,18 @@ export function IntegrationsView({ isActive }: IntegrationsViewProps) {
       }
 
       // Update the status in the integrations_config table
-      console.log(`Updating status in DB for integration ${integrationId} to ${finalStatus}...`);
-      // Update the 'connection_status' column instead of 'status'
+      console.log(`Updating connection_status in DB for integration ${integrationId} to ${finalStatus}...`);
+      // Update the 'connection_status' column
       const { error: updateError } = await supabase
         .from('integrations_config')
         .update({ connection_status: finalStatus as string })
         .eq('integration_id', integrationId);
 
       if (updateError) {
-        console.error(`Error updating status in DB for ${integrationId}:`, updateError);
+        console.error(`Error updating connection_status in DB for ${integrationId}:`, updateError);
         toast({ title: "DB Update Error", description: `Failed to save status: ${updateError.message}`, variant: "destructive" });
       } else {
-        console.log(`Successfully updated status in DB for ${integrationId}.`);
+        console.log(`Successfully updated connection_status in DB for ${integrationId}.`);
         refetch();
       }
 

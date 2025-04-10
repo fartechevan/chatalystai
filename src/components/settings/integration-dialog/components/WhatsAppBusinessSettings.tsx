@@ -139,7 +139,7 @@ export function WhatsAppBusinessSettings({ selectedIntegration, onConnect }: Wha
           }
           console.log(`Mapped fetched status '${fetchedStatus}' to connectionStatus '${connectionStatus}'`);
 
-          console.log(`Attempting to upsert config for integration ${selectedIntegration.id} (Instance: ${fetchedInstanceId}) with status: ${connectionStatus}`);
+          console.log(`Attempting to upsert config for integration ${selectedIntegration.id} (Instance: ${fetchedInstanceId}) with connection_status: ${connectionStatus}`);
           const { error: upsertError } = await supabase
             .from('integrations_config')
             .upsert(
@@ -148,7 +148,7 @@ export function WhatsAppBusinessSettings({ selectedIntegration, onConnect }: Wha
                 instance_id: fetchedInstanceId,
                 token: fetchedToken,
                 instance_display_name: displayName,
-                connection_status: connectionStatus // Use connection_status instead of status
+                connection_status: connectionStatus
               },
               { onConflict: 'integration_id' }
             );
@@ -167,17 +167,17 @@ export function WhatsAppBusinessSettings({ selectedIntegration, onConnect }: Wha
            console.log(`Configured instance ID ${configuredInstanceId} not found in fetch results. Assuming disconnected/deleted.`);
            connectionStatus = 'close';
 
-           console.log(`Attempting to update status to '${connectionStatus}' for integration ${selectedIntegration.id} (Instance ID: ${configuredInstanceId})`);
+           console.log(`Attempting to update connection_status to '${connectionStatus}' for integration ${selectedIntegration.id} (Instance ID: ${configuredInstanceId})`);
            const { error: updateStatusError } = await supabase
              .from('integrations_config')
-             .update({ connection_status: connectionStatus as string }) // Use connection_status instead of status
+             .update({ connection_status: connectionStatus as string })
              .eq('integration_id', selectedIntegration.id);
 
            if (updateStatusError) {
-             console.error(`Error updating status to '${connectionStatus}' for integration ${selectedIntegration.id}:`, updateStatusError);
+             console.error(`Error updating connection_status to '${connectionStatus}' for integration ${selectedIntegration.id}:`, updateStatusError);
              toast({ title: "Status Update Failed", description: `Could not update status for missing instance: ${updateStatusError.message}`, variant: "destructive" });
            } else {
-             console.log(`Successfully updated status to '${connectionStatus}' for missing instance ${configuredInstanceId}.`);
+             console.log(`Successfully updated connection_status to '${connectionStatus}' for missing instance ${configuredInstanceId}.`);
            }
            setInstanceDetails(null);
         }
@@ -323,7 +323,7 @@ export function WhatsAppBusinessSettings({ selectedIntegration, onConnect }: Wha
                 instance_id: fetchedInstanceId,
                 token: fetchedToken,
                 instance_display_name: displayName,
-                connection_status: 'unknown' // Set initial status
+                connection_status: 'unknown'
               },
               { onConflict: 'integration_id' }
             );
