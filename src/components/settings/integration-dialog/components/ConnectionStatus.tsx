@@ -1,20 +1,20 @@
 
 import { Button } from "@/components/ui/button";
 import { Loader2, CheckCircle, Plus, AlertCircle, X } from "lucide-react";
-import type { ConnectionState } from "../hooks/useWhatsAppConversations/types";
+import type { ConnectionState } from "@/integrations/evolution-api/types"; // Corrected import path
 import type { Integration } from "../../types";
 
 interface ConnectionStatusProps {
   connectionState: ConnectionState;
   selectedIntegration: Integration | null;
-  onConnect: () => void;
+  // onConnect: () => void; // Removed prop
   onOpenChange: (open: boolean) => void;
 }
 
 export function ConnectionStatus({
   connectionState,
   selectedIntegration,
-  onConnect,
+  // onConnect, // Removed prop
   onOpenChange,
 }: ConnectionStatusProps) {
   if (connectionState === 'connecting') {
@@ -56,6 +56,7 @@ export function ConnectionStatus({
   }
   
   // Default: Not connected state
+  console.log(`[ConnectionStatus] Rendering default state (connectionState: ${connectionState})`); // Add log before returning the button UI
   return (
     <div className="space-y-4">
       {selectedIntegration && (
@@ -71,9 +72,7 @@ export function ConnectionStatus({
       <p className="text-sm text-muted-foreground">
         Connect multiple WhatsApp numbers to send important conversations straight to your inbox.
       </p>
-      <Button className="w-full" size="lg" onClick={onConnect}>
-        Create New Instance
-      </Button>
+      {/* Button removed as it's now handled in IntegrationDialog */}
     </div>
   );
 }

@@ -31,3 +31,22 @@ export interface EvolutionInstance {
   // Include other top-level properties if the API returns them
   // e.g., apiKey, version, etc. if they are part of the array elements
 }
+
+// Interface for the response from the /instance/connect endpoint
+export interface ConnectInstanceResponse {
+  instance?: {
+    instanceId?: string;
+    status?: string; // e.g., 'refused', 'connecting'
+  };
+  qrcode?: {
+    pairingCode?: string | null; // Pairing code can be null
+    code?: string; // QR code string representation
+    count?: number;
+    base64?: string; // Base64 encoded QR code image data
+  };
+  // Keep potential top-level fields if they might sometimes appear (optional)
+  pairingCode?: string;
+  code?: string;
+  count?: number;
+  base64?: string;
+}

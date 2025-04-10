@@ -11,7 +11,9 @@ interface IntegrationCardProps {
 }
 
 export function IntegrationCard({ integration, onConnect }: IntegrationCardProps) {
-  const isConnected = integration.is_connected;
+  // Use connectionStatus to determine if connected
+  const isConnected = integration.connectionStatus === 'open';
+  // Use the original status field for availability
   const isAvailable = integration.status === "available";
 
   return (
@@ -37,6 +39,7 @@ export function IntegrationCard({ integration, onConnect }: IntegrationCardProps
               {integration.description || "No description available."}
             </p>
           </div>
+          {/* Show green dot if connectionStatus is 'open' */}
           {isConnected && (
             <div className="flex items-center">
               <span className="h-2 w-2 rounded-full bg-green-500" />

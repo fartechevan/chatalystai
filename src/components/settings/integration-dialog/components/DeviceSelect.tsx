@@ -5,7 +5,7 @@ interface DeviceSelectProps {
   open: boolean;
   onClose: () => void;
   onOpenChange: (open: boolean) => void;
-  handleDeviceSelect: () => void;
+  // handleDeviceSelect removed
   handleConnect: () => void;
 }
 
@@ -13,7 +13,7 @@ export function DeviceSelect({
   open,
   onClose,
   onOpenChange,
-  handleDeviceSelect,
+  // handleDeviceSelect removed
   handleConnect
 }: DeviceSelectProps) {
   return (
@@ -34,18 +34,18 @@ export function DeviceSelect({
         </div>
         <div className="grid grid-cols-2 gap-4">
           <Button 
-            variant="outline" 
+            variant="outline"
             size="lg"
             className="w-full py-8 text-lg"
-            onClick={handleDeviceSelect}
+            onClick={handleConnect} // Changed onClick to handleConnect
           >
             Android
           </Button>
-          <Button 
-            variant="outline" 
+          <Button
+            variant="outline"
             size="lg"
             className="w-full py-8 text-lg"
-            onClick={handleDeviceSelect}
+            onClick={handleConnect} // Changed onClick to handleConnect
           >
             iPhone
           </Button>

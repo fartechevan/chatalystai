@@ -1,6 +1,7 @@
+import { apiServiceInstance } from '@/services/api/apiService';
 import { getEvolutionCredentials } from '../utils/credentials';
 
-// Updated interface to match observed log structure
+// Interface for the expected response structure when connecting
 interface ConnectInstanceResponse {
   instance?: {
     instanceId?: string;
@@ -22,13 +23,27 @@ interface ConnectInstanceResponse {
 
 export async function connectToInstance(
   instanceName: string,
-  integrationId: string
+  integrationId: string,
 ): Promise<ConnectInstanceResponse | null> {
+  if (!instanceName) {
+    // console.error("connectToInstance: Instance name is required."); // Removed log
+    // Optionally throw an error or return null based on desired strictness
+    return null;
+  }
+   if (!integrationId) {
+    // console.error("connectToInstance: Integration ID is required."); // Removed log
+    return null;
+  }
+
   try {
+    // 1. Get credentials
     const { apiKey, baseUrl } = await getEvolutionCredentials(integrationId);
+
+    // 2. Construct URL
     const connectUrl = `${baseUrl}/instance/connect/${instanceName}`;
 
-    const response = await fetch(connectUrl, {
+    // 3. Make request using ApiService
+    const responseData = await apiServiceInstance.request<ConnectInstanceResponse>(connectUrl, {
       method: 'GET',
       headers: {
         apikey: apiKey,
@@ -36,16 +51,14 @@ export async function connectToInstance(
       },
     });
 
-    if (!response.ok) {
-      console.error(`Failed to connect instance ${instanceName}: ${response.status} ${response.statusText}`);
-      return null;
-    }
-
-    const responseData: ConnectInstanceResponse = await response.json();
-    console.log(`Successfully connected to instance ${instanceName}. Response:`, responseData);
+    // 4. Return successful response data
+    // Logging is handled by ApiService if enabled
     return responseData;
+
   } catch (error) {
-    console.error(`Error connecting to instance ${instanceName}:`, error);
+    // Log the specific service error context before returning null
+    // console.error(`connectToInstance: Error connecting to instance ${instanceName} (Integration: ${integrationId}):`, error); // Removed log
+    // Return null to indicate connection failure, as per original logic
     return null;
   }
 }

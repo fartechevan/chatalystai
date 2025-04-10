@@ -1,6 +1,7 @@
-import { supabase } from "@/integrations/supabase/client"; // Keep for DB update
+import { apiServiceInstance } from "@/services/api/apiService"; // Import ApiService
+import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { getEvolutionCredentials } from "../utils/credentials"; // Import credential utility
+import { getEvolutionCredentials } from "../utils/credentials";
 
 type LogoutOptions = {
   toast: ReturnType<typeof useToast>;
@@ -21,12 +22,12 @@ export async function logoutWhatsAppInstance(
 ): Promise<boolean> {
 
   if (!instanceId || !integrationId) {
-      console.error('Instance ID and Integration ID are required for logout.');
+      // console.error('Instance ID and Integration ID are required for logout.'); // Removed log
       options?.toast?.toast({ title: "Error", description: "Instance and Integration ID are required.", variant: "destructive" });
       return false;
   }
 
-  console.log(`Attempting to log out instance ${instanceId} (Integration: ${integrationId})...`);
+  // console.log(`Attempting to log out instance ${instanceId} (Integration: ${integrationId})...`); // Removed log
 
   try {
     // 1. Fetch credentials
@@ -34,34 +35,28 @@ export async function logoutWhatsAppInstance(
 
     // 2. Construct the Evolution API URL
     const apiUrl = `${baseUrl}/instance/logout/${instanceId}`;
-    console.log(`Frontend: Logging out directly via Evolution API: ${apiUrl}`);
 
-    // 3. Make the direct request to the Evolution API
-    const evoResponse = await fetch(apiUrl, {
-      method: "DELETE", // Use DELETE method for logout
+    // 3. Make the request using ApiService
+    // Logout might return success status with no body or a simple JSON { success: true }
+    await apiServiceInstance.request<unknown>(apiUrl, { // Use unknown as response type might vary
+      method: "DELETE",
       headers: {
         "apikey": apiKey,
       },
     });
 
-    // 4. Check if the Evolution API request was successful
-    if (!evoResponse.ok) {
-      const errorText = await evoResponse.text();
-      console.error(`Frontend: Evolution API logout failed (${evoResponse.status}): ${errorText}`);
-      throw new Error(`Evolution API Logout Error (${evoResponse.status}): ${errorText}`);
-    }
+    // 4. Logout successful - API call succeeded (didn't throw)
+    // Logging handled by ApiService if enabled.
+    // console.log(`logoutWhatsAppInstance: API call successful for instance ${instanceId}.`); // Removed log
 
-    // 5. Logout successful - API call succeeded
-    console.log(`Logout API call successful for WhatsApp instance ${instanceId}.`);
-
-    // 6. Clean up the integrations_config table (Keep this logic)
+    // 5. Clean up the integrations_config table (Keep this logic)
     const { error: dbError } = await supabase
-      .from('integrations_config')
+      .from('integrations_config') // Ensure this table name is correct
       .update({ instance_id: null }) // Assuming nullifying is the desired action
       .eq('instance_id', instanceId);
-    
+
     if (dbError) {
-      console.error('Error updating integrations_config during logout:', dbError);
+      // console.error('Error updating integrations_config during logout:', dbError); // Removed log
       // Decide if this should cause the overall logout to fail
     }
     
@@ -77,7 +72,7 @@ export async function logoutWhatsAppInstance(
     return true;
 
   } catch (error) {
-     console.error('Exception in logoutWhatsAppInstance:', error);
+     // console.error('Exception in logoutWhatsAppInstance:', error); // Removed log
      options?.toast?.toast({
        title: "Error",
        description: `Failed to disconnect WhatsApp instance: ${(error as Error).message}`,
