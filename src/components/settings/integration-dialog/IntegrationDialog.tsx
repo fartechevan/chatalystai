@@ -1,3 +1,4 @@
+
 declare global {
   interface Window {
     fbAsyncInit: () => void;
@@ -10,7 +11,6 @@ declare global {
   };
 }
 
-// --- Rewritten Import Block ---
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { useState } from "react";
 import type { Integration } from "../types";
@@ -20,8 +20,7 @@ import { DeviceSelect } from "./components/DeviceSelect";
 import { IntegrationTabs } from "./components/IntegrationTabs";
 import { DialogMain } from "./components/DialogMain";
 import { useIntegrationConnectionState } from "./hooks/useIntegrationConnectionState";
-import { Button } from "@/components/ui/button"; // Import Button
-// --- End Rewritten Import Block ---
+import { Button } from "@/components/ui/button";
 
 interface IntegrationDialogProps {
   open: boolean;
@@ -50,7 +49,6 @@ export function IntegrationDialog({
     qrCodeBase64,
     pairingCode,
     handleConnect,
-    // handleDeviceSelect // Removed from destructuring
   } = useIntegrationConnectionState(selectedIntegration, open, () => handleDialogChange(false));
 
   const handleDialogChange = (open: boolean) => {
@@ -67,6 +65,12 @@ export function IntegrationDialog({
       }
     }
     onOpenChange(isConnected || connectionState === 'open');
+  };
+
+  // Create a wrapper function to handle the connect call
+  const handleConnectWrapper = () => {
+    // Call handleConnect with no arguments, it will handle any required parameters internally
+    handleConnect(null);
   };
 
   if (integrationQRPopup) {
@@ -93,8 +97,7 @@ export function IntegrationDialog({
           setShowDeviceSelect(false);
           setIntegrationMainPopup(true);
         }}
-        handleConnect={handleConnect}
-        // handleDeviceSelect prop removed
+        handleConnect={handleConnectWrapper}
       />
     );
   }
@@ -107,11 +110,8 @@ export function IntegrationDialog({
           selectedIntegration={selectedIntegration}
           connectionState={connectionState}
           isLoading={isLoading}
-          // onConnect={handleConnect} // Prop removed as button is handled below
           onOpenChange={handleDialogChange}
         />
-
-        {/* Removed the conditionally rendered button that was added for debugging */}
 
         {/* Right Column */}
         <div className="w-1/2">
@@ -119,7 +119,7 @@ export function IntegrationDialog({
             selectedIntegration={selectedIntegration}
             handleConnectWithFacebook={handleConnectWithFacebook}
             onClose={() => handleDialogChange(false)}
-            onConnect={handleConnect} // Keep onConnect here for tabs if needed
+            onConnect={handleConnectWrapper}
           />
         </div>
 

@@ -71,6 +71,10 @@ export function WhatsAppBusinessSettings({ selectedIntegration, onConnect }: Wha
   const [isCreating, setIsCreating] = useState<boolean>(false);
   const [isSaving, setIsSaving] = useState<boolean>(false);
 
+  const [instanceName, setInstanceName] = useState<string>("");
+  const [instanceDisplayName, setInstanceDisplayName] = useState<string>("");
+  const [apiKey, setApiKey] = useState<string>("");
+
   useEffect(() => {
     const fetchAndConfigureInstance = async () => {
       // config is removed from dependencies, fetch fresh config inside
@@ -515,7 +519,8 @@ export function WhatsAppBusinessSettings({ selectedIntegration, onConnect }: Wha
           .update({
             instance_id: instanceName,
             instance_display_name: instanceDisplayName || instanceName,
-            status: 'unknown' // Using 'status' instead of 'connection_status'
+            // Remove status field as it doesn't exist
+            connection_status: 'unknown'
           })
           .eq('id', existingConfig.id);
 
@@ -529,7 +534,8 @@ export function WhatsAppBusinessSettings({ selectedIntegration, onConnect }: Wha
             instance_id: instanceName,
             instance_display_name: instanceDisplayName || instanceName,
             token: apiKey, // If provided
-            status: 'unknown' // Using 'status' instead of 'connection_status'
+            // Remove status field as it doesn't exist
+            connection_status: 'unknown'
           });
 
         if (insertError) throw insertError;
@@ -540,8 +546,8 @@ export function WhatsAppBusinessSettings({ selectedIntegration, onConnect }: Wha
         description: "Instance configuration saved successfully."
       });
 
-      // Optionally call onConnect callback
-      if (onConnect) onConnect();
+      // Optionally call onConnect callback with the display name
+      if (onConnect) onConnect(instanceDisplayName || instanceName);
 
     } catch (error) {
       console.error("Error updating instance information:", error);
