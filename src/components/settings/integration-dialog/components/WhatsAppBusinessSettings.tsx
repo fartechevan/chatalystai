@@ -69,6 +69,7 @@ export function WhatsAppBusinessSettings({ selectedIntegration, onConnect }: Wha
   const [loadError, setLoadError] = useState<string | null>(null);
   const [noInstanceFoundFromServer, setNoInstanceFoundFromServer] = useState(false);
   const [isCreating, setIsCreating] = useState<boolean>(false);
+  const [isSaving, setIsSaving] = useState<boolean>(false);
 
   useEffect(() => {
     const fetchAndConfigureInstance = async () => {
@@ -486,7 +487,74 @@ export function WhatsAppBusinessSettings({ selectedIntegration, onConnect }: Wha
       }
   };
 
-  // Handler to refetch config and then call onConnect
+  const updateInstanceInformation = async () => {
+    if (!selectedIntegration?.id || !instanceName) {
+      toast({
+        title: "Missing Information",
+        description: "Integration ID or Instance Name is missing",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      // Check if a config already exists for this integration
+      const { data: existingConfig, error: configError } = await supabase
+        .from('integrations_config')
+        .select('id, instance_id')
+        .eq('integration_id', selectedIntegration.id)
+        .maybeSingle();
+
+      if (configError) throw configError;
+
+      if (existingConfig) {
+        // Update the existing config
+        const { error: updateError } = await supabase
+          .from('integrations_config')
+          .update({
+            instance_id: instanceName,
+            instance_display_name: instanceDisplayName || instanceName,
+            status: 'unknown' // Using 'status' instead of 'connection_status'
+          })
+          .eq('id', existingConfig.id);
+
+        if (updateError) throw updateError;
+      } else {
+        // Create a new config
+        const { error: insertError } = await supabase
+          .from('integrations_config')
+          .insert({
+            integration_id: selectedIntegration.id,
+            instance_id: instanceName,
+            instance_display_name: instanceDisplayName || instanceName,
+            token: apiKey, // If provided
+            status: 'unknown' // Using 'status' instead of 'connection_status'
+          });
+
+        if (insertError) throw insertError;
+      }
+
+      toast({
+        title: "Success",
+        description: "Instance configuration saved successfully."
+      });
+
+      // Optionally call onConnect callback
+      if (onConnect) onConnect();
+
+    } catch (error) {
+      console.error("Error updating instance information:", error);
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to save instance configuration",
+        variant: "destructive"
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   const handleRefetchAndConnect = async () => {
     setIsRefetching(true);
     console.log("[handleRefetchAndConnect] Refetching config...");
@@ -521,7 +589,6 @@ export function WhatsAppBusinessSettings({ selectedIntegration, onConnect }: Wha
        setIsRefetching(false);
     }
   };
-
 
   const isConnected = (details: DisplayInstance | null) => {
     return details?.instance?.status === 'open';
@@ -646,18 +713,18 @@ export function WhatsAppBusinessSettings({ selectedIntegration, onConnect }: Wha
                            <Button
                              variant="destructive"
                             size="sm"
-                            onClick={handleDelete}
-                            disabled={isDeleteLoading}
-                            title="Delete Instance"
-                            className="h-6 w-6 p-0"
-                          >
-                            {isDeleteLoading ? (
-                              <Loader2 className="h-4 w-4 animate-spin" />
-                            ) : (
-                              <Trash2 className="h-4 w-4" />
-                            )}
-                            <span className="sr-only">Delete Instance</span>
-                          </Button>
+                             onClick={handleDelete}
+                             disabled={isDeleteLoading}
+                             title="Delete Instance"
+                             className="h-6 w-6 p-0"
+                           >
+                             {isDeleteLoading ? (
+                               <Loader2 className="h-4 w-4 animate-spin" />
+                             ) : (
+                               <Trash2 className="h-4 w-4" />
+                             )}
+                             <span className="sr-only">Delete Instance</span>
+                           </Button>
                         </div>
                       )}
                     </TableCell>

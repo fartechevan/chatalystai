@@ -1,54 +1,61 @@
-// Import the centralized API key and server URL
-import { evolutionApiKey, evolutionServerUrl } from "./config";
+
+import type { ConnectionState } from "@/components/settings/types";
+import { getEvolutionApiCredentials } from "./utils/credentials";
 
 /**
- * Checks the connection state of a specific Evolution API instance.
- * @param instanceName The name of the instance to check.
- * @returns An object containing the instance state or an error object.
+ * Check the status of an Evolution API instance
  */
-// Remove apiKey parameter as it's now imported
-async function checkInstanceStatus(instanceName: string) {
-  const serverUrl = evolutionServerUrl; // Use the imported server URL
-  // Assuming the endpoint to check a specific instance's state is /instance/connectionState/{instanceName}
-  // Verify this endpoint with the Evolution API documentation if issues arise.
-  const url = `${serverUrl}/instance/connectionState/${instanceName}`;
-
-  // Use the imported key
-  if (!evolutionApiKey) {
-    console.error('API key is missing from config.');
-    return { error: 'API key is required' };
-  }
-  if (!instanceName) {
-    console.error('Instance name is missing.');
-    return { error: 'Instance name is required' };
-  }
-
+export async function checkInstanceStatus(
+  instanceId: string, 
+  token?: string,
+  baseUrl?: string
+): Promise<ConnectionState> {
   try {
-    const response = await fetch(url, {
+    // Get credentials if not provided
+    if (!token || !baseUrl) {
+      const credentials = await getEvolutionApiCredentials(undefined, instanceId);
+      token = token || credentials.apiKey || '';
+      baseUrl = baseUrl || credentials.baseUrl || 'https://api.evoapicloud.com';
+    }
+    
+    if (!token) {
+      console.error('No API key available for instance status check');
+      return 'unknown';
+    }
+    
+    const endpoint = `${baseUrl}/instance/connectionState/${instanceId}`;
+    
+    const response = await fetch(endpoint, {
       method: 'GET',
       headers: {
-        'apikey': evolutionApiKey, // Use imported key
-        'Content-Type': 'application/json' // Often needed, though GET might not strictly require it
-      },
+        'Content-Type': 'application/json',
+        'apikey': token,
+      }
     });
-
+    
     if (!response.ok) {
-      // Log more details for debugging
-      const errorBody = await response.text();
-      console.error(`Error checking instance status for ${instanceName}:`, response.status, response.statusText, errorBody);
-      // Return a structured error
-      return { error: `Failed to check instance status: ${response.status} ${response.statusText}`, status: response.status };
+      const error = await response.text();
+      console.error(`Error checking instance status: ${error}`);
+      return 'unknown';
     }
-
-    const result = await response.json();
-    // The result structure might be simple like { state: 'open' } or more complex.
-    // Adjust parsing based on the actual API response.
-    console.log(`Status check result for ${instanceName}:`, result);
-    return result; // e.g., { state: 'open' } or similar
+    
+    const data = await response.json();
+    console.log('Instance status data:', data);
+    
+    // Map the Evolution API state to our ConnectionState type
+    if (data.state) {
+      const state = data.state.toLowerCase();
+      
+      if (state === 'open') return 'open';
+      if (state === 'connecting') return 'connecting';
+      if (state === 'close') return 'close';
+      if (state.includes('qrcode')) return 'qrcode';
+      if (state.includes('pairing')) return 'pairingCode';
+    }
+    
+    return 'unknown';
   } catch (error) {
-    console.error(`Error during instance status check for ${instanceName}:`, error);
-    return { error: `Internal server error during status check: ${(error as Error).message}` };
+    console.error('Error checking instance status:', error);
+    return 'unknown';
   }
 }
-
-export default checkInstanceStatus;

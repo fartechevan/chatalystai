@@ -1,70 +1,71 @@
-import { apiServiceInstance } from "@/services/api/apiService";
-import type { ConnectionState } from "../types";
 
-// Interface for the expected response structure from the status endpoint
-interface InstanceStatusResponse {
-  instance?: {
-    state?: string; // The connection state string (e.g., 'open', 'close', 'connecting')
-    // other potential fields...
-  };
-  // other potential top-level fields...
-}
-
+import type { ConnectionState } from "@/components/settings/types";
+import { getEvolutionApiCredentials } from "./utils/credentials";
 
 /**
- * Check the status of a WhatsApp instance using ApiService.
- * @param instanceId The ID of the instance to check.
- * @param instanceToken The specific token for this instance.
- * @param baseUrl The base URL for the Evolution API.
- * @returns Promise<ConnectionState> The connection state ('open', 'close', 'connecting', 'unknown').
+ * Check the status of an Evolution API instance
+ * @param instanceId The ID of the instance
+ * @param token Optional token for the instance (overrides credentials from other sources)
+ * @param baseUrl Optional base URL for the instance (overrides credentials from other sources)
+ * @returns The connection state
  */
-export const checkInstanceStatus = async (
-  instanceId: string | null,
-  instanceToken: string | null, // Token to use
-  baseUrl: string | null,
-): Promise<ConnectionState> => {
-  if (!instanceId || !instanceToken || !baseUrl) {
-    // console.error("checkInstanceStatus: Instance ID, Instance Token, and Base URL are required."); // Removed log
-    return 'unknown'; // Return 'unknown' as per original logic
-  }
-
+export async function checkInstanceStatus(
+  instanceId: string,
+  token?: string,
+  baseUrl?: string
+): Promise<ConnectionState> {
   try {
-    // 1. Construct the Evolution API URL
-    const apiUrl = `${baseUrl}/instance/connectionState/${instanceId}`;
-
-    // 2. Make the request using ApiService
-    const result = await apiServiceInstance.request<InstanceStatusResponse>(apiUrl, {
-      method: "GET",
-      headers: {
-        "Content-Type": "application/json",
-        "apikey": instanceToken, // Use the provided instance token
-      },
-    });
-
-    // 3. Determine connection state from the successful response data
-    const connectionStatus = result?.instance?.state;
-    // console.log(`checkInstanceStatus: Connection status detected for ${instanceId}:`, connectionStatus); // Removed log
-
-    if (connectionStatus === 'open') {
-      return 'open';
-    } else if (['connecting', 'qrcode', 'syncing'].includes(connectionStatus ?? '')) { // Handle potential null/undefined
-      return 'connecting';
-    } else if (connectionStatus === 'close') {
-      return 'close';
-    } else {
-      // console.warn(`checkInstanceStatus: Unexpected connection status '${connectionStatus}' for instance ${instanceId}. Returning 'unknown'.`); // Removed log
+    console.log(`Checking status for instance: ${instanceId}`);
+    
+    // Get credentials if not provided
+    if (!token || !baseUrl) {
+      const credentials = await getEvolutionApiCredentials(undefined, instanceId);
+      if (!token) token = credentials.apiKey || undefined;
+      if (!baseUrl) baseUrl = credentials.baseUrl || undefined;
+    }
+    
+    // If still no credentials, return unknown
+    if (!token || !baseUrl) {
+      console.error("Missing credentials for instance status check");
       return 'unknown';
     }
 
-  } catch (error) {
-     // Check if the error is a 404 from the ApiService
-     if (error instanceof Error && error.message.includes('Status: 404')) {
-       // console.warn(`checkInstanceStatus: Instance ID ${instanceId} not found (Status: 404). Returning 'close'.`); // Removed log
-       return 'close'; // Treat 404 as 'close' as per original logic
-     }
+    const endpoint = `${baseUrl}/instance/connectionState/${instanceId}`;
+    
+    const response = await fetch(endpoint, {
+      method: 'GET',
+      headers: {
+        'Content-Type': 'application/json',
+        'apikey': token,
+      },
+    });
 
-    // Log the specific service error context before returning 'unknown'
-    // console.error(`checkInstanceStatus: Error checking status for instance ${instanceId}:`, error); // Removed log
-    return 'unknown'; // Return 'unknown' on any other exception
+    // Attempt to parse the response
+    const data = await response.json();
+    
+    if (!response.ok) {
+      console.error(`Error checking instance status: ${data.error || response.statusText}`);
+      return 'unknown';
+    }
+    
+    console.log('Instance status response:', data);
+    
+    // Map the response to a connection state
+    if (data.state) {
+      // The API returns state as a string - map it to our ConnectionState type
+      const state = data.state.toLowerCase();
+      
+      // Map Evolution API states to our ConnectionState type
+      if (state === 'open') return 'open';
+      if (state === 'connecting') return 'connecting';
+      if (state === 'close') return 'close';
+      if (state.includes('qrcode')) return 'qrcode';
+      if (state.includes('pairing')) return 'pairingCode';
+    }
+    
+    return 'unknown';
+  } catch (error) {
+    console.error('Error checking instance status:', error);
+    return 'unknown';
   }
-};
+}
