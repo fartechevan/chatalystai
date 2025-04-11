@@ -1,3 +1,4 @@
+
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Plus } from "lucide-react";
@@ -55,7 +56,8 @@ export function IntegrationsView({ isActive }: IntegrationsViewProps) {
           *,
           integrations_config (
             instance_id,
-            token
+            token,
+            status
           )
         `)
         .order('name');
@@ -131,8 +133,8 @@ export function IntegrationsView({ isActive }: IntegrationsViewProps) {
       const { error: updateError } = await supabase
         .from('integrations_config')
         .update({ 
-          // Do not include status field as it doesn't exist
-          connection_status: finalStatus as string 
+          // Use status field as it exists in the table schema
+          status: finalStatus as string 
         })
         .eq('integration_id', integrationId);
 
