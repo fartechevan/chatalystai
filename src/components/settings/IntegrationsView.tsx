@@ -23,9 +23,29 @@ export function IntegrationsView({ isActive }: IntegrationsViewProps) {
   const [selectedIntegration, setSelectedIntegration] = useState<Integration | null>(null);
   const { toast } = useToast();
 
+  // Define the type for each item in the response data array
+  type DBIntegrationType = {
+    id: string;
+    name: string;
+    description?: string;
+    base_url?: string;
+    icon_url?: string;
+    status?: 'available' | 'coming_soon' | string;
+    type?: string;
+    integrations_config: null | {
+      instance_id?: string;
+      token?: string;
+      status?: string;
+    } | Array<{
+      instance_id?: string;
+      token?: string;
+      status?: string;
+    }>;
+  };
+
   // Fetch integrations joined with config, including the new status field
   const { data: integrations = [], isLoading, refetch } = useQuery({
-    queryKey: ['integrationsWithConfig'], // Changed queryKey to reflect joined data
+    queryKey: ['integrationsWithConfig'], 
     queryFn: async () => {
       console.log("Fetching integrations joined with config...");
       // Fetch data by joining integrations and integrations_config
@@ -35,8 +55,7 @@ export function IntegrationsView({ isActive }: IntegrationsViewProps) {
           *,
           integrations_config (
             instance_id,
-            token,
-            status
+            token
           )
         `)
         .order('name');
@@ -46,28 +65,8 @@ export function IntegrationsView({ isActive }: IntegrationsViewProps) {
         throw error;
       }
 
-      // Define the expected type for each item in the response data array
-      type DBIntegrationType = {
-        id: string;
-        name: string;
-        description?: string;
-        base_url?: string;
-        icon_url?: string;
-        status?: 'available' | 'coming_soon' | string;
-        type?: string;
-        integrations_config: null | {
-          instance_id?: string;
-          token?: string;
-          status?: string;
-        } | Array<{
-          instance_id?: string;
-          token?: string;
-          status?: string;
-        }>;
-      };
-
       // Process the data to ensure consistent types
-      const processedData = data.map((item: DBIntegrationType) => {
+      const processedData = (data as unknown as DBIntegrationType[]).map((item: DBIntegrationType) => {
         const config = Array.isArray(item.integrations_config)
           ? item.integrations_config[0] 
           : item.integrations_config;
@@ -106,7 +105,7 @@ export function IntegrationsView({ isActive }: IntegrationsViewProps) {
   });
 
   // This function checks status, updates DB, and triggers refetch
-  const updateAndRefreshStatus = async (integration: Integration & { instance_id?: string; token?: string }) => {
+  const updateAndRefreshStatus = async (integration: Integration & { instance_id?: string; token?: string; }) => {
     let finalStatus: ConnectionState = 'unknown';
     const { id: integrationId, instance_id, token, base_url } = integration;
 
@@ -127,10 +126,14 @@ export function IntegrationsView({ isActive }: IntegrationsViewProps) {
 
       // Update the status in the integrations_config table
       console.log(`Updating status in DB for integration ${integrationId} to ${finalStatus}...`);
+      
       // Update the 'status' column in the database using the finalStatus
       const { error: updateError } = await supabase
         .from('integrations_config')
-        .update({ status: finalStatus as string }) // Update the actual 'status' column
+        .update({ 
+          // Do not include status field as it doesn't exist
+          connection_status: finalStatus as string 
+        })
         .eq('integration_id', integrationId);
 
       if (updateError) {

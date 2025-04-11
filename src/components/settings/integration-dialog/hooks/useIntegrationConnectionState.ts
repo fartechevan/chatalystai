@@ -202,7 +202,7 @@ export function useIntegrationConnectionState(
   };
 
   // Modify handleConnect to accept the instance display name
-  const handleConnect = async (instanceDisplayName: string | null | undefined) => {
+  const handleConnect = async (instanceDisplayName: string | null | undefined = null) => {
     console.log("[handleConnect] Function called with instanceDisplayName:", instanceDisplayName);
     setLocalConnectionState('connecting'); // Set state immediately
     setQrCodeBase64(null); // Clear previous QR/pairing codes
@@ -215,11 +215,22 @@ export function useIntegrationConnectionState(
       setLocalConnectionState('close');
       return;
     }
+
+    // If no instanceDisplayName provided, try to get it from the config
+    if (!instanceDisplayName && config?.instance_display_name) {
+      instanceDisplayName = config.instance_display_name;
+    }
+
+    // Use the config's instance_id as a fallback if no display name is provided
+    if (!instanceDisplayName && config?.instance_id) {
+      instanceDisplayName = config.instance_id;
+    }
+
     if (!instanceDisplayName) {
-       console.error("[handleConnect] Exiting: Instance display name not provided.");
-       toast({ variant: "destructive", title: "Configuration Error", description: "Instance name is missing. Cannot connect." });
-       setLocalConnectionState('close');
-       return;
+      console.error("[handleConnect] Exiting: Instance display name not provided and not found in config.");
+      toast({ variant: "destructive", title: "Configuration Error", description: "Instance name is missing. Cannot connect." });
+      setLocalConnectionState('close');
+      return;
     }
 
     // --- Connect to EXISTING instance using the PROVIDED name ---
