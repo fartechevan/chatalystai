@@ -12,11 +12,11 @@ interface ConversationMainAreaProps {
   selectedConversation: Conversation | null;
   isLoading: boolean;
   messages: MessageType[];
-  newMessage: string;  // Changed to string type
-  setNewMessage: (message: string) => void; // Kept as function
+  newMessage: string;
+  setNewMessage: (message: string) => void;
   handleSendMessage: () => void;
-  sendMessageMutation: UseMutationResult<void, Error, string, unknown>; // Assuming string input, void result
-  summarizeMutation: UseMutationResult<void, Error, string, unknown>; // Assuming string (conversationId) input, void result
+  sendMessageMutation: UseMutationResult<any, Error, string, unknown>; // Changed to any to be more flexible
+  summarizeMutation: UseMutationResult<any, Error, any, unknown>; // Changed to more flexible types
   summary: string | undefined;
   summaryTimestamp: string | undefined;
 }
@@ -61,7 +61,7 @@ export function ConversationMainArea({
           {summarizeMutation.isPending && (
             <div className="absolute inset-0 bg-background/80 flex items-center justify-center">
               <div className="flex flex-col items-center gap-2">
-                <div className="animate-spin h-8 w-8 border-4 border-primary border-t-transparent rounded-full"></div>
+                <Loader2 className="h-8 w-8 animate-spin" />
                 <p>Summarizing conversation...</p>
               </div>
             </div>
