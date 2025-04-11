@@ -1,4 +1,4 @@
-import { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { SupabaseClient } from "@supabase/supabase-js";
 
 /**
  * Finds an existing customer or creates a new one
@@ -6,11 +6,8 @@ import { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 export async function findOrCreateCustomer(supabaseClient: SupabaseClient, phoneNumber: string, contactName: string, fromMe: boolean): Promise<string | null> {
   console.log(`Finding or creating customer with phone: ${phoneNumber}, contactName: ${contactName}, fromMe: ${fromMe}`);
 
-  // Ensure phone number includes country code (+60 for Malaysia)
-  let formattedPhoneNumber = phoneNumber;
-  if (!phoneNumber.startsWith('+')) {
-    formattedPhoneNumber = '+60' + phoneNumber;
-  }
+  // Use the phone number as provided
+  const formattedPhoneNumber = phoneNumber;
   
   // Try to find existing customer
   const { data: existingCustomer, error: customerError } = await supabaseClient
