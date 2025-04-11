@@ -1,5 +1,5 @@
 
-import { X, Menu, Search, Settings } from "lucide-react";
+import { X, Menu, Search, Settings, MessageSquarePlus } from "lucide-react"; // Added MessageSquarePlus
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -9,6 +9,8 @@ import type { Conversation } from "./types";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import type { Customer } from "./types/customer";
+import { BroadcastModal } from "./BroadcastModal";
+// Removed useQuery import
 
 interface ConversationLeftPanelProps {
   leftPanelOpen: boolean;
@@ -29,6 +31,9 @@ export function ConversationLeftPanel({
   selectedConversation,
   setSelectedConversation,
 }: ConversationLeftPanelProps) {
+  const [isBroadcastModalOpen, setIsBroadcastModalOpen] = useState(false);
+
+  // Removed useQuery hook for fetching config
 
   const getAvatarInitial = (conversation: Conversation) => {
     const displayName = getConversationName(conversation);
@@ -74,7 +79,16 @@ export function ConversationLeftPanel({
             <div className="flex-1">
               <h3 className="font-medium text-sm">INBOX</h3>
             </div>
-            <Button variant="ghost" size="icon">
+            {/* Add New Broadcast Button */}
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setIsBroadcastModalOpen(true)}
+              title="New Broadcast"
+            >
+              <MessageSquarePlus className="h-4 w-4" />
+            </Button>
+            <Button variant="ghost" size="icon" title="Settings">
               <Settings className="h-4 w-4" />
             </Button>
           </div>
@@ -130,6 +144,13 @@ export function ConversationLeftPanel({
           )}
         </ScrollArea>
       </div>
+
+      {/* Render the Broadcast Modal */}
+      <BroadcastModal
+        isOpen={isBroadcastModalOpen}
+        onClose={() => setIsBroadcastModalOpen(false)}
+        // Removed integrationId and instanceName props
+      />
     </div>
   );
 }
