@@ -47,13 +47,13 @@ export function useEvolutionApiConnection(selectedIntegration: Integration | nul
       clearInterval(pollingInterval);
       setPollingInterval(null);
     }
-
-    console.log(`Starting connection status polling for NEW instance: ${newInstanceId}`);
-    const intervalId = setInterval(async () => {
-      console.log(`Polling for NEW instance status: ${newInstanceId}`);
-      const baseUrlToCheck = config?.base_url;
-
-      if (!baseUrlToCheck) {
+ 
+     console.log(`Starting connection status polling for NEW instance: ${newInstanceId}`);
+     const intervalId = setInterval(async () => {
+       // console.log(`Polling for NEW instance status: ${newInstanceId}`); // Removed log
+       const baseUrlToCheck = config?.base_url;
+ 
+       if (!baseUrlToCheck) {
         console.error("Polling Error: Base URL not available from config.");
         clearInterval(intervalId);
         setPollingInterval(null);
@@ -111,13 +111,13 @@ export function useEvolutionApiConnection(selectedIntegration: Integration | nul
         // Extract QR code or pairing code
         const qrData = response.qrcode;
         const pairing = qrData?.pairingCode;
-        const base64 = qrData?.base64; // Base64 is usually preferred for display
-
-        console.log("Connection attempt response:", response);
-
-        if (base64) {
-          setQrCodeBase64(base64);
-          setPairingCode(null); // Clear pairing code if we have QR image
+         const base64 = qrData?.base64; // Base64 is usually preferred for display
+ 
+         // console.log("Connection attempt response:", response); // Removed log
+ 
+         if (base64) {
+           setQrCodeBase64(base64);
+           setPairingCode(null); // Clear pairing code if we have QR image
           setConnectionState('qrcode'); // State indicates QR needs scanning
           toast({ title: "Scan QR Code", description: "Scan the QR code with your WhatsApp." });
           // Polling might not be needed here if status check happens elsewhere or QR display implies connecting
@@ -148,13 +148,13 @@ export function useEvolutionApiConnection(selectedIntegration: Integration | nul
       return false;
     }
   };
-
-  useEffect(() => {
-    if (config) {
-      console.log('Initial connection state check with config:', config);
-      checkCurrentConnectionState();
-    }
-
+ 
+   useEffect(() => {
+     if (config) {
+       // console.log('Initial connection state check with config:', config); // Removed log
+       checkCurrentConnectionState();
+     }
+ 
     return () => {
       if (pollingInterval) {
         console.log('Cleaning up polling interval on unmount/config change.');

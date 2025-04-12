@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
@@ -18,15 +17,16 @@ import {
   useAssignee
 } from "./leadDetails/hooks";
 import { useToast } from "@/components/ui/use-toast";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQueryClient, QueryClient } from "@tanstack/react-query"; // Import QueryClient
 import { supabase } from "@/integrations/supabase/client";
+import type { Profile } from "./types"; // Import Profile
 
 interface LeadDetailsPanelProps {
   isExpanded: boolean;
   onToggle: () => void;
   selectedConversation: Conversation | null;
   setSelectedConversation: (conversation: Conversation | null) => void;
-  queryClient: any;
+  queryClient: QueryClient; // Use QueryClient type
 }
 
 export function LeadDetailsPanel({
@@ -36,7 +36,7 @@ export function LeadDetailsPanel({
   setSelectedConversation,
   queryClient,
 }: LeadDetailsPanelProps) {
-  const [profiles, setProfiles] = useState<any[]>([]);
+  const [profiles, setProfiles] = useState<Profile[]>([]); // Use Profile[] type
   const [activeTab, setActiveTab] = useState("main");
   
   // Custom hooks for managing different aspects of the lead details panel
@@ -75,7 +75,7 @@ export function LeadDetailsPanel({
     if (isExpanded) {
       const getProfiles = async () => {
         const profilesData = await fetchProfiles();
-        setProfiles(profilesData);
+        setProfiles(profilesData as Profile[]); // Apply Profile[] type
       };
       getProfiles();
     }
@@ -205,12 +205,12 @@ export function LeadDetailsPanel({
               </Tabs>
             </>
           ) : (
-            <EmptyLeadState 
-              conversationId={selectedConversation?.conversation_id || ''}
-              onLeadCreated={async (leadId) => {
-                console.log("Lead created:", leadId);
-                // Invalidate the conversations query to refetch conversations
-                await queryClient.invalidateQueries({ queryKey: ['conversations'] });
+             <EmptyLeadState 
+               conversationId={selectedConversation?.conversation_id || ''}
+               onLeadCreated={async (leadId) => {
+                 // console.log("Lead created:", leadId); // Removed log
+                 // Invalidate the conversations query to refetch conversations
+                 await queryClient.invalidateQueries({ queryKey: ['conversations'] });
 
                 // Fetch the updated conversation data
                 const { data: updatedConversation, error } = await supabase

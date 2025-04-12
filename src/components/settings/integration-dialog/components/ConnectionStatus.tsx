@@ -54,12 +54,12 @@ export function ConnectionStatus({
       </div>
     );
   }
-  
-  // Default: Not connected state
-  console.log(`[ConnectionStatus] Rendering default state (connectionState: ${connectionState})`); // Add log before returning the button UI
-  return (
-    <div className="space-y-4">
-      {selectedIntegration && (
+   
+   // Default: Not connected state
+   // console.log(`[ConnectionStatus] Rendering default state (connectionState: ${connectionState})`); // Removed log
+   return (
+     <div className="space-y-4">
+       {selectedIntegration && (
         <div className="aspect-video rounded-md bg-gradient-to-br from-green-50 to-green-100 mb-4 flex items-center justify-center p-8">
           <img
             src={selectedIntegration.icon_url || selectedIntegration.icon}

@@ -46,7 +46,7 @@ export function useWhatsAppConversations(instanceId: string | null, isConnected:
         throw new Error(`Failed to fetch WhatsApp conversations: ${error.message}`);
       }
 
-      console.log('WhatsApp conversation data:', data);
+      // console.log('WhatsApp conversation data:', data); // Removed log
       return data;
     },
     enabled: !!instanceId && isConnected,

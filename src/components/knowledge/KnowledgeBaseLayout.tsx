@@ -68,7 +68,7 @@ export function KnowledgeBaseLayout() {
   // Ensure this handler explicitly sets showImportForm to true
   const handleShowImportForm = () => {
     setShowImportForm(true);
-    console.log("Import form visibility set to:", true);
+    // console.log("Import form visibility set to:", true); // Removed log
   };
 
   const handleSelectDocument = async (documentId: string | null) => {

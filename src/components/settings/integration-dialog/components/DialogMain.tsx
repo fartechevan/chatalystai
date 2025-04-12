@@ -17,13 +17,13 @@ export function DialogMain({
   connectionState,
   isLoading,
   // onConnect, // Removed prop
-  onOpenChange
-}: DialogMainProps) {
-  // Log the connectionState being received by DialogMain
-  console.log(`[DialogMain] Rendering with connectionState: ${connectionState}, isLoading: ${isLoading}`);
-
-  return (
-    <div className="w-1/2">
+   onOpenChange
+ }: DialogMainProps) {
+   // Log the connectionState being received by DialogMain
+   // console.log(`[DialogMain] Rendering with connectionState: ${connectionState}, isLoading: ${isLoading}`); // Removed log
+ 
+   return (
+     <div className="w-1/2">
       <DialogHeader>
         <DialogTitle>Connect WhatsApp</DialogTitle>
         <DialogDescription>

@@ -112,7 +112,6 @@ export const sendBroadcastService = async ({
       let updatePayload: Database['public']['Tables']['broadcast_recipients']['Update'] = { status: 'failed' };
 
       try {
-        console.log(`Attempting to send to ${recipient.phone_number}`);
         const response = await fetch(evolutionApiUrl, {
           method: "POST",
           headers: {
@@ -127,7 +126,6 @@ export const sendBroadcastService = async ({
           throw new Error(`API Error ${response.status}: ${errorBody}`);
         }
         // const responseData = await response.json(); // Process if needed
-        console.log(`Successfully sent to ${recipient.phone_number}`);
         successfulSends++;
         updatePayload = { status: 'sent', sent_at: new Date().toISOString() };
       } catch (error: unknown) {

@@ -7,14 +7,14 @@ interface QRCodeScreenProps {
   onOpenChange: (open: boolean) => void;
   qrCodeBase64?: string | null;
   pairingCode?: string | null;
-}
-
-export function QRCodeScreen({ open, onClose, onOpenChange, qrCodeBase64, pairingCode }: QRCodeScreenProps) {
-  console.log('QR Code Data:', qrCodeBase64); // Debug log
-  console.log('Pairing Code:', pairingCode); // Debug log
-
-  return (
-    <BaseDialog
+ }
+ 
+ export function QRCodeScreen({ open, onClose, onOpenChange, qrCodeBase64, pairingCode }: QRCodeScreenProps) {
+   // console.log('QR Code Data:', qrCodeBase64); // Removed log
+   // console.log('Pairing Code:', pairingCode); // Removed log
+ 
+   return (
+     <BaseDialog
       open={open}
       onOpenChange={onOpenChange}
       onClose={onClose}

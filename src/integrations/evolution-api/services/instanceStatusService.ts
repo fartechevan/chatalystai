@@ -48,7 +48,7 @@ export async function checkInstanceStatus(
       return 'unknown';
     }
     
-    console.log('Instance status response:', data);
+    // console.log('Instance status response:', data); // Removed log
     
     // Map the response to a connection state
     if (data.state) {

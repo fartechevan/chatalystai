@@ -14,13 +14,13 @@ interface PipelineBoardProps {
 
 export function PipelineBoard({ stages, stageLeads, onLeadMoved }: PipelineBoardProps) {
   const { toast } = useToast();
-
-  const handleDragEnd = async (result: DropResult) => {
-    if (!result.destination) return;
-    console.log("Drag end:", result);
-
-    const sourceStageId = result.source.droppableId;
-    const destinationStageId = result.destination.droppableId;
+ 
+   const handleDragEnd = async (result: DropResult) => {
+     if (!result.destination) return;
+     // console.log("Drag end:", result); // Removed log
+ 
+     const sourceStageId = result.source.droppableId;
+     const destinationStageId = result.destination.droppableId;
     const leadId = result.draggableId;
 
     const sourceStageIndex = stages.findIndex(stage => stage.id === sourceStageId);

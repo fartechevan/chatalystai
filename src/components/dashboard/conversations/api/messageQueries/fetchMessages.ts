@@ -23,9 +23,9 @@ export async function fetchMessages(conversationId: string) {
 
   if (error) {
     console.error('Error fetching messages:', error);
-    throw error;
-  }
-
-  console.log('Fetched messages:', data);
-  return data;
-}
+     throw error;
+   }
+ 
+   // console.log('Fetched messages:', data); // Removed log
+   return data;
+ }
