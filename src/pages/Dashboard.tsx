@@ -14,7 +14,7 @@ export default function Dashboard() {
         <DashboardSidebar />
         <main className="flex-1 pt-8 px-8 overflow-auto relative">
           {/* Removed logout button container */}
-          <div className="container">
+          <div>
             <Outlet />
           </div>
         </main>
