@@ -42,11 +42,11 @@ export const SidebarBase = React.forwardRef<HTMLDivElement, SidebarBaseProps>(
       return (
         <Sheet open={openMobile} onOpenChange={setOpenMobile} {...props}>
           <SheetContent
-            data-sidebar="sidebar"
-            data-mobile="true"
-            className="w-[--sidebar-width] bg-sidebar p-0 text-sidebar-foreground [&>button]:hidden"
-            style={
-              {
+             data-sidebar="sidebar"
+             data-mobile="true"
+             className="w-[--sidebar-width] bg-white p-0 text-gray-900 [&>button]:hidden" // Changed bg-sidebar to bg-white and text color
+             style={
+               {
                 "--sidebar-width": "20rem", // Increased width for mobile
               } as React.CSSProperties
             }

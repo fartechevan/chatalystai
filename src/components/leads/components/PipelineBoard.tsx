@@ -63,11 +63,15 @@ export function PipelineBoard({ stages, stageLeads, onLeadMoved }: PipelineBoard
   };
 
   return (
+    // DragDropContext should be the outermost wrapper
     <DragDropContext onDragEnd={handleDragEnd}>
-      <div className="flex-1 overflow-x-auto p-6">
-        <div className="flex gap-6 min-w-max">
-          {stages.map((stage, index) => (
-            <LeadsStage
+      {/* Outer container takes flexible vertical space */}
+      <div className="flex-1 overflow-hidden"> 
+        {/* Inner container handles horizontal scrolling and padding */}
+        <div className="h-full overflow-x-auto p-6"> 
+          <div className="flex gap-6 min-w-max h-full"> {/* Ensure inner flex container also takes height */}
+            {stages.map((stage, index) => (
+              <LeadsStage
               key={stage.id}
               id={stage.id}
               name={stage.name}
@@ -75,6 +79,7 @@ export function PipelineBoard({ stages, stageLeads, onLeadMoved }: PipelineBoard
               leads={stageLeads[stage.id] || []}
             />
           ))}
+          </div>
         </div>
       </div>
     </DragDropContext>

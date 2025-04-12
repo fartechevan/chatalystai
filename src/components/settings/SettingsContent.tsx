@@ -47,7 +47,12 @@ export function SettingsContent({ section }: SettingsContentProps) {
   }
 
   if (section === 'integrations') {
-    return <IntegrationsView isActive={section === 'integrations'} />;
+    // Use responsive padding for the wrapper
+    return (
+      <div className="p-4 md:p-6"> 
+        <IntegrationsView isActive={section === 'integrations'} />
+      </div>
+    );
   }
 
   if (section === 'access') {

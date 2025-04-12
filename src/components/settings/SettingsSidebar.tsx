@@ -9,17 +9,24 @@ import {
   Users, 
   Webhook, 
   MessageCircle,
-  Shield
+  Shield,
+  PanelLeftClose, // Added
+  PanelLeftOpen   // Added
 } from "lucide-react";
+import { cn } from "@/lib/utils"; // Added cn
 
 interface SettingsSidebarProps {
   selectedSection: string;
   onSectionChange: (section: string) => void;
+  isCollapsed: boolean; // Added prop
+  onCollapse: () => void; // Added prop
 }
 
 export function SettingsSidebar({
   selectedSection,
   onSectionChange,
+  isCollapsed, // Added prop
+  onCollapse, // Added prop
 }: SettingsSidebarProps) {
   const sidebarItems = [
     { id: "account", label: "Account", icon: Settings },
@@ -33,28 +40,58 @@ export function SettingsSidebar({
   ];
 
   return (
-    <div className="pb-12 min-w-64 bg-muted/40">
-      <div className="px-6 py-8 border-b">
-        <h2 className="text-lg font-semibold">Settings</h2>
-        <p className="text-sm text-muted-foreground">
+    // Removed pb-12, Added relative positioning, h-full, transition
+    // Removed min-w-64, width is controlled by parent
+    <div className={cn(
+      "bg-muted/40 h-full flex flex-col relative transition-all duration-300",
+      isCollapsed ? "items-center" : "" 
+    )}>
+      {/* Header */}
+      <div className={cn("py-8 border-b", isCollapsed ? "px-2" : "px-6")}>
+        <h2 className={cn("text-lg font-semibold", isCollapsed ? "hidden" : "")}>Settings</h2>
+        <p className={cn("text-sm text-muted-foreground", isCollapsed ? "hidden" : "")}>
           Manage your account settings and preferences.
         </p>
       </div>
-      <ScrollArea className="h-[calc(100vh-8rem)] py-2">
-        <div className="px-2">
+      
+      {/* Navigation */}
+      <ScrollArea className="flex-1 py-2"> 
+        {/* Standardize padding within scroll area */}
+        <div className="px-2"> 
           {sidebarItems.map((item) => (
             <Button
               key={item.id}
               variant={selectedSection === item.id ? "secondary" : "ghost"}
-              className="w-full justify-start mb-1"
+              className={cn(
+                "w-full mb-1", // Removed justify-start here, apply conditionally
+                isCollapsed ? "justify-center" : "justify-start" // Apply correct justification
+              )}
               onClick={() => onSectionChange(item.id)}
+              title={item.label} // Add title for collapsed view
             >
-              <item.icon className="mr-2 h-4 w-4" />
-              {item.label}
+              <item.icon className={cn("h-4 w-4", isCollapsed ? "" : "mr-2")} />
+              <span className={cn(isCollapsed ? "hidden" : "")}>{item.label}</span>
             </Button>
           ))}
         </div>
       </ScrollArea>
+
+      {/* Collapse Button - Rendered conditionally by parent layout */}
+      {/* We add the button structure here, but parent controls visibility */}
+       <button
+          onClick={onCollapse}
+          className={cn(
+            "absolute -right-3 top-3 p-1 rounded-full bg-background border shadow-sm hover:bg-accent",
+            "transition-transform hidden md:inline-flex" // Initially hidden, parent shows on desktop
+          )}
+          title={isCollapsed ? 'Expand settings menu' : 'Collapse settings menu'}
+        >
+          {isCollapsed ? (
+            <PanelLeftOpen className="h-4 w-4" /> 
+          ) : (
+            <PanelLeftClose className="h-4 w-4" />
+          )}
+        </button>
     </div>
   );
 }

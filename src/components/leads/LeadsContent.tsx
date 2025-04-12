@@ -31,8 +31,11 @@ export function LeadsContent({ pipelineId }: LeadsContentProps) {
   }
 
   return (
-    <div className="flex flex-col h-full">
+    // This container just needs to arrange its children vertically.
+    // Height/overflow is managed by the parent in LeadsLayout.
+    <div className="flex flex-col h-full"> 
       <LeadsHeader selectedPipelineId={pipelineId} />
+      {/* PipelineBoard needs flex-1 to take remaining vertical space */}
       <PipelineBoard 
         stages={stages} 
         stageLeads={stageLeads} 

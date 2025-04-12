@@ -77,30 +77,19 @@ export function IntegrationsView({ isActive }: IntegrationsViewProps) {
   const { data: userAccessIntegrationIds, isLoading: isLoadingAccess } = useQuery({
     queryKey: ['userIntegrationAccess', userId],
     queryFn: async () => {
-      if (!userId) return []; // Should not happen if enabled correctly
+      if (!userId) return []; 
       
-      // Fetch config IDs the user has access to
+      // Fetch integration IDs directly from profile_integration_access
       const { data: accessData, error: accessError } = await supabase
         .from('profile_integration_access')
-        .select('integration_config_id')
+        .select('integration_id') // Select the correct foreign key
         .eq('profile_id', userId);
 
       if (accessError) throw accessError;
       if (!accessData || accessData.length === 0) return [];
 
-      const configIds = accessData.map(a => a.integration_config_id);
-
-      // Fetch the integration IDs linked to these configs
-      const { data: configLinkData, error: configLinkError } = await supabase
-        .from('integrations_config')
-        .select('integration_id')
-        .in('id', configIds);
-      
-      if (configLinkError) throw configLinkError;
-      if (!configLinkData) return [];
-
-      // Return unique integration IDs
-      return [...new Set(configLinkData.map(c => c.integration_id).filter(Boolean) as string[])];
+      // Return unique integration IDs directly
+      return [...new Set(accessData.map(a => a.integration_id).filter(Boolean) as string[])];
     },
     enabled: !!userId && !isAdmin && isActive && !isCheckingRole, // Only run for non-admins when ready
   });
@@ -321,32 +310,29 @@ export function IntegrationsView({ isActive }: IntegrationsViewProps) {
   const isLoading = isCheckingRole || isLoadingIntegrations || (!isAdmin && isLoadingAccess); 
 
   return (
-    <div className="p-8 max-w-7xl mx-auto space-y-8">
+    // Removed all padding again. Rely entirely on parent (SettingsLayout). Kept space-y-8.
+    <div className="space-y-8"> 
       <IntegrationDialog
         open={dialogOpen}
         onOpenChange={handleDialogClose}
         selectedIntegration={selectedIntegration}
       />
 
-      <div className="flex items-center justify-between">
+      {/* Make top row stack on mobile, row on md+ */}
+      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 md:gap-0">
         <Input
           placeholder="Search"
-          className="max-w-sm"
+          className="w-full md:max-w-sm" // Full width on mobile, max-w on md+
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
         />
-        <div className="flex items-center gap-2">
-          <Button variant="outline" size="sm">
-            WEB HOOKS
-          </Button>
-          <Button size="sm">
-            <Plus className="h-4 w-4 mr-2" />
-            CREATE INTEGRATION
-          </Button>
-        </div>
+        {/* Removed Webhooks and Create Integration buttons */}
       </div>
 
-      <div className="flex items-center gap-4 border-b">
+      {/* Removed duplicated search row */}
+
+      {/* Keep margin-bottom */}
+      <div className="flex items-center gap-4 border-b mb-8"> 
         {tabs.map((tab) => (
           <button
             key={tab}
@@ -368,12 +354,14 @@ export function IntegrationsView({ isActive }: IntegrationsViewProps) {
         ))}
       </div>
 
-      <div className="space-y-6">
-        <h2 className="text-lg font-semibold">Messengers</h2>
+      {/* Removed px-4 wrapper */}
+      <div> 
+        <h2 className="text-lg font-semibold mb-6">Messengers</h2> 
         {isLoading ? (
           <div className="text-center text-muted-foreground py-8">Loading integrations...</div>
         ) : filteredIntegrations.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          // Re-added gap-4 to grid container
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4"> 
             {filteredIntegrations.map((integration) => (
               <IntegrationCard
                 key={integration.id}
