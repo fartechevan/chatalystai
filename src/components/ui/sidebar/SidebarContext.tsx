@@ -1,3 +1,4 @@
+
 import * as React from "react"
 import { useIsMobile } from "@/hooks/use-mobile"
 
@@ -48,6 +49,13 @@ export const SidebarProvider = React.forwardRef<HTMLDivElement, SidebarProviderP
     const [openMobile, setOpenMobile] = React.useState(false)
     const [_open, _setOpen] = React.useState(defaultOpen)
     const open = openProp ?? _open
+    
+    // Close mobile sidebar when screen size changes from mobile to desktop
+    React.useEffect(() => {
+      if (!isMobile && openMobile) {
+        setOpenMobile(false)
+      }
+    }, [isMobile, openMobile])
     
     const setOpen = React.useCallback(
       (value: boolean | ((value: boolean) => boolean)) => {
@@ -105,7 +113,7 @@ export const SidebarProvider = React.forwardRef<HTMLDivElement, SidebarProviderP
           style={
             {
               "--sidebar-width": "16rem",
-              "--sidebar-width-icon": "3rem",
+              "--sidebar-width-icon": "4.5rem",
               ...style,
             } as React.CSSProperties
           }

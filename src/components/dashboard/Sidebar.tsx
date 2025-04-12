@@ -1,3 +1,4 @@
+
 import { 
   Home, 
   Menu, 
@@ -6,12 +7,12 @@ import {
   List, 
   Calendar, 
   Target,
-  Mail,
   BarChart2,
   HelpCircle,
   UserRound,
+  LogOut,
   BookOpen,
-  LogOut
+  X
 } from "lucide-react";
 import {
   Sidebar,
@@ -26,6 +27,7 @@ import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { useAuth } from "@/components/auth/AuthProvider";
+import { useEffect } from "react";
 
 type MenuItem = {
   title: string;
@@ -49,8 +51,15 @@ const menuItems: MenuItem[] = [
 export function DashboardSidebar() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { toggleSidebar } = useSidebar();
+  const { openMobile, setOpenMobile, isMobile, state } = useSidebar();
   const { user } = useAuth();
+
+  // Close mobile sidebar when route changes
+  useEffect(() => {
+    if (isMobile && openMobile) {
+      setOpenMobile(false);
+    }
+  }, [location.pathname, isMobile, openMobile, setOpenMobile]);
 
   const handleLogout = async () => {
     try {
@@ -80,12 +89,24 @@ export function DashboardSidebar() {
         variant="ghost"
         size="icon"
         className="fixed top-4 left-4 z-50 md:hidden"
-        onClick={toggleSidebar}
+        onClick={() => setOpenMobile(!openMobile)}
       >
-        <Menu className="h-5 w-5" />
+        {openMobile ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
       </Button>
+      
       <Sidebar collapsible="icon" className="bg-[#1C2434]">
         <SidebarContent>
+          {isMobile && openMobile && (
+            <Button
+              variant="ghost"
+              size="icon"
+              className="absolute top-2 right-2 text-white/70 hover:text-white"
+              onClick={() => setOpenMobile(false)}
+            >
+              <X className="h-5 w-5" />
+            </Button>
+          )}
+          
           <div className="px-2 py-2">
             {menuItems.map((item) => (
               <SidebarMenuButton
@@ -94,13 +115,18 @@ export function DashboardSidebar() {
                 isActive={location.pathname === item.path}
                 tooltip={item.title}
                 className={cn(
-                  "relative w-full",
+                  "relative w-full mb-1",
                   location.pathname === item.path ? "bg-white/10 text-white" : "text-gray-400 hover:text-white hover:bg-white/5"
                 )}
               >
-                <Link to={item.path} className="flex items-center gap-3">
+                <Link to={item.path} className="flex items-center gap-3 py-2.5">
                   <item.icon className="h-5 w-5" />
-                  <span className="text-sm">{item.title}</span>
+                  <span className={cn(
+                    "text-sm transition-opacity",
+                    state === "collapsed" && !isMobile ? "opacity-0" : "opacity-100"
+                  )}>
+                    {item.title}
+                  </span>
                   {item.badge ? (
                     <span className="absolute right-2 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] text-white">
                       {item.badge}
@@ -116,13 +142,18 @@ export function DashboardSidebar() {
               asChild
               tooltip="Profile"
               className={cn(
-                "w-full",
+                "w-full mb-1",
                 location.pathname === "/dashboard/profile" ? "bg-white/10 text-white" : "text-gray-400 hover:text-white hover:bg-white/5"
               )}
             >
-              <Link to="/dashboard/profile" className="flex items-center gap-3">
+              <Link to="/dashboard/profile" className="flex items-center gap-3 py-2.5">
                 <UserRound className="h-5 w-5" />
-                <span className="text-sm">Profile</span>
+                <span className={cn(
+                  "text-sm transition-opacity",
+                  state === "collapsed" && !isMobile ? "opacity-0" : "opacity-100"
+                )}>
+                  Profile
+                </span>
               </Link>
             </SidebarMenuButton>
             
@@ -131,9 +162,14 @@ export function DashboardSidebar() {
               onClick={handleLogout}
               className="w-full text-gray-400 hover:text-white hover:bg-white/5 mt-2"
             >
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-3 py-2.5">
                 <LogOut className="h-5 w-5" />
-                <span className="text-sm">Logout</span>
+                <span className={cn(
+                  "text-sm transition-opacity",
+                  state === "collapsed" && !isMobile ? "opacity-0" : "opacity-100"
+                )}>
+                  Logout
+                </span>
               </div>
             </SidebarMenuButton>
           </div>
