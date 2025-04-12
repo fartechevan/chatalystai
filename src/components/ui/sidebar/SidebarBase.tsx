@@ -47,7 +47,7 @@ export const SidebarBase = React.forwardRef<HTMLDivElement, SidebarBaseProps>(
             className="w-[--sidebar-width] bg-sidebar p-0 text-sidebar-foreground [&>button]:hidden"
             style={
               {
-                "--sidebar-width": "11rem",
+                "--sidebar-width": "20rem", // Increased width for mobile
               } as React.CSSProperties
             }
             side={side}
@@ -98,7 +98,7 @@ export const SidebarBase = React.forwardRef<HTMLDivElement, SidebarBaseProps>(
         >
           <div
             data-sidebar="sidebar"
-            className="flex h-full w-full flex-col bg-sidebar group-data-[variant=floating]:rounded-lg group-data-[variant=floating]:border group-data-[variant=floating]:border-sidebar-border group-data-[variant=floating]:shadow bg-[#1C2434]"
+            className="flex h-full w-full flex-col bg-sidebar group-data-[variant=floating]:rounded-lg group-data-[variant=floating]:border group-data-[variant=floating]:border-sidebar-border group-data-[variant=floating]:shadow bg-[#333333]" // Updated background color
           >
             {children}
           </div>
