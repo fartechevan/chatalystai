@@ -38,13 +38,13 @@ export function usePipelineData(pipelineId: string | null) {
       console.error('Error fetching stages:', error);
       setLoading(false);
       return;
-    }
-    
-    if (data) {
-      console.log("Loaded stages:", data);
-      setStages(data);
-      
-      const leadsData: StageLeads = {};
+     }
+     
+     if (data) {
+       // console.log("Loaded stages:", data); // Removed log
+       setStages(data);
+       
+       const leadsData: StageLeads = {};
       for (const stage of data) {
         const { data: stageLeadsData, error: leadsError } = await supabase
           .from('lead_pipeline')
@@ -97,13 +97,13 @@ export function usePipelineData(pipelineId: string | null) {
             .filter((lead): lead is Lead => lead !== null);
           
           leadsData[stage.id] = validLeads || [];
-        }
-      }
-      
-      console.log("Loaded leads data:", leadsData);
-      setStageLeads(leadsData);
-    }
-    
+         }
+       }
+       
+       // console.log("Loaded leads data:", leadsData); // Removed log
+       setStageLeads(leadsData);
+     }
+     
     setLoading(false);
   };
 

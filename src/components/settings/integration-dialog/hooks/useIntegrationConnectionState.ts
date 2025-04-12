@@ -100,13 +100,13 @@ export function useIntegrationConnectionState(
     }
 
     // Start polling only if in qrcode or pairingCode state
-    if (localConnectionState === 'qrcode' || localConnectionState === 'pairingCode') {
-      console.log(`[Polling Effect] Starting polling for state: ${localConnectionState}`);
-      const intervalId = setInterval(async () => {
-        console.log(`[Polling Interval] Checking connection state (current: ${localConnectionState})...`);
-        // Call the check function. The state update will be handled by useEvolutionApiConnection's effect
-        // which updates localConnectionState, triggering the outer effect's cleanup/check.
-        await checkCurrentConnectionState();
+     if (localConnectionState === 'qrcode' || localConnectionState === 'pairingCode') {
+       console.log(`[Polling Effect] Starting polling for state: ${localConnectionState}`);
+       const intervalId = setInterval(async () => {
+         // console.log(`[Polling Interval] Checking connection state (current: ${localConnectionState})...`); // Removed log
+         // Call the check function. The state update will be handled by useEvolutionApiConnection's effect
+         // which updates localConnectionState, triggering the outer effect's cleanup/check.
+         await checkCurrentConnectionState();
       }, 3000); // Poll every 3 seconds
       setQrPollingInterval(intervalId);
     } else {

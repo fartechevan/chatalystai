@@ -92,39 +92,39 @@ export function useLeadPipeline(
       if (stageError) {
         console.error('Error fetching stage:', stageError);
         return;
-      }
-      
-      if (stageData) {
-        console.log("Fetched stage data:", stageData);
-        const { data: pipelineData, error: pipelineError } = await supabase
-          .from('pipelines')
-          .select('*')
+       }
+       
+       if (stageData) {
+         // console.log("Fetched stage data:", stageData); // Removed log
+         const { data: pipelineData, error: pipelineError } = await supabase
+           .from('pipelines')
+           .select('*')
           .eq('id', stageData.pipeline_id)
           .maybeSingle();
           
         if (pipelineError) {
           console.error('Error fetching pipeline:', pipelineError);
           return;
-        }
-        
-        if (pipelineData) {
-          console.log("Fetched pipeline data:", pipelineData);
-          const { data: stagesData, error: stagesError } = await supabase
-            .from('pipeline_stages')
-            .select('id, name, position, pipeline_id')
+         }
+         
+         if (pipelineData) {
+           // console.log("Fetched pipeline data:", pipelineData); // Removed log
+           const { data: stagesData, error: stagesError } = await supabase
+             .from('pipeline_stages')
+             .select('id, name, position, pipeline_id')
             .eq('pipeline_id', stageData.pipeline_id)
             .order('position');
           
           if (stagesError) {
             console.error('Error fetching pipeline stages:', stagesError);
             return;
-          }
-          
-          if (stagesData) {
-            console.log("Fetched pipeline stages:", stagesData);
-            const pipelineWithStages: Pipeline = {
-              id: pipelineData.id,
-              name: pipelineData.name,
+           }
+           
+           if (stagesData) {
+             // console.log("Fetched pipeline stages:", stagesData); // Removed log
+             const pipelineWithStages: Pipeline = {
+               id: pipelineData.id,
+               name: pipelineData.name,
               is_default: pipelineData.is_default,
               stages: stagesData
             };

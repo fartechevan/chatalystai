@@ -1,6 +1,5 @@
-
 import { useState, useCallback } from "react";
-import { Customer, Lead } from "../../types";
+import { Customer, Lead, Profile } from "../../types"; // Import Profile
 import { fetchCustomerById } from "./utils/customerUtils";
 import { 
   createFakeLeadFromCustomer, 
@@ -11,7 +10,7 @@ import { supabase } from "@/integrations/supabase/client";
 export function useCustomerData(setLead: React.Dispatch<React.SetStateAction<Lead | null>>) {
   const [customer, setCustomer] = useState<Customer | null>(null);
 
-  const handleCustomerFetch = useCallback(async (customerId: string, profiles: any[]) => {
+  const handleCustomerFetch = useCallback(async (customerId: string, profiles: Profile[]) => { // Use Profile[] type
     const customerData = await fetchCustomerById(customerId);
     
     if (customerData) {
@@ -38,13 +37,13 @@ export function useCustomerData(setLead: React.Dispatch<React.SetStateAction<Lea
           
           // Virtual properties derived from customer data
           company_name: customerData.company_name || undefined,
-          name: customerData.name
-        };
-        
-        console.log("Handling lead data:", leadData);
-        setLead(leadData);
-        
-        return { lead: leadData, customer: customerData };
+           name: customerData.name
+         };
+         
+         // console.log("Handling lead data:", leadData); // Removed log
+         setLead(leadData);
+         
+         return { lead: leadData, customer: customerData };
       } else {
         // Create a fake lead since we have a customer but no lead
         const fakeLead = createFakeLeadFromCustomer(

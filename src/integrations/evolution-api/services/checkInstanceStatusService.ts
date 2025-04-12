@@ -40,7 +40,7 @@ export async function checkInstanceStatus(
     }
     
     const data = await response.json();
-    console.log('Instance status data:', data);
+    // console.log('Instance status data:', data); // Removed log
     
     // Map the Evolution API state to our ConnectionState type
     if (data.state) {

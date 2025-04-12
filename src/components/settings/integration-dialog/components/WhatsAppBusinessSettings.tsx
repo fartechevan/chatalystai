@@ -103,12 +103,12 @@ export function WhatsAppBusinessSettings({ selectedIntegration, onConnect }: Wha
           } else {
             console.error('Unexpected response from fetchInstances:', allInstancesResult);
             throw new Error('Received unexpected data format when fetching instances.');
-          }
-        }
-        console.log("Successfully fetched instances array:", allInstancesResult);
-        // --- End Error handling ---
-
-        // Fetch the LATEST config directly from Supabase NOW
+           }
+         }
+         // console.log("Successfully fetched instances array:", allInstancesResult); // Removed log
+         // --- End Error handling ---
+ 
+         // Fetch the LATEST config directly from Supabase NOW
         console.log(`Fetching latest config directly for integration ${selectedIntegration.id}...`);
         const { data: latestConfigData, error: latestConfigError } = await supabase
           .from('integrations_config')
@@ -118,12 +118,12 @@ export function WhatsAppBusinessSettings({ selectedIntegration, onConnect }: Wha
 
         if (latestConfigError && latestConfigError.code !== 'PGRST116') { // Ignore 'No rows found' error
           console.error('Error fetching latest config directly:', latestConfigError);
-          throw new Error(`Failed to fetch latest configuration: ${latestConfigError.message}`);
-        }
-        console.log("Latest config data fetched directly:", latestConfigData);
-        const configuredInstanceId = latestConfigData?.instance_id; // Use ID from the direct fetch
-
-        // Handle case where no live instances exist
+           throw new Error(`Failed to fetch latest configuration: ${latestConfigError.message}`);
+         }
+         // console.log("Latest config data fetched directly:", latestConfigData); // Removed log
+         const configuredInstanceId = latestConfigData?.instance_id; // Use ID from the direct fetch
+ 
+         // Handle case where no live instances exist
         if (allInstancesResult.length === 0) {
           console.log("No instances found on the server for this integration.");
           setNoInstanceFoundFromServer(true);
@@ -219,13 +219,13 @@ export function WhatsAppBusinessSettings({ selectedIntegration, onConnect }: Wha
              // The log message here was incorrect, status is not saved.
              // console.log(`Successfully upserted config for integration ${selectedIntegration.id} with status ${connectionStatus}.`);
              console.log(`Successfully upserted config for integration ${selectedIntegration.id}.`);
-          }
-
-          // Update the UI state with the live instance details
-          console.log("Setting LIVE instance details state:", targetInstance);
-          setInstanceDetails(targetInstance);
-          // Invalidate config query in case display name/token was updated
-          await queryClient.invalidateQueries({ queryKey: ['integration-config', selectedIntegration.id] });
+           }
+ 
+           // Update the UI state with the live instance details
+           // console.log("Setting LIVE instance details state:", targetInstance); // Removed log
+           setInstanceDetails(targetInstance);
+           // Invalidate config query in case display name/token was updated
+           await queryClient.invalidateQueries({ queryKey: ['integration-config', selectedIntegration.id] });
 
         } else if (configuredInstanceId) { // Only run this block if a config ID *existed* but wasn't found live
            // Configured instance ID exists in DB, but no matching live instance found
@@ -378,13 +378,13 @@ export function WhatsAppBusinessSettings({ selectedIntegration, onConnect }: Wha
         customerId: metadata.customerId as string,
         qrcode: metadata.qrcode as boolean,
         webhook: validatedWebhook!,
-      };
-      instanceNameForLogs = payloadToSend.instanceName;
-
-      console.log("--- handleDirectCreateInstance: Sending strictly validated metadata payload:", JSON.stringify(payloadToSend, null, 2));
-      const response = await fetch(createUrl, {
-        method: 'POST',
-        headers: { 'apikey': apiKey, 'Content-Type': 'application/json' },
+       };
+       instanceNameForLogs = payloadToSend.instanceName;
+ 
+       // console.log("--- handleDirectCreateInstance: Sending strictly validated metadata payload:", JSON.stringify(payloadToSend, null, 2)); // Removed log
+       const response = await fetch(createUrl, {
+         method: 'POST',
+         headers: { 'apikey': apiKey, 'Content-Type': 'application/json' },
         body: JSON.stringify(payloadToSend),
       });
       const responseData = await response.json();
