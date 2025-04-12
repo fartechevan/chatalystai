@@ -17,6 +17,7 @@ import { ListsView } from "./components/lists/ListsView";
 import { TaskBoard } from "./components/lists/TaskBoard";
 import Leads from "./pages/Leads";
 import ComingSoon from "@/pages/ComingSoon"; // Keep this for placeholder
+import { ConversationStatsView } from "./components/dashboard/stats/ConversationStatsView"; // Import the new stats view
 import KnowledgeBase from "./pages/KnowledgeBase";
 import { ChunkView } from "./components/knowledge/ChunkView";
 import Profile from "./pages/Profile";
@@ -63,7 +64,7 @@ const App = () => {
                     <Route path="conversations" element={<ConversationView />} />
                     <Route path="broadcasts" element={<BroadcastsPage />} /> 
                     <Route path="broadcasts/:broadcastId" element={<BroadcastDetailsView />} /> 
-                    <Route path="stats" element={<ComingSoon />} />
+                    <Route path="stats" element={<ConversationStatsView />} /> {/* Use the new stats view */}
                     <Route path="help" element={<ComingSoon />} />
                     <Route path="mail" element={<ComingSoon />} />
                     <Route path="knowledge" element={<KnowledgeBase />} />
