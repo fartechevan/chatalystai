@@ -49,8 +49,14 @@ const menuItems: MenuItem[] = [
 export function DashboardSidebar() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { toggleSidebar } = useSidebar();
+  const { toggleSidebar, setOpenMobile, isMobile } = useSidebar(); // Get setOpenMobile and isMobile
   const { user } = useAuth();
+
+  const handleLinkClick = () => {
+    if (isMobile) {
+      setOpenMobile(false); // Close sidebar on mobile after link click
+    }
+  };
 
   const handleLogout = async () => {
     try {
@@ -98,7 +104,11 @@ export function DashboardSidebar() {
                   location.pathname === item.path ? "bg-white/10 text-white" : "text-gray-400 hover:text-white hover:bg-white/5"
                 )}
               >
-                <Link to={item.path} className="flex items-center gap-3">
+                <Link 
+                  to={item.path} 
+                  className="flex items-center gap-3"
+                  onClick={handleLinkClick} // Add onClick handler
+                >
                   <item.icon className="h-5 w-5" />
                   <span className="text-sm">{item.title}</span>
                   {item.badge ? (
@@ -115,14 +125,18 @@ export function DashboardSidebar() {
             <SidebarMenuButton
               asChild
               tooltip="Profile"
-              className={cn(
-                "w-full",
-                location.pathname === "/dashboard/profile" ? "bg-white/10 text-white" : "text-gray-400 hover:text-white hover:bg-white/5"
-              )}
-            >
-              <Link to="/dashboard/profile" className="flex items-center gap-3">
-                <UserRound className="h-5 w-5" />
-                <span className="text-sm">Profile</span>
+                className={cn(
+                  "w-full",
+                  location.pathname === "/dashboard/profile" ? "bg-white/10 text-white" : "text-gray-400 hover:text-white hover:bg-white/5"
+                )}
+              >
+                <Link 
+                  to="/dashboard/profile" 
+                  className="flex items-center gap-3"
+                  onClick={handleLinkClick} // Add onClick handler
+                >
+                  <UserRound className="h-5 w-5" />
+                  <span className="text-sm">Profile</span>
               </Link>
             </SidebarMenuButton>
             
