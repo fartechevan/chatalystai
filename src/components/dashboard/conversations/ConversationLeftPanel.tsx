@@ -43,19 +43,14 @@ export function ConversationLeftPanel({
   const getConversationName = (conversation: Conversation) => {
     // First priority: Use customer_name if it exists and is not empty
     if (conversation.customer_name && conversation.customer_name.trim() !== '') {
-      return conversation.customer_name;
-    }
-
-    // Second priority: Use lead name or company name if available
-    if (conversation.lead) {
-      if (conversation.lead.name) return conversation.lead.name;
-      if (conversation.lead.company_name) return conversation.lead.company_name;
-      return `Lead #${conversation.lead_id?.slice(0, 6)}`;
-    }
-    
-    // Third priority: Check for participants with external_user_identifier (phone number)
-    if (conversation.participants && conversation.participants.length > 0) {
-      const memberParticipant = conversation.participants.find(p => p.role === 'member');
+       return conversation.customer_name;
+     }
+ 
+     // Removed second priority block that used lead details
+     
+     // Now Third priority (was previously third): Check for participants with external_user_identifier (phone number)
+     if (conversation.participants && conversation.participants.length > 0) {
+       const memberParticipant = conversation.participants.find(p => p.role === 'member');
       if (memberParticipant && memberParticipant.external_user_identifier) {
         return memberParticipant.external_user_identifier;
       }
@@ -129,17 +124,13 @@ export function ConversationLeftPanel({
                         {getConversationName(conv)}
                       </p>
                       <span className="text-xs text-muted-foreground whitespace-nowrap">
-                        {new Date(conv.updated_at).toLocaleDateString()}
-                      </span>
-                    </div>
-                    {conv.lead_id && (
-                      <p className="text-xs text-muted-foreground truncate mt-1">
-                        {`Lead #${conv.lead_id.slice(0, 6)}`}
-                      </p>
-                    )}
-                  </div>
-                </button>
-              ))}
+                         {new Date(conv.updated_at).toLocaleDateString()}
+                       </span>
+                     </div>
+                     {/* Removed the display of lead_id */}
+                   </div>
+                 </button>
+               ))}
             </div>
           )}
         </ScrollArea>

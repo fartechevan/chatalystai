@@ -1,8 +1,8 @@
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Plus } from "lucide-react";
-import { useState, useEffect } from "react";
+import { Plus, ShieldAlert } from "lucide-react";
+import { useState, useEffect, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { IntegrationDialog } from "./integration-dialog/IntegrationDialog";
@@ -23,6 +23,39 @@ export function IntegrationsView({ isActive }: IntegrationsViewProps) {
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedIntegration, setSelectedIntegration] = useState<Integration | null>(null);
   const { toast } = useToast();
+  const [userId, setUserId] = useState<string | null>(null);
+  const [userRole, setUserRole] = useState<string | null>(null);
+  const [isCheckingRole, setIsCheckingRole] = useState(true);
+
+  // Get current user ID and Role
+  useEffect(() => {
+    const fetchUser = async () => {
+      setIsCheckingRole(true);
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        setUserId(user.id);
+        const { data: profile, error } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', user.id)
+          .single();
+        
+        if (error) {
+          console.error("Error fetching user role:", error);
+          setUserRole(null);
+        } else {
+          setUserRole(profile?.role || null);
+        }
+      } else {
+        setUserId(null);
+        setUserRole(null);
+      }
+      setIsCheckingRole(false);
+    };
+    fetchUser();
+  }, []);
+
+  const isAdmin = userRole === 'admin';
 
   // Define the type for each item in the response data array
   type DBIntegrationType = {
@@ -33,30 +66,57 @@ export function IntegrationsView({ isActive }: IntegrationsViewProps) {
     icon_url?: string;
     status?: 'available' | 'coming_soon' | string;
     type?: string;
-    integrations_config: null | {
+    integrations_config: { // Keep config for status/instance_id, but access is based on integration_id now
       instance_id?: string;
       token?: string;
       status?: string;
-    } | Array<{
-      instance_id?: string;
-      token?: string;
-      status?: string;
-    }>;
+    }[] | null;
   };
 
-  // Fetch integrations joined with config, including the new status field
-  const { data: integrations = [], isLoading, refetch } = useQuery({
-    queryKey: ['integrationsWithConfig'], 
+  // Fetch the integration_ids the current user has access to (only needed if NOT admin)
+  const { data: userAccessIntegrationIds, isLoading: isLoadingAccess } = useQuery({
+    queryKey: ['userIntegrationAccess', userId],
     queryFn: async () => {
-      console.log("Fetching integrations joined with config...");
-      // Fetch data by joining integrations and integrations_config
+      if (!userId) return []; // Should not happen if enabled correctly
+      
+      // Fetch config IDs the user has access to
+      const { data: accessData, error: accessError } = await supabase
+        .from('profile_integration_access')
+        .select('integration_config_id')
+        .eq('profile_id', userId);
+
+      if (accessError) throw accessError;
+      if (!accessData || accessData.length === 0) return [];
+
+      const configIds = accessData.map(a => a.integration_config_id);
+
+      // Fetch the integration IDs linked to these configs
+      const { data: configLinkData, error: configLinkError } = await supabase
+        .from('integrations_config')
+        .select('integration_id')
+        .in('id', configIds);
+      
+      if (configLinkError) throw configLinkError;
+      if (!configLinkData) return [];
+
+      // Return unique integration IDs
+      return [...new Set(configLinkData.map(c => c.integration_id).filter(Boolean) as string[])];
+    },
+    enabled: !!userId && !isAdmin && isActive && !isCheckingRole, // Only run for non-admins when ready
+  });
+
+  // Fetch ALL integrations joined with config (still need config for status/instance)
+  const { data: allIntegrations = [], isLoading: isLoadingIntegrations, refetch } = useQuery({
+    queryKey: ['allIntegrationsWithConfig'],
+    queryFn: async () => {
+      console.log("Fetching ALL integrations joined with config...");
       const { data, error } = await supabase
         .from('integrations')
         .select(`
           *,
-          integrations_config (
-            instance_id,
-            token,
+          integrations_config ( 
+            instance_id, 
+            token, 
             status
           )
         `)
@@ -69,20 +129,18 @@ export function IntegrationsView({ isActive }: IntegrationsViewProps) {
 
       // Process the data to ensure consistent types
       const processedData = (data as unknown as DBIntegrationType[]).map((item: DBIntegrationType) => {
-        const config = Array.isArray(item.integrations_config)
-          ? item.integrations_config[0] 
-          : item.integrations_config;
+        const config = item.integrations_config?.[0]; // Still get config for status/instance
 
         return {
           ...item, // Spread integration fields
           instance_id: config?.instance_id,
           token: config?.token,
+          // No longer need config_id here as access is based on integration.id
           status: item.status || 'unknown', // Keep original availability status
-          // Map the status from the config table to the connectionStatus field
           connectionStatus: (config?.status as ConnectionState) || 'unknown',
           integrations_config: undefined, // Remove the nested object
           type: item.type || "messenger", // Ensure there's always a type
-        } as Integration & { instance_id?: string; token?: string };
+        } as Integration & { instance_id?: string; token?: string }; // Removed config_id from type assertion
       });
 
       // Manually add WhatsApp Cloud API if not present
@@ -103,7 +161,7 @@ export function IntegrationsView({ isActive }: IntegrationsViewProps) {
       // Add manual entry if it doesn't exist in the DB result
       return hasWhatsAppCloudApi ? processedData : [...processedData, whatsappCloudApi];
     },
-    enabled: isActive,
+    enabled: isActive && !isCheckingRole, // Only fetch when view is active and role check is done
   });
 
   // This function checks status, updates DB, and triggers refetch
@@ -231,21 +289,36 @@ export function IntegrationsView({ isActive }: IntegrationsViewProps) {
     // Optionally refetch all integrations: refetch();
   };
 
-  // Map integrations and merge with dynamic status from state
-  const integrationsList = integrations.map(integration => ({
-    ...integration,
-    // Status now comes directly from the fetched data (already defaulted to 'unknown')
-    type: integration.type || "messenger"
-  }));
-
-  const filteredIntegrations = integrationsList.filter(integration => {
-    const matchesSearch = integration.name.toLowerCase().includes(searchQuery.toLowerCase());
-    if (activeTab === "Connected") {
-      // Filter based on connectionStatus being 'open'
-      return matchesSearch && integration.connectionStatus === 'open';
+  // Determine the base list of integrations to show (all for admin, accessible for others)
+  const baseIntegrationsList = useMemo(() => {
+    if (isCheckingRole) return []; // Wait until role check is done
+    if (isAdmin) {
+      return allIntegrations; // Admins see everything fetched
+    } else {
+      // Non-admins: filter based on fetched access IDs
+      if (isLoadingAccess || !userAccessIntegrationIds) {
+        return []; // Wait for access data or return empty if no access
+      }
+      return allIntegrations.filter(integration => 
+        userAccessIntegrationIds.includes(integration.id)
+      );
     }
-    return matchesSearch;
-  });
+  }, [allIntegrations, userAccessIntegrationIds, isAdmin, isCheckingRole, isLoadingAccess]);
+
+  // Final filtering based on search query and active tab
+  const filteredIntegrations = useMemo(() => {
+    return baseIntegrationsList.filter(integration => {
+      const matchesSearch = integration.name.toLowerCase().includes(searchQuery.toLowerCase());
+      if (activeTab === "Connected") {
+        // Ensure connectionStatus exists and is 'open'
+        return matchesSearch && integration.connectionStatus === 'open'; 
+      }
+      return matchesSearch;
+    });
+  }, [baseIntegrationsList, searchQuery, activeTab]);
+
+  // Combine loading states
+  const isLoading = isCheckingRole || isLoadingIntegrations || (!isAdmin && isLoadingAccess); 
 
   return (
     <div className="p-8 max-w-7xl mx-auto space-y-8">
@@ -298,8 +371,8 @@ export function IntegrationsView({ isActive }: IntegrationsViewProps) {
       <div className="space-y-6">
         <h2 className="text-lg font-semibold">Messengers</h2>
         {isLoading ? (
-          <div className="text-center text-muted-foreground">Loading integrations...</div>
-        ) : (
+          <div className="text-center text-muted-foreground py-8">Loading integrations...</div>
+        ) : filteredIntegrations.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             {filteredIntegrations.map((integration) => (
               <IntegrationCard
@@ -309,6 +382,11 @@ export function IntegrationsView({ isActive }: IntegrationsViewProps) {
               />
             ))}
           </div>
+        ) : (
+           <div className="text-center py-8 text-muted-foreground flex flex-col items-center gap-2">
+             <ShieldAlert className="h-6 w-6" />
+             <span>No integrations found matching your criteria or access rights.</span>
+           </div>
         )}
       </div>
     </div>

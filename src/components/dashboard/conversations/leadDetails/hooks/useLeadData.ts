@@ -76,13 +76,15 @@ export function useLeadData(
                 if (customerError) {
                   console.error('Error finding existing customer:', customerError);
                   setLead(null);
-                  setCustomer(null);
-                } else if (existingCustomer) {
-                  // If customer exists, fetch customer data using the customer ID
-                  await handleCustomerFetch(existingCustomer.id, profiles);
-                } else {
-                  // If customer does not exist, set lead and customer to null
-                  setLead(null);
+                   setCustomer(null);
+                 } else if (existingCustomer) {
+                   // If customer exists, fetch customer data using the customer ID
+                   await handleCustomerFetch(existingCustomer.id, profiles);
+                   // Explicitly set lead to null here because the conversation has no lead_id
+                   setLead(null); 
+                 } else {
+                   // If customer does not exist, set lead and customer to null
+                   setLead(null);
                   setCustomer(null);
                 }
               } else {

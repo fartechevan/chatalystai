@@ -1,102 +1,204 @@
-
 import { Button } from "@/components/ui/button";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Plus, Users } from "lucide-react";
-import { useState } from "react";
+import { Plus, Users, ShieldAlert } from "lucide-react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { IntegrationAccessDialog } from "./IntegrationAccessDialog";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import { Tables } from "@/integrations/supabase/types"; // Import Tables type
 
-// Define interface for the integration config with access details
-interface IntegrationConfig {
-  id: string;
-  integrations: {
-    id: string;
-    name: string;
-  };
+// Define Profile type based on Supabase schema
+type Profile = Tables<'profiles'>;
+
+// Define interface for the integration with access details, ensuring profiles matches the Profile type
+interface IntegrationWithAccess {
+  id: string; // Integration ID
+  name: string;
+  description?: string | null;
   access: {
-    id: string;
+    id: string; // profile_integration_access ID
     profile_id: string;
-    profiles: {
-      name: string;
-      email: string;
-    };
+    profiles: Profile; // Use the defined Profile type
   }[];
 }
 
-export function ProfileAccessManagement() {
-  const [selectedConfigId, setSelectedConfigId] = useState<string | null>(null);
-  const [dialogOpen, setDialogOpen] = useState(false);
+// Define type for the data structure returned by the query function
+type QueryFnData = IntegrationWithAccess[];
 
-  // Fetch integration configs with their access records
-  const { data: integrationConfigs, isLoading } = useQuery({
-    queryKey: ['integration-configs-with-access'],
-    queryFn: async () => {
-      // First fetch all integration configs
-      const { data: configData, error: configError } = await supabase
-        .from('integrations_config')
-        .select('id, integration_id');
+// Define a more accurate type for the access record based on user confirmation
+interface ProfileIntegrationAccessRecord {
+  id: string;
+  profile_id: string;
+  integration_id: string; 
+  created_at: string;
+  created_by: string | null;
+}
+
+
+export function ProfileAccessManagement() {
+  const [selectedIntegrationId, setSelectedIntegrationId] = useState<string | null>(null);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [currentUserRole, setCurrentUserRole] = useState<string | null>(null);
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [isCheckingRole, setIsCheckingRole] = useState(true);
+
+  // Fetch current user's role and ID
+  useEffect(() => {
+    const fetchUser = async () => {
+      setIsCheckingRole(true);
+      const { data: { user } } = await supabase.auth.getUser();
+      if (user) {
+        setCurrentUserId(user.id);
+        const { data: profile, error } = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', user.id)
+          .single();
+        
+        if (error) {
+          console.error("Error fetching user role:", error);
+          setCurrentUserRole(null);
+        } else {
+          setCurrentUserRole(profile?.role as string || null); 
+        }
+      } else {
+        setCurrentUserId(null);
+        setCurrentUserRole(null);
+      }
+      setIsCheckingRole(false);
+    };
+    fetchUser();
+  }, []);
+
+  const isAdmin = currentUserRole === 'admin';
+
+  // Fetch integrations with their access records based on user role
+  const { data: integrationsWithAccess, isLoading, error: queryError } = useQuery<QueryFnData, Error>({
+    queryKey: ['integrations-with-access', isAdmin, currentUserId],
+    queryFn: async (): Promise<QueryFnData> => {
       
-      if (configError) throw configError;
-      
-      // For each config, fetch the integration details and access records
-      const processedData: IntegrationConfig[] = [];
-      
-      if (configData && configData.length > 0) {
-        for (const config of configData) {
-          // Get integration details
-          const { data: integrationData, error: integrationError } = await supabase
-            .from('integrations')
-            .select('id, name')
-            .eq('id', config.integration_id)
-            .single();
-          
-          if (integrationError) continue;
-          
-          // Get access records for this config
-          const { data: accessData, error: accessError } = await supabase
+      let integrationsToFetchIds: string[] | null = null;
+
+      // Non-admin: Determine which integrations they have access to
+      if (!isAdmin && currentUserId) {
+        // Select integration_id directly, casting result to bypass incorrect types
+        const { data: userAccessData, error: userAccessError } = await supabase
+          .from('profile_integration_access')
+          .select('integration_id') 
+          .eq('profile_id', currentUserId);
+        
+        if (userAccessError) throw userAccessError;
+        if (!userAccessData || userAccessData.length === 0) return []; 
+
+        // Cast to expected structure
+        const accessRecords = userAccessData as { integration_id: string }[];
+        integrationsToFetchIds = [...new Set(accessRecords.map(a => a.integration_id).filter(Boolean))];
+        if (integrationsToFetchIds.length === 0) return [];
+      }
+
+      // 1. Fetch integrations (all for admin, filtered for non-admin)
+      let integrationsData: Tables<'integrations'>[] | null = null;
+      try {
+        let query = supabase.from('integrations').select('*'); 
+        if (integrationsToFetchIds) {
+          query = query.in('id', integrationsToFetchIds);
+        }
+        const { data, error } = await query;
+        if (error) throw error;
+        integrationsData = data;
+        if (!integrationsData || integrationsData.length === 0) return []; 
+      } catch (error) {
+        console.error("Error fetching integrations:", error);
+        throw new Error(`Failed to fetch integrations: ${(error as Error).message}`);
+      }
+
+      // 2. Fetch all relevant access records directly linked to the fetched integrations
+      const integrationIds = integrationsData.map(i => i.id);
+      let allAccessData: ProfileIntegrationAccessRecord[] | null = []; 
+      if (integrationIds.length > 0) {
+        try {
+          const { data, error } = await supabase
             .from('profile_integration_access')
-            .select('id, profile_id')
-            .eq('integration_config_id', config.id);
-          
-          if (accessError) continue;
-          
-          // For each access record, fetch the profile details
-          const processedAccess = [];
-          
-          for (const access of accessData || []) {
-            const { data: profileData, error: profileError } = await supabase
-              .from('profiles')
-              .select('name, email')
-              .eq('id', access.profile_id)
-              .single();
-            
-            if (!profileError && profileData) {
-              processedAccess.push({
-                id: access.id,
-                profile_id: access.profile_id,
-                profiles: profileData
-              });
-            }
-          }
-          
-          // Add to the processed data
-          processedData.push({
-            id: config.id,
-            integrations: integrationData,
-            access: processedAccess
-          });
+            .select('*') // Select all columns, assuming integration_id is present
+            .in('integration_id', integrationIds); // Filter by integration_id
+          if (error) throw error;
+          // Cast to our defined type that includes integration_id
+          allAccessData = data as ProfileIntegrationAccessRecord[]; 
+        } catch (error) {
+          console.error("Error fetching access records:", error);
+          console.warn("Proceeding without access records due to fetch error.");
         }
       }
+      allAccessData = allAccessData || [];
+
+      // 3. Fetch necessary profile details
+      const uniqueProfileIds = [...new Set(allAccessData.map(a => a.profile_id).filter(Boolean))];
+      let profilesMap = new Map<string, Profile>(); 
+      if (uniqueProfileIds.length > 0) {
+         try {
+           const { data: profilesData, error: profilesError } = await supabase
+             .from('profiles')
+             .select('*') // Select all fields to match Profile type
+             .in('id', uniqueProfileIds);
+           if (profilesError) throw profilesError;
+           if (profilesData) {
+             profilesMap = new Map(profilesData.map(p => [p.id, p]));
+           }
+         } catch (error) {
+           console.error("Error fetching profiles:", error);
+           console.warn("Proceeding without profile details due to fetch error.");
+         }
+      }
+
+      // 4. Combine the data
+      const processedData: QueryFnData = integrationsData.map(integration => {
+        const integrationAccessRecords = allAccessData.filter(
+          access => access.integration_id === integration.id && access.profile_id 
+        );
+
+        const processedAccess = integrationAccessRecords
+          .map(access => {
+            const profile = profilesMap.get(access.profile_id!);
+            const fallbackProfile: Profile = { 
+              id: access.profile_id!, 
+              email: 'No email', 
+              name: 'Unknown User', 
+              created_at: new Date().toISOString(), 
+              role: 'user' 
+            };
+            const profileDetails = profile || fallbackProfile; 
+            return {
+              id: access.id, 
+              profile_id: access.profile_id!,
+              profiles: profileDetails, 
+            };
+          });
+
+        const uniqueAccess = Array.from(new Map(processedAccess.map(item => [item.profile_id, item])).values());
+
+        return {
+          id: integration.id,
+          name: integration.name,
+          description: integration.description,
+          access: uniqueAccess,
+        };
+      });
       
       return processedData;
-    }
+    },
+    enabled: !isCheckingRole
   });
 
-  const handleOpenDialog = (configId: string) => {
-    setSelectedConfigId(configId);
+  const handleOpenDialog = (integrationId: string) => { 
+    setSelectedIntegrationId(integrationId); 
     setDialogOpen(true);
   };
 
@@ -109,38 +211,57 @@ export function ProfileAccessManagement() {
         </div>
       </div>
 
-      {isLoading ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {[1, 2, 3].map((i) => (
-            <Card key={i} className="overflow-hidden">
-              <CardHeader className="bg-muted/30">
-                <Skeleton className="h-6 w-3/4" />
-              </CardHeader>
-              <CardContent className="p-5">
-                <div className="space-y-2">
-                  <Skeleton className="h-4 w-full" />
-                  <Skeleton className="h-4 w-4/5" />
-                  <Skeleton className="h-4 w-3/5" />
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+      {isLoading || isCheckingRole ? (
+        <div className="border rounded-md">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-[30%]"><Skeleton className="h-5 w-24" /></TableHead>
+                <TableHead><Skeleton className="h-5 w-32" /></TableHead>
+                <TableHead className="text-right w-[150px]"><Skeleton className="h-5 w-20" /></TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {[1, 2, 3].map((i) => (
+                <TableRow key={i}>
+                  <TableCell><Skeleton className="h-5 w-3/4" /></TableCell>
+                  <TableCell><Skeleton className="h-5 w-full" /></TableCell>
+                  <TableCell className="text-right"><Skeleton className="h-8 w-full" /></TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
         </div>
-      ) : integrationConfigs && integrationConfigs.length > 0 ? (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {integrationConfigs.map((config) => (
-            <Card key={config.id} className="overflow-hidden h-[220px]">
-              <CardHeader className="border-b bg-muted/30">
-                <CardTitle className="text-md">{config.integrations.name}</CardTitle>
-              </CardHeader>
-              <CardContent className="p-0">
-                <ScrollArea className="h-[120px]">
-                  <div className="p-4">
-                    {config.access?.length > 0 ? (
-                      <div className="space-y-2">
-                        {config.access.map((access) => (
+      ) : queryError ? (
+        <div className="text-center py-8 text-destructive flex flex-col items-center gap-2 border rounded-md">
+          <ShieldAlert className="h-6 w-6" />
+          <span>Error loading integrations: {queryError.message}</span>
+        </div>
+      ) : integrationsWithAccess && integrationsWithAccess.length > 0 ? (
+        <div className="border rounded-md">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="w-[30%]">Integration</TableHead>
+                <TableHead>Users with Access</TableHead>
+                <TableHead className="text-right w-[150px]">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {integrationsWithAccess.map((integration) => (
+                <TableRow key={integration.id}>
+                  <TableCell>
+                    <div className="font-medium">{integration.name}</div>
+                    {integration.description && (
+                      <div className="text-xs text-muted-foreground">{integration.description}</div>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    {integration.access?.length > 0 ? (
+                      <div className="flex flex-col space-y-1">
+                        {integration.access.map((access) => (
                           <div key={access.id} className="text-sm flex items-center">
-                            <Users className="h-3 w-3 mr-2 text-muted-foreground" />
+                            <Users className="h-3 w-3 mr-1.5 text-muted-foreground flex-shrink-0" />
                             <div>
                               <span className="font-medium">{access.profiles.name}</span>
                               <span className="text-xs text-muted-foreground ml-1">({access.profiles.email})</span>
@@ -149,38 +270,37 @@ export function ProfileAccessManagement() {
                         ))}
                       </div>
                     ) : (
-                      <div className="text-sm text-muted-foreground py-2">
+                      <div className="text-sm text-muted-foreground">
                         No users have access yet.
                       </div>
                     )}
-                  </div>
-                </ScrollArea>
-                <div className="p-3 border-t">
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    className="w-full"
-                    onClick={() => handleOpenDialog(config.id)}
-                  >
-                    <Plus className="h-4 w-4 mr-2" />
-                    Manage Access
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleOpenDialog(integration.id)}
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Manage Access
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
         </div>
       ) : (
-        <div className="text-center py-8 text-muted-foreground">
-          No integration configurations found.
+        <div className="text-center py-8 text-muted-foreground border rounded-md">
+          No integrations found or accessible.
         </div>
       )}
 
-      {selectedConfigId && (
+      {selectedIntegrationId && (
         <IntegrationAccessDialog 
           open={dialogOpen} 
           setOpen={setDialogOpen} 
-          integrationConfigId={selectedConfigId} 
+          integrationId={selectedIntegrationId}
         />
       )}
     </div>

@@ -5,12 +5,13 @@ import { corsHeaders } from "../_shared/cors.ts";
 interface Customer {
   id: string;
   phone_number: string | null;
-  // Add other fields if needed, but phone_number is key
+  name?: string; // Optional: Include name if available/needed
 }
 
 interface BroadcastPayload {
   customerIds: string[];
   messageText: string;
+  integrationId: string; // Add integrationId to payload
 }
 
 // Helper to get Evolution API credentials securely from env vars or secrets
@@ -51,10 +52,10 @@ serve(async (req: Request) => {
 
   try {
     const payload: BroadcastPayload = await req.json();
-    const { customerIds, messageText } = payload;
+    const { customerIds, messageText, integrationId } = payload; // Destructure integrationId
 
-    if (!customerIds || customerIds.length === 0 || !messageText) {
-      return new Response(JSON.stringify({ error: "Missing customerIds or messageText" }), {
+    if (!customerIds || customerIds.length === 0 || !messageText || !integrationId) {
+      return new Response(JSON.stringify({ error: "Missing customerIds, messageText, or integrationId" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -67,54 +68,87 @@ serve(async (req: Request) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "" // Use Service Role Key
     );
 
-    // 1. Fetch active WhatsApp integration config (integration_id and instance_id)
-    const { data: integrationConfig, error: configError } = await supabaseAdmin
-      .from('integrations')
-      .select('id, integrations_config(instance_id)')
-      .eq('type', 'whatsapp')
-      .limit(1)
-      .single();
+    // --- Start Broadcast Tracking ---
 
-    if (configError) throw new Error(`Error fetching integration config: ${configError.message}`);
-    if (!integrationConfig) throw new Error("No active WhatsApp integration found.");
+    // 1. Fetch instance_id using the provided integrationId
+    const { data: configData, error: configError } = await supabaseAdmin
+      .from('integrations_config')
+      .select('instance_id')
+      .eq('integration_id', integrationId)
+      .maybeSingle(); // Use maybeSingle to handle potential null
 
-    // Extract instance_id correctly - it's nested
-    const instanceId = integrationConfig.integrations_config?.[0]?.instance_id;
-    const integrationId = integrationConfig.id;
+    if (configError && configError.code !== 'PGRST116') { // Ignore 'No rows found' error initially
+        throw new Error(`Error fetching instance config: ${configError.message}`);
+    }
+    const instanceId = configData?.instance_id;
+    if (!instanceId) {
+        throw new Error(`No instance configured for integration ${integrationId}.`);
+    }
 
-    if (!instanceId) throw new Error(`No instance configured for integration ${integrationId}.`);
+    // 2. Create Broadcast Record
+    const { data: broadcastData, error: broadcastInsertError } = await supabaseAdmin
+      .from('broadcasts')
+      .insert({
+        message_text: messageText,
+        integration_id: integrationId,
+        instance_id: instanceId,
+      })
+      .select('id') // Select the ID of the newly created broadcast
+      .single(); // Expect a single row back
 
-    // 2. Fetch Evolution API credentials
+    if (broadcastInsertError) throw new Error(`Error creating broadcast record: ${broadcastInsertError.message}`);
+    const broadcastId = broadcastData.id;
+
+    // 3. Fetch Customer Details (ID and Phone Number)
+    const { data: customers, error: customerError } = await supabaseAdmin
+      .from("customers")
+      .select("id, phone_number") // Select only needed fields
+      .in("id", customerIds);
+
+    if (customerError) throw new Error(`Error fetching customer details: ${customerError.message}`);
+
+    const validCustomers = (customers || []).filter(
+      (c: Customer): c is Customer & { phone_number: string } =>
+        typeof c.phone_number === 'string' && c.phone_number.trim() !== ''
+    );
+
+    if (validCustomers.length === 0) {
+      // Update broadcast status if needed, or just return
+      return new Response(JSON.stringify({ warning: "No valid phone numbers found for selected customers.", broadcastId }), {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
+    // 4. Create Initial Recipient Records (Pending)
+    const recipientRecords = validCustomers.map(c => ({
+      broadcast_id: broadcastId,
+      customer_id: c.id,
+      phone_number: c.phone_number,
+      status: 'pending', // Initial status
+    }));
+
+    const { data: insertedRecipients, error: recipientInsertError } = await supabaseAdmin
+      .from('broadcast_recipients')
+      .insert(recipientRecords)
+      .select('id, phone_number, customer_id'); // Select needed info for updates
+
+    if (recipientInsertError) throw new Error(`Error creating recipient records: ${recipientInsertError.message}`);
+
+    // --- End Broadcast Tracking Setup ---
+
+    // 5. Fetch Evolution API credentials
     const { apiKey, baseUrl } = await getEvolutionCredentials(supabaseAdmin, integrationId);
     const evolutionApiUrl = `${baseUrl}/message/sendText/${instanceId}`;
 
-    // 3. Fetch phone numbers for selected customers
-    const { data: customers, error: customerError } = await supabaseAdmin
-      .from("customers")
-      .select("id, phone_number")
-      .in("id", customerIds);
-
-    if (customerError) throw new Error(`Error fetching customer phone numbers: ${customerError.message}`);
-
-    const phoneNumbers = (customers || [])
-      .map((c: Customer) => c.phone_number)
-      .filter((pn): pn is string => typeof pn === 'string' && pn.trim() !== ''); // Ensure it's a non-empty string
-
-    if (phoneNumbers.length === 0) {
-       return new Response(JSON.stringify({ warning: "No valid phone numbers found for selected customers." }), {
-         status: 200, // Or maybe 400 depending on desired behavior
-         headers: { ...corsHeaders, "Content-Type": "application/json" },
-       });
-    }
-
-    // 4. Send messages sequentially
+    // 6. Send messages sequentially and update recipient status
     let successfulSends = 0;
     let failedSends = 0;
-    // Explicitly type the results array
-    const results: Array<{ number: string; status: 'success' | 'failed'; error?: string }> = [];
 
-    for (const number of phoneNumbers) {
-      const evolutionPayload = { number, text: messageText };
+    for (const recipient of insertedRecipients || []) {
+      const evolutionPayload = { number: recipient.phone_number, text: messageText };
+      let updatePayload: { status: string; error_message?: string; sent_at?: string } = { status: 'failed' };
+
       try {
         const response = await fetch(evolutionApiUrl, {
           method: "POST",
@@ -131,17 +165,34 @@ serve(async (req: Request) => {
         }
         // const responseData = await response.json(); // Process if needed
         successfulSends++;
-        results.push({ number, status: 'success' });
+        updatePayload = { status: 'sent', sent_at: new Date().toISOString() };
       } catch (error: unknown) { // Type catch error as unknown
         failedSends++;
         const errorMessage = error instanceof Error ? error.message : String(error);
-        results.push({ number, status: 'failed', error: errorMessage });
-        console.error(`Failed to send broadcast to ${number}:`, errorMessage);
+        updatePayload = { status: 'failed', error_message: errorMessage };
+        console.error(`Failed to send broadcast to ${recipient.phone_number}:`, errorMessage);
+      }
+
+      // Update the recipient record status
+      const { error: updateError } = await supabaseAdmin
+        .from('broadcast_recipients')
+        .update(updatePayload)
+        .eq('id', recipient.id); // Update by recipient ID
+
+      if (updateError) {
+        console.error(`Failed to update status for recipient ${recipient.id} (${recipient.phone_number}): ${updateError.message}`);
+        // Decide how to handle this - maybe retry or log prominently
       }
     }
 
-    // 5. Return summary
-    return new Response(JSON.stringify({ successfulSends, failedSends, totalAttempted: phoneNumbers.length, results }), {
+    // 7. Return summary including the broadcast ID
+    return new Response(JSON.stringify({
+      broadcastId, // Include the ID of the created broadcast
+      successfulSends,
+      failedSends,
+      totalAttempted: validCustomers.length,
+      // Optionally include detailed results if needed by frontend
+    }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 200,
     });

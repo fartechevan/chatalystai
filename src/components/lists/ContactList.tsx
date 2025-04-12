@@ -1,8 +1,9 @@
 
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query"; // Import useQueryClient
 import { supabase } from "@/integrations/supabase/client";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
+import { AddContactDialog } from "./components/AddContactDialog"; // Import the dialog
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -13,6 +14,7 @@ interface ContactListProps {
 }
 
 export function ContactList({ onSelectContact }: ContactListProps) {
+  const queryClient = useQueryClient(); // Get query client instance
   const { data: contacts, isLoading } = useQuery({
     queryKey: ['customers'],
     queryFn: async () => {
@@ -53,13 +55,13 @@ export function ContactList({ onSelectContact }: ContactListProps) {
           </span>
         </div>
         <div className="flex items-center gap-2">
-          <Button variant="outline" size="icon" className="h-8 w-8">
-            <MoreHorizontal className="h-4 w-4" />
-          </Button>
-          <Button size="sm" className="h-8">
-            <Plus className="h-4 w-4 mr-2" />
-            ADD CONTACT
-          </Button>
+          {/* Removed the MoreHorizontal button */}
+          {/* Replace the old button with the AddContactDialog component */}
+          <AddContactDialog 
+            onContactAdded={() => {
+              queryClient.invalidateQueries({ queryKey: ['customers'] }); // Invalidate query on success
+            }} 
+          />
         </div>
       </div>
 
