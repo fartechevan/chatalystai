@@ -1,3 +1,4 @@
+
 import * as React from "react"
 import { cn } from "@/lib/utils"
 import { Sheet, SheetContent } from "@/components/ui/sheet"
@@ -44,15 +45,15 @@ export const SidebarBase = React.forwardRef<HTMLDivElement, SidebarBaseProps>(
           <SheetContent
             data-sidebar="sidebar"
             data-mobile="true"
-            className="w-[--sidebar-width] bg-sidebar p-0 text-sidebar-foreground [&>button]:hidden"
+            className="w-[--sidebar-width] max-w-[80vw] bg-sidebar p-0 text-sidebar-foreground border-r shadow-lg"
             style={
               {
-                "--sidebar-width": "11rem",
+                "--sidebar-width": "14rem",
               } as React.CSSProperties
             }
             side={side}
           >
-            <div className="flex h-full w-full flex-col">{children}</div>
+            <div className="flex h-full w-full flex-col overflow-y-auto">{children}</div>
           </SheetContent>
         </Sheet>
       )
@@ -68,14 +69,14 @@ export const SidebarBase = React.forwardRef<HTMLDivElement, SidebarBaseProps>(
         data-side={side}
         style={
           {
-            "--sidebar-width": "9rem",
-            "--sidebar-width-icon": "11rem",
+            "--sidebar-width": "14rem",
+            "--sidebar-width-icon": "4.5rem",
           } as React.CSSProperties
         }
       >
         <div
           className={cn(
-            "duration-200 relative h-svh w-[--sidebar-width] bg-transparent transition-[width] ease-linear z-10",
+            "duration-300 relative h-svh w-[--sidebar-width] bg-transparent transition-[width] ease-in-out",
             "group-data-[collapsible=offcanvas]:w-0",
             "group-data-[side=right]:rotate-180",
             variant === "floating" || variant === "inset"
@@ -85,7 +86,7 @@ export const SidebarBase = React.forwardRef<HTMLDivElement, SidebarBaseProps>(
         />
         <div
           className={cn(
-            "duration-200 fixed inset-y-0 z-20 hidden h-svh w-[--sidebar-width] transition-[left,right,width] ease-linear md:flex",
+            "duration-300 fixed inset-y-0 z-20 hidden h-svh w-[--sidebar-width] transition-[left,right,width] ease-in-out md:flex",
             side === "left"
               ? "left-0 group-data-[collapsible=offcanvas]:left-[calc(var(--sidebar-width)*-1)]"
               : "right-0 group-data-[collapsible=offcanvas]:right-[calc(var(--sidebar-width)*-1)]",
@@ -98,7 +99,7 @@ export const SidebarBase = React.forwardRef<HTMLDivElement, SidebarBaseProps>(
         >
           <div
             data-sidebar="sidebar"
-            className="flex h-full w-full flex-col bg-sidebar group-data-[variant=floating]:rounded-lg group-data-[variant=floating]:border group-data-[variant=floating]:border-sidebar-border group-data-[variant=floating]:shadow bg-[#1C2434]"
+            className="flex h-full w-full flex-col bg-sidebar overflow-y-auto group-data-[variant=floating]:rounded-lg group-data-[variant=floating]:border group-data-[variant=floating]:border-sidebar-border group-data-[variant=floating]:shadow bg-[#1C2434]"
           >
             {children}
           </div>
