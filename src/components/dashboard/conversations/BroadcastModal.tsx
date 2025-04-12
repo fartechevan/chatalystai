@@ -9,11 +9,19 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label"; // Import Label
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"; // Import Select components
 import { supabase } from "@/integrations/supabase/client";
 import type { Customer } from "./types/customer";
-import { sendTextService } from "@/integrations/evolution-api/services/sendTextService"; // Keep this import
-import { getEvolutionCredentials } from "@/integrations/evolution-api/utils/credentials"; // Import credential fetcher
 import { useToast } from "@/hooks/use-toast";
+import type { Database } from "@/integrations/supabase/types"; // Import Database type
+import { sendBroadcastService } from '@/services/broadcast/sendBroadcastService'; // Import the new service
 
 interface BroadcastModalProps {
   isOpen: boolean;
@@ -29,8 +37,11 @@ export function BroadcastModal({
   const [customers, setCustomers] = useState<Customer[]>([]);
   const [selectedCustomers, setSelectedCustomers] = useState<string[]>([]);
   const [broadcastMessage, setBroadcastMessage] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(false); // For loading customers
   const [isSending, setIsSending] = useState(false);
+  const [availableIntegrations, setAvailableIntegrations] = useState<Database['public']['Tables']['integrations']['Row'][]>([]);
+  const [selectedIntegrationId, setSelectedIntegrationId] = useState<string>(''); // Initialize as empty string
+  const [isLoadingIntegrations, setIsLoadingIntegrations] = useState(false);
 
   // Reset state when modal opens or closes
   useEffect(() => {
@@ -39,6 +50,8 @@ export function BroadcastModal({
       setSelectedCustomers([]);
       setBroadcastMessage('');
       setIsSending(false);
+      setSelectedIntegrationId(''); // Reset selected integration
+      setAvailableIntegrations([]); // Clear integrations list
     }
   }, [isOpen]);
 
@@ -63,6 +76,41 @@ export function BroadcastModal({
     }
   }, [isOpen, step, customers.length, toast]);
 
+  // Fetch available integrations when switching to compose step
+  useEffect(() => {
+    if (isOpen && step === 'composeMessage' && availableIntegrations.length === 0) {
+      const fetchIntegrations = async () => {
+        setIsLoadingIntegrations(true);
+        try {
+          // Fetch all integrations including api_key and base_url
+          // SECURITY WARNING: Exposing api_key in the frontend is risky!
+          const { data, error } = await supabase
+            .from('integrations')
+            .select('id, name, base_url, api_key'); // Select necessary fields
+
+          if (error) throw error;
+          // Filter out integrations missing essential data (handle potential nulls)
+          const validIntegrations = (data || []).filter(
+            (integration): integration is Database['public']['Tables']['integrations']['Row'] & { api_key: string; base_url: string } =>
+              integration.api_key !== null && integration.base_url !== null
+          );
+          setAvailableIntegrations(validIntegrations);
+          // Optionally set a default selected integration
+          if (data && data.length > 0) {
+            setSelectedIntegrationId(data[0].id); // Select the first one by default
+          }
+        } catch (error) {
+          console.error("Error fetching integrations:", error);
+          toast({ title: "Error", description: "Could not load integrations.", variant: "destructive" });
+        } finally {
+          setIsLoadingIntegrations(false);
+        }
+      };
+      fetchIntegrations();
+    }
+  }, [isOpen, step, availableIntegrations.length, toast]);
+
+
   const handleSelectCustomer = (customerId: string) => {
     setSelectedCustomers(prevSelected =>
       prevSelected.includes(customerId)
@@ -79,89 +127,69 @@ export function BroadcastModal({
     setStep('selectCustomers');
   };
 
-  // Reverted handleSend to use frontend logic with hardcoded ID
+  // Updated handleSend to call the new frontend service
   const handleSend = async () => {
-    console.log("Selected Customer IDs:", selectedCustomers);
-    console.log("Message:", broadcastMessage);
-
-    const hardcodedIntegrationId = "1fe47f4b-3b22-43cf-acf2-6bd3eeb0a96d"; // Hardcoded ID
-
-    // 1. Fetch instance name (still needed for the API path)
-    let instanceName: string | null = null;
-    try {
-      const { data: configData, error: configError } = await supabase
-        .from('integrations_config')
-        .select('instance_id')
-        .eq('integration_id', hardcodedIntegrationId) // Use hardcoded ID
-        .maybeSingle();
-      if (configError && configError.code !== 'PGRST116') throw configError;
-      if (!configData?.instance_id) throw new Error(`No instance configured for integration ${hardcodedIntegrationId}.`);
-      instanceName = configData.instance_id;
-
-    } catch (error: unknown) {
-       const errorMessage = error instanceof Error ? error.message : "Could not load instance details.";
-       console.error("Error fetching instance config for broadcast:", errorMessage);
-       toast({ title: "Configuration Error", description: errorMessage, variant: "destructive" });
-       return; // Stop execution if config fails
+    if (selectedCustomers.length === 0 || !broadcastMessage.trim()) {
+      toast({ title: "Error", description: "Please select customers and enter a message.", variant: "destructive" });
+      return;
+    }
+    if (!selectedIntegrationId) {
+      toast({ title: "Error", description: "Please select an integration to send from.", variant: "destructive" });
+      return;
     }
 
-    // Config fetched successfully, now prepare to send
-    setIsSending(true);
-
-    // 2. Get phone numbers
-    const selectedCustomerDetails = customers.filter(c => selectedCustomers.includes(c.id));
-    const phoneNumbers = selectedCustomerDetails.map(c => c.phone_number).filter(Boolean) as string[];
-    console.log("Sending to phone numbers:", phoneNumbers);
-
-    if (phoneNumbers.length === 0) {
-       toast({ title: "Warning", description: "No valid phone numbers found for selected customers.", variant: "destructive" });
-       setIsSending(false);
+    // Find the selected integration details (including API key and base URL)
+    const selectedIntegration = availableIntegrations.find(int => int.id === selectedIntegrationId);
+    // Ensure the integration and its required fields (api_key, base_url) exist
+    if (!selectedIntegration || !selectedIntegration.api_key || !selectedIntegration.base_url) {
+       toast({ title: "Error", description: "Selected integration details are missing or incomplete (API Key or Base URL).", variant: "destructive" });
        return;
     }
 
-    // 3. Send messages sequentially
-    let successfulSends = 0;
-    let failedSends = 0;
-    const totalToSend = phoneNumbers.length;
+    setIsSending(true);
 
-    // Note: Credentials (API key) are fetched inside sendTextService now
-    // We only need to pass the hardcoded integrationId and fetched instanceName
+    try {
+       // Call the new frontend service function
+       const result = await sendBroadcastService({
+         integrationId: selectedIntegrationId,
+         customerIds: selectedCustomers,
+         messageText: broadcastMessage,
+         apiKey: selectedIntegration.api_key, // Pass API key - SECURITY RISK!
+         baseUrl: selectedIntegration.base_url, // Pass base URL
+       });
 
-    for (const number of phoneNumbers) {
-      try {
-        // Call sendTextService directly from frontend
-        await sendTextService({
-          integrationId: hardcodedIntegrationId, // Pass hardcoded ID
-          instance: instanceName!, // Pass fetched instance name
-          number,
-          text: broadcastMessage,
+      console.log("Broadcast Service Response:", result);
+      const { successfulSends, failedSends, totalAttempted, broadcastId, warning } = result;
+
+      if (warning) {
+         toast({ title: "Broadcast Warning", description: warning, variant: "default" });
+      } else if (failedSends > 0) {
+        toast({
+          title: "Broadcast Partially Failed",
+          description: `${failedSends} out of ${totalAttempted} messages failed. Broadcast ID: ${broadcastId}. Check server logs for details.`,
+          variant: "destructive",
         });
-        successfulSends++;
-      } catch (error: unknown) {
-        failedSends++;
-        const errorMessage = error instanceof Error ? error.message : String(error);
-        console.error(`Failed to send broadcast to ${number}:`, errorMessage);
-        // Optionally show a toast for each failure, or just summarize at the end
+      } else {
+        toast({
+          title: "Broadcast Sent Successfully",
+          description: `Message sent to ${successfulSends} customer(s). Broadcast ID: ${broadcastId}.`,
+        });
       }
-    }
 
-    // 4. Show summary toast
-    if (failedSends > 0) {
+      // TODO: Optionally trigger a refetch of broadcasts list on the BroadcastsPage
+
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : "An unknown error occurred while sending the broadcast.";
+      console.error("Error sending broadcast via service:", errorMessage);
       toast({
-        title: "Broadcast Partially Failed",
-        description: `${failedSends} out of ${totalToSend} messages failed. Check console for details.`,
+        title: "Broadcast Failed",
+        description: `Failed to send broadcast. ${errorMessage}`, // Include service error
         variant: "destructive",
       });
-    } else {
-      toast({
-        title: "Broadcast Sent",
-        description: `Successfully sent message to ${successfulSends} customer(s).`,
-      });
+    } finally {
+      setIsSending(false);
+      onClose(); // Close modal regardless of success/failure
     }
-
-    // 5. Reset state and close modal
-    setIsSending(false);
-    onClose();
   };
 
 
@@ -204,7 +232,35 @@ export function BroadcastModal({
 
         {/* Step 2: Compose Message */}
         {step === 'composeMessage' && (
-          <div className="py-4">
+          <div className="py-4 space-y-4">
+            {/* Integration Selector */}
+            <div>
+              <Label htmlFor="integration-select">Send From:</Label>
+              {isLoadingIntegrations ? (
+                <p className="text-sm text-muted-foreground">Loading integrations...</p>
+              ) : availableIntegrations.length === 0 ? (
+                // Update the message for no integrations found
+                <p className="text-sm text-red-500">No integrations found.</p> 
+              ) : (
+                <Select
+                  value={selectedIntegrationId}
+                  onValueChange={setSelectedIntegrationId}
+                >
+                  <SelectTrigger id="integration-select" className="w-full mt-1">
+                    <SelectValue placeholder="Select integration..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableIntegrations.map((integration) => (
+                      <SelectItem key={integration.id} value={integration.id}>
+                        {integration.name} 
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            </div>
+
+            {/* Message Textarea */}
             <Textarea
               placeholder="Type your broadcast message here..."
               value={broadcastMessage}
@@ -229,7 +285,11 @@ export function BroadcastModal({
           {step === 'composeMessage' && (
             <>
               <Button variant="outline" onClick={handleBack} disabled={isSending}>Back</Button>
-              <Button onClick={handleSend} disabled={!broadcastMessage.trim() || isSending}>
+              {/* Disable Send button if no integration is selected or loading */}
+              <Button 
+                onClick={handleSend} 
+                disabled={!broadcastMessage.trim() || !selectedIntegrationId || isLoadingIntegrations || isSending}
+              >
                 {isSending ? 'Sending...' : 'Send'}
               </Button>
             </>

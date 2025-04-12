@@ -64,3 +64,60 @@ export async function findOrCreateCustomer(supabaseClient: SupabaseClient, phone
   console.log(`Returning customerId: ${customerId}`);
   return customerId;
 }
+
+
+/**
+ * Adds a new customer contact or updates an existing one by phone number.
+ */
+export async function addOrUpdateCustomerContact(supabaseClient: SupabaseClient, phoneNumber: string, name: string): Promise<string | null> {
+  console.log(`Adding or updating customer contact with phone: ${phoneNumber}, name: ${name}`);
+
+  // Use the phone number as provided
+  const formattedPhoneNumber = phoneNumber;
+
+  // Try to find existing customer
+  const { data: existingCustomer, error: customerError } = await supabaseClient
+    .from('customers')
+    .select('id')
+    .eq('phone_number', formattedPhoneNumber)
+    .maybeSingle();
+
+  if (customerError) {
+    console.error('Error finding existing customer during add/update:', customerError);
+    return null;
+  }
+
+  // If customer exists, update their name
+  if (existingCustomer) {
+    console.log(`Found existing customer with ID: ${existingCustomer.id}. Updating name to ${name}`);
+    const { error: updateError } = await supabaseClient
+      .from('customers')
+      .update({ name: name })
+      .eq('id', existingCustomer.id);
+
+    if (updateError) {
+      console.error('Error updating customer name:', updateError);
+      return null;
+    }
+    return existingCustomer.id;
+  }
+
+  // Otherwise, create a new customer
+  console.log(`Creating new customer contact with phone: ${formattedPhoneNumber}, name: ${name}`);
+  const { data: newCustomer, error: createCustomerError } = await supabaseClient
+    .from('customers')
+    .insert({
+      phone_number: formattedPhoneNumber,
+      name: name,
+    })
+    .select('id')
+    .single();
+
+  if (createCustomerError) {
+    console.error('Error creating new customer contact:', createCustomerError);
+    return null;
+  }
+
+  console.log(`Created new customer contact with ID: ${newCustomer.id}`);
+  return newCustomer.id;
+}

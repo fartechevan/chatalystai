@@ -18,6 +18,7 @@ export interface Integration {
   // is_connected?: boolean; // Remove is_connected
   status?: 'available' | 'coming_soon' | string; // Original availability status
   connectionStatus?: ConnectionState; // New field for connection state
+  config_id?: string; // Added optional config ID for access checks
 }
 
 // Define the connection state type to include 'unknown', 'qrcode', and 'pairingCode'

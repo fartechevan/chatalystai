@@ -1,7 +1,8 @@
 
-import { useState, useRef, useEffect } from "react";
-import { Loader2 } from "lucide-react";
-import { UseMutationResult } from "@tanstack/react-query";
+import { useState, useEffect } from "react";
+import { Loader2 } from "lucide-react"; // Removed User icon, kept Loader2 for summary
+import { UseMutationResult } from "@tanstack/react-query"; // Removed useMutation, useQueryClient
+// Removed toast, supabase, Button imports
 
 import type { Conversation, Message as MessageType } from "./types";
 import { ConversationHeader } from "./ConversationHeader";
@@ -15,8 +16,8 @@ interface ConversationMainAreaProps {
   newMessage: string;
   setNewMessage: (message: string) => void;
   handleSendMessage: () => void;
-  sendMessageMutation: UseMutationResult<any, Error, string, unknown>; // Changed to any to be more flexible
-  summarizeMutation: UseMutationResult<any, Error, any, unknown>; // Changed to more flexible types
+  sendMessageMutation: UseMutationResult<unknown, Error, string, unknown>; // Changed any to unknown
+  summarizeMutation: UseMutationResult<unknown, Error, unknown, unknown>; // Changed any to unknown
   summary: string | undefined;
   summaryTimestamp: string | undefined;
 }
@@ -31,15 +32,23 @@ export function ConversationMainArea({
   sendMessageMutation,
   summarizeMutation,
   summary,
-  summaryTimestamp
+  summaryTimestamp,
 }: ConversationMainAreaProps) {
-  const [isSummarized, setIsSummarized] = useState(!!summary);
+  // Removed derivedCustomerId state, queryClient, useEffect for customer ID,
+  // createLeadMutation, and handleCreateLead function.
 
   // Determine if this conversation is a WhatsApp conversation
-  const isWhatsAppConversation = selectedConversation?.integrations_id ? true : false;
+  const isWhatsAppConversation = selectedConversation?.integrations_id
+    ? true
+    : false;
+  // Removed showCreateLeadButton calculation
 
   return (
-    <div className={`flex-1 flex flex-col min-h-0 border-r border-l relative ${!selectedConversation ? 'items-center justify-center' : ''}`}>
+    <div
+      className={`flex-1 flex flex-col min-h-0 border-r border-l relative ${
+        !selectedConversation ? "items-center justify-center" : ""
+      }`}
+    >
       {selectedConversation ? (
         <>
           <ConversationHeader conversation={selectedConversation} />
@@ -49,7 +58,9 @@ export function ConversationMainArea({
             isLoading={isLoading} 
             conversation={selectedConversation}
           />
-          
+
+          {/* Removed Create Lead Button Area */}
+
           <MessageInput
             newMessage={newMessage}
             setNewMessage={setNewMessage}

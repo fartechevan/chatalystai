@@ -9,6 +9,86 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      broadcast_recipients: {
+        Row: {
+          broadcast_id: string
+          customer_id: string | null
+          error_message: string | null
+          id: string
+          phone_number: string
+          sent_at: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          broadcast_id: string
+          customer_id?: string | null
+          error_message?: string | null
+          id?: string
+          phone_number: string
+          sent_at?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          broadcast_id?: string
+          customer_id?: string | null
+          error_message?: string | null
+          id?: string
+          phone_number?: string
+          sent_at?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "broadcast_recipients_broadcast_id_fkey"
+            columns: ["broadcast_id"]
+            isOneToOne: false
+            referencedRelation: "broadcasts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "broadcast_recipients_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      broadcasts: {
+        Row: {
+          created_at: string
+          id: string
+          instance_id: string | null
+          integration_id: string | null
+          message_text: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          instance_id?: string | null
+          integration_id?: string | null
+          message_text: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          instance_id?: string | null
+          integration_id?: string | null
+          message_text?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "broadcasts_integration_id_fkey"
+            columns: ["integration_id"]
+            isOneToOne: false
+            referencedRelation: "integrations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       conversation_participants: {
         Row: {
           conversation_id: string
@@ -596,21 +676,21 @@ export type Database = {
           created_at: string
           created_by: string | null
           id: string
-          integration_config_id: string
+          integration_id: string
           profile_id: string
         }
         Insert: {
           created_at?: string
           created_by?: string | null
           id?: string
-          integration_config_id: string
+          integration_id: string
           profile_id: string
         }
         Update: {
           created_at?: string
           created_by?: string | null
           id?: string
-          integration_config_id?: string
+          integration_id?: string
           profile_id?: string
         }
         Relationships: [
@@ -622,10 +702,10 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "profile_integration_access_integration_config_id_fkey"
-            columns: ["integration_config_id"]
+            foreignKeyName: "profile_integration_access_integration_id_fkey"
+            columns: ["integration_id"]
             isOneToOne: false
-            referencedRelation: "integrations_config"
+            referencedRelation: "integrations"
             referencedColumns: ["id"]
           },
           {

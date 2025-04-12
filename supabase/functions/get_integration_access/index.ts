@@ -24,12 +24,38 @@ serve(async (req) => {
       }
     )
 
-    // Get the current user
-    const {
-      data: { user },
-    } = await supabaseClient.auth.getUser()
+    // Get the current user and their profile data including role
+    const { data: { user }, error: userError } = await supabaseClient.auth.getUser()
+    if (userError || !user) {
+      console.error('Error fetching user or user not found:', userError)
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
 
-    if (!user) {
+    // Fetch the user's profile to get their role
+    const { data: userProfile, error: profileError } = await supabaseClient
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single()
+
+    if (profileError || !userProfile) {
+      console.error(`Error fetching profile for user ${user.id}:`, profileError)
+      return new Response(JSON.stringify({ error: 'Failed to retrieve user profile' }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      })
+    }
+
+    const userRole = userProfile.role
+    console.log(`User ${user.id} has role: ${userRole}`)
+
+    // Check if user is authorized (e.g., has 'admin' role) for sensitive actions
+    const isAuthorizedAdmin = userRole === 'admin'
+
+    if (!user) { // This check seems redundant now but kept for safety, main checks are above
       return new Response(JSON.stringify({ error: 'Unauthorized' }), {
         status: 401,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -38,11 +64,18 @@ serve(async (req) => {
 
     // Parse request body
     const requestData = await req.json()
-    const { action, configId, profileId, accessId, instanceId } = requestData
+    // Renamed configId to integrationId to match new schema
+    const { action, integrationId, profileId, accessId, instanceId } = requestData 
 
-    console.log(`Integration access request: action=${action}, user=${user.id}, configId=${configId}, profileId=${profileId}, instanceId=${instanceId || 'N/A'}`)
+    // Log using integrationId
+    console.log(`Integration access request: action=${action}, user=${user.id}, integrationId=${integrationId}, profileId=${profileId}, accessId=${accessId}, instanceId=${instanceId || 'N/A'}`)
 
     if (action === 'fetchAccess') {
+       if (!integrationId) {
+         return new Response(JSON.stringify({ error: 'integrationId is required for fetchAccess' }), {
+           status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+         })
+       }
       const { data, error } = await supabaseClient
         .from('profile_integration_access')
         .select(`
@@ -50,25 +83,48 @@ serve(async (req) => {
           profile_id,
           profiles:profile_id (id, name, email, role)
         `)
-        .eq('integration_config_id', configId)
+        .eq('integration_id', integrationId) // Use integration_id
 
       if (error) throw error
-      console.log(`Fetched ${data?.length || 0} access records for config ${configId}`)
+      console.log(`Fetched ${data?.length || 0} access records for integration ${integrationId}`)
       return new Response(JSON.stringify({ data }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     } else if (action === 'grantAccess') {
+      // --- RBAC Check ---
+      if (!isAuthorizedAdmin) {
+        console.warn(`Unauthorized attempt to grant access by user ${user.id} (role: ${userRole})`)
+        return new Response(JSON.stringify({ error: 'Forbidden: Admin role required' }), {
+          status: 403,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+      // --- End RBAC Check ---
+
+      // Ensure integrationId is provided for grantAccess
+      if (!integrationId) {
+        return new Response(JSON.stringify({ error: 'integrationId is required for grantAccess' }), {
+          status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+       if (!profileId) {
+         return new Response(JSON.stringify({ error: 'profileId is required for grantAccess' }), {
+           status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+         })
+       }
+
       const { error } = await supabaseClient
         .from('profile_integration_access')
         .insert({
           profile_id: profileId,
-          integration_config_id: configId,
+          integration_id: integrationId, // Use integration_id
           created_by: user.id,
         })
 
       if (error) {
-        if (error.code === '23505') {
-          console.log(`Access already granted for profile ${profileId} to config ${configId}`)
+        // Check for unique constraint violation (code 23505)
+        if (error.code === '23505') { 
+          console.log(`Access already granted for profile ${profileId} to integration ${integrationId}`)
           return new Response(JSON.stringify({ error: 'Access already granted' }), {
             status: 409,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -77,11 +133,21 @@ serve(async (req) => {
         throw error
       }
 
-      console.log(`Access granted for profile ${profileId} to config ${configId} by ${user.id}`)
+      console.log(`Access granted for profile ${profileId} to integration ${integrationId} by ${user.id}`)
       return new Response(JSON.stringify({ success: true }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       })
     } else if (action === 'revokeAccess') {
+       // --- RBAC Check ---
+       if (!isAuthorizedAdmin) {
+        console.warn(`Unauthorized attempt to revoke access by user ${user.id} (role: ${userRole})`)
+        return new Response(JSON.stringify({ error: 'Forbidden: Admin role required' }), {
+          status: 403,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        })
+      }
+      // --- End RBAC Check ---
+
       const { error } = await supabaseClient
         .from('profile_integration_access')
         .delete()

@@ -15,10 +15,12 @@ import { ConversationView } from "./components/dashboard/conversations/Conversat
 import { ListsView } from "./components/lists/ListsView";
 import { TaskBoard } from "./components/lists/TaskBoard";
 import Leads from "./pages/Leads";
-import ComingSoon from "@/pages/ComingSoon";
+import ComingSoon from "@/pages/ComingSoon"; // Keep this for placeholder
 import KnowledgeBase from "./pages/KnowledgeBase";
 import { ChunkView } from "./components/knowledge/ChunkView";
 import Profile from "./pages/Profile";
+import BroadcastsPage from "./pages/Broadcasts"; // Import the actual Broadcasts page
+import BroadcastDetailsView from "./components/broadcasts/BroadcastDetailsView"; // Import the details view
 
 const App = () => {
   const queryClient = new QueryClient({
@@ -56,6 +58,9 @@ const App = () => {
                     <Route path="leads" element={<Leads />} />
                     <Route path="calendar" element={<TaskBoard />} />
                     <Route path="conversations" element={<ConversationView />} />
+                    {/* Update Broadcasts route and add details route */}
+                    <Route path="broadcasts" element={<BroadcastsPage />} /> 
+                    <Route path="broadcasts/:broadcastId" element={<BroadcastDetailsView />} /> 
                     <Route path="stats" element={<ComingSoon />} />
                     <Route path="help" element={<ComingSoon />} />
                     <Route path="mail" element={<ComingSoon />} />

@@ -10,6 +10,7 @@ import {
   BarChart2,
   HelpCircle,
   UserRound,
+  RadioTower, // Import Broadcast icon
   BookOpen,
   LogOut
 } from "lucide-react";
@@ -38,6 +39,7 @@ const menuItems: MenuItem[] = [
   { title: "Dashboard", icon: Home, path: "/dashboard" },
   { title: "Leads", icon: Target, path: "/dashboard/leads" },
   { title: "Chat", icon: MessageSquare, path: "/dashboard/conversations" },
+  { title: "Broadcasts", icon: RadioTower, path: "/dashboard/broadcasts" }, // Add Broadcasts item
   { title: "Calendar", icon: Calendar, path: "/dashboard/calendar" },
   { title: "Lists", icon: List, path: "/dashboard/lists" },
   { title: "Knowledge", icon: BookOpen, path: "/dashboard/knowledge" },
