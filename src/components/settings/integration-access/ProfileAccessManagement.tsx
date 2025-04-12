@@ -3,6 +3,14 @@ import { Plus, Users, ShieldAlert } from "lucide-react";
 import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useMediaQuery } from "@/hooks/use-media-query"; // Import useMediaQuery
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card"; // Import Card components
 import { IntegrationAccessDialog } from "./IntegrationAccessDialog";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
@@ -13,7 +21,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Tables } from "@/integrations/supabase/types"; // Import Tables type
+import { Tables } from "@/integrations/supabase/types";
 
 // Define Profile type based on Supabase schema
 type Profile = Tables<'profiles'>;
@@ -44,6 +52,7 @@ interface ProfileIntegrationAccessRecord {
 
 
 export function ProfileAccessManagement() {
+  const isMobile = useMediaQuery("(max-width: 768px)"); // Check for mobile screen size
   const [selectedIntegrationId, setSelectedIntegrationId] = useState<string | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [currentUserRole, setCurrentUserRole] = useState<string | null>(null);
@@ -211,54 +220,74 @@ export function ProfileAccessManagement() {
         </div>
       </div>
 
-      {isLoading || isCheckingRole ? (
-        <div className="border rounded-md">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-[30%]"><Skeleton className="h-5 w-24" /></TableHead>
-                <TableHead><Skeleton className="h-5 w-32" /></TableHead>
-                <TableHead className="text-right w-[150px]"><Skeleton className="h-5 w-20" /></TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {[1, 2, 3].map((i) => (
-                <TableRow key={i}>
-                  <TableCell><Skeleton className="h-5 w-3/4" /></TableCell>
-                  <TableCell><Skeleton className="h-5 w-full" /></TableCell>
-                  <TableCell className="text-right"><Skeleton className="h-8 w-full" /></TableCell>
+      {/* Loading State */}
+      {(isLoading || isCheckingRole) && (
+        isMobile ? (
+          <div className="space-y-4">
+            {[1, 2].map((i) => (
+              <Card key={i}>
+                <CardHeader>
+                  <Skeleton className="h-6 w-1/2 mb-2" />
+                  <Skeleton className="h-4 w-3/4" />
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  <Skeleton className="h-5 w-full" />
+                  <Skeleton className="h-5 w-full" />
+                  <Skeleton className="h-9 w-full mt-2" />
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        ) : (
+          <div className="border rounded-md">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-[30%]"><Skeleton className="h-5 w-24" /></TableHead>
+                  <TableHead><Skeleton className="h-5 w-32" /></TableHead>
+                  <TableHead className="text-right w-[150px]"><Skeleton className="h-5 w-20" /></TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
-      ) : queryError ? (
+              </TableHeader>
+              <TableBody>
+                {[1, 2, 3].map((i) => (
+                  <TableRow key={i}>
+                    <TableCell><Skeleton className="h-5 w-3/4" /></TableCell>
+                    <TableCell><Skeleton className="h-5 w-full" /></TableCell>
+                    <TableCell className="text-right"><Skeleton className="h-8 w-full" /></TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        )
+      )}
+
+      {/* Error State */}
+      {queryError && !isLoading && !isCheckingRole && (
         <div className="text-center py-8 text-destructive flex flex-col items-center gap-2 border rounded-md">
           <ShieldAlert className="h-6 w-6" />
           <span>Error loading integrations: {queryError.message}</span>
         </div>
-      ) : integrationsWithAccess && integrationsWithAccess.length > 0 ? (
-        <div className="border rounded-md">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-[30%]">Integration</TableHead>
-                <TableHead>Users with Access</TableHead>
-                <TableHead className="text-right w-[150px]">Actions</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
+      )}
+
+      {/* Data State */}
+      {!isLoading && !isCheckingRole && !queryError && (
+        integrationsWithAccess && integrationsWithAccess.length > 0 ? (
+          isMobile ? (
+            // Mobile Card View
+            <div className="space-y-4">
               {integrationsWithAccess.map((integration) => (
-                <TableRow key={integration.id}>
-                  <TableCell>
-                    <div className="font-medium">{integration.name}</div>
+                <Card key={integration.id}>
+                  <CardHeader>
+                    <CardTitle>{integration.name}</CardTitle>
                     {integration.description && (
-                      <div className="text-xs text-muted-foreground">{integration.description}</div>
+                      <CardDescription>{integration.description}</CardDescription>
                     )}
-                  </TableCell>
-                  <TableCell>
+                  </CardHeader>
+                  <CardContent>
+                    <h4 className="text-sm font-medium mb-2">Users with Access:</h4>
                     {integration.access?.length > 0 ? (
-                      <div className="flex flex-col space-y-1">
+                      <div className="space-y-2">
                         {integration.access.map((access) => (
                           <div key={access.id} className="text-sm flex items-center">
                             <Users className="h-3 w-3 mr-1.5 text-muted-foreground flex-shrink-0" />
@@ -274,30 +303,85 @@ export function ProfileAccessManagement() {
                         No users have access yet.
                       </div>
                     )}
-                  </TableCell>
-                  <TableCell className="text-right">
                     <Button
                       variant="outline"
                       size="sm"
+                      className="w-full mt-4"
                       onClick={() => handleOpenDialog(integration.id)}
                     >
                       <Plus className="h-4 w-4 mr-2" />
                       Manage Access
                     </Button>
-                  </TableCell>
-                </TableRow>
+                  </CardContent>
+                </Card>
               ))}
-            </TableBody>
-          </Table>
-        </div>
-      ) : (
-        <div className="text-center py-8 text-muted-foreground border rounded-md">
-          No integrations found or accessible.
-        </div>
+            </div>
+          ) : (
+            // Desktop Table View
+            <div className="border rounded-md">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-[30%]">Integration</TableHead>
+                    <TableHead>Users with Access</TableHead>
+                    <TableHead className="text-right w-[150px]">Actions</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {integrationsWithAccess.map((integration) => (
+                    <TableRow key={integration.id}>
+                      <TableCell>
+                        <div className="font-medium">{integration.name}</div>
+                        {integration.description && (
+                          <div className="text-xs text-muted-foreground">{integration.description}</div>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {integration.access?.length > 0 ? (
+                          <div className="flex flex-col space-y-1">
+                            {integration.access.map((access) => (
+                              <div key={access.id} className="text-sm flex items-center">
+                                <Users className="h-3 w-3 mr-1.5 text-muted-foreground flex-shrink-0" />
+                                <div>
+                                  <span className="font-medium">{access.profiles.name}</span>
+                                  <span className="text-xs text-muted-foreground ml-1">({access.profiles.email})</span>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <div className="text-sm text-muted-foreground">
+                            No users have access yet.
+                          </div>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleOpenDialog(integration.id)}
+                        >
+                          <Plus className="h-4 w-4 mr-2" />
+                          Manage Access
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          )
+        ) : (
+          // No Data State
+          <div className="text-center py-8 text-muted-foreground border rounded-md">
+            No integrations found or accessible.
+          </div>
+        )
       )}
 
+      {/* Dialog remains the same */}
       {selectedIntegrationId && (
-        <IntegrationAccessDialog 
+        <IntegrationAccessDialog
           open={dialogOpen} 
           setOpen={setDialogOpen} 
           integrationId={selectedIntegrationId}
