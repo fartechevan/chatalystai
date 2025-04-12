@@ -11,20 +11,19 @@ import { supabase } from "@/integrations/supabase/client";
 import type { Customer } from "./types/customer";
 import { BroadcastModal } from "./BroadcastModal";
 // Removed useQuery import
+import { cn } from "@/lib/utils"; // Added cn
 
 interface ConversationLeftPanelProps {
-  leftPanelOpen: boolean;
-  setLeftPanelOpen: (open: boolean) => void;
+  // Removed leftPanelOpen and setLeftPanelOpen props
   searchQuery: string;
   setSearchQuery: (query: string) => void;
   filteredConversations: Conversation[];
   selectedConversation: Conversation | null;
-  setSelectedConversation: (conversation: Conversation) => void;
+  setSelectedConversation: (conversation: Conversation | null) => void; // Allow null
 }
 
 export function ConversationLeftPanel({
-  leftPanelOpen,
-  setLeftPanelOpen,
+  // Removed leftPanelOpen, setLeftPanelOpen
   searchQuery,
   setSearchQuery,
   filteredConversations,
@@ -32,8 +31,6 @@ export function ConversationLeftPanel({
   setSelectedConversation,
 }: ConversationLeftPanelProps) {
   const [isBroadcastModalOpen, setIsBroadcastModalOpen] = useState(false);
-
-  // Removed useQuery hook for fetching config
 
   const getAvatarInitial = (conversation: Conversation) => {
     const displayName = getConversationName(conversation);
@@ -60,18 +57,15 @@ export function ConversationLeftPanel({
   };
 
   return (
-    <div className={`${leftPanelOpen ? 'w-64' : 'w-12'} border-r bg-background transition-all duration-300 relative md:w-80 flex flex-col`}>
-      <button
-        onClick={() => setLeftPanelOpen(!leftPanelOpen)}
-        className="md:hidden absolute right-0 top-0 p-2 transform translate-x-full bg-background border rounded-r-lg"
-      >
-        {leftPanelOpen ? <X className="h-4 w-4" /> : <Menu className="h-4 w-4" />}
-      </button>
+    // Removed width classes (controlled by parent), added h-full
+    <div className={cn("border-r bg-background flex flex-col h-full")}> 
+      {/* Removed internal mobile toggle button */}
       
-      <div className={`${leftPanelOpen ? 'opacity-100' : 'opacity-0 md:opacity-100'} transition-opacity duration-300 flex flex-col h-full`}>
+      {/* Content always visible now, parent controls visibility */}
+      <div className="flex flex-col h-full"> 
         <div className="p-4 border-b flex flex-col gap-4">
           <div className="flex items-center gap-2">
-            <div className="flex-1">
+            <div className="flex-1"> 
               <h3 className="font-medium text-sm">INBOX</h3>
             </div>
             {/* Add New Broadcast Button */}

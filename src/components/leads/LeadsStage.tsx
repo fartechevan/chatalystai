@@ -36,7 +36,8 @@ export function LeadsStage({ name, id, index = 0, leads }: LeadsStageProps) {
   };
 
   return (
-    <div className="flex-1 min-w-[250px]">
+    // Remove flex-1, rely on min-width and parent flex container
+    <div className="min-w-[250px]"> 
       <div className={cn(
         "border-b-2 pb-2 mb-4",
         stageColors[index as keyof typeof stageColors] || "border-gray-400"
@@ -73,7 +74,7 @@ export function LeadsStage({ name, id, index = 0, leads }: LeadsStageProps) {
                     {...provided.draggableProps}
                     {...provided.dragHandleProps}
                     className={cn(
-                      "transition-all",
+                      "transition-all duration-300 ease-in-out", // Changed to ease-in-out
                       snapshot.isDragging && "opacity-50"
                     )}
                   >

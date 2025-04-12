@@ -3,12 +3,16 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardHeader, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button"; // Added Button
+import { ChevronLeft } from "lucide-react"; // Added Icon
+import { cn } from "@/lib/utils"; // Added cn
 
 interface ContactDetailsProps {
   contactId: string;
+  onCloseDetails?: () => void; // Added optional prop
 }
 
-export function ContactDetails({ contactId }: ContactDetailsProps) {
+export function ContactDetails({ contactId, onCloseDetails }: ContactDetailsProps) {
   const { data: contact, isLoading } = useQuery({
     queryKey: ['customer', contactId],
     queryFn: async () => {
@@ -37,8 +41,9 @@ export function ContactDetails({ contactId }: ContactDetailsProps) {
   }
 
   return (
-    <div className="p-6">
-      <Card>
+    <div className="p-6 h-full flex flex-col"> {/* Ensure full height */}
+       {/* Mobile Back Button Removed */}
+      <Card className="flex-1 overflow-auto"> {/* Allow card content to scroll if needed */}
         <CardHeader>
           <h2 className="text-2xl font-bold">{contact.name}</h2>
           <p className="text-muted-foreground">{contact.email}</p>

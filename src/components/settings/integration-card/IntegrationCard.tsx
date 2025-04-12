@@ -18,7 +18,8 @@ export function IntegrationCard({ integration, onConnect }: IntegrationCardProps
 
   return (
     <Card className="overflow-hidden">
-      <CardContent className="p-6 pb-0">
+      {/* Re-added responsive padding p-4 md:p-6 */}
+      <CardContent className="p-4 md:p-6 pb-0"> 
         <div className="flex justify-between items-start">
           <div>
             {integration.icon_url ? (
@@ -47,7 +48,8 @@ export function IntegrationCard({ integration, onConnect }: IntegrationCardProps
           )}
         </div>
       </CardContent>
-      <CardFooter className="flex justify-end p-6">
+      {/* Re-added responsive padding p-4 md:p-6 */}
+      <CardFooter className="flex justify-end p-4 md:p-6"> 
         <Button
           variant={isConnected ? "outline" : "default"}
           size="sm"

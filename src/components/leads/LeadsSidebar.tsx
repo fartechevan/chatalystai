@@ -1,7 +1,9 @@
 
 import { 
-  Plus, ChevronLeft,
-  Users
+  Plus, 
+  Users,
+  PanelLeftClose, // Icon for collapsing
+  PanelLeftOpen   // Icon for expanding
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState, useEffect } from "react";
@@ -55,10 +57,11 @@ export function LeadsSidebar({
     loadPipelines();
   }, [selectedPipelineId, onPipelineSelect]);
 
+  // Added 'h-full' for use within SheetContent/Layout containers
   return (
     <div className={cn(
-      "border-r bg-muted/30 transition-all duration-300 relative flex flex-col",
-      isCollapsed ? "" : "w-48"
+      "border-r bg-muted/30 transition-all duration-300 relative flex flex-col h-full", 
+      // Width and visibility are now controlled by the parent (LeadsLayout or SheetContent)
     )}>
       <nav className="p-3 space-y-1">
         {pipelines.map((pipeline) => (
@@ -74,6 +77,7 @@ export function LeadsSidebar({
             title={pipeline.name}
           >
             <Users className="h-4 w-4 flex-shrink-0" />
+            {/* Hide text span based on collapse state */}
             {!isCollapsed && <span>{pipeline.name}</span>}
           </button>
         ))}
@@ -84,18 +88,27 @@ export function LeadsSidebar({
           className="w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm text-muted-foreground hover:bg-muted"
         >
           <Plus className="h-4 w-4 flex-shrink-0" />
+           {/* Hide text span based on collapse state */}
           {!isCollapsed && <span>New Pipeline</span>}
         </button>
       </div>
+      {/* Collapse button - Visibility controlled by parent (LeadsLayout) */}
+      {/* The button itself remains, but its container in LeadsLayout will be hidden on mobile */}
       <button
         onClick={onCollapse}
         className={cn(
           "absolute -right-3 top-3 p-1 rounded-full bg-background border shadow-sm hover:bg-accent",
-          "transition-transform",
-          isCollapsed && "rotate-180"
+          "transition-transform", // Removed responsive hiding
+          // Parent container in LeadsLayout will handle hiding this for mobile drawer
         )}
       >
-        <ChevronLeft className="h-4 w-4" />
+        {/* Use different icons based on collapsed state */}
+        {isCollapsed ? (
+          <PanelLeftOpen className="h-4 w-4" /> 
+        ) : (
+          <PanelLeftClose className="h-4 w-4" />
+        )}
+        <span className="sr-only">{isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}</span>
       </button>
 
       <PipelineSetupDialog

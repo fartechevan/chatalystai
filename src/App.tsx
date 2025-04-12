@@ -1,17 +1,18 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { LoginForm } from "./components/auth/LoginForm";
-import Dashboard from "./pages/Dashboard";
+// Dashboard component is likely no longer needed here if Main handles the index route
+// import Dashboard from "./pages/Dashboard"; 
 import Main from "./pages/Main";
 import Settings from "./pages/Settings";
 import { AuthProvider } from "./components/auth/AuthProvider";
 import { ProtectedRoute } from "./components/auth/ProtectedRoute";
 import { SidebarProvider } from "./components/ui/sidebar";
 import { ConversationView } from "./components/dashboard/conversations/ConversationView";
+import { DashboardLayout } from "./components/dashboard/DashboardLayout"; // Import the new layout
 import { ListsView } from "./components/lists/ListsView";
 import { TaskBoard } from "./components/lists/TaskBoard";
 import Leads from "./pages/Leads";
@@ -48,17 +49,18 @@ const App = () => {
                     path="/dashboard"
                     element={
                       <ProtectedRoute>
-                        <Dashboard />
+                        {/* Use DashboardLayout as the element */}
+                        <DashboardLayout /> 
                       </ProtectedRoute>
                     }
                   >
-                    <Route index element={<Main />} />
+                    {/* Child routes are now rendered inside DashboardLayout's Outlet */}
+                    <Route index element={<Main />} /> 
                     <Route path="settings" element={<Settings />} />
                     <Route path="lists" element={<ListsView />} />
                     <Route path="leads" element={<Leads />} />
                     <Route path="calendar" element={<TaskBoard />} />
                     <Route path="conversations" element={<ConversationView />} />
-                    {/* Update Broadcasts route and add details route */}
                     <Route path="broadcasts" element={<BroadcastsPage />} /> 
                     <Route path="broadcasts/:broadcastId" element={<BroadcastDetailsView />} /> 
                     <Route path="stats" element={<ComingSoon />} />

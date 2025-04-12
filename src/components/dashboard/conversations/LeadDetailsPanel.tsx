@@ -19,34 +19,34 @@ import {
 import { useToast } from "@/components/ui/use-toast";
 import { useQueryClient, QueryClient } from "@tanstack/react-query"; // Import QueryClient
 import { supabase } from "@/integrations/supabase/client";
-import type { Profile } from "./types"; // Import Profile
+import type { Profile } from "./types"; 
 
 interface LeadDetailsPanelProps {
-  isExpanded: boolean;
-  onToggle: () => void;
+  // Removed isExpanded, onToggle
   selectedConversation: Conversation | null;
   setSelectedConversation: (conversation: Conversation | null) => void;
-  queryClient: QueryClient; // Use QueryClient type
+  queryClient: QueryClient; 
+  onClose?: () => void; // Keep onClose for mobile drawer closing if needed
 }
 
 export function LeadDetailsPanel({
-  isExpanded,
-  onToggle,
+  // Removed isExpanded, onToggle
   selectedConversation,
   setSelectedConversation,
   queryClient,
+  onClose, // Keep onClose
 }: LeadDetailsPanelProps) {
-  const [profiles, setProfiles] = useState<Profile[]>([]); // Use Profile[] type
+  const [profiles, setProfiles] = useState<Profile[]>([]); 
   const [activeTab, setActiveTab] = useState("main");
   
-  // Custom hooks for managing different aspects of the lead details panel
+  // Custom hooks - Pass true for isExpanded since it's always expanded when rendered now
   const { 
     isLoading, 
     customer, 
     lead, 
     daysSinceCreation, 
     setLead 
-  } = useLeadData(isExpanded, selectedConversation, profiles);
+  } = useLeadData(true, selectedConversation, profiles); 
   
   const {
     allPipelines,
@@ -54,12 +54,12 @@ export function LeadDetailsPanel({
     selectedStage,
     handlePipelineChange,
     handleStageChange
-  } = useLeadPipeline(lead, selectedConversation, isExpanded);
+  } = useLeadPipeline(lead, selectedConversation, true); // Pass true for isExpanded
   
   const {
     tags,
     setTags,
-    isTagsLoading,
+    isTagsLoading, // Keep this loading state
     handleAddTag,
     handleRemoveTag
   } = useLeadTags(lead);
@@ -70,34 +70,31 @@ export function LeadDetailsPanel({
     fetchProfiles
   } = useAssignee(profiles, lead);
 
-  // Fetch profiles when expanded
+  // Fetch profiles on mount or when selectedConversation changes
   useEffect(() => {
-    if (isExpanded) {
-      const getProfiles = async () => {
-        const profilesData = await fetchProfiles();
-        setProfiles(profilesData as Profile[]); // Apply Profile[] type
-      };
-      getProfiles();
-    }
-  }, [isExpanded, fetchProfiles]);
+    const getProfiles = async () => {
+      const profilesData = await fetchProfiles();
+      setProfiles(profilesData as Profile[]); 
+    };
+    getProfiles();
+    // Dependency array might need adjustment based on fetchProfiles implementation
+  }, [fetchProfiles, selectedConversation]); 
 
   return (
-    <div className={cn(
-      "border-r bg-background transition-all duration-300 flex flex-col",
-      isExpanded ? "w-[320px]" : "w-10"
-    )}>
+    // Removed width classes (controlled by parent), added h-full
+    <div className={cn("border-l bg-background flex flex-col h-full")}> 
+      {/* Pass necessary props to LeadHeader, remove isExpanded/onToggle and onClose */}
       <LeadHeader 
-        isExpanded={isExpanded} 
-        onToggle={onToggle} 
         lead={lead} 
         isLoading={isLoading} 
+        // Removed onClose prop pass
       />
 
-      {isExpanded && (
-        <div className="flex-1 overflow-auto flex flex-col">
-          {isLoading ? (
-            <div className="flex-1 flex items-center justify-center">
-              <div className="animate-pulse flex flex-col items-center gap-4">
+      {/* Content always rendered now, parent controls visibility */}
+      <div className="flex-1 overflow-auto flex flex-col"> 
+        {isLoading ? (
+          <div className="flex-1 flex items-center justify-center">
+            <div className="animate-pulse flex flex-col items-center gap-4">
                 <div className="h-12 w-12 bg-muted rounded-full"></div>
                 <div className="h-4 w-32 bg-muted rounded"></div>
                 <div className="h-3 w-40 bg-muted rounded"></div>
@@ -228,9 +225,8 @@ export function LeadDetailsPanel({
                 setSelectedConversation(updatedConversation as Conversation);
               }}
             />
-          )}
-        </div>
-      )}
-    </div>
+          )} {/* End Conditional Rendering: isLoading ? (...) : lead ? (...) : (...) */}
+        </div> {/* End Content Area div */}
+    </div> /* End Root div */
   );
 }
