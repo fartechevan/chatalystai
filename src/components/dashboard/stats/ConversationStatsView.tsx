@@ -36,6 +36,7 @@ export type Message = {
   content: string | null;
   created_at: string;
   sender_participant_id: string | null;
+  is_user?: boolean; // Flag to indicate if sender is a customer
 };
 
 type Conversation = {
@@ -56,7 +57,7 @@ export type AnalyzedConversation = Conversation & {
   sentimentResult: SentimentResult | null;
 };
 
-// Fetch function for conversations and their messages with date filtering
+// Fetch function for conversations and their messages with date filtering and participant role check
 const fetchConversationsWithMessages = async (startDate?: Date, endDate?: Date): Promise<Conversation[]> => {
   let query = supabase
     .from('conversations')
@@ -84,20 +85,52 @@ const fetchConversationsWithMessages = async (startDate?: Date, endDate?: Date):
   // Order messages within conversations
   query = query.order('created_at', { referencedTable: 'messages', ascending: true });
 
-  const { data, error } = await query;
+  const { data: conversationsData, error: conversationsError } = await query;
 
-  if (error) {
-    console.error("Error fetching conversations with messages:", error);
-    throw new Error(error.message);
+  if (conversationsError) {
+    console.error("Error fetching conversations with messages:", conversationsError);
+    throw new Error(conversationsError.message);
   }
-  // Ensure messages is always an array and explicitly return empty array on error/no data
-  if (!data) {
+  if (!conversationsData) {
     return [];
   }
-  return data.map(conv => ({
-    ...conv,
-    messages: conv.messages || []
-  }));
+
+  // --- Fetch participant info to determine message sender role ---
+  const allMessageParticipantIds = conversationsData.flatMap(
+      conv => conv.messages?.map(msg => msg.sender_participant_id).filter(id => !!id) ?? []
+  );
+  const uniqueParticipantIds = [...new Set(allMessageParticipantIds)];
+
+  let participantMap = new Map<string, { customer_id: string | null }>();
+  if (uniqueParticipantIds.length > 0) {
+      const { data: participants, error: participantError } = await supabase
+          .from('conversation_participants')
+          .select('id, customer_id')
+          .in('id', uniqueParticipantIds);
+
+      if (participantError) {
+          console.error("Error fetching participants for role check:", participantError);
+          // Continue without participant info, roles might default or be incorrect
+      } else if (participants) {
+          participantMap = new Map(participants.map(p => [p.id, { customer_id: p.customer_id }]));
+      }
+  }
+  // --- End Fetch participant info ---
+
+  // Map conversations and add is_user flag to messages
+  return conversationsData.map(conv => {
+    const messagesWithRole = conv.messages?.map(msg => {
+        const participant = msg.sender_participant_id ? participantMap.get(msg.sender_participant_id) : undefined;
+        // Determine if the sender is a user (customer)
+        const is_user = !!participant?.customer_id;
+        return { ...msg, is_user };
+    }) ?? [];
+
+    return {
+        ...conv,
+        messages: messagesWithRole,
+    };
+  });
 };
 
 // Function to invoke the sentiment analysis edge function
