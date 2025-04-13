@@ -3,7 +3,13 @@
 import { serve } from "std/http/server.ts";
 import { createClient, SupabaseClient } from "@supabase/supabase-js";
 import { corsHeaders } from "../_shared/cors.ts";
-import OpenAI from "https://esm.sh/openai@4.52.7";
+import OpenAI, { ChatCompletionMessageParam } from "https://esm.sh/openai@4.52.7";
+
+// Define a simple type for history messages (matching client-side)
+type HistoryMessage = {
+  sender: 'user' | 'bot';
+  text: string;
+};
 
 // Initialize OpenAI client
 const openai = new OpenAI({
@@ -67,10 +73,20 @@ serve(async (req) => {
   }
 
   try {
-    const { query } = await req.json();
+    // Extract query and optional history from request body
+    const { query, history = [] } = await req.json() as { query: string; history?: HistoryMessage[] };
     if (!query || typeof query !== 'string') {
       throw new Error("Missing or invalid 'query' parameter in request body.");
     }
+    // Basic validation for history format if needed
+    if (!Array.isArray(history)) {
+       console.warn("Received invalid format for history, ignoring.");
+       // history = []; // Reset if invalid, already defaulted above
+    }
+
+    console.log("Received query:", query);
+    console.log("Received history length:", history.length);
+
 
     const supabaseClient = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
@@ -94,14 +110,22 @@ serve(async (req) => {
       );
     }
 
-    // 3. Construct SQL query using OpenAI
+    // 3. Construct SQL query using OpenAI, incorporating history
     const schemaString = relevantSchemaParts.map(p => `${p.table_name}(${p.column_name}) - ${p.description}`).join('\n');
+    
+    // Format history for the prompt
+    const historyString = history.map(msg => `${msg.sender === 'user' ? 'User' : 'Assistant'}: ${msg.text}`).join('\n');
+
     const sqlGenerationPrompt = `
-      Given the user query: "${query}"
-      And the following potentially relevant database schema parts (table(column) - description):
+      Conversation History:
+      ${historyString}
+
+      Current User Query: "${query}"
+
+      Potentially relevant database schema parts (table(column) - description):
       ${schemaString}
 
-      Generate a safe, read-only PostgreSQL query to answer the user's question based *only* on the provided schema parts.
+      Based on the conversation history and the current user query, generate a safe, read-only PostgreSQL query to answer the user's latest question using *only* the provided schema parts.
       - Only use the tables and columns listed above.
       - Do not use functions or procedures unless explicitly mentioned in the schema descriptions.
       - If the query cannot be answered with the given schema, respond with "QUERY_NOT_POSSIBLE".
@@ -109,11 +133,29 @@ serve(async (req) => {
     `;
 
     console.log("Sending prompt to OpenAI for SQL generation...");
+
+    // Construct the messages array for SQL generation *before* the API call
+    const sqlGenMessages: ChatCompletionMessageParam[] = [];
+    history.forEach(msg => {
+      // Map client-side 'bot' role to OpenAI 'assistant' role
+      sqlGenMessages.push({ role: msg.sender === 'user' ? 'user' : 'assistant', content: msg.text });
+    });
+    // Add the system prompt defining the task and constraints
+    sqlGenMessages.push({
+      role: 'system',
+      content: `You are a SQL generation assistant. Given potentially relevant schema and a user query (potentially referencing conversation history), generate a safe, read-only PostgreSQL query. Use only the provided schema. If impossible, respond with "QUERY_NOT_POSSIBLE". Respond ONLY with the raw SQL query.`
+    });
+    // Add the final user query along with the relevant schema context
+    sqlGenMessages.push({
+      role: 'user',
+      content: `Relevant Schema:\n${schemaString}\n\nGenerate SQL for this query: "${query}"`
+    });
+
     const sqlCompletion = await openai.chat.completions.create({
       model: "gpt-3.5-turbo", // Or a more capable model if needed
-      messages: [{ role: "user", content: sqlGenerationPrompt }],
+      messages: sqlGenMessages, // Use the constructed messages array
       temperature: 0.2, // Lower temperature for more deterministic SQL
-      max_tokens: 200,
+      max_tokens: 250, // Slightly increase tokens for potentially longer context
       stop: ["--", ";"], // Stop generation at comments or end of statement
     });
 
@@ -156,22 +198,31 @@ serve(async (req) => {
     // Check if queryResult is an array (as expected from json_agg)
     if (queryResult && Array.isArray(queryResult)) {
       if (queryResult.length > 0) {
-        // Convert the JSON result to a natural language response using OpenAI
+        // Convert the JSON result to a natural language response using OpenAI, incorporating history
         const resultString = JSON.stringify(queryResult, null, 2);
-        const summarizationPrompt = `
-          The user asked: "${query}"
-          The database query returned the following result:
-          \`\`\`json
-          ${resultString}
-          \`\`\`
-          Explain this result to the user in a concise, non-technical sentence or two, directly answering their original question. Avoid mentioning JSON or SQL.
-        `;
+        
+        // Construct messages array for summarization
+        const summaryMessages: ChatCompletionMessageParam[] = [];
+         history.forEach(msg => {
+           summaryMessages.push({ role: msg.sender === 'user' ? 'user' : 'assistant', content: msg.text });
+         });
+         // Add the latest query and the result context
+         summaryMessages.push({ role: 'user', content: query }); // Add the user's last query
+         summaryMessages.push({
+           role: 'system',
+           content: `You are an assistant explaining database query results. The user's query led to the following data. Explain this result concisely and non-technically, directly answering the user's last query based on the conversation history and the data. 
+- If the data represents a list of items (e.g., names, titles, summaries), present the key information as a bulleted list (using markdown '-' or '*').
+- Otherwise, provide a brief summary sentence.
+- Avoid mentioning JSON or SQL. 
+Data:\n\`\`\`json\n${resultString}\n\`\`\``
+         });
 
-        console.log("Sending result to OpenAI for summarization...");
+
+        console.log("Sending result to OpenAI for summarization with history and list formatting...");
         try {
           const summaryCompletion = await openai.chat.completions.create({
             model: "gpt-3.5-turbo", // Or a more capable model
-            messages: [{ role: "user", content: summarizationPrompt }],
+            messages: summaryMessages, // Use the structured history + result prompt
             temperature: 0.5,
             max_tokens: 150,
           });
