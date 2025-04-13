@@ -126,7 +126,7 @@ export function IntegrationsView({ isActive }: IntegrationsViewProps) {
           token: config?.token,
           // No longer need config_id here as access is based on integration.id
           status: item.status || 'unknown', // Keep original availability status
-          connectionStatus: (config?.status as ConnectionState) || 'unknown',
+          connectionStatus: (config?.status as ConnectionState) || 'unknown', // Using status from config, not connection_status
           integrations_config: undefined, // Remove the nested object
           type: item.type || "messenger", // Ensure there's always a type
         } as Integration & { instance_id?: string; token?: string }; // Removed config_id from type assertion
