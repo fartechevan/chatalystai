@@ -35,21 +35,25 @@ export function ChatPopup({ isOpen, onOpenChange }: ChatPopupProps) {
     const userMessage = inputValue.trim();
     if (!userMessage) return;
 
+    // Prepare the history *before* adding the new message
+    // We only need sender and text for the backend
+    const historyPayload = messages.map(({ id, ...rest }) => rest); 
+
     const newUserMessage: ChatMessage = { id: Date.now().toString(), sender: 'user', text: userMessage };
-    setMessages(prev => [...prev, newUserMessage]);
+    // Update messages state optimistically
+    const updatedMessages = [...messages, newUserMessage]; 
+    setMessages(updatedMessages); 
     setInputValue('');
     setIsLoading(true);
 
-    // --- TODO: Backend Interaction ---
-    // Here you would typically:
-    // 1. Send the userMessage to a backend function (e.g., a Supabase Edge Function).
-    // 2. The backend function would interpret the query, interact with the database 
-    //    (e.g., query conversations, messages, sentiment data based on the user's request).
-    // 3. The backend would generate a response (text, maybe structured data/chart hints).
     try {
-      // Call the backend function
+      // Call the backend function, now including history
+      console.log("Sending history:", historyPayload); // Log history being sent
       const { data, error } = await supabase.functions.invoke('query-data-with-ai', {
-        body: { query: userMessage },
+        body: { 
+          query: userMessage, 
+          history: historyPayload // Send previous messages as history
+        },
       });
 
       let botText = "Sorry, I couldn't process that request."; // Default error message
@@ -70,7 +74,8 @@ export function ChatPopup({ isOpen, onOpenChange }: ChatPopupProps) {
         sender: 'bot',
         text: botText,
       };
-      setMessages(prev => [...prev, botResponse]);
+      // Update messages state with the bot response
+      setMessages(prev => [...prev, botResponse]); 
 
     } catch (invokeError) {
       // Catch potential errors during the invoke call itself
@@ -114,7 +119,7 @@ export function ChatPopup({ isOpen, onOpenChange }: ChatPopupProps) {
                 className={`flex ${message.sender === 'user' ? 'justify-end' : 'justify-start'}`}
               >
                 <div
-                  className={`max-w-[75%] rounded-lg px-3 py-2 text-sm ${
+                  className={`max-w-[75%] rounded-lg px-3 py-2 text-sm whitespace-pre-wrap ${ // Added whitespace-pre-wrap
                     message.sender === 'user'
                       ? 'bg-primary text-primary-foreground'
                       : 'bg-muted'
