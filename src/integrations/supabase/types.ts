@@ -741,6 +741,36 @@ export type Database = {
         }
         Relationships: []
       }
+      schema_embeddings: {
+        Row: {
+          column_name: string | null
+          created_at: string | null
+          description: string
+          embedding: string | null
+          id: string
+          schema_name: string
+          table_name: string
+        }
+        Insert: {
+          column_name?: string | null
+          created_at?: string | null
+          description: string
+          embedding?: string | null
+          id?: string
+          schema_name: string
+          table_name: string
+        }
+        Update: {
+          column_name?: string | null
+          created_at?: string | null
+          description?: string
+          embedding?: string | null
+          id?: string
+          schema_name?: string
+          table_name?: string
+        }
+        Relationships: []
+      }
       tags: {
         Row: {
           created_at: string
