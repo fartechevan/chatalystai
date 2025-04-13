@@ -8,9 +8,12 @@ import { supabase } from '@/integrations/supabase/client';
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
-import { Loader2 } from 'lucide-react';
+import { Loader2, DatabaseZap } from 'lucide-react'; // Added DatabaseZap icon
 import { format, parseISO, startOfDay } from 'date-fns';
 import { TagCloud } from 'react-tagcloud'; // Import TagCloud
+import { ChatWidget } from './ChatWidget'; // Import ChatWidget
+import { ChatPopup } from './ChatPopup'; // Import ChatPopup
+import { toast } from '@/hooks/use-toast'; // Import toast
 
 // Define types
 type Message = {
@@ -120,11 +123,6 @@ const DivergentStackedBarChartComponent = ({ data }: { data: AnalyzedConversatio
    if (totalSentiments === 0 && hasAnalyzedData) {
        return <div className="text-center text-muted-foreground p-4">Analysis complete, but no sentiments detected (all unknown/failed).</div>;
    }
-   // This condition is now covered by the first one
-   // if (totalSentiments === 0 && !hasAnalyzedData && data.length > 0) {
-   //      return <div className="text-center text-muted-foreground p-4">Click "Analyze Sentiments" to process conversations.</div>;
-   // }
-
 
   return (
     <ResponsiveContainer width="100%" height={300}>
@@ -281,8 +279,11 @@ const SankeyDiagramChart = () => <div>Sankey Diagram Placeholder</div>;
 // --- Main View Component ---
 export function ConversationStatsView() {
   const [analyzedConversations, setAnalyzedConversations] = useState<AnalyzedConversation[]>([]);
-  const [isAnalyzing, setIsAnalyzing] = useState(false);
-  const [analysisError, setAnalysisError] = useState<string | null>(null);
+  const [isAnalyzing, setIsAnalyzing] = useState(false); // For sentiment analysis
+  const [analysisError, setAnalysisError] = useState<string | null>(null); // For sentiment analysis
+  const [isChatOpen, setIsChatOpen] = useState(false);
+  const [isVectorizing, setIsVectorizing] = useState(false); // State for schema vectorization
+  const [vectorizeStatus, setVectorizeStatus] = useState<string | null>(null); // Status message for vectorization
 
   const { data: initialConversationsData, isLoading: isLoadingConversations, error: fetchConversationsError } = useQuery<Conversation[]>({
     queryKey: ['conversationsWithMessages'],
@@ -317,13 +318,40 @@ export function ConversationStatsView() {
           sentimentResult: resultsMap.get(conv.conversation_id) || conv.sentimentResult,
         }));
       });
+      toast({ title: "Sentiment analysis complete." }); // Add success toast
     } catch (error) {
        console.error("Error during batch sentiment analysis:", error);
        setAnalysisError("An error occurred during the analysis process. Check console for details.");
+       toast({ title: "Sentiment analysis failed.", variant: "destructive" }); // Add error toast
     } finally {
       setIsAnalyzing(false);
     }
   }, [analyzedConversations]);
+
+  // Function to trigger schema vectorization
+  const handleVectorizeSchema = useCallback(async () => {
+    setIsVectorizing(true);
+    setVectorizeStatus("Vectorizing schema...");
+    try {
+      const { data, error } = await supabase.functions.invoke('vectorize-schema');
+
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+
+      setVectorizeStatus(data?.message || "Schema vectorization completed successfully.");
+       toast({ title: "Schema Vectorization Success", description: data?.message });
+
+    } catch (error) { // Explicitly type error as unknown or Error
+      console.error("Error vectorizing schema:", error);
+      const errorMessage = error instanceof Error ? error.message : "An unknown error occurred";
+      setVectorizeStatus(`Error: ${errorMessage}`);
+      toast({ title: "Schema Vectorization Failed", description: errorMessage, variant: "destructive" });
+    } finally {
+      setIsVectorizing(false);
+      // Optionally clear status message after a delay
+      setTimeout(() => setVectorizeStatus(null), 5000); 
+    }
+  }, []);
 
   if (isLoadingConversations) {
     return (
@@ -346,64 +374,79 @@ export function ConversationStatsView() {
   const hasAnalysisRun = analyzedConversations.some(c => c.sentimentResult !== null);
 
   return (
-    <div className="p-4 md:p-6 space-y-4">
-      <div className="flex justify-between items-center mb-4">
-         <h1 className="text-2xl font-semibold">Conversation Analysis</h1>
-         <Button onClick={handleAnalyzeSentiments} disabled={isAnalyzing || analyzedConversations.length === 0}>
-           {isAnalyzing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-           Analyze Sentiments ({analyzedConversations.filter(c => !c.sentimentResult).length} remaining)
-         </Button>
+    // Use React.Fragment to return multiple top-level elements
+    <>
+      <div className="p-4 md:p-6 space-y-4">
+        <div className="flex justify-between items-center mb-4">
+           <h1 className="text-2xl font-semibold">Conversation Analysis</h1>
+           <div className="flex items-center space-x-2"> {/* Group buttons */}
+             {/* Add Vectorize Schema Button */}
+             <Button onClick={handleVectorizeSchema} disabled={isVectorizing} variant="outline" size="sm">
+               {isVectorizing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <DatabaseZap className="mr-2 h-4 w-4" />}
+               Vectorize Schema
+             </Button>
+             <Button onClick={handleAnalyzeSentiments} disabled={isAnalyzing || analyzedConversations.length === 0}>
+               {isAnalyzing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+               Analyze Sentiments ({analyzedConversations.filter(c => !c.sentimentResult).length} remaining)
+             </Button>
+           </div>
+        </div>
+         {/* Display vectorize status */}
+         {vectorizeStatus && <p className={`text-sm ${vectorizeStatus.startsWith('Error') ? 'text-red-500' : 'text-green-600'} mt-1`}>{vectorizeStatus}</p>}
+         {analysisError && <p className="text-sm text-red-500 mt-2">{analysisError}</p>}
+
+        <Tabs defaultValue="divergent-stacked-bar">
+           <TabsList className="grid w-full grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-2 mb-4">
+             <TabsTrigger value="divergent-stacked-bar">Divergent Stacked Bar</TabsTrigger>
+             <TabsTrigger value="trend-chart" disabled={!hasAnalysisRun}>Trend Chart</TabsTrigger>
+             <TabsTrigger value="heat-map" disabled={!hasAnalysisRun}>Heat Map</TabsTrigger>
+             <TabsTrigger value="sankey-diagram" disabled={!hasAnalysisRun}>Sankey Diagram</TabsTrigger>
+             <TabsTrigger value="word-cloud" disabled={!hasAnalysisRun}>Word Cloud</TabsTrigger>
+             <TabsTrigger value="sparkline" disabled={!hasAnalysisRun}>Sparkline</TabsTrigger>
+             <TabsTrigger value="likert-scale" disabled={!hasAnalysisRun}>Likert Scale</TabsTrigger>
+           </TabsList>
+
+          <Card className="mt-4">
+            <CardHeader>
+              <CardTitle>Sentiment Analysis Report</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <TabsContent value="divergent-stacked-bar">
+                <p className="text-sm text-muted-foreground mb-4">Best Use Case: Overall sentiment distribution. Advantages: Easy comparison across sentiment categories.</p>
+                <DivergentStackedBarChartComponent data={analyzedConversations} />
+              </TabsContent>
+              <TabsContent value="trend-chart">
+                <p className="text-sm text-muted-foreground mb-4">Best Use Case: Sentiment changes over time. Advantages: Combines trends and distributions.</p>
+                <TrendChartComponent data={analyzedConversations} />
+              </TabsContent>
+              <TabsContent value="heat-map">
+                <p className="text-sm text-muted-foreground mb-4">Best Use Case: Sentiment intensity by category/timeframe. Advantages: Quick identification of hotspots.</p>
+                <HeatMapChartComponent data={analyzedConversations} />
+              </TabsContent>
+              <TabsContent value="sankey-diagram">
+                <p className="text-sm text-muted-foreground mb-4">Best Use Case: Flow between sentiment levels and categories. Advantages: Shows relationships effectively.</p>
+                <SankeyDiagramChart />
+              </TabsContent>
+              <TabsContent value="word-cloud">
+                <p className="text-sm text-muted-foreground mb-4">Best Use Case: Frequent terms in feedback. Advantages: Simple and visually appealing.</p>
+                <WordCloudComponent data={analyzedConversations} />
+              </TabsContent>
+              <TabsContent value="sparkline">
+                <p className="text-sm text-muted-foreground mb-4">Best Use Case: Quick overview of sentiment fluctuations (e.g., 'Good' sentiment trend). Advantages: Compact and insightful.</p>
+                <SparklineChartComponent data={analyzedConversations} />
+              </TabsContent>
+              <TabsContent value="likert-scale">
+                <p className="text-sm text-muted-foreground mb-4">Best Use Case: Displaying distribution similar to survey responses. Advantages: Standardized representation.</p>
+                <LikertScaleChartComponent data={analyzedConversations} />
+              </TabsContent>
+            </CardContent>
+          </Card>
+        </Tabs>
       </div>
 
-       {analysisError && <p className="text-sm text-red-500 mt-2">{analysisError}</p>}
-
-      <Tabs defaultValue="divergent-stacked-bar">
-         <TabsList className="grid w-full grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-2 mb-4">
-           <TabsTrigger value="divergent-stacked-bar">Divergent Stacked Bar</TabsTrigger>
-           <TabsTrigger value="trend-chart" disabled={!hasAnalysisRun}>Trend Chart</TabsTrigger>
-           <TabsTrigger value="heat-map" disabled={!hasAnalysisRun}>Heat Map</TabsTrigger>
-           <TabsTrigger value="sankey-diagram" disabled={!hasAnalysisRun}>Sankey Diagram</TabsTrigger>
-           <TabsTrigger value="word-cloud" disabled={!hasAnalysisRun}>Word Cloud</TabsTrigger>
-           <TabsTrigger value="sparkline" disabled={!hasAnalysisRun}>Sparkline</TabsTrigger>
-           <TabsTrigger value="likert-scale" disabled={!hasAnalysisRun}>Likert Scale</TabsTrigger>
-         </TabsList>
-
-        <Card className="mt-4">
-          <CardHeader>
-            <CardTitle>Sentiment Analysis Report</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <TabsContent value="divergent-stacked-bar">
-              <p className="text-sm text-muted-foreground mb-4">Best Use Case: Overall sentiment distribution. Advantages: Easy comparison across sentiment categories.</p>
-              <DivergentStackedBarChartComponent data={analyzedConversations} />
-            </TabsContent>
-            <TabsContent value="trend-chart">
-              <p className="text-sm text-muted-foreground mb-4">Best Use Case: Sentiment changes over time. Advantages: Combines trends and distributions.</p>
-              <TrendChartComponent data={analyzedConversations} />
-            </TabsContent>
-            <TabsContent value="heat-map">
-              <p className="text-sm text-muted-foreground mb-4">Best Use Case: Sentiment intensity by category/timeframe. Advantages: Quick identification of hotspots.</p>
-              <HeatMapChartComponent data={analyzedConversations} />
-            </TabsContent>
-            <TabsContent value="sankey-diagram">
-              <p className="text-sm text-muted-foreground mb-4">Best Use Case: Flow between sentiment levels and categories. Advantages: Shows relationships effectively.</p>
-              <SankeyDiagramChart />
-            </TabsContent>
-            <TabsContent value="word-cloud">
-              <p className="text-sm text-muted-foreground mb-4">Best Use Case: Frequent terms in feedback. Advantages: Simple and visually appealing.</p>
-              <WordCloudComponent data={analyzedConversations} />
-            </TabsContent>
-            <TabsContent value="sparkline">
-              <p className="text-sm text-muted-foreground mb-4">Best Use Case: Quick overview of sentiment fluctuations (e.g., 'Good' sentiment trend). Advantages: Compact and insightful.</p>
-              <SparklineChartComponent data={analyzedConversations} />
-            </TabsContent>
-            <TabsContent value="likert-scale">
-              <p className="text-sm text-muted-foreground mb-4">Best Use Case: Displaying distribution similar to survey responses. Advantages: Standardized representation.</p>
-              <LikertScaleChartComponent data={analyzedConversations} />
-            </TabsContent>
-          </CardContent>
-        </Card>
-      </Tabs>
-    </div>
+      {/* Add Chat Widget and Popup */}
+      <ChatWidget onClick={() => setIsChatOpen(true)} />
+      <ChatPopup isOpen={isChatOpen} onOpenChange={setIsChatOpen} />
+    </>
   );
 }
