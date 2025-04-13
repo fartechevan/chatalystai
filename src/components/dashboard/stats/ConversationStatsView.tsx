@@ -6,17 +6,33 @@ import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 // Import LineChart components from recharts
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
+// Removed duplicate React import line
+// Removed duplicate Tabs import line
+// Removed duplicate Card import line
+// Removed duplicate useQuery import line
+// Removed duplicate supabase import line
+// Removed duplicate recharts import line
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
-import { Loader2, DatabaseZap } from 'lucide-react'; // Added DatabaseZap icon
-import { format, parseISO, startOfDay } from 'date-fns';
+import { Loader2, DatabaseZap, Calendar as CalendarIcon } from 'lucide-react'; // Added DatabaseZap icon and CalendarIcon
+import { format, parseISO, startOfDay, subDays } from 'date-fns'; // Added subDays
+import { DateRange } from "react-day-picker"; // Added DateRange
 import { TagCloud } from 'react-tagcloud'; // Import TagCloud
+import { cn } from "@/lib/utils"; // Import cn utility
+import { Calendar } from "@/components/ui/calendar"; // Import Calendar
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover"; // Import Popover components
+// Removed incorrect DateRangeFilter import
+import { SelectedConversationsList } from './SelectedConversationsList'; // Import the new list component
 import { ChatWidget } from './ChatWidget'; // Import ChatWidget
 import { ChatPopup } from './ChatPopup'; // Import ChatPopup
 import { toast } from '@/hooks/use-toast'; // Import toast
 
-// Define types
-type Message = {
+// Define types - Exported Message
+export type Message = {
   content: string | null;
   created_at: string;
   sender_participant_id: string | null;
@@ -35,14 +51,14 @@ type SentimentResult = {
   description?: string;
 };
 
-// Combined type for easier state management
-type AnalyzedConversation = Conversation & {
+// Combined type for easier state management - Exported
+export type AnalyzedConversation = Conversation & {
   sentimentResult: SentimentResult | null;
 };
 
-// Fetch function for conversations and their messages
-const fetchConversationsWithMessages = async (): Promise<Conversation[]> => {
-  const { data, error } = await supabase
+// Fetch function for conversations and their messages with date filtering
+const fetchConversationsWithMessages = async (startDate?: Date, endDate?: Date): Promise<Conversation[]> => {
+  let query = supabase
     .from('conversations')
     .select(`
       conversation_id,
@@ -52,8 +68,23 @@ const fetchConversationsWithMessages = async (): Promise<Conversation[]> => {
         created_at,
         sender_participant_id
       )
-    `)
-    .order('created_at', { referencedTable: 'messages', ascending: true });
+    `);
+
+  // Apply date filters if provided
+  if (startDate) {
+    query = query.gte('created_at', startDate.toISOString());
+  }
+  if (endDate) {
+    // Add 1 day to endDate to include the entire day
+    const inclusiveEndDate = new Date(endDate);
+    inclusiveEndDate.setDate(inclusiveEndDate.getDate() + 1);
+    query = query.lte('created_at', inclusiveEndDate.toISOString());
+  }
+
+  // Order messages within conversations
+  query = query.order('created_at', { referencedTable: 'messages', ascending: true });
+
+  const { data, error } = await query;
 
   if (error) {
     console.error("Error fetching conversations with messages:", error);
@@ -96,7 +127,12 @@ const analyzeSentimentForConversation = async (conversationId: string): Promise<
 };
 
 // --- Divergent Stacked Bar Chart Component ---
-const DivergentStackedBarChartComponent = ({ data }: { data: AnalyzedConversation[] }) => {
+interface DivergentStackedBarChartProps {
+  data: AnalyzedConversation[];
+  onBarClick?: (sentiment: 'good' | 'moderate' | 'bad' | 'unknown') => void; // Add click handler prop
+}
+
+const DivergentStackedBarChartComponent = ({ data, onBarClick }: DivergentStackedBarChartProps) => {
   const sentimentCounts = data.reduce((acc, curr) => {
     const sentiment = curr.sentimentResult?.sentiment || 'unknown';
     acc[sentiment] = (acc[sentiment] || 0) + 1;
@@ -132,46 +168,12 @@ const DivergentStackedBarChartComponent = ({ data }: { data: AnalyzedConversatio
         <YAxis type="category" dataKey="name" />
         <Tooltip />
         <Legend />
-        <Bar dataKey="good" stackId="a" fill="#22c55e" name="Good" />
-        <Bar dataKey="moderate" stackId="a" fill="#facc15" name="Moderate" />
-        <Bar dataKey="bad" stackId="a" fill="#ef4444" name="Bad" />
-        <Bar dataKey="unknown" stackId="a" fill="#a1a1aa" name="Unknown/Not Analyzed" />
+        {/* Add onClick handlers to bars */}
+        <Bar dataKey="good" stackId="a" fill="#22c55e" name="Good" onClick={() => onBarClick?.('good')} style={{ cursor: onBarClick ? 'pointer' : 'default' }} />
+        <Bar dataKey="moderate" stackId="a" fill="#facc15" name="Moderate" onClick={() => onBarClick?.('moderate')} style={{ cursor: onBarClick ? 'pointer' : 'default' }} />
+        <Bar dataKey="bad" stackId="a" fill="#ef4444" name="Bad" onClick={() => onBarClick?.('bad')} style={{ cursor: onBarClick ? 'pointer' : 'default' }} />
+        <Bar dataKey="unknown" stackId="a" fill="#a1a1aa" name="Unknown/Not Analyzed" onClick={() => onBarClick?.('unknown')} style={{ cursor: onBarClick ? 'pointer' : 'default' }} />
       </BarChart>
-    </ResponsiveContainer>
-  );
-};
-
-// --- Trend Chart Component ---
-const TrendChartComponent = ({ data }: { data: AnalyzedConversation[] }) => {
-  const sentimentsByDate = data.reduce((acc, curr) => {
-    if (!curr.sentimentResult) return acc;
-    const date = format(startOfDay(parseISO(curr.created_at)), 'yyyy-MM-dd');
-    if (!acc[date]) {
-      acc[date] = { date, good: 0, moderate: 0, bad: 0, unknown: 0 };
-    }
-    acc[date][curr.sentimentResult.sentiment]++;
-    return acc;
-  }, {} as Record<string, { date: string; good: number; moderate: number; bad: number; unknown: number }>);
-
-  const chartData = Object.values(sentimentsByDate).sort((a, b) => a.date.localeCompare(b.date));
-
-  if (chartData.length === 0) {
-    return <div className="text-center text-muted-foreground p-4">Not enough analyzed data to show trend.</div>;
-  }
-
-  return (
-    <ResponsiveContainer width="100%" height={300}>
-      <LineChart data={chartData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
-        <CartesianGrid strokeDasharray="3 3" />
-        <XAxis dataKey="date" />
-        <YAxis allowDecimals={false} />
-        <Tooltip />
-        <Legend />
-        <Line type="monotone" dataKey="good" stroke="#22c55e" name="Good" />
-        <Line type="monotone" dataKey="moderate" stroke="#facc15" name="Moderate" />
-        <Line type="monotone" dataKey="bad" stroke="#ef4444" name="Bad" />
-        <Line type="monotone" dataKey="unknown" stroke="#a1a1aa" name="Unknown" />
-      </LineChart>
     </ResponsiveContainer>
   );
 };
@@ -211,9 +213,6 @@ const HeatMapChartComponent = ({ data }: { data: AnalyzedConversation[] }) => {
   );
 };
 
-// --- Likert Scale Component (Reusing Divergent Stacked Bar Logic) ---
-const LikertScaleChartComponent = DivergentStackedBarChartComponent;
-
 // --- Word Cloud Component ---
 const WordCloudComponent = ({ data }: { data: AnalyzedConversation[] }) => {
   const stopWords = new Set(['a', 'an', 'the', 'is', 'in', 'it', 'of', 'to', 'for', 'on', 'with', 'as', 'by', 'at', 'this', 'that', 'and', 'or', 'but', 'if', 'you', 'me', 'my', 'i', 'he', 'she', 'we', 'they', 'are', 'was', 'were', 'be', 'been', 'have', 'has', 'had', 'do', 'does', 'did', 'will', 'would', 'should', 'can', 'could', 'not', 'no', 'so', 'up', 'out', 'go', 'get', 'ok', 'okay', 'hi', 'hello', 'thanks', 'thank']);
@@ -243,39 +242,6 @@ const WordCloudComponent = ({ data }: { data: AnalyzedConversation[] }) => {
   );
 };
 
-// --- Sparkline Chart Component ---
-const SparklineChartComponent = ({ data }: { data: AnalyzedConversation[] }) => {
-   const sentimentsByDate = data.reduce((acc, curr) => {
-    if (!curr.sentimentResult) return acc;
-    const date = format(startOfDay(parseISO(curr.created_at)), 'yyyy-MM-dd');
-    if (!acc[date]) {
-      acc[date] = { date, good: 0, moderate: 0, bad: 0 };
-    }
-    if (['good', 'moderate', 'bad'].includes(curr.sentimentResult.sentiment)) {
-       acc[date][curr.sentimentResult.sentiment]++;
-    }
-    return acc;
-  }, {} as Record<string, { date: string; good: number; moderate: number; bad: number;}>);
-
-  const chartData = Object.values(sentimentsByDate).sort((a, b) => a.date.localeCompare(b.date));
-
-  if (chartData.length < 2) {
-    return <div className="text-center text-muted-foreground p-4">Not enough data points for sparkline.</div>;
-  }
-
-  return (
-    <ResponsiveContainer width="100%" height={100}>
-      <LineChart data={chartData} margin={{ top: 5, right: 5, left: 5, bottom: 5 }}>
-         <Tooltip contentStyle={{ fontSize: '10px', padding: '2px 5px' }} labelFormatter={(label) => `Date: ${label}`} />
-        <Line type="monotone" dataKey="good" stroke="#22c55e" dot={false} strokeWidth={2} name="Good Sentiments" />
-      </LineChart>
-    </ResponsiveContainer>
-  );
-};
-
-// --- Placeholder components for remaining charts ---
-const SankeyDiagramChart = () => <div>Sankey Diagram Placeholder</div>;
-
 // --- Main View Component ---
 export function ConversationStatsView() {
   const [analyzedConversations, setAnalyzedConversations] = useState<AnalyzedConversation[]>([]);
@@ -284,19 +250,45 @@ export function ConversationStatsView() {
   const [isChatOpen, setIsChatOpen] = useState(false);
   const [isVectorizing, setIsVectorizing] = useState(false); // State for schema vectorization
   const [vectorizeStatus, setVectorizeStatus] = useState<string | null>(null); // Status message for vectorization
+  const [dateRange, setDateRange] = useState<DateRange | undefined>({
+    from: subDays(new Date(), 29), // Default to last 30 days
+    to: new Date(),
+  });
+  // State for selected sentiment and filtered conversations
+  const [selectedSentiment, setSelectedSentiment] = useState<'good' | 'moderate' | 'bad' | 'unknown' | null>(null);
+  const [filteredSentimentConversations, setFilteredSentimentConversations] = useState<AnalyzedConversation[]>([]);
+
 
   const { data: initialConversationsData, isLoading: isLoadingConversations, error: fetchConversationsError } = useQuery<Conversation[]>({
-    queryKey: ['conversationsWithMessages'],
-    queryFn: fetchConversationsWithMessages,
+    // Include dateRange in queryKey to refetch when it changes
+    queryKey: ['conversationsWithMessages', dateRange?.from, dateRange?.to],
+    queryFn: () => fetchConversationsWithMessages(dateRange?.from, dateRange?.to),
+    enabled: !!dateRange?.from && !!dateRange?.to, // Only run query if dates are set
   });
 
   useEffect(() => {
     if (initialConversationsData) {
       setAnalyzedConversations(initialConversationsData.map(conv => ({ ...conv, sentimentResult: null })));
     }
+    // Reset selection when data reloads
+    setSelectedSentiment(null);
+    setFilteredSentimentConversations([]);
   }, [initialConversationsData]);
 
+  // Handler for clicking a bar segment
+  const handleSentimentClick = useCallback((sentiment: 'good' | 'moderate' | 'bad' | 'unknown') => {
+    setSelectedSentiment(sentiment);
+    const filtered = analyzedConversations.filter(
+      conv => conv.sentimentResult?.sentiment === sentiment
+    );
+    setFilteredSentimentConversations(filtered);
+  }, [analyzedConversations]);
+
   const handleAnalyzeSentiments = useCallback(async () => {
+    // Reset selection before analysis
+    setSelectedSentiment(null);
+    setFilteredSentimentConversations([]);
+
     const conversationsToAnalyze = analyzedConversations.filter(c => !c.sentimentResult);
     if (!conversationsToAnalyze || conversationsToAnalyze.length === 0) {
       setAnalysisError("No conversations need analysis or data hasn't loaded.");
@@ -376,18 +368,22 @@ export function ConversationStatsView() {
   return (
     // Use React.Fragment to return multiple top-level elements
     <>
-      <div className="p-4 md:p-6 space-y-4">
-        <div className="flex justify-between items-center mb-4">
-           <h1 className="text-2xl font-semibold">Conversation Analysis</h1>
-           <div className="flex items-center space-x-2"> {/* Group buttons */}
+      {/* Adjust main layout to grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 p-4 md:p-6">
+        {/* Left Column: Filters and Charts */}
+        <div className="lg:col-span-2 space-y-4">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-4">
+             <h1 className="text-2xl font-semibold">Conversation Analysis</h1>
+             <div className="flex items-center space-x-2 flex-wrap"> {/* Group buttons */}
              {/* Add Vectorize Schema Button */}
              <Button onClick={handleVectorizeSchema} disabled={isVectorizing} variant="outline" size="sm">
                {isVectorizing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <DatabaseZap className="mr-2 h-4 w-4" />}
                Vectorize Schema
              </Button>
-             <Button onClick={handleAnalyzeSentiments} disabled={isAnalyzing || analyzedConversations.length === 0}>
+             {/* Updated button label calculation */}
+             <Button onClick={handleAnalyzeSentiments} disabled={isAnalyzing || analyzedConversations.filter(c => !c.sentimentResult).length === 0}>
                {isAnalyzing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-               Analyze Sentiments ({analyzedConversations.filter(c => !c.sentimentResult).length} remaining)
+               Analyze Sentiments ({analyzedConversations.filter(c => !c.sentimentResult).length} needing analysis)
              </Button>
            </div>
         </div>
@@ -395,15 +391,52 @@ export function ConversationStatsView() {
          {vectorizeStatus && <p className={`text-sm ${vectorizeStatus.startsWith('Error') ? 'text-red-500' : 'text-green-600'} mt-1`}>{vectorizeStatus}</p>}
          {analysisError && <p className="text-sm text-red-500 mt-2">{analysisError}</p>}
 
+           {/* Add Calendar Date Range Picker */}
+           <div className={cn("grid gap-2")}> {/* Removed mb-4 */}
+             <Popover>
+               <PopoverTrigger asChild>
+               <Button
+                 id="date"
+                 variant={"outline"}
+                 className={cn(
+                   "w-[300px] justify-start text-left font-normal",
+                   !dateRange && "text-muted-foreground"
+                 )}
+               >
+                 <CalendarIcon className="mr-2 h-4 w-4" />
+                 {dateRange?.from ? (
+                   dateRange.to ? (
+                     <>
+                       {format(dateRange.from, "LLL dd, y")} -{" "}
+                       {format(dateRange.to, "LLL dd, y")}
+                     </>
+                   ) : (
+                     format(dateRange.from, "LLL dd, y")
+                   )
+                 ) : (
+                   <span>Pick a date range</span>
+                 )}
+               </Button>
+             </PopoverTrigger>
+             <PopoverContent className="w-auto p-0" align="start">
+               <Calendar
+                 initialFocus
+                 mode="range"
+                 defaultMonth={dateRange?.from}
+                 selected={dateRange}
+                 onSelect={setDateRange}
+                 numberOfMonths={2}
+               />
+             </PopoverContent>
+           </Popover>
+         </div>
+
         <Tabs defaultValue="divergent-stacked-bar">
-           <TabsList className="grid w-full grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-2 mb-4">
-             <TabsTrigger value="divergent-stacked-bar">Divergent Stacked Bar</TabsTrigger>
-             <TabsTrigger value="trend-chart" disabled={!hasAnalysisRun}>Trend Chart</TabsTrigger>
+           {/* Adjusted grid columns back after removing tab */}
+           <TabsList className="grid w-full grid-cols-2 md:grid-cols-3 gap-2 mb-4">
+             <TabsTrigger value="divergent-stacked-bar">Sentiment Distribution</TabsTrigger> {/* Renamed for clarity */}
              <TabsTrigger value="heat-map" disabled={!hasAnalysisRun}>Heat Map</TabsTrigger>
-             <TabsTrigger value="sankey-diagram" disabled={!hasAnalysisRun}>Sankey Diagram</TabsTrigger>
              <TabsTrigger value="word-cloud" disabled={!hasAnalysisRun}>Word Cloud</TabsTrigger>
-             <TabsTrigger value="sparkline" disabled={!hasAnalysisRun}>Sparkline</TabsTrigger>
-             <TabsTrigger value="likert-scale" disabled={!hasAnalysisRun}>Likert Scale</TabsTrigger>
            </TabsList>
 
           <Card className="mt-4">
@@ -412,39 +445,81 @@ export function ConversationStatsView() {
             </CardHeader>
             <CardContent>
               <TabsContent value="divergent-stacked-bar">
-                <p className="text-sm text-muted-foreground mb-4">Best Use Case: Overall sentiment distribution. Advantages: Easy comparison across sentiment categories.</p>
-                <DivergentStackedBarChartComponent data={analyzedConversations} />
+                {/* Updated description */}
+                <p className="text-sm text-muted-foreground mb-4">Shows the sentiment distribution for conversations within the selected date range. Click a bar segment to see corresponding conversations.</p>
+                {/* Pass click handler */}
+                <DivergentStackedBarChartComponent data={analyzedConversations} onBarClick={handleSentimentClick} />
               </TabsContent>
-              <TabsContent value="trend-chart">
-                <p className="text-sm text-muted-foreground mb-4">Best Use Case: Sentiment changes over time. Advantages: Combines trends and distributions.</p>
-                <TrendChartComponent data={analyzedConversations} />
-              </TabsContent>
+              {/* Removed Filtered Sentiment Bar Tab Content */}
+              {/* Removed Trend Chart TabsContent */}
               <TabsContent value="heat-map">
                 <p className="text-sm text-muted-foreground mb-4">Best Use Case: Sentiment intensity by category/timeframe. Advantages: Quick identification of hotspots.</p>
                 <HeatMapChartComponent data={analyzedConversations} />
               </TabsContent>
-              <TabsContent value="sankey-diagram">
-                <p className="text-sm text-muted-foreground mb-4">Best Use Case: Flow between sentiment levels and categories. Advantages: Shows relationships effectively.</p>
-                <SankeyDiagramChart />
-              </TabsContent>
+              {/* Removed Sankey Diagram TabsContent */}
               <TabsContent value="word-cloud">
                 <p className="text-sm text-muted-foreground mb-4">Best Use Case: Frequent terms in feedback. Advantages: Simple and visually appealing.</p>
                 <WordCloudComponent data={analyzedConversations} />
               </TabsContent>
-              <TabsContent value="sparkline">
-                <p className="text-sm text-muted-foreground mb-4">Best Use Case: Quick overview of sentiment fluctuations (e.g., 'Good' sentiment trend). Advantages: Compact and insightful.</p>
-                <SparklineChartComponent data={analyzedConversations} />
-              </TabsContent>
-              <TabsContent value="likert-scale">
-                <p className="text-sm text-muted-foreground mb-4">Best Use Case: Displaying distribution similar to survey responses. Advantages: Standardized representation.</p>
-                <LikertScaleChartComponent data={analyzedConversations} />
-              </TabsContent>
+              {/* Removed Sparkline and Likert Scale TabsContent */}
             </CardContent>
           </Card>
         </Tabs>
-      </div>
 
-      {/* Add Chat Widget and Popup */}
+        {/* --- Summary Section --- */}
+        {hasAnalysisRun && (
+           <Card className="mt-6">
+             <CardHeader>
+               <CardTitle>Sentiment Summary (Selected Range)</CardTitle>
+             </CardHeader>
+             <CardContent>
+               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+                 <div>
+                   <p className="text-2xl font-bold text-green-500">{analyzedConversations.filter(c => c.sentimentResult?.sentiment === 'good').length}</p>
+                   <p className="text-sm text-muted-foreground">Good</p>
+                 </div>
+                 <div>
+                   <p className="text-2xl font-bold text-yellow-500">{analyzedConversations.filter(c => c.sentimentResult?.sentiment === 'moderate').length}</p>
+                   <p className="text-sm text-muted-foreground">Moderate</p>
+                 </div>
+                 <div>
+                   <p className="text-2xl font-bold text-red-500">{analyzedConversations.filter(c => c.sentimentResult?.sentiment === 'bad').length}</p>
+                   <p className="text-sm text-muted-foreground">Bad</p>
+                 </div>
+                 <div>
+                   <p className="text-2xl font-bold text-gray-500">{analyzedConversations.filter(c => c.sentimentResult?.sentiment === 'unknown').length}</p>
+                   <p className="text-sm text-muted-foreground">Unknown</p>
+                 </div>
+               </div>
+             </CardContent>
+           </Card>
+        )}
+        {/* --- End Summary Section --- */}
+
+       </div> {/* End Left Column */}
+
+        {/* Right Column: Selected Conversations List */}
+        <div className="lg:col-span-1">
+          {/* Placeholder for the conversation list - to be implemented next */}
+          {selectedSentiment && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="capitalize flex justify-between items-center">
+                  {selectedSentiment} Conversations ({filteredSentimentConversations.length})
+                  <Button variant="ghost" size="sm" onClick={() => setSelectedSentiment(null)}>X</Button>
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {/* Replace placeholder with the actual list component */}
+                <SelectedConversationsList conversations={filteredSentimentConversations} />
+              </CardContent>
+            </Card>
+          )}
+        </div> {/* End Right Column */}
+      </div> {/* End Main Grid */}
+
+
+      {/* Add Chat Widget and Popup (Keep outside the main grid) */}
       <ChatWidget onClick={() => setIsChatOpen(true)} />
       <ChatPopup isOpen={isChatOpen} onOpenChange={setIsChatOpen} />
     </>
