@@ -91,14 +91,18 @@ serve(async (req) => {
          role: 'user', // Default role if participants can't be determined
          content: msg.content || '',
        }));
-    }
+     }
+
+    // --- Concatenate messages into a single string ---
+    const fullConversationText = formattedMessages.map(msg => `${msg.role}: ${msg.content}`).join('\n');
+    // --- End Concatenation ---
 
     const apiKey = Deno.env.get('OPENAI_API_KEY');
     if (!apiKey) {
       throw new Error('OPENAI_API_KEY environment variable is not set.');
     }
 
-    // Analyze sentiment with OpenAI
+    // Analyze sentiment with OpenAI using the concatenated text
     const openAIResponse = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -110,12 +114,16 @@ serve(async (req) => {
         messages: [
           {
             role: 'system',
-            content: 'Analyze the following conversation messages and determine the overall sentiment. Respond ONLY with a JSON object containing: "sentiment" (string: "bad", "moderate", or "good") and "description" (string: a brief explanation for the sentiment, focusing on the effectiveness of the interaction in helping the customer). Example: {"sentiment": "good", "description": "The assistant effectively resolved the user\'s issue."}'
-          },
-          ...formattedMessages // Use the correctly formatted messages
-        ],
-        response_format: { type: "json_object" }, // Ensure OpenAI returns JSON
-      }),
+             content: 'Analyze the following conversation transcript and determine the overall sentiment. Respond ONLY with a JSON object containing: "sentiment" (string: "bad", "moderate", or "good") and "description" (string: a brief explanation for the sentiment, focusing on the effectiveness of the interaction in helping the customer). Example: {"sentiment": "good", "description": "The assistant effectively resolved the user\'s issue."}'
+           },
+           // Send the full conversation text as a single user message
+           {
+             role: 'user',
+             content: fullConversationText
+           }
+         ],
+         response_format: { type: "json_object" }, // Ensure OpenAI returns JSON
+       }),
     })
 
     if (!openAIResponse.ok) {

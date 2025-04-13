@@ -7,7 +7,7 @@ import { DashboardStats } from "@/components/dashboard/DashboardStats";
 import { DashboardFilters } from "@/components/dashboard/DashboardFilters";
 
 export default function Main() {
-  const [timeFilter, setTimeFilter] = useState<'today' | 'yesterday' | 'week' | 'month'>('today');
+  const [timeFilter, setTimeFilter] = useState<'today' | 'yesterday' | 'week' | 'month'>('month'); // Default to 'month'
   const [userFilter, setUserFilter] = useState<string>('all');
   
   // Fetch user data
@@ -98,7 +98,7 @@ export default function Main() {
   const { data: messages = [], isLoading: isMessagesLoading } = useQuery({
     queryKey: ["messages", timeFilter, userFilter],
     queryFn: async () => {
-      let query = supabase
+      const query = supabase // Changed to const
         .from("messages")
         .select("*")
         .gte("created_at", startDate.toISOString())
