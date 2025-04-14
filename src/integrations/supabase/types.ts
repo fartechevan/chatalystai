@@ -274,7 +274,6 @@ export type Database = {
           icon_url: string | null
           id: string
           is_connected: boolean | null
-          metadata: Json | null
           name: string
           status: Database["public"]["Enums"]["integration_status"]
           updated_at: string | null
@@ -287,7 +286,6 @@ export type Database = {
           icon_url?: string | null
           id?: string
           is_connected?: boolean | null
-          metadata?: Json | null
           name: string
           status?: Database["public"]["Enums"]["integration_status"]
           updated_at?: string | null
@@ -300,7 +298,6 @@ export type Database = {
           icon_url?: string | null
           id?: string
           is_connected?: boolean | null
-          metadata?: Json | null
           name?: string
           status?: Database["public"]["Enums"]["integration_status"]
           updated_at?: string | null
@@ -319,6 +316,8 @@ export type Database = {
           token: string | null
           updated_at: string
           user_reference_id: string | null
+          webhook_events: string[] | null
+          webhook_url: string | null
         }
         Insert: {
           created_at?: string
@@ -331,6 +330,8 @@ export type Database = {
           token?: string | null
           updated_at?: string
           user_reference_id?: string | null
+          webhook_events?: string[] | null
+          webhook_url?: string | null
         }
         Update: {
           created_at?: string
@@ -343,6 +344,8 @@ export type Database = {
           token?: string | null
           updated_at?: string
           user_reference_id?: string | null
+          webhook_events?: string[] | null
+          webhook_url?: string | null
         }
         Relationships: [
           {
@@ -917,6 +920,10 @@ export type Database = {
         Args: { "": string } | { "": unknown }
         Returns: unknown
       }
+      execute_dynamic_sql: {
+        Args: { sql_query: string }
+        Returns: Json
+      }
       get_current_month: {
         Args: Record<PropertyKey, never>
         Returns: {
@@ -1011,6 +1018,21 @@ export type Database = {
         Returns: {
           id: string
           content: string
+          similarity: number
+        }[]
+      }
+      match_schema_embeddings: {
+        Args: {
+          query_embedding: string
+          match_threshold: number
+          match_count: number
+        }
+        Returns: {
+          id: string
+          schema_name: string
+          table_name: string
+          column_name: string
+          description: string
           similarity: number
         }[]
       }

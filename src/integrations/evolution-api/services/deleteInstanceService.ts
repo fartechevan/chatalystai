@@ -31,7 +31,7 @@ export async function deleteEvolutionInstance(instanceId: string, integrationId:
     await apiServiceInstance.request<unknown>(deleteUrl, { // Use unknown as response type might vary
       method: 'DELETE',
       headers: {
-        'apikey': apiKey,
+        'Authorization': `Bearer ${apiKey}`, // Use standard Authorization header
         'Content-Type': 'application/json',
       },
     });
