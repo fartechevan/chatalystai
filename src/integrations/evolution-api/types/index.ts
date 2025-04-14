@@ -15,21 +15,55 @@ export interface EvolutionApiConfig {
   instance_display_name?: string; // Added field for stored display name
 }
 
-// Define the structure for an Evolution API instance
-// Based on typical response from /instance/fetchInstances
+// Define the structure for the Setting object nested within EvolutionInstance
+interface EvolutionInstanceSetting {
+  id?: string;
+  rejectCall?: boolean;
+  msgCall?: string;
+  groupsIgnore?: boolean;
+  alwaysOnline?: boolean;
+  readMessages?: boolean;
+  readStatus?: boolean;
+  syncFullHistory?: boolean;
+  wavoipToken?: string;
+  createdAt?: string; // Assuming ISO date string
+  updatedAt?: string; // Assuming ISO date string
+  instanceId?: string;
+}
+
+// Define the structure for the _count object nested within EvolutionInstance
+interface EvolutionInstanceCount {
+  Message?: number;
+  Contact?: number;
+  Chat?: number;
+}
+
+// Define the structure for an Evolution API instance based on the provided API response
 export interface EvolutionInstance {
-  instance: {
-    instanceName: string;
-    status: 'open' | 'connecting' | 'close' | 'qrcode' | 'syncing'; // Common statuses
-    owner?: string; // Typically the phone number
-    ownerJid?: string; // Added ownerJid based on API response and usage
-    instanceId?: string; // Added instanceId based on API response and usage
-    profileName?: string;
-    profilePictureUrl?: string;
-    // Add other relevant fields as needed based on actual API response
-  };
-  // Include other top-level properties if the API returns them
-  // e.g., apiKey, version, etc. if they are part of the array elements
+  id?: string;
+  name?: string;
+  connectionStatus?: 'connecting' | 'open' | 'close' | 'qrcode' | 'syncing' | string; // Allow known statuses + string
+  ownerJid?: string | null;
+  profileName?: string | null;
+  profilePicUrl?: string | null;
+  integration?: string; // e.g., "WHATSAPP-BAILEYS"
+  number?: string | null;
+  businessId?: string | null;
+  token?: string;
+  clientName?: string;
+  disconnectionReasonCode?: string | null;
+  disconnectionObject?: any | null; // Type unknown
+  disconnectionAt?: string | null; // Assuming ISO date string
+  createdAt?: string; // Assuming ISO date string
+  updatedAt?: string; // Assuming ISO date string
+  Chatwoot?: any | null; // Type unknown
+  Proxy?: any | null; // Type unknown
+  Rabbitmq?: any | null; // Type unknown
+  Sqs?: any | null; // Type unknown
+  Websocket?: any | null; // Type unknown
+  Setting?: EvolutionInstanceSetting | null;
+  _count?: EvolutionInstanceCount | null;
+  // Removed the incorrect nested 'instance' object
 }
 
 // Interface for the response from the /instance/connect endpoint

@@ -21,14 +21,17 @@ export function useEvolutionApiConnection(selectedIntegration: Integration | nul
   const { config, isLoading: configLoading } = useEvolutionApiConfig(selectedIntegration);
 
   const checkCurrentConnectionState = useCallback(async () => {
-    const instanceIdToCheck = config?.instance_id;
+    // Use instance_display_name instead of instance_id
+    const instanceNameToCheck = config?.instance_display_name;
     const baseUrlToCheck = config?.base_url;
     const tokenToUse = config?.token;
 
-    if (instanceIdToCheck && tokenToUse && baseUrlToCheck) {
-      console.log(`Checking status for configured instance: ${instanceIdToCheck}`);
+    // Check if we have the necessary config values
+    if (instanceNameToCheck && tokenToUse && baseUrlToCheck) {
+      console.log(`Checking status for configured instance: ${instanceNameToCheck}`); // Log display name
       try {
-        const currentState = await checkInstanceStatus(instanceIdToCheck, tokenToUse, baseUrlToCheck);
+        // Call checkInstanceStatus with instanceName (display name)
+        const currentState = await checkInstanceStatus(instanceNameToCheck, tokenToUse, baseUrlToCheck);
         setConnectionState(currentState);
         return true;
       } catch (error) {
@@ -37,11 +40,14 @@ export function useEvolutionApiConnection(selectedIntegration: Integration | nul
         return false;
       }
     } else {
-      console.log('Status Check: Necessary details not available (Instance ID, Main API Key, or Base URL missing).');
+      // Update log message to reflect required fields
+      console.log('Status Check: Necessary details not available (Instance Display Name, Token, or Base URL missing).');
     }
     return false;
-  }, [config]);
+  }, [config]); // Keep config dependency
 
+  // Note: startPolling still uses newInstanceId. This might need adjustment later
+  // if instance creation/identification relies solely on display name going forward.
   const startPolling = useCallback((newInstanceId: string, newToken: string) => {
     if (pollingInterval) {
       clearInterval(pollingInterval);

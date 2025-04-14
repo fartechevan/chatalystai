@@ -18,7 +18,8 @@ import { deleteEvolutionInstance } from "@/integrations/evolution-api/services/d
 // Import useEvolutionApiConfig to get refetchConfig
 import { useEvolutionApiConfig } from "@/integrations/evolution-api/hooks/useEvolutionApiConfig";
 import { getEvolutionCredentials } from "@/integrations/evolution-api/utils/credentials";
-import type { ConnectionState } from "../../types"; // Import ConnectionState
+import type { ConnectionState } from "../../types"; // Import ConnectionState from settings
+import type { EvolutionInstance } from "@/integrations/evolution-api/types"; // Import the correct instance type
 
 interface WhatsAppBusinessSettingsProps {
   selectedIntegration: Integration | null;
@@ -38,20 +39,32 @@ interface InstanceData {
   };
 }
 
+// Updated payload type: Removed projectId, customerId, webhook
 interface ValidatedCreatePayload {
   instanceName: string;
-  integration: string;
-  projectId: string;
-  customerId: string;
+  integration: string; // e.g., 'WHATSAPP-BAILEYS'
   qrcode: boolean;
-  webhook: {
-    url: string;
-    events: string[];
-    ByEvents: boolean;
-  };
 }
 
-type DisplayInstance = InstanceData;
+// Remove the outdated InstanceData interface
+/*
+interface InstanceData {
+  id?: string;
+  token?: string;
+  instance: {
+    instanceName: string;
+    status: 'open' | 'connecting' | 'close' | 'qrcode' | 'syncing';
+    owner?: string;
+    profileName?: string;
+    profilePictureUrl?: string;
+  };
+}
+*/
+
+// Removed duplicated incorrect ValidatedCreatePayload definition
+
+// Remove the outdated DisplayInstance type alias
+// type DisplayInstance = InstanceData;
 
 export function WhatsAppBusinessSettings({ selectedIntegration, onConnect }: WhatsAppBusinessSettingsProps) {
   const queryClient = useQueryClient();
@@ -60,7 +73,8 @@ export function WhatsAppBusinessSettings({ selectedIntegration, onConnect }: Wha
   // Get refetchConfig from the hook
   const { config, isLoading: isConfigLoading, refetchConfig } = useEvolutionApiConfig(selectedIntegration);
 
-  const [instanceDetails, setInstanceDetails] = useState<DisplayInstance | null>(null);
+  // Update the state type to use the correct EvolutionInstance type
+  const [instanceDetails, setInstanceDetails] = useState<EvolutionInstance | null>(null);
   const [isFetchingLive, setIsFetchingLive] = useState(true);
   // Add state for refetching before connect
   const [isRefetching, setIsRefetching] = useState(false);
@@ -90,25 +104,14 @@ export function WhatsAppBusinessSettings({ selectedIntegration, onConnect }: Wha
       setNoInstanceFoundFromServer(false);
 
       try {
-        // Fetch live instances first
-        console.log(`Fetching all instances for integration ${selectedIntegration.id}...`);
-        const allInstancesResult = await fetchEvolutionInstances(selectedIntegration.id);
+        // Fetch the single live instance (or null)
+        console.log(`Fetching instance for integration ${selectedIntegration.id}...`);
+        const instanceResult = await fetchEvolutionInstances(selectedIntegration.id);
+        // fetchEvolutionInstances now returns EvolutionInstance | null or throws an error
+        // The try/catch block will handle errors thrown by the service.
+        console.log("Fetched instance result:", instanceResult);
 
-        // --- Error handling for fetchInstances ---
-        if (!Array.isArray(allInstancesResult)) {
-          if (allInstancesResult !== null && typeof allInstancesResult === 'object' && 'error' in allInstancesResult) {
-            const errorResult = allInstancesResult as { error: string; details?: string };
-            console.error('Error fetching instances list:', errorResult.error, errorResult.details);
-            throw new Error(errorResult.error || 'Failed to fetch instances list.');
-          } else {
-            console.error('Unexpected response from fetchInstances:', allInstancesResult);
-            throw new Error('Received unexpected data format when fetching instances.');
-           }
-         }
-         // console.log("Successfully fetched instances array:", allInstancesResult); // Removed log
-         // --- End Error handling ---
- 
-         // Fetch the LATEST config directly from Supabase NOW
+        // Fetch the LATEST config directly from Supabase NOW
         console.log(`Fetching latest config directly for integration ${selectedIntegration.id}...`);
         const { data: latestConfigData, error: latestConfigError } = await supabase
           .from('integrations_config')
@@ -122,10 +125,10 @@ export function WhatsAppBusinessSettings({ selectedIntegration, onConnect }: Wha
          }
          // console.log("Latest config data fetched directly:", latestConfigData); // Removed log
          const configuredInstanceId = latestConfigData?.instance_id; // Use ID from the direct fetch
- 
-         // Handle case where no live instances exist
-        if (allInstancesResult.length === 0) {
-          console.log("No instances found on the server for this integration.");
+
+         // Handle case where no live instance exists
+        if (instanceResult === null) {
+          console.log("No instance found on the server for this integration.");
           setNoInstanceFoundFromServer(true);
           // If config existed but no live instance, clear the stale config
           if (configuredInstanceId) {
@@ -157,43 +160,43 @@ export function WhatsAppBusinessSettings({ selectedIntegration, onConnect }: Wha
           return;
         }
 
-        // Now proceed with comparison using the freshly fetched configuredInstanceId
-        let targetInstance: InstanceData | undefined = undefined;
+        // Now proceed with comparison using the freshly fetched configuredInstanceId and the single instanceResult
+        let targetInstance: EvolutionInstance | null = null; // Use correct type
         let connectionStatus: ConnectionState = 'unknown';
 
         if (configuredInstanceId) {
-           console.log(`Comparing live instances against latest configured ID: ${configuredInstanceId}`);
-           targetInstance = (allInstancesResult as InstanceData[]).find(inst => inst.id === configuredInstanceId);
-        } else {
-           // Handle case where DB config is missing/empty, but live instances exist
-           if (allInstancesResult.length === 1) {
-               console.log("DB Config empty/missing, but found one live instance. Selecting it for initial config.");
-               targetInstance = (allInstancesResult as InstanceData[])[0];
+           console.log(`Comparing live instance against latest configured ID: ${configuredInstanceId}`);
+           // Check if the fetched instance matches the configured ID
+           if (instanceResult && instanceResult.id === configuredInstanceId) {
+             targetInstance = instanceResult; // Assign if it matches - Remove cast
+             console.log(`Live instance ${instanceResult.id} matches configured ID.`);
            } else {
-               console.log("DB Config empty/missing and multiple live instances found. Configuration needed.");
-               setLoadError("Configuration needed: Multiple instances found, but none specifically configured in the database.");
-               setIsFetchingLive(false);
-               return; // Stop processing, user needs to configure
+             console.log(`Live instance (${instanceResult?.id ?? 'none'}) does not match configured ID ${configuredInstanceId}.`);
+             // targetInstance remains null
            }
+        } else if (instanceResult) {
+           // Handle case where DB config is missing/empty, but one live instance exists
+           console.log("DB Config empty/missing, but found one live instance. Selecting it for initial config.");
+           targetInstance = instanceResult; // Assign - Remove cast
         }
+        // If configuredInstanceId is null AND instanceResult is null, targetInstance remains null, handled later.
 
         // --- Logic for handling found/not found targetInstance ---
-        if (targetInstance && targetInstance.id) {
+        if (targetInstance && targetInstance.id) { // targetInstance is now potentially null
           // Instance found live that matches the latest config ID (or is the only live one)
           const fetchedInstanceId = targetInstance.id;
           const fetchedToken = targetInstance.token; // Use token from the live instance data
           console.log(`Found matching live instance ID: ${fetchedInstanceId}. Determining display name and status...`);
 
-          // Determine display name (prioritize profile name from live data)
-          const displayName = targetInstance.instance?.profileName || targetInstance.instance?.instanceName || fetchedInstanceId || 'Unnamed Instance';
+          // Determine display name (prioritize profile name from live data, fallback to name)
+          const displayName = targetInstance.profileName || targetInstance.name || fetchedInstanceId || 'Unnamed Instance';
           console.log(`Determined display name: ${displayName}`);
 
-          // Determine connection status from live data
-
-          const fetchedStatus = targetInstance.instance?.status;
+          // Determine connection status from live data (using top-level connectionStatus)
+          const fetchedStatus = targetInstance.connectionStatus; // Use top-level field
           if (fetchedStatus === 'open') connectionStatus = 'open';
           else if (fetchedStatus === 'close') connectionStatus = 'close';
-          else if (['connecting', 'qrcode', 'syncing'].includes(fetchedStatus)) connectionStatus = 'connecting';
+          else if (['connecting', 'qrcode', 'syncing'].includes(fetchedStatus || '')) connectionStatus = 'connecting'; // Handle potential undefined fetchedStatus
           else connectionStatus = 'unknown';
           console.log(`Mapped live status '${fetchedStatus}' to connectionStatus '${connectionStatus}'`);
 
@@ -333,55 +336,56 @@ export function WhatsAppBusinessSettings({ selectedIntegration, onConnect }: Wha
     setIsCreating(true);
     let instanceNameForLogs = 'Unknown';
     try {
-      const { apiKey, baseUrl, metadata: fetchedMetadata } = await getEvolutionCredentials(selectedIntegration.id);
+      // 1. Fetch API Key and Base URL (metadata is no longer returned)
+      const { apiKey, baseUrl } = await getEvolutionCredentials(selectedIntegration.id);
       const createUrl = `${baseUrl}/instance/create`;
 
-      if (!fetchedMetadata || typeof fetchedMetadata !== 'object' || Array.isArray(fetchedMetadata)) {
-        throw new Error("Fetched metadata is missing or not a valid object.");
+      // 2. Fetch necessary configuration details
+      console.log(`Fetching config details for integration ${selectedIntegration.id}`);
+
+      // Fetch instance_display_name from integrations_config
+      const { data: configData, error: configError } = await supabase
+        .from('integrations_config')
+        .select('instance_display_name') // Fetch the display name
+        .eq('integration_id', selectedIntegration.id)
+        .single();
+
+      if (configError) {
+        console.error(`Error fetching integrations_config for ${selectedIntegration.id}:`, configError);
+        throw new Error(`Failed to fetch instance configuration: ${configError.message}`);
       }
-      const metadata = fetchedMetadata as Record<string, unknown>;
-
-      const missingOrInvalid: string[] = [];
-      if (typeof metadata.instanceName !== 'string' || !metadata.instanceName) missingOrInvalid.push('instanceName (string)');
-      if (typeof metadata.integration !== 'string' || !metadata.integration) missingOrInvalid.push('integration (string)');
-      if (typeof metadata.projectId !== 'string' || !metadata.projectId) missingOrInvalid.push('projectId (string)');
-      if (typeof metadata.customerId !== 'string' || !metadata.customerId) missingOrInvalid.push('customerId (string)');
-      if (typeof metadata.qrcode !== 'boolean') missingOrInvalid.push('qrcode (boolean)');
-
-      let validatedWebhook: ValidatedCreatePayload['webhook'] | undefined = undefined;
-      if (typeof metadata.webhook !== 'object' || metadata.webhook === null || Array.isArray(metadata.webhook)) {
-        missingOrInvalid.push('webhook (object)');
-      } else {
-        const webhookData = metadata.webhook as Record<string, unknown>;
-        if (typeof webhookData.url !== 'string' || !webhookData.url) missingOrInvalid.push('webhook.url (string)');
-        if (!Array.isArray(webhookData.events) || webhookData.events.length === 0 || !webhookData.events.every((e: unknown) => typeof e === 'string')) {
-             missingOrInvalid.push('webhook.events (non-empty array of strings)');
-        }
-        if (typeof webhookData.ByEvents !== 'boolean') missingOrInvalid.push('webhook.ByEvents (boolean)');
-        if (!missingOrInvalid.some(field => field.startsWith('webhook.'))) {
-           validatedWebhook = {
-               url: webhookData.url as string,
-               events: webhookData.events as string[],
-               ByEvents: webhookData.ByEvents as boolean
-           };
-        }
+      if (!configData || !configData.instance_display_name) {
+        throw new Error(`Instance display name not found in integrations_config for integration ${selectedIntegration.id}. Cannot create instance.`);
       }
+      const instanceName = configData.instance_display_name; // Use the correct column
 
-      if (missingOrInvalid.length > 0) {
-        throw new Error(`Missing or invalid required fields in fetched metadata: ${missingOrInvalid.join(', ')}`);
+      // Fetch integration type (e.g., 'WHATSAPP-BAILEYS') from the main integrations table
+      // Assuming the 'name' column in 'integrations' holds this type identifier. Adjust if needed.
+      const { data: integrationData, error: integrationError } = await supabase
+        .from('integrations')
+        .select('name') // Assuming 'name' holds the type like 'WHATSAPP-BAILEYS'
+        .eq('id', selectedIntegration.id)
+        .single();
+
+      if (integrationError) {
+        console.error(`Error fetching integration type for ${selectedIntegration.id}:`, integrationError);
+        throw new Error(`Failed to fetch integration type: ${integrationError.message}`);
       }
+      if (!integrationData || !integrationData.name) {
+         throw new Error(`Integration type (name) not found in integrations table for ID ${selectedIntegration.id}.`);
+      }
+      const integrationType = integrationData.name; // Use the fetched type
 
+      // 3. Construct the final payload for the API
       const payloadToSend: ValidatedCreatePayload = {
-        instanceName: metadata.instanceName as string,
-        integration: metadata.integration as string,
-        projectId: metadata.projectId as string,
-        customerId: metadata.customerId as string,
-        qrcode: metadata.qrcode as boolean,
-        webhook: validatedWebhook!,
+        instanceName: instanceName, // Fetched from integrations_config.instance_display_name
+        integration: integrationType, // Fetched from integrations.name
+        qrcode: false, // Hardcoded as per requirement
+        // webhook details omitted as per requirement - TODO: Add webhook config later
        };
        instanceNameForLogs = payloadToSend.instanceName;
- 
-       // console.log("--- handleDirectCreateInstance: Sending strictly validated metadata payload:", JSON.stringify(payloadToSend, null, 2)); // Removed log
+
+       console.log("--- handleDirectCreateInstance: Sending payload built from config/integration tables:", JSON.stringify(payloadToSend, null, 2));
        const response = await fetch(createUrl, {
          method: 'POST',
          headers: { 'apikey': apiKey, 'Content-Type': 'application/json' },
@@ -397,20 +401,22 @@ export function WhatsAppBusinessSettings({ selectedIntegration, onConnect }: Wha
 
         try {
           console.log("Fetching instance details immediately after creation...");
-          const allInstancesResult = await fetchEvolutionInstances(selectedIntegration.id);
-          if (!Array.isArray(allInstancesResult) || allInstancesResult.length === 0) {
-            throw new Error("Could not fetch instance details after creation.");
+          const newInstance = await fetchEvolutionInstances(selectedIntegration.id); // Returns Instance | null
+          // Check if an instance was actually fetched
+          if (newInstance === null) {
+            throw new Error("Could not fetch instance details after creation (returned null).");
           }
-          const newInstance = (allInstancesResult as InstanceData[])[0];
-          if (!newInstance || !newInstance.id || !newInstance.token) {
+          // Check if the fetched instance has the required properties
+          if (!newInstance.id || !newInstance.token) {
              throw new Error("Fetched instance details are incomplete (missing id or token).");
           }
 
           const fetchedInstanceId = newInstance.id;
           const fetchedToken = newInstance.token;
-          const displayName = newInstance.instance?.profileName || newInstance.instance?.instanceName || fetchedInstanceId || 'Unnamed Instance';
+          // Determine display name using top-level fields
+          const displayName = newInstance.profileName || newInstance.name || fetchedInstanceId || 'Unnamed Instance';
 
-          console.log(`Upserting config for new instance ${fetchedInstanceId} with display name ${displayName} and status 'unknown'.`);
+          console.log(`Upserting config for new instance ${fetchedInstanceId} with display name ${displayName}.`); // Status is not saved here
           const { error: upsertError } = await supabase
             .from('integrations_config')
             .upsert(
@@ -596,8 +602,12 @@ export function WhatsAppBusinessSettings({ selectedIntegration, onConnect }: Wha
     }
   };
 
-  const isConnected = (details: DisplayInstance | null) => {
-    return details?.instance?.status === 'open';
+  // Updated isConnected to use top-level connectionStatus
+  const isConnected = (details: EvolutionInstance | null) => { // Use correct type
+    // Assuming DisplayInstance still needs update or we cast/check properties directly
+    // Let's cast to EvolutionInstance for type safety here, assuming DisplayInstance might be stale
+    const evolutionDetails = details; // No need to cast anymore
+    return evolutionDetails?.connectionStatus === 'open';
   };
 
   if (isConfigLoading || isFetchingLive) {
@@ -691,11 +701,12 @@ export function WhatsAppBusinessSettings({ selectedIntegration, onConnect }: Wha
                             variant="ghost"
                             size="sm"
                             className="h-6 w-6 p-0"
-                            onClick={() => instanceDetails?.instance?.instanceName && handleLogout(instanceDetails.instance.instanceName)}
-                            disabled={!instanceDetails?.instance?.instanceName || isLogoutLoading === instanceDetails.instance.instanceName}
+                            // Use top-level 'name' for logout, assuming 'name' is the instance name used by API
+                            onClick={() => instanceDetails?.name && handleLogout(instanceDetails.name)}
+                            disabled={!instanceDetails?.name || isLogoutLoading === instanceDetails.name}
                             title="Disconnect"
                           >
-                            {isLogoutLoading === instanceDetails?.instance?.instanceName ? (
+                            {isLogoutLoading === instanceDetails?.name ? (
                               <Loader2 className="h-4 w-4 animate-spin" />
                             ) : (
                               <X className="h-4 w-4 text-gray-400 hover:text-red-500" />

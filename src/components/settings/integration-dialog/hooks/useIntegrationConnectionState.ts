@@ -7,6 +7,7 @@ import { fetchEvolutionInstances } from "@/integrations/evolution-api/services/f
 import { getEvolutionCredentials } from "@/integrations/evolution-api/utils/credentials"; // Import getEvolutionCredentials
 import { useEvolutionApiConfig } from "@/integrations/evolution-api/hooks/useEvolutionApiConfig";
 import { connectToInstance as evolutionConnectToInstance } from "@/integrations/evolution-api/services/instanceConnectService";
+import { setEvolutionWebhook } from "@/integrations/evolution-api/services/setWebhookService"; // Import the new service
 // createEvolutionInstance removed
 import { toast } from "@/components/ui/use-toast"; // Import toast for error handling
 
@@ -82,7 +83,63 @@ export function useIntegrationConnectionState(
         onConnectionEstablished();
       }
 
-      // Fetch details in the background after triggering the UI change
+      // --- BEGIN: Set Webhook after connection ---
+      if (selectedIntegration?.id) {
+        console.log("[Connection Open Effect] Attempting to set webhook...");
+        // Fetch webhook config and instance name asynchronously
+        const setupWebhook = async () => {
+          try {
+            const { data: webhookConfig, error: configError } = await supabase
+              .from('integrations_config')
+              .select('webhook_url, webhook_events, instance_display_name') // Fetch necessary fields
+              .eq('integration_id', selectedIntegration.id)
+              .single();
+
+            if (configError) {
+              throw new Error(`Failed to fetch webhook config: ${configError.message}`);
+            }
+
+            if (!webhookConfig?.webhook_url || !webhookConfig?.webhook_events || !webhookConfig?.instance_display_name) {
+               console.warn("[Connection Open Effect] Webhook URL, events, or instance name missing in config. Skipping webhook setup.");
+               toast({
+                 title: "Webhook Setup Skipped",
+                 description: "Webhook configuration details are incomplete.",
+                 variant: "default", // Use default or warning variant
+               });
+               return; // Don't proceed if config is incomplete
+            }
+
+            const success = await setEvolutionWebhook(
+              selectedIntegration.id,
+              webhookConfig.instance_display_name,
+              webhookConfig.webhook_url,
+              webhookConfig.webhook_events
+            );
+
+            if (success) {
+              console.log("[Connection Open Effect] Webhook set successfully.");
+              toast({ title: "Webhook Configured", description: "Webhook settings applied successfully." });
+            } else {
+              console.error("[Connection Open Effect] Failed to set webhook via service.");
+              toast({ title: "Webhook Setup Failed", description: "Could not apply webhook settings automatically.", variant: "destructive" });
+            }
+          } catch (error) {
+            console.error("[Connection Open Effect] Error during webhook setup:", error);
+            toast({
+              title: "Webhook Setup Error",
+              description: `An error occurred: ${error instanceof Error ? error.message : String(error)}`,
+              variant: "destructive",
+            });
+          }
+        };
+        // Run webhook setup asynchronously
+        setupWebhook();
+      } else {
+         console.warn("[Connection Open Effect] Cannot set webhook: selectedIntegration ID is missing.");
+      }
+      // --- END: Set Webhook after connection ---
+
+      // Fetch details in the background after triggering the UI change (keep this)
       if (selectedIntegration) {
         // Intentionally not awaiting this, let it run in background
         fetchAndUpdateDetails(selectedIntegration.id);
@@ -146,30 +203,37 @@ export function useIntegrationConnectionState(
       const storedInstanceId = configData.instance_id;
       console.log(`[fetchAndUpdateDetails] Found stored instance_id: ${storedInstanceId}`);
 
-      const fetchedInstances = await fetchEvolutionInstances(integrationId);
-      console.log(`[fetchAndUpdateDetails] Fetched ${fetchedInstances.length} instances from API.`);
+      // fetchEvolutionInstances now returns a single instance or null
+      const fetchedInstance = await fetchEvolutionInstances(integrationId);
+      console.log(`[fetchAndUpdateDetails] Fetched instance from API:`, fetchedInstance);
 
-      const matchingInstance = fetchedInstances.find(
-        (inst: EvolutionInstance) => inst.instance?.instanceId === storedInstanceId
-      );
-
-      if (matchingInstance?.instance) {
-        const { instanceName, ownerJid } = matchingInstance.instance;
+      // Check if an instance was fetched and if its ID matches the stored ID
+      if (fetchedInstance && fetchedInstance.id === storedInstanceId) {
+        // Use top-level properties from the fetched instance
+        const instanceName = fetchedInstance.name; // Assuming 'name' holds the instance name
+        const ownerJid = fetchedInstance.ownerJid; // Assuming 'ownerJid' holds the owner JID
         console.log(`[fetchAndUpdateDetails] Found matching instance: Name=${instanceName}, OwnerJid=${ownerJid}`);
 
-        const { error: updateError } = await supabase
-          .from('integrations_config')
-          .update({
-            instance_display_name: instanceName,
-            owner_id: ownerJid
-          })
-          .eq('integration_id', integrationId);
+        // Only update if we have a valid instance name
+        if (instanceName) {
+          const { error: updateError } = await supabase // Declare updateError here
+            .from('integrations_config')
+            .update({
+              instance_display_name: instanceName, // Update display name
+              owner_id: ownerJid // Update owner_id (which might be null)
+            })
+            .eq('integration_id', integrationId);
 
-        if (updateError) {
-          console.error(`[fetchAndUpdateDetails] Error updating integrations_config for ${integrationId}:`, updateError);
+          // Check updateError here, within the scope where it's declared
+          if (updateError) {
+            console.error(`[fetchAndUpdateDetails] Error updating integrations_config for ${integrationId}:`, updateError);
+          } else {
+            console.log(`[fetchAndUpdateDetails] Successfully updated integrations_config for ${integrationId}.`);
+          }
         } else {
-          console.log(`[fetchAndUpdateDetails] Successfully updated integrations_config for ${integrationId}.`);
+           console.warn(`[fetchAndUpdateDetails] Fetched instance ${fetchedInstance.id} is missing a 'name'. Cannot update display name.`);
         }
+        // Removed the redundant check for updateError outside the if block
       } else {
         console.warn(`[fetchAndUpdateDetails] Could not find matching instance with ID ${storedInstanceId}.`);
       }
