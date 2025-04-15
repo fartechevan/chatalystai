@@ -203,18 +203,22 @@ export function useIntegrationConnectionState(
       const storedInstanceId = configData.instance_id;
       console.log(`[fetchAndUpdateDetails] Found stored instance_id: ${storedInstanceId}`);
 
-      // fetchEvolutionInstances now returns a single instance or null
-      const fetchedInstance = await fetchEvolutionInstances(integrationId);
-      console.log(`[fetchAndUpdateDetails] Fetched instance from API:`, fetchedInstance);
+      // fetchEvolutionInstances now returns an array of instances
+      const liveInstances = await fetchEvolutionInstances(integrationId);
+      console.log(`[fetchAndUpdateDetails] Fetched live instances from API:`, liveInstances);
 
-      // Check if an instance was fetched and if its ID matches the stored ID
-      if (fetchedInstance && fetchedInstance.id === storedInstanceId) {
-        // Use top-level properties from the fetched instance
-        const instanceName = fetchedInstance.name; // Assuming 'name' holds the instance name
-        const ownerJid = fetchedInstance.ownerJid; // Assuming 'ownerJid' holds the owner JID
+      // Find the instance in the array that matches the stored ID
+      const matchedInstance = liveInstances.find(inst => inst.id === storedInstanceId);
+      console.log(`[fetchAndUpdateDetails] Matched instance from array:`, matchedInstance);
+
+      // Check if a matching instance was found
+      if (matchedInstance) {
+        // Use top-level properties from the matched instance
+        const instanceName = matchedInstance.name; // Assuming 'name' holds the instance name
+        const ownerJid = matchedInstance.ownerJid; // Assuming 'ownerJid' holds the owner JID
         console.log(`[fetchAndUpdateDetails] Found matching instance: Name=${instanceName}, OwnerJid=${ownerJid}`);
 
-        // Only update if we have a valid instance name
+        // Only update if we have a valid instance name from the matched instance
         if (instanceName) {
           const { error: updateError } = await supabase // Declare updateError here
             .from('integrations_config')
@@ -231,11 +235,11 @@ export function useIntegrationConnectionState(
             console.log(`[fetchAndUpdateDetails] Successfully updated integrations_config for ${integrationId}.`);
           }
         } else {
-           console.warn(`[fetchAndUpdateDetails] Fetched instance ${fetchedInstance.id} is missing a 'name'. Cannot update display name.`);
+            console.warn(`[fetchAndUpdateDetails] Matched instance ${matchedInstance.id} is missing a 'name'. Cannot update display name.`);
         }
         // Removed the redundant check for updateError outside the if block
       } else {
-        console.warn(`[fetchAndUpdateDetails] Could not find matching instance with ID ${storedInstanceId}.`);
+        console.warn(`[fetchAndUpdateDetails] Could not find live instance matching stored ID ${storedInstanceId}.`);
       }
     } catch (error) {
       console.error(`[fetchAndUpdateDetails] Error during fetch/update process for ${integrationId}:`, error);
