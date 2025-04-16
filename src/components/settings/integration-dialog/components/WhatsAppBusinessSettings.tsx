@@ -17,6 +17,7 @@ import type { Integration } from "../../types";
 import { logoutWhatsAppInstance } from "@/integrations/evolution-api/services/logoutService";
 import { fetchEvolutionInstances } from "@/integrations/evolution-api/services/fetchInstancesService";
 import { deleteEvolutionInstance } from "@/integrations/evolution-api/services/deleteInstanceService";
+import { setEvolutionWebhook } from "@/integrations/evolution-api/services/setWebhookService"; // <-- Import added
 // Import useEvolutionApiConfig to get refetchConfig
 import { useEvolutionApiConfig } from "@/integrations/evolution-api/hooks/useEvolutionApiConfig";
 import { getEvolutionCredentials } from "@/integrations/evolution-api/utils/credentials";
@@ -461,11 +462,65 @@ export function WhatsAppBusinessSettings({ selectedIntegration, onConnect }: Wha
             throw new Error(`Failed to save instance configuration after creation: ${upsertError.message}`);
           }
 
-          console.log("Successfully saved configuration immediately after creation.");
-          toast({ title: "Configuration Saved", description: `Instance ${displayName} configured.` });
+           console.log("Successfully saved configuration immediately after creation.");
+           toast({ title: "Configuration Saved", description: `Instance ${displayName} configured. Setting webhook...` });
 
-          // Invalidate both list and specific config queries
-          await queryClient.invalidateQueries({ queryKey: ['integrationsWithConfig'] });
+           // --- BEGIN: Set Webhook after CREATION ---
+           try {
+             console.log(`[handleDirectCreateInstance] Attempting to set webhook for new instance ${displayName}...`);
+             // Fetch the necessary webhook config again (URL and Events)
+             const { data: webhookConfig, error: configError } = await supabase
+               .from('integrations_config')
+               .select('webhook_url, webhook_events') // Only need URL and events now
+               .eq('integration_id', selectedIntegration.id)
+               .single();
+
+             if (configError) {
+               throw new Error(`Failed to fetch webhook config for new instance: ${configError.message}`);
+             }
+
+             if (!webhookConfig?.webhook_url || !webhookConfig?.webhook_events) {
+               console.warn("[handleDirectCreateInstance] Webhook URL or events missing in config. Skipping webhook setup for new instance.");
+               toast({
+                 title: "Webhook Setup Skipped",
+                 description: "Webhook configuration details are incomplete for the new instance.",
+                 variant: "default",
+               });
+             } else {
+               // --- Added Log ---
+               console.log("[handleDirectCreateInstance] Webhook events being set for new instance:", webhookConfig.webhook_events);
+               // --- End Added Log ---
+
+               const webhookSuccess = await setEvolutionWebhook(
+                 selectedIntegration.id,
+                  displayName, // Use the display name determined earlier
+                  webhookConfig.webhook_url,
+                  // --- Test: Hardcode only MESSAGES_UPSERT ---
+                  ["MESSAGES_UPSERT"]
+                  // webhookConfig.webhook_events // Original line commented out for testing
+                );
+
+                if (webhookSuccess) {
+                 console.log("[handleDirectCreateInstance] Webhook set successfully for new instance.");
+                 toast({ title: "Webhook Configured", description: "Webhook settings applied successfully for the new instance." });
+               } else {
+                 console.error("[handleDirectCreateInstance] Failed to set webhook via service for new instance.");
+                 toast({ title: "Webhook Setup Failed", description: "Could not apply webhook settings automatically for the new instance.", variant: "destructive" });
+               }
+             }
+           } catch (webhookError) {
+             console.error("[handleDirectCreateInstance] Error during webhook setup for new instance:", webhookError);
+             toast({
+               title: "Webhook Setup Error",
+               description: `An error occurred setting the webhook for the new instance: ${webhookError instanceof Error ? webhookError.message : String(webhookError)}`,
+               variant: "destructive",
+             });
+           }
+           // --- END: Set Webhook after CREATION ---
+
+
+           // Invalidate both list and specific config queries
+           await queryClient.invalidateQueries({ queryKey: ['integrationsWithConfig'] });
           await queryClient.invalidateQueries({ queryKey: ['integration-config', selectedIntegration.id] });
           setNoInstanceFoundFromServer(false);
 
@@ -691,7 +746,7 @@ export function WhatsAppBusinessSettings({ selectedIntegration, onConnect }: Wha
                         </div>
                       ) : (
                         <div className="flex items-center justify-end space-x-2">
-                          <Button
+                          <Button // Reconstruct the Button tag correctly
                             variant="outline"
                             size="sm"
                             // Use the new handler
