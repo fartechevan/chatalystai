@@ -1,10 +1,16 @@
 import { apiServiceInstance } from '@/services/api/apiService';
 import { getEvolutionCredentials } from '../utils/credentials';
 
+// Updated interface to match the new nested structure
 interface SetWebhookPayload {
-  url: string;
-  webhookByEvents: boolean; // Assuming this is always needed/true based on typical usage
-  events: string[];
+  webhook: {
+    enabled: boolean;
+    url: string;
+    headers: Record<string, string>; // Allow for custom headers if needed later
+    byEvents: boolean; // Renamed from webhookByEvents
+    base64: boolean;
+    events: string[];
+  };
 }
 
 /**
@@ -33,19 +39,26 @@ export async function setEvolutionWebhook(
     // 2. Construct URL
     const setWebhookUrl = `${baseUrl}/webhook/set/${instanceName}`;
 
-    // 3. Prepare payload
+    // 3. Prepare payload using the new nested structure
     const payload: SetWebhookPayload = {
-      url: webhookUrl,
-      webhookByEvents: true, // Assuming true is the desired default
-      events: webhookEvents,
-    };
+      webhook: {
+        enabled: true, // Default to enabled
+         url: webhookUrl,
+         headers: {}, // Default to empty headers
+         byEvents: false, // Explicitly set to false as requested
+         base64: false, // Explicitly set to false as requested (was already default)
+         events: webhookEvents,
+      }
+     };
 
-    console.log(`Attempting to set webhook for instance ${instanceName}:`, payload);
+     // --- Added Log ---
+     console.log(`[setEvolutionWebhook] Attempting to set webhook for instance ${instanceName}. URL: ${setWebhookUrl}, Payload:`, JSON.stringify(payload, null, 2));
+     // --- End Added Log ---
 
-    // 4. Make request using ApiService
+     // 4. Make request using ApiService
     // Assuming the API returns a simple success/failure or specific structure
     // Adjust response type if needed based on actual API response
-    await apiServiceInstance.request<any>(setWebhookUrl, {
+    await apiServiceInstance.request<unknown>(setWebhookUrl, { // Changed any to unknown
       method: 'POST',
       headers: {
         'apikey': apiKey,

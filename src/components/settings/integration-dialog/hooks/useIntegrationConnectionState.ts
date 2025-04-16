@@ -109,6 +109,10 @@ export function useIntegrationConnectionState(
                return; // Don't proceed if config is incomplete
             }
 
+            // --- Added Log ---
+            console.log("[Connection Open Effect] Webhook events being set:", webhookConfig.webhook_events);
+            // --- End Added Log ---
+
             const success = await setEvolutionWebhook(
               selectedIntegration.id,
               webhookConfig.instance_display_name,
