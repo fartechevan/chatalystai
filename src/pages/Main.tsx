@@ -1,4 +1,7 @@
+
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 import { GetStartedView } from "@/components/dashboard/getting-started/GetStartedView";
 import { DashboardStats } from "@/components/dashboard/DashboardStats";
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
@@ -97,7 +100,7 @@ export default function Main() {
   const { data: messages = [], isLoading: isMessagesLoading } = useQuery({
     queryKey: ["messages", timeFilter, userFilter],
     queryFn: async () => {
-      const query = supabase // Changed to const
+      const query = supabase
         .from("messages")
         .select("*")
         .gte("created_at", startDate.toISOString())
