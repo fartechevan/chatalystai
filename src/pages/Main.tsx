@@ -1,10 +1,9 @@
-
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
-import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
+import { GetStartedView } from "@/components/dashboard/getting-started/GetStartedView";
 import { DashboardStats } from "@/components/dashboard/DashboardStats";
+import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 import { DashboardFilters } from "@/components/dashboard/DashboardFilters";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 
 export default function Main() {
   const [timeFilter, setTimeFilter] = useState<'today' | 'yesterday' | 'week' | 'month'>('month'); // Default to 'month'
@@ -143,29 +142,40 @@ export default function Main() {
   return (
     <div className="flex-1 flex flex-col -mt-8 -mx-8">
       <div className="bg-white py-6">
-        <div className="container mx-auto px-8 flex flex-col items-center">
+        <div className="container mx-auto px-8">
           <DashboardHeader />
-          <div className="mt-8 w-full">
-            <DashboardFilters 
-              selectedTime={timeFilter}
-              onTimeChange={setTimeFilter}
-              selectedUser={userFilter}
-              onUserChange={setUserFilter}
-            />
-          </div>
-        </div>
-      </div>
-      <div className="flex-1 pb-6">
-        <div className="container mx-auto px-8 -mt-4">
-          <DashboardStats 
-            timeFilter={timeFilter} 
-            userFilter={userFilter}
-            leads={leads}
-            conversations={conversations}
-            messages={messages}
-            tasks={tasks}
-            isLoading={isLeadsLoading || isConversationsLoading || isMessagesLoading || isTasksLoading}
-          />
+          <Tabs defaultValue="getting-started" className="mt-6">
+            <TabsList>
+              <TabsTrigger value="getting-started">Getting Started</TabsTrigger>
+              <TabsTrigger value="analytics">Analytics</TabsTrigger>
+            </TabsList>
+            <TabsContent value="getting-started" className="mt-6">
+              <GetStartedView />
+            </TabsContent>
+            <TabsContent value="analytics" className="mt-6">
+              <div className="mt-8 w-full">
+                <DashboardFilters 
+                  selectedTime={timeFilter}
+                  onTimeChange={setTimeFilter}
+                  selectedUser={userFilter}
+                  onUserChange={setUserFilter}
+                />
+              </div>
+              <div className="flex-1 pb-6">
+                <div className="container mx-auto -mt-4">
+                  <DashboardStats 
+                    timeFilter={timeFilter} 
+                    userFilter={userFilter}
+                    leads={leads}
+                    conversations={conversations}
+                    messages={messages}
+                    tasks={tasks}
+                    isLoading={isLeadsLoading || isConversationsLoading || isMessagesLoading || isTasksLoading}
+                  />
+                </div>
+              </div>
+            </TabsContent>
+          </Tabs>
         </div>
       </div>
     </div>
