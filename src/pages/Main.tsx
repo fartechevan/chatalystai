@@ -6,12 +6,13 @@ import { GetStartedView } from "@/components/dashboard/getting-started/GetStarte
 import { DashboardStats } from "@/components/dashboard/DashboardStats";
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 import { DashboardFilters } from "@/components/dashboard/DashboardFilters";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Button } from "@/components/ui/button";
 
 export default function Main() {
   const [timeFilter, setTimeFilter] = useState<'today' | 'yesterday' | 'week' | 'month'>('month'); // Default to 'month'
   const [userFilter, setUserFilter] = useState<string>('all');
-  
+  const [selectedPanel, setSelectedPanel] = useState<'getting-started' | 'analytics'>('getting-started');
+
   // Fetch user data
   const { data: userData } = useQuery({
     queryKey: ["auth-user"],
@@ -20,12 +21,12 @@ export default function Main() {
       return data.user;
     },
   });
-  
+
   // Get date range based on time filter
   const getDateRange = () => {
     const now = new Date();
     let startDate = new Date();
-    
+
     switch (timeFilter) {
       case 'today':
         startDate.setHours(0, 0, 0, 0);
@@ -43,12 +44,12 @@ export default function Main() {
         startDate.setMonth(now.getMonth() - 1);
         break;
     }
-    
+
     return { startDate, endDate: now };
   };
-  
+
   const { startDate, endDate } = getDateRange();
-  
+
   // Fetch leads data with filters
   const { data: leads = [], isLoading: isLeadsLoading } = useQuery({
     queryKey: ["leads", timeFilter, userFilter],
@@ -58,13 +59,13 @@ export default function Main() {
         .select("*")
         .gte("created_at", startDate.toISOString())
         .lte("created_at", endDate.toISOString());
-      
+
       if (userFilter !== 'all') {
         query = query.eq("user_id", userFilter);
       }
-      
+
       const { data, error } = await query;
-      
+
       if (error) {
         console.error("Error fetching leads:", error);
         return [];
@@ -82,12 +83,12 @@ export default function Main() {
         .select("*")
         .gte("created_at", startDate.toISOString())
         .lte("created_at", endDate.toISOString());
-      
+
       // For conversations, we'd need to check user_id through related tables
       // This is simplified here - in real implementation, you might need to join tables
-      
+
       const { data, error } = await query;
-      
+
       if (error) {
         console.error("Error fetching conversations:", error);
         return [];
@@ -105,11 +106,11 @@ export default function Main() {
         .select("*")
         .gte("created_at", startDate.toISOString())
         .lte("created_at", endDate.toISOString());
-      
+
       // If needed, add filtering for user
-      
+
       const { data, error } = await query;
-      
+
       if (error) {
         console.error("Error fetching messages:", error);
         return [];
@@ -127,13 +128,13 @@ export default function Main() {
         .select("*")
         .gte("created_at", startDate.toISOString())
         .lte("created_at", endDate.toISOString());
-      
+
       if (userFilter !== 'all') {
         query = query.eq("assignee_id", userFilter);
       }
-      
+
       const { data, error } = await query;
-      
+
       if (error) {
         console.error("Error fetching tasks:", error);
         return [];
@@ -141,44 +142,65 @@ export default function Main() {
       return data || [];
     },
   });
-  
+
   return (
     <div className="flex-1 flex flex-col -mt-8 -mx-8">
-      <div className="bg-white py-6">
+      <div className="bg-white py-6 min-h-screen">
         <div className="container mx-auto px-8">
           <DashboardHeader />
-          <Tabs defaultValue="getting-started" className="mt-6">
-            <TabsList>
-              <TabsTrigger value="getting-started">Getting Started</TabsTrigger>
-              <TabsTrigger value="analytics">Analytics</TabsTrigger>
-            </TabsList>
-            <TabsContent value="getting-started" className="mt-6">
-              <GetStartedView />
-            </TabsContent>
-            <TabsContent value="analytics" className="mt-6">
-              <div className="mt-8 w-full">
-                <DashboardFilters 
-                  selectedTime={timeFilter}
-                  onTimeChange={setTimeFilter}
-                  selectedUser={userFilter}
-                  onUserChange={setUserFilter}
-                />
-              </div>
-              <div className="flex-1 pb-6">
-                <div className="container mx-auto -mt-4">
-                  <DashboardStats 
-                    timeFilter={timeFilter} 
-                    userFilter={userFilter}
-                    leads={leads}
-                    conversations={conversations}
-                    messages={messages}
-                    tasks={tasks}
-                    isLoading={isLeadsLoading || isConversationsLoading || isMessagesLoading || isTasksLoading}
-                  />
+          <div className="flex mt-6 h-[calc(100vh-120px)] rounded-xl overflow-hidden shadow bg-muted/30 border">
+
+            {/* Left vertical menu */}
+            <div className="w-48 min-w-[150px] border-r bg-white flex flex-col pt-4">
+              <Button
+                className={`w-full justify-start px-6 py-3 text-lg ${selectedPanel === 'getting-started' ? "bg-blue-100 font-semibold text-blue-700" : "bg-transparent text-gray-700 hover:bg-muted"}`}
+                variant="ghost"
+                onClick={() => setSelectedPanel('getting-started')}
+              >
+                Getting Started
+              </Button>
+              <Button
+                className={`w-full justify-start px-6 py-3 text-lg ${selectedPanel === 'analytics' ? "bg-blue-100 font-semibold text-blue-700" : "bg-transparent text-gray-700 hover:bg-muted"}`}
+                variant="ghost"
+                onClick={() => setSelectedPanel('analytics')}
+              >
+                Analytics
+              </Button>
+            </div>
+
+            {/* Middle panel (content) */}
+            <div className="flex-1 bg-transparent h-full overflow-auto">
+              {selectedPanel === "getting-started" && (
+                <div className="p-6 h-full">
+                  {/* Replicate the Getting Started view here */}
+                  <GetStartedView />
                 </div>
-              </div>
-            </TabsContent>
-          </Tabs>
+              )}
+              {selectedPanel === "analytics" && (
+                <div className="p-6 h-full flex flex-col gap-6">
+                  <div className="w-full mb-2">
+                    <DashboardFilters
+                      selectedTime={timeFilter}
+                      onTimeChange={setTimeFilter}
+                      selectedUser={userFilter}
+                      onUserChange={setUserFilter}
+                    />
+                  </div>
+                  <div className="flex-1 pb-6">
+                    <DashboardStats
+                      timeFilter={timeFilter}
+                      userFilter={userFilter}
+                      leads={leads}
+                      conversations={conversations}
+                      messages={messages}
+                      tasks={tasks}
+                      isLoading={isLeadsLoading || isConversationsLoading || isMessagesLoading || isTasksLoading}
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       </div>
     </div>
