@@ -1,15 +1,13 @@
-// Config import is no longer needed here as this will use a Supabase function
 import { apiServiceInstance } from "@/services/api/apiService"; // Import ApiService
 import { getEvolutionCredentials } from "../utils/credentials";
+import { supabase } from '@/integrations/supabase/client'; // Import Supabase client for display name lookup
 
-
-export interface SendTextParams { // Add export
-  // serverUrl: string; // Remove serverUrl, will be fetched via credentials
-  instance: string;
-  integrationId: string; // Add integrationId to fetch credentials
+export interface SendTextParams {
+  instance: string; // Instance ID from the frontend selection
+  integrationId: string; // Integration ID to fetch credentials and config
   number: string; // Recipient's phone number
   text: string; // The message text
-  // Optional parameters based on the curl example
+  // Optional parameters
   delay?: number;
   linkPreview?: boolean;
   mentionsEveryOne?: boolean;
@@ -20,117 +18,112 @@ export interface SendTextParams { // Add export
   };
 }
 
-export interface SendTextResponse { // Add export
-  // Define the expected success response structure from the API if known
-  // Define the expected success response structure from the API if known
-  // Example:
-  // messageId?: string;
-  // status?: string;
+export interface SendTextResponse {
+  // Define the expected success response structure from the Evolution API
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   [key: string]: any; // Allow for other properties
 }
 
 /**
- * Sends a text message via the WhatsApp API.
+ * Sends a text message directly via the Evolution API.
+ * Fetches credentials and instance display name before making the call.
  * @param params - The parameters for sending the text message.
  * @returns A promise that resolves with the API response on success.
- * @throws If fetching credentials or the API request fails.
+ * @throws If fetching credentials, display name, or the API request fails.
  */
 export const sendTextService = async (params: SendTextParams): Promise<SendTextResponse> => {
-  // Destructure all params including integrationId
+  // Destructure all params
   const { instance, integrationId, number, text, ...optionalData } = params;
 
-  // Removed warning about refactoring as direct call is intended.
+  console.log(`sendTextService: Sending text directly for instance ID ${instance}, integration ${integrationId}`);
 
-  // 1. Fetch credentials (Errors will propagate up)
+  // 1. Fetch Evolution API credentials
+  console.log("sendTextService: Fetching Evolution credentials...");
   const { apiKey, baseUrl } = await getEvolutionCredentials(integrationId);
-    // 2. Construct the Evolution API URL
-    const apiUrl = `${baseUrl}/message/sendText/${instance}`;
-    // console.log(`Frontend: Sending text directly via Evolution API: ${apiUrl}`); // Removed log
+  console.log(`sendTextService: Credentials fetched. Base URL: ${baseUrl}`);
 
-    // 3. Construct the payload using logic similar to the edge function
-    // Define a type for the payload structure locally if needed, or use 'any' carefully
-    const evolutionPayload: {
-        number: string;
-        text: string;
-        options?: {
-            delay?: number;
-            linkPreview?: boolean;
-            mentions?: {
-                everyOne?: boolean;
-                mentioned?: string[];
-            };
-            quoted?: { key: { id: string }; message: { conversation: string } };
-        };
-    } = {
-        number,
-        text,
-        // Construct options object only if optional params exist
-        ...(Object.keys(optionalData).length > 0 && {
-            options: {
-                ...(optionalData.delay !== undefined && { delay: optionalData.delay }),
-                ...(optionalData.linkPreview !== undefined && { linkPreview: optionalData.linkPreview }),
-                // Construct mentions object only if needed and correctly structured
-                ...((optionalData.mentionsEveryOne || optionalData.mentioned) && {
-                    mentions: {
-                        ...(optionalData.mentionsEveryOne === true && { everyOne: true }), // Ensure boolean check
-                        ...(optionalData.mentioned && optionalData.mentioned.length > 0 && { mentioned: optionalData.mentioned }), // Ensure array has items
-                    }
-                }),
-                ...(optionalData.quoted && { quoted: optionalData.quoted }),
-            }
-        })
-    };
+  // 2. Fetch instance_display_name from integrations_config using Supabase client
+  console.log(`sendTextService: Fetching instance display name for instance ID ${instance}...`);
+  const { data: configData, error: configError } = await supabase
+    .from('integrations_config')
+    .select('instance_display_name')
+    .eq('integration_id', integrationId)
+    .eq('instance_id', instance) // Match based on the instance ID passed from frontend
+    .maybeSingle(); // Use maybeSingle to allow zero or one row
 
-    // Remove options if it's empty or contains only an empty mentions object
-     if (evolutionPayload.options) {
-        if (evolutionPayload.options.mentions && Object.keys(evolutionPayload.options.mentions).length === 0) {
-            delete evolutionPayload.options.mentions; // Clean up empty mentions
-        }
-        if (Object.keys(evolutionPayload.options).length === 0) {
-            delete evolutionPayload.options; // Remove options if completely empty
-        }
-    }
+  // Check for database errors first
+  if (configError) {
+      console.error(`sendTextService: Database error fetching integration config for instance ${instance}:`, configError);
+      throw new Error(`Database error fetching integration config: ${configError.message}`);
+  }
 
+  // Check if data was actually found
+  if (!configData || !configData.instance_display_name) {
+      console.error(`sendTextService: Configuration not found for instance ID ${instance} and integration ID ${integrationId}. Please check integrations_config table.`);
+      throw new Error(`Configuration not found for instance ${instance}.`);
+  }
 
-    // console.log("sendTextService: Sending payload:", JSON.stringify(evolutionPayload, null, 2)); // Removed log
+  const instanceDisplayName = configData.instance_display_name;
+  console.log(`sendTextService: Found instance display name: ${instanceDisplayName}`);
 
-    // 4. Make the request using ApiService
-    const result = await apiServiceInstance.request<SendTextResponse>(apiUrl, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "apikey": apiKey,
-      },
-      body: JSON.stringify(evolutionPayload),
-    });
+  // 3. Construct the Evolution API URL using the fetched display name
+  const apiUrl = `${baseUrl}/message/sendText/${instanceDisplayName}`;
+  console.log(`sendTextService: Constructed direct API URL: ${apiUrl}`);
 
-    // 5. Return the successful response (error handling done by ApiService)
-    // Logging handled by ApiService if enabled.
-    // console.log(`sendTextService: Send text successful for ${number} via instance ${instance}.`); // Removed log
-    return result;
-  /* --- Remove the old commented-out fetch logic --- */
-  /*
-  const headers = {
-    'Content-Type': 'application/json',
-    'apikey': evolutionApiKey,
+  // 4. Construct the payload
+  const evolutionPayload: {
+      number: string;
+      text: string;
+      options?: {
+          delay?: number;
+          linkPreview?: boolean;
+          mentions?: {
+              everyOne?: boolean;
+              mentioned?: string[];
+          };
+          quoted?: { key: { id: string }; message: { conversation: string } };
+      };
+  } = {
+      number,
+      text,
+      ...(Object.keys(optionalData).length > 0 && {
+          options: {
+              ...(optionalData.delay !== undefined && { delay: optionalData.delay }),
+              ...(optionalData.linkPreview !== undefined && { linkPreview: optionalData.linkPreview }),
+              ...((optionalData.mentionsEveryOne || optionalData.mentioned) && {
+                  mentions: {
+                      ...(optionalData.mentionsEveryOne === true && { everyOne: true }),
+                      ...(optionalData.mentioned && optionalData.mentioned.length > 0 && { mentioned: optionalData.mentioned }),
+                  }
+              }),
+              ...(optionalData.quoted && { quoted: optionalData.quoted }),
+          }
+      })
   };
 
-  const body = JSON.stringify({
-    number, // Ensure these are defined
-    text,   // Ensure these are defined
-    // Include optional parameters
-    ...(optionalData.delay !== undefined && { delay: optionalData.delay }), // Check optionalData exists
-    ...(optionalData.linkPreview !== undefined && { linkPreview: optionalData.linkPreview }), // Check optionalData exists
-    ...(optionalData.mentionsEveryOne !== undefined && { mentionsEveryOne: optionalData.mentionsEveryOne }), // Check optionalData exists
-    ...(optionalData.mentioned && { mentioned: optionalData.mentioned }), // Check optionalData exists
-    ...(optionalData.quoted && { quoted: optionalData.quoted }), // Check optionalData exists
+   // Clean up empty options/mentions
+   if (evolutionPayload.options) {
+      if (evolutionPayload.options.mentions && Object.keys(evolutionPayload.options.mentions).length === 0) {
+          delete evolutionPayload.options.mentions;
+      }
+      if (Object.keys(evolutionPayload.options).length === 0) {
+          delete evolutionPayload.options;
+      }
+  }
+  console.log("sendTextService: Sending payload:", JSON.stringify(evolutionPayload, null, 2));
+
+  // 5. Make the direct request using ApiService
+  const result = await apiServiceInstance.request<SendTextResponse>(apiUrl, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "apikey": apiKey, // Use the fetched API key
+    },
+    body: JSON.stringify(evolutionPayload),
+    logRequests: true // Enable logging for this specific call via apiService
   });
 
-  try {
-    // ... (rest of the old fetch logic) ...
-  } catch (error) {
-    // ... (old error handling) ...
-  }
-  */
+  // 6. Return the successful response (error handling done by ApiService)
+  console.log(`sendTextService: Direct API call successful for ${number} via instance ${instanceDisplayName}.`);
+  return result;
 };
