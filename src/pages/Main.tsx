@@ -6,7 +6,7 @@ import { GetStartedView } from "@/components/dashboard/getting-started/GetStarte
 import { DashboardStats } from "@/components/dashboard/DashboardStats";
 import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
 import { DashboardFilters } from "@/components/dashboard/DashboardFilters";
-import { Button } from "@/components/ui/button";
+import { DashboardSidebarMenu } from "@/components/dashboard/DashboardSidebarMenu";
 
 export default function Main() {
   const [timeFilter, setTimeFilter] = useState<'today' | 'yesterday' | 'week' | 'month'>('month'); // Default to 'month'
@@ -149,30 +149,17 @@ export default function Main() {
         <div className="container mx-auto px-8">
           <DashboardHeader />
           <div className="flex mt-6 h-[calc(100vh-120px)] rounded-xl overflow-hidden shadow bg-muted/30 border">
-
-            {/* Left vertical menu */}
-            <div className="w-48 min-w-[150px] border-r bg-white flex flex-col pt-4">
-              <Button
-                className={`w-full justify-start px-6 py-3 text-lg ${selectedPanel === 'getting-started' ? "bg-blue-100 font-semibold text-blue-700" : "bg-transparent text-gray-700 hover:bg-muted"}`}
-                variant="ghost"
-                onClick={() => setSelectedPanel('getting-started')}
-              >
-                Getting Started
-              </Button>
-              <Button
-                className={`w-full justify-start px-6 py-3 text-lg ${selectedPanel === 'analytics' ? "bg-blue-100 font-semibold text-blue-700" : "bg-transparent text-gray-700 hover:bg-muted"}`}
-                variant="ghost"
-                onClick={() => setSelectedPanel('analytics')}
-              >
-                Analytics
-              </Button>
+            {/* Left sidebar (mimics LeadsSidebar pattern, but static options) */}
+            <div className="w-48 min-w-[150px]">
+              <DashboardSidebarMenu
+                selectedPanel={selectedPanel}
+                onSelect={setSelectedPanel}
+              />
             </div>
-
-            {/* Middle panel (content) */}
+            {/* Main content area */}
             <div className="flex-1 bg-transparent h-full overflow-auto">
               {selectedPanel === "getting-started" && (
                 <div className="p-6 h-full">
-                  {/* Replicate the Getting Started view here */}
                   <GetStartedView />
                 </div>
               )}
