@@ -20,8 +20,15 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import type { Customer } from "./types/customer";
 import { useToast } from "@/hooks/use-toast";
-import type { Database } from "@/integrations/supabase/types"; // Import Database type
-import { sendBroadcastService } from '@/services/broadcast/sendBroadcastService'; // Import the new service
+import type { Database } from "@/integrations/supabase/types";
+import { sendBroadcastService } from '@/services/broadcast/sendBroadcastService';
+
+// Define a type for the combined integration and instance data
+interface IntegrationInstanceInfo {
+  integrationId: string;
+  instanceId: string;
+  name: string; // Integration name for display
+}
 
 interface BroadcastModalProps {
   isOpen: boolean;
@@ -39,8 +46,10 @@ export function BroadcastModal({
   const [broadcastMessage, setBroadcastMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false); // For loading customers
   const [isSending, setIsSending] = useState(false);
-  const [availableIntegrations, setAvailableIntegrations] = useState<Database['public']['Tables']['integrations']['Row'][]>([]);
-  const [selectedIntegrationId, setSelectedIntegrationId] = useState<string>(''); // Initialize as empty string
+  // Update state to hold IntegrationInstanceInfo
+  const [availableIntegrations, setAvailableIntegrations] = useState<IntegrationInstanceInfo[]>([]);
+  // State to hold the selected IntegrationInstanceInfo object or just its integrationId
+  const [selectedIntegrationId, setSelectedIntegrationId] = useState<string>('');
   const [isLoadingIntegrations, setIsLoadingIntegrations] = useState(false);
 
   // Reset state when modal opens or closes
@@ -50,8 +59,8 @@ export function BroadcastModal({
       setSelectedCustomers([]);
       setBroadcastMessage('');
       setIsSending(false);
-      setSelectedIntegrationId(''); // Reset selected integration
-      setAvailableIntegrations([]); // Clear integrations list
+      setSelectedIntegrationId('');
+      setAvailableIntegrations([]);
     }
   }, [isOpen]);
 
@@ -82,25 +91,46 @@ export function BroadcastModal({
       const fetchIntegrations = async () => {
         setIsLoadingIntegrations(true);
         try {
-          // Fetch all integrations including api_key and base_url
-          // SECURITY WARNING: Exposing api_key in the frontend is risky!
-          const { data, error } = await supabase
+          // 1. Fetch integrations (just ID and name)
+          const { data: integrationsData, error: integrationsError } = await supabase
             .from('integrations')
-            .select('id, name, base_url, api_key'); // Select necessary fields
+            .select('id, name');
+          if (integrationsError) throw integrationsError;
+          if (!integrationsData) throw new Error("No integrations found.");
 
-          if (error) throw error;
-          // Filter out integrations missing essential data (handle potential nulls)
-          const validIntegrations = (data || []).filter(
-            (integration): integration is Database['public']['Tables']['integrations']['Row'] & { api_key: string; base_url: string } =>
-              integration.api_key !== null && integration.base_url !== null
-          );
-          setAvailableIntegrations(validIntegrations);
-          // Optionally set a default selected integration
-          if (data && data.length > 0) {
-            setSelectedIntegrationId(data[0].id); // Select the first one by default
+          // 2. Fetch integration configs (integration_id and instance_id)
+          const { data: configsData, error: configsError } = await supabase
+            .from('integrations_config')
+            .select('integration_id, instance_id'); // Fetch relevant fields
+          if (configsError) throw configsError;
+          if (!configsData) throw new Error("No integration configurations found.");
+
+          // 3. Combine the data, linking integrations to their instance IDs
+          const combinedData: IntegrationInstanceInfo[] = integrationsData.map(integration => {
+            // Find the first config matching this integration ID
+            const config = configsData.find(c => c.integration_id === integration.id);
+            return {
+              integrationId: integration.id,
+              name: integration.name || `Integration ${integration.id}`, // Use name or fallback
+              instanceId: config?.instance_id || '', // Store instanceId, empty if no config
+            };
+          }).filter(item => item.instanceId); // Filter out integrations without a configured instanceId
+
+          if (combinedData.length === 0) {
+             console.warn("No integrations with valid configurations (instanceId) found.");
+             // Optionally inform the user
           }
+
+          setAvailableIntegrations(combinedData);
+          // Set default selection if available
+          if (combinedData.length > 0) {
+            setSelectedIntegrationId(combinedData[0].integrationId); // Select the first integration ID
+          } else {
+             setSelectedIntegrationId(''); // Ensure selection is cleared if no valid options
+          }
+
         } catch (error) {
-          console.error("Error fetching integrations:", error);
+          console.error("Error fetching integrations/configs:", error);
           toast({ title: "Error", description: "Could not load integrations.", variant: "destructive" });
         } finally {
           setIsLoadingIntegrations(false);
@@ -138,32 +168,32 @@ export function BroadcastModal({
       return;
     }
 
-    // Find the selected integration details (including API key and base URL)
-    const selectedIntegration = availableIntegrations.find(int => int.id === selectedIntegrationId);
-    // Ensure the integration and its required fields (api_key, base_url) exist
-    if (!selectedIntegration || !selectedIntegration.api_key || !selectedIntegration.base_url) {
-       toast({ title: "Error", description: "Selected integration details are missing or incomplete (API Key or Base URL).", variant: "destructive" });
+    // Find the selected integration's details, including the instanceId
+    const selectedIntegrationInfo = availableIntegrations.find(int => int.integrationId === selectedIntegrationId);
+
+    if (!selectedIntegrationInfo || !selectedIntegrationInfo.instanceId) {
+       toast({ title: "Error", description: "Selected integration is missing configuration (Instance ID).", variant: "destructive" });
        return;
     }
 
     setIsSending(true);
 
     try {
-       // Call the new frontend service function
+       // Call the service with integrationId and instanceId
+       // Remove apiKey and baseUrl as they are fetched within the service now
        const result = await sendBroadcastService({
          integrationId: selectedIntegrationId,
+         instanceId: selectedIntegrationInfo.instanceId, // Pass the correct instanceId
          customerIds: selectedCustomers,
          messageText: broadcastMessage,
-         apiKey: selectedIntegration.api_key, // Pass API key - SECURITY RISK!
-         baseUrl: selectedIntegration.base_url, // Pass base URL
        });
 
+      // Response handling remains the same
       console.log("Broadcast Service Response:", result);
-      const { successfulSends, failedSends, totalAttempted, broadcastId, warning } = result;
+      const { successfulSends, failedSends, totalAttempted, broadcastId } = result;
 
-      if (warning) {
-         toast({ title: "Broadcast Warning", description: warning, variant: "default" });
-      } else if (failedSends > 0) {
+      // Removed check for 'warning' as it's not returned by the service
+      if (failedSends > 0) {
         toast({
           title: "Broadcast Partially Failed",
           description: `${failedSends} out of ${totalAttempted} messages failed. Broadcast ID: ${broadcastId}. Check server logs for details.`,
@@ -250,9 +280,10 @@ export function BroadcastModal({
                     <SelectValue placeholder="Select integration..." />
                   </SelectTrigger>
                   <SelectContent>
-                    {availableIntegrations.map((integration) => (
-                      <SelectItem key={integration.id} value={integration.id}>
-                        {integration.name} 
+                    {availableIntegrations.map((integrationInfo) => (
+                      // Use integrationId for the value, as that's what's stored in selectedIntegrationId state
+                      <SelectItem key={integrationInfo.integrationId} value={integrationInfo.integrationId}>
+                        {integrationInfo.name} {/* Display the integration name */}
                       </SelectItem>
                     ))}
                   </SelectContent>

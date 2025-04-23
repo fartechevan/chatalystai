@@ -1,163 +1,157 @@
-import { supabase } from '@/integrations/supabase/client';
-import type { Database } from '@/integrations/supabase/types';
+// Removed apiServiceInstance and getEvolutionCredentials imports
+import { supabase } from '@/integrations/supabase/client'; // Assuming path
+import { sendTextService } from '@/integrations/evolution-api/services/sendTextService'; // Import the service we want to reuse
 
-type Customer = Database['public']['Tables']['customers']['Row'];
-
-interface SendBroadcastParams {
-  integrationId: string;
-  customerIds: string[];
-  messageText: string;
-  // Note: Passing apiKey and baseUrl directly is a security risk!
-  apiKey: string; 
-  baseUrl: string;
+interface CustomerInfo {
+  id: string;
+  phone_number: string;
 }
 
-interface SendBroadcastResult {
+interface RecipientInfo extends CustomerInfo {
+    recipient_id: string; // ID from broadcast_recipients table
+}
+
+export interface SendBroadcastParams {
+  customerIds: string[];
+  messageText: string;
+  integrationId: string;
+  instanceId: string; // Added: Specify which instance to send from
+}
+
+export interface SendBroadcastResult {
   broadcastId: string;
   successfulSends: number;
   failedSends: number;
   totalAttempted: number;
-  warning?: string;
 }
 
-export const sendBroadcastService = async ({
-  integrationId,
-  customerIds,
-  messageText,
-  apiKey,
-  baseUrl,
-}: SendBroadcastParams): Promise<SendBroadcastResult> => {
-  console.log("Starting broadcast service:", { integrationId, customerIds, messageText });
+/**
+ * Sends a broadcast message directly via the Evolution API from the client-side.
+ * Handles database operations for tracking and makes individual API calls.
+ * @param params - The parameters for sending the broadcast message.
+ * @returns A promise that resolves with the broadcast summary on success.
+ * @throws If any step (db operations, calling sendTextService) fails critically.
+ */
+export const sendBroadcastService = async (params: SendBroadcastParams): Promise<SendBroadcastResult> => {
+  const { customerIds, messageText, integrationId, instanceId } = params;
 
-  let successfulSends = 0;
-  let failedSends = 0;
-  let broadcastId = '';
+  console.log(`sendBroadcastService: Starting broadcast for ${customerIds.length} customers, integration ${integrationId}, instance ${instanceId}`);
 
+  // Credentials and display name will be handled by sendTextService internally.
+
+  // --- 2. Setup Broadcast Tracking in DB ---
+  let broadcastId: string;
+  let validRecipients: RecipientInfo[] = [];
+  console.log("sendBroadcastService: Setting up broadcast tracking...");
   try {
-    // 1. Fetch Instance ID from integrations_config
-    const { data: configData, error: configError } = await supabase
-      .from('integrations_config')
-      .select('instance_id')
-      .eq('integration_id', integrationId)
-      .maybeSingle();
-
-    if (configError && configError.code !== 'PGRST116') {
-      throw new Error(`Error fetching instance config: ${configError.message}`);
-    }
-    const instanceId = configData?.instance_id;
-    if (!instanceId) {
-      throw new Error(`No instance configured for integration ${integrationId}.`);
-    }
-    console.log("Fetched instanceId:", instanceId);
-
-    // 2. Create Broadcast Record
+    // Create Broadcast Record - Store the actual instanceId (UUID)
     const { data: broadcastData, error: broadcastInsertError } = await supabase
       .from('broadcasts')
-      .insert({
-        message_text: messageText,
-        integration_id: integrationId,
-        instance_id: instanceId,
-      })
+      .insert({ message_text: messageText, integration_id: integrationId, instance_id: instanceId }) // Store the actual instanceId
       .select('id')
       .single();
-
-    if (broadcastInsertError) throw new Error(`Error creating broadcast record: ${broadcastInsertError.message}`);
+    if (broadcastInsertError) throw broadcastInsertError;
     broadcastId = broadcastData.id;
-    console.log("Created broadcast record:", broadcastId);
+    console.log(`sendBroadcastService: Created broadcast record ID: ${broadcastId}`);
 
-    // 3. Fetch Customer Phone Numbers
+    // Fetch Customer Phone Numbers
     const { data: customers, error: customerError } = await supabase
       .from("customers")
       .select("id, phone_number")
       .in("id", customerIds);
-
-    if (customerError) throw new Error(`Error fetching customer details: ${customerError.message}`);
+    if (customerError) throw customerError;
 
     const validCustomers = (customers || []).filter(
-      (c: Partial<Customer>): c is Customer & { phone_number: string } =>
-        typeof c.phone_number === 'string' && c.phone_number.trim() !== ''
+      (c): c is CustomerInfo => typeof c.phone_number === 'string' && c.phone_number.trim() !== ''
     );
 
     if (validCustomers.length === 0) {
-      console.warn("No valid phone numbers found for selected customers.");
-      // Return early, maybe update broadcast status if needed
-      return { broadcastId, successfulSends: 0, failedSends: 0, totalAttempted: 0, warning: "No valid phone numbers found." };
+      console.warn("sendBroadcastService: No valid phone numbers found for selected customers.");
+      // Update broadcast status to 'completed' or 'failed'? Or handle upstream.
+      return { broadcastId, successfulSends: 0, failedSends: 0, totalAttempted: 0 };
     }
-    console.log("Found valid customers:", validCustomers.length);
+    console.log(`sendBroadcastService: Found ${validCustomers.length} customers with valid phone numbers.`);
 
-    // 4. Create Initial Recipient Records (Pending)
+    // Create Initial Recipient Records
     const recipientRecords = validCustomers.map(c => ({
       broadcast_id: broadcastId,
       customer_id: c.id,
       phone_number: c.phone_number,
       status: 'pending',
     }));
-
     const { data: insertedRecipients, error: recipientInsertError } = await supabase
       .from('broadcast_recipients')
       .insert(recipientRecords)
-      .select('id, phone_number'); // Select needed info for updates
+      .select('id, phone_number, customer_id'); // Select needed info
+    if (recipientInsertError) throw recipientInsertError;
 
-    if (recipientInsertError) throw new Error(`Error creating recipient records: ${recipientInsertError.message}`);
-    if (!insertedRecipients) throw new Error('Failed to get inserted recipient details.');
-    console.log("Created recipient records:", insertedRecipients.length);
+    // Map to RecipientInfo structure
+    validRecipients = (insertedRecipients || []).map(r => ({
+        id: r.customer_id,
+        phone_number: r.phone_number,
+        recipient_id: r.id // Store the broadcast_recipients table ID
+    }));
+    console.log(`sendBroadcastService: Created ${validRecipients.length} recipient records.`);
 
+  } catch (error) {
+    console.error("sendBroadcastService: Error setting up broadcast tracking:", error);
+    // Consider cleanup or marking broadcast as failed if setup fails midway
+    throw new Error(`Failed to setup broadcast tracking: ${error instanceof Error ? error.message : String(error)}`);
+  }
 
-    // 5. Send messages sequentially via Evolution API and update status
-    const evolutionApiUrl = `${baseUrl}/message/sendText/${instanceId}`;
-    console.log("Evolution API URL:", evolutionApiUrl);
+  // --- 3. Send Messages using sendTextService & Update Status ---
+  console.log("sendBroadcastService: Starting message sending loop...");
+  let successfulSends = 0;
+  let failedSends = 0;
 
-    for (const recipient of insertedRecipients) {
-      const evolutionPayload = { number: recipient.phone_number, text: messageText };
-      let updatePayload: Database['public']['Tables']['broadcast_recipients']['Update'] = { status: 'failed' };
+  for (const recipient of validRecipients) {
+    let updatePayload: { status: string; error_message?: string | null; sent_at?: string | null } = { status: 'failed', error_message: null, sent_at: null };
 
-      try {
-        const response = await fetch(evolutionApiUrl, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "apikey": apiKey, // Using API key directly in frontend - SECURITY RISK!
-          },
-          body: JSON.stringify(evolutionPayload),
-        });
+    try {
+      console.log(`sendBroadcastService: Calling sendTextService for ${recipient.phone_number} (Recipient ID: ${recipient.recipient_id})...`);
+      // Call the reusable sendTextService
+      await sendTextService({
+          integrationId: integrationId,
+          instance: instanceId, // Pass instanceId as 'instance' param to sendTextService
+          number: recipient.phone_number,
+          text: messageText,
+          // Pass any relevant optional parameters if needed for broadcasts
+      });
+      successfulSends++;
+      updatePayload = { status: 'sent', sent_at: new Date().toISOString(), error_message: null };
+      console.log(`sendBroadcastService: Successfully sent to ${recipient.phone_number}.`);
+    } catch (error: unknown) {
+      failedSends++;
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      updatePayload = { status: 'failed', error_message: errorMessage, sent_at: null };
+      console.error(`sendBroadcastService: Failed to send to ${recipient.phone_number}:`, errorMessage);
+    }
 
-        if (!response.ok) {
-          const errorBody = await response.text();
-          throw new Error(`API Error ${response.status}: ${errorBody}`);
-        }
-        // const responseData = await response.json(); // Process if needed
-        successfulSends++;
-        updatePayload = { status: 'sent', sent_at: new Date().toISOString() };
-      } catch (error: unknown) {
-        failedSends++;
-        const errorMessage = error instanceof Error ? error.message : String(error);
-        updatePayload = { status: 'failed', error_message: errorMessage };
-        console.error(`Failed to send broadcast to ${recipient.phone_number}:`, errorMessage);
-      }
-
-      // Update the recipient record status
+    // Update recipient status in DB
+    try {
       const { error: updateError } = await supabase
         .from('broadcast_recipients')
         .update(updatePayload)
-        .eq('id', recipient.id);
-
+        .eq('id', recipient.recipient_id); // Update by recipient ID
       if (updateError) {
-        console.error(`Failed to update status for recipient ${recipient.id} (${recipient.phone_number}): ${updateError.message}`);
-        // Potentially increment failedSends again or handle differently
+        console.error(`sendBroadcastService: Failed to update status for recipient ${recipient.recipient_id} (${recipient.phone_number}): ${updateError.message}`);
+        // Log error but continue processing other recipients
       }
+    } catch (dbUpdateError) {
+       console.error(`sendBroadcastService: Database error updating status for recipient ${recipient.recipient_id}:`, dbUpdateError);
     }
-
-    console.log("Broadcast sending finished:", { successfulSends, failedSends });
-    return { broadcastId, successfulSends, failedSends, totalAttempted: validCustomers.length };
-
-  } catch (error) {
-    console.error("Error in sendBroadcastService:", error);
-    // Rethrow or handle error appropriately for the UI
-    const errorMessage = error instanceof Error ? error.message : "An unexpected error occurred during the broadcast.";
-     // Attempt to update broadcast status to failed if possible
-     if (broadcastId) {
-        await supabase.from('broadcasts').update({ /* Add a status field? */ }).eq('id', broadcastId);
-     }
-    throw new Error(errorMessage); // Rethrow to be caught by the calling component
+     // Optional: Add a small delay between requests if needed to avoid rate limiting
+     // await new Promise(resolve => setTimeout(resolve, 200)); // e.g., 200ms delay
   }
+
+  // --- 4. Finalize and Return Summary ---
+  console.log(`sendBroadcastService: Broadcast complete. Success: ${successfulSends}, Failed: ${failedSends}`);
+  // Optionally update the main broadcast record status to 'completed' here
+
+  return {
+    broadcastId,
+    successfulSends,
+    failedSends,
+    totalAttempted: validRecipients.length,
+  };
 };
