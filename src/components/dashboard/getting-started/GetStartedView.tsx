@@ -1,3 +1,4 @@
+
 import { Card, CardContent } from "@/components/ui/card";
 import { ChannelSection } from "./sections/ChannelSection";
 import { OnboardingSection } from "./sections/OnboardingSection";
@@ -5,6 +6,7 @@ import { StartExploringSection } from "./sections/StartExploringSection";
 import { AnalyticsPreview } from "./sections/AnalyticsPreview";
 import { User } from "@supabase/supabase-js";
 import { useIntegrationsCount } from "@/hooks/useIntegrationsCount";
+import { useCustomerCount } from "@/hooks/useCustomerCount";
 
 interface GetStartedViewProps {
   userData: User | undefined | null;
@@ -12,9 +14,9 @@ interface GetStartedViewProps {
 
 export function GetStartedView({ userData }: GetStartedViewProps) {
   const { integrationsCount } = useIntegrationsCount();
+  const { customerCount } = useCustomerCount();
   
   const stats = {
-    contacts: 0,
     credits: 10000
   };
 
@@ -26,7 +28,7 @@ export function GetStartedView({ userData }: GetStartedViewProps) {
           <div className="flex gap-4 text-sm text-muted-foreground">
             <span>{integrationsCount} Channels</span>
             <span>•</span>
-            <span>{stats.contacts} Contacts</span>
+            <span>{customerCount} Contacts</span>
             <span>•</span>
             <span>{stats.credits} Credits</span>
           </div>
