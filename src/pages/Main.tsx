@@ -4,9 +4,10 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { GetStartedView } from "@/components/dashboard/getting-started/GetStartedView";
 import { DashboardStats } from "@/components/dashboard/DashboardStats";
-import { DashboardHeader } from "@/components/dashboard/DashboardHeader";
+import { User } from "@supabase/supabase-js"; // Import User type if not already present at top
+// Removed DashboardHeader import
 import { DashboardFilters } from "@/components/dashboard/DashboardFilters";
-import { DashboardSidebarMenu } from "@/components/dashboard/DashboardSidebarMenu";
+import { MainDashboardSidebar } from "@/components/dashboard/MainDashboardSidebar"; // Import the new sidebar
 
 export default function Main() {
   const [timeFilter, setTimeFilter] = useState<'today' | 'yesterday' | 'week' | 'month'>('month'); // Default to 'month'
@@ -22,10 +23,37 @@ export default function Main() {
     },
   });
 
+  // Fetch integrations count
+  const { data: integrationsCount = 0, isLoading: isIntegrationsLoading } = useQuery<number>({
+    queryKey: ["integrations-count", userData?.id], // Use user ID in the query key
+    queryFn: async () => {
+      const user = userData as User | null; // Type assertion for clarity
+      console.log("Fetching integrations count for user ID:", user?.id); // Log user ID
+      if (!user?.id) {
+        console.log("User ID not available, returning 0 integrations.");
+        return 0; // Don't run if user ID is not available
+      }
+
+      // Try selecting a specific column instead of '*'
+      const { count, error } = await supabase
+        .from("integrations_config")
+        .eq("user_id", user.id); // Filter by user ID
+
+      if (error) {
+        console.error("Error fetching integrations count:", error);
+        return 0;
+      }
+      console.log("Supabase returned count:", count); // Log the count
+      return count ?? 0; // Return the count or 0 if null/undefined
+    },
+    enabled: !!userData?.id, // Only run the query when userData.id is available
+  });
+
+
   // Get date range based on time filter
   const getDateRange = () => {
     const now = new Date();
-    let startDate = new Date();
+    const startDate = new Date();
 
     switch (timeFilter) {
       case 'today':
@@ -54,7 +82,7 @@ export default function Main() {
   const { data: leads = [], isLoading: isLeadsLoading } = useQuery({
     queryKey: ["leads", timeFilter, userFilter],
     queryFn: async () => {
-      let query = supabase
+      let query = supabase // Revert back to let
         .from("leads")
         .select("*")
         .gte("created_at", startDate.toISOString())
@@ -78,7 +106,7 @@ export default function Main() {
   const { data: conversations = [], isLoading: isConversationsLoading } = useQuery({
     queryKey: ["conversations", timeFilter, userFilter],
     queryFn: async () => {
-      let query = supabase
+      const query = supabase // Change to const as it's not reassigned
         .from("conversations")
         .select("*")
         .gte("created_at", startDate.toISOString())
@@ -123,7 +151,7 @@ export default function Main() {
   const { data: tasks = [], isLoading: isTasksLoading } = useQuery({
     queryKey: ["tasks", timeFilter, userFilter],
     queryFn: async () => {
-      let query = supabase
+      let query = supabase // Revert back to let
         .from("tasks")
         .select("*")
         .gte("created_at", startDate.toISOString())
@@ -144,14 +172,13 @@ export default function Main() {
   });
 
   return (
-    <div className="flex-1 flex flex-col -mt-8 -mx-8">
-      <div className="bg-white py-6 min-h-screen">
-        <div className="container mx-auto px-8">
-          <DashboardHeader />
-          <div className="flex mt-6 h-[calc(100vh-120px)] rounded-xl overflow-hidden shadow bg-muted/30 border">
-            {/* Left sidebar (mimics LeadsSidebar pattern, but static options) */}
-            <div className="w-48 min-w-[150px]">
-              <DashboardSidebarMenu
+    // Removed outer div with negative margins and bg-white div
+    <div className="flex flex-1 h-full"> {/* Make this the main flex container, removed flex-col */}
+      {/* Removed container div and DashboardHeader */}
+      {/* The main content area now directly contains the sidebar and content */}
+      {/* Use the new sidebar */}
+      <div className="w-64 min-w-[200px] border-r bg-muted/30"> {/* Added border and bg here */}
+              <MainDashboardSidebar
                 selectedPanel={selectedPanel}
                 onSelect={setSelectedPanel}
               />
@@ -159,13 +186,15 @@ export default function Main() {
             {/* Main content area */}
             <div className="flex-1 bg-transparent h-full overflow-auto">
               {selectedPanel === "getting-started" && (
-                <div className="p-6 h-full">
-                  <GetStartedView />
+                <div className="h-full"> {/* Removed p-6 */}
+                  {/* Pass integrationsCount as a prop */}
+                  <GetStartedView userData={userData} integrationsCount={integrationsCount} />
                 </div>
               )}
               {selectedPanel === "analytics" && (
-                <div className="p-6 h-full flex flex-col gap-6">
-                  <div className="w-full mb-2">
+                <div className="h-full flex flex-col gap-6"> {/* Removed p-6 */}
+                  {/* Consider adding padding back selectively if needed */}
+                  <div className="w-full mb-2 px-6 pt-6"> {/* Added padding back here for filters */}
                     <DashboardFilters
                       selectedTime={timeFilter}
                       onTimeChange={setTimeFilter}
@@ -173,7 +202,7 @@ export default function Main() {
                       onUserChange={setUserFilter}
                     />
                   </div>
-                  <div className="flex-1 pb-6">
+                  <div className="flex-1 pb-6 px-6"> {/* Added horizontal padding back here for stats */}
                     <DashboardStats
                       timeFilter={timeFilter}
                       userFilter={userFilter}
@@ -186,10 +215,7 @@ export default function Main() {
                   </div>
                 </div>
               )}
-            </div>
-          </div>
-        </div>
-      </div>
+            </div> {/* Closes main content area */}
     </div>
   );
 }
