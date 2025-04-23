@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -21,33 +22,6 @@ export default function Main() {
       return data.user;
     },
   });
-
-  // Fetch integrations count
-  const { data: integrationsCount = 0, isLoading: isIntegrationsLoading } = useQuery<number>({
-    queryKey: ["integrations-count", userData?.id], // Use user ID in the query key
-    queryFn: async () => {
-      const user = userData as User | null; // Type assertion for clarity
-      console.log("Fetching integrations count for user ID:", user?.id); // Log user ID
-      if (!user?.id) {
-        console.log("User ID not available, returning 0 integrations.");
-        return 0; // Don't run if user ID is not available
-      }
-
-      // Try selecting a specific column instead of '*'
-      const { count, error } = await supabase
-        .from("integrations_config")
-        .eq("user_id", user.id); // Filter by user ID
-
-      if (error) {
-        console.error("Error fetching integrations count:", error);
-        return 0;
-      }
-      console.log("Supabase returned count:", count); // Log the count
-      return count ?? 0; // Return the count or 0 if null/undefined
-    },
-    enabled: !!userData?.id, // Only run the query when userData.id is available
-  });
-
 
   // Get date range based on time filter
   const getDateRange = () => {
@@ -81,7 +55,7 @@ export default function Main() {
   const { data: leads = [], isLoading: isLeadsLoading } = useQuery({
     queryKey: ["leads", timeFilter, userFilter],
     queryFn: async () => {
-      let query = supabase // Revert back to let
+      let query = supabase
         .from("leads")
         .select("*")
         .gte("created_at", startDate.toISOString())
@@ -105,7 +79,7 @@ export default function Main() {
   const { data: conversations = [], isLoading: isConversationsLoading } = useQuery({
     queryKey: ["conversations", timeFilter, userFilter],
     queryFn: async () => {
-      const query = supabase // Change to const as it's not reassigned
+      const query = supabase
         .from("conversations")
         .select("*")
         .gte("created_at", startDate.toISOString())
@@ -150,7 +124,7 @@ export default function Main() {
   const { data: tasks = [], isLoading: isTasksLoading } = useQuery({
     queryKey: ["tasks", timeFilter, userFilter],
     queryFn: async () => {
-      let query = supabase // Revert back to let
+      let query = supabase
         .from("tasks")
         .select("*")
         .gte("created_at", startDate.toISOString())
@@ -186,8 +160,8 @@ export default function Main() {
             <div className="flex-1 bg-transparent h-full overflow-auto">
               {selectedPanel === "getting-started" && (
                 <div className="h-full"> {/* Removed p-6 */}
-                  {/* Pass integrationsCount as a prop */}
-                  <GetStartedView userData={userData} integrationsCount={integrationsCount} />
+                  {/* Only pass userData prop - removed integrationsCount */}
+                  <GetStartedView userData={userData} />
                 </div>
               )}
               {selectedPanel === "analytics" && (
