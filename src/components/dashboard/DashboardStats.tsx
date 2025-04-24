@@ -1,7 +1,7 @@
 
 import { StatsCard } from "./StatsCard";
 import { TasksSection } from "./TasksSection";
-import { MessagesSection } from "./MessagesSection";
+import { MessagesSection } from "./MessagesSection"; 
 import { LeadSourcesSection } from "./LeadSourcesSection";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tables } from "@/integrations/supabase/types"; // Import Tables type

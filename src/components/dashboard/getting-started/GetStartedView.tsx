@@ -3,7 +3,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { ChannelSection } from "./sections/ChannelSection";
 import { OnboardingSection } from "./sections/OnboardingSection";
 import { StartExploringSection } from "./sections/StartExploringSection";
-import { AnalyticsPreview } from "./sections/AnalyticsPreview";
+// Removed AnalyticsPreview import
 import { User } from "@supabase/supabase-js";
 import { useIntegrationsCount } from "@/hooks/useIntegrationsCount";
 import { useCustomerCount } from "@/hooks/useCustomerCount";
@@ -38,7 +38,7 @@ export function GetStartedView({ userData }: GetStartedViewProps) {
       <OnboardingSection />
       <ChannelSection />
       <StartExploringSection />
-      <AnalyticsPreview />
+      {/* Removed AnalyticsPreview component */}
     </div>
   );
 }
