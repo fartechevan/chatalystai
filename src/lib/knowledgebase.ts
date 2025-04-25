@@ -2,6 +2,7 @@
 import { generateEmbedding } from "@/lib/embeddings";
 import { supabase } from "@/integrations/supabase/client";
 import { v4 as uuidv4 } from "uuid";
+import { toast } from "@/components/ui/use-toast";
 
 export async function saveChunkWithEmbedding(content: string, documentId: string) {
   try {
@@ -11,37 +12,56 @@ export async function saveChunkWithEmbedding(content: string, documentId: string
     let contentEmbedding;
     
     if (isClient) {
-      // Use Supabase Edge Function when in the browser
-      const { data: embeddingData, error: embeddingError } = await supabase.functions.invoke('knowledge-base', {
-        method: 'POST',
-        body: {
-          action: 'save_chunk',
-          content: content,
-          document_id: documentId
+      try {
+        // First, generate the embedding locally
+        contentEmbedding = await generateEmbedding(content);
+
+        // Then save the chunk with embedding
+        const { data, error } = await supabase
+          .from('knowledge_chunks')
+          .insert({
+            id: uuidv4(),
+            content: content, 
+            document_id: documentId, 
+            embedding: JSON.stringify(contentEmbedding),
+            metadata: JSON.stringify({}),
+            sequence: 0,
+          });
+
+        if (error) {
+          console.error('Error inserting knowledge chunk:', error);
+          toast({
+            title: "Error Saving Chunk",
+            description: `Failed to save chunk: ${error.message}`,
+            variant: "destructive"
+          });
+          throw new Error(error.message);
         }
-      });
 
-      if (embeddingError) {
-        console.error('Error invoking knowledge-base function:', embeddingError);
-        throw new Error('Error generating embedding or saving chunk');
+        return {
+          message: 'Knowledge chunk saved successfully',
+          data: data,
+        };
+      } catch (embeddingError) {
+        console.error('Error generating embedding:', embeddingError);
+        toast({
+          title: "Embedding Error",
+          description: `Failed to generate embedding: ${embeddingError instanceof Error ? embeddingError.message : 'Unknown error'}`,
+          variant: "destructive"
+        });
+        throw embeddingError;
       }
-
-      return embeddingData;
     } else {
-      // Server-side approach (should not be reached in browser context)
+      // Server-side fallback (should not be reached in browser context)
       contentEmbedding = await generateEmbedding(content);
 
-      // Convert the embedding to a string
-      const embeddingString = JSON.stringify(contentEmbedding);
-
-      // Insert the chunk into the knowledge_chunks table
       const { data, error } = await supabase
         .from('knowledge_chunks')
         .insert([{ 
           id: uuidv4(),
           content: content, 
           document_id: documentId, 
-          embedding: embeddingString,
+          embedding: JSON.stringify(contentEmbedding),
           metadata: JSON.stringify({}),
           sequence: 0,
         }]);
@@ -57,7 +77,12 @@ export async function saveChunkWithEmbedding(content: string, documentId: string
       };
     }
   } catch (error: any) {
-    console.error(error);
+    console.error('Comprehensive chunk saving error:', error);
+    toast({
+      title: "Chunk Saving Failed",
+      description: error.message || "An unexpected error occurred",
+      variant: "destructive"
+    });
     throw new Error(error.message);
   }
 }
