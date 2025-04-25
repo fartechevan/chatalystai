@@ -1,7 +1,9 @@
-import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+/// <reference types="https://esm.sh/@supabase/functions-js/src/edge-runtime.d.ts" />
+
+import { serve } from "std/http/server.ts"; // Use import map alias
 import { corsHeaders } from "../_shared/cors.ts";
-import { Database } from "../_shared/database.types.ts";
+import { createSupabaseClient, getAuthenticatedUser } from "../_shared/supabaseClient.ts";
+import { parseRequest, listSegmentContactsDb, formatResponsePayload } from "./utils.ts";
 
 serve(async (req) => {
   // Handle CORS preflight request
@@ -10,90 +12,51 @@ serve(async (req) => {
   }
 
   try {
-    // Ensure the request method is GET
-    if (req.method !== "GET") {
-      return new Response(JSON.stringify({ error: "Method Not Allowed" }), {
-        status: 405,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+    // 1. Parse and Validate Request
+    const { segmentId } = parseRequest(req); // No await needed for sync function
 
-    // Extract segment_id from query parameters
-    const url = new URL(req.url);
-    const segmentId = url.searchParams.get("segment_id");
+    // 2. Create Authenticated Supabase Client & Verify User
+    await getAuthenticatedUser(req); // Ensures user is authenticated
+    const supabaseClient = createSupabaseClient(req);
 
-    if (!segmentId) {
-      return new Response(JSON.stringify({ error: "Segment ID query parameter is required" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+    // 3. List Segment Contacts via DB function
+    const { data: rawData, error } = await listSegmentContactsDb(supabaseClient, segmentId);
 
-    // Create Supabase client with auth context
-    const supabaseClient = createClient<Database>(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_ANON_KEY") ?? "",
-      {
-        global: { headers: { Authorization: req.headers.get("Authorization")! } },
-        auth: {
-          persistSession: false,
-        },
-      }
-    );
-
-    // Get the authenticated user (needed for RLS check)
-    const {
-      data: { user },
-      error: userError,
-    } = await supabaseClient.auth.getUser();
-
-    if (userError || !user) {
-      console.error("User fetch error:", userError);
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    // Fetch contacts belonging to the specified segment owned by the user
-    // RLS policies on both tables ensure data security
-    const { data, error } = await supabaseClient
-      .from("segment_contacts")
-      .select(`
-        segment_id,
-        added_at,
-        customers ( id, name, phone_number, email )
-      `)
-      .eq("segment_id", segmentId);
-      // RLS on segment_contacts checks ownership via segment_id -> segments.user_id
-
+    // 4. Handle Response
     if (error) {
       console.error("Supabase select error:", error);
+      let status = 500;
+      let message = error.message || "Failed to list segment contacts";
       // Check if the error is due to RLS violation (segment not found or not owned)
       if (error.code === 'PGRST116') { // PostgREST error code for RLS violation or 0 rows affected
-         return new Response(JSON.stringify({ error: "Segment not found or access denied" }), {
-           status: 404, // Not Found or Forbidden
-           headers: { ...corsHeaders, "Content-Type": "application/json" },
-         });
+        status = 404; // Not Found or Forbidden
+        message = "Segment not found or access denied";
       }
-      return new Response(JSON.stringify({ error: error.message }), {
-        status: 500,
+      return new Response(JSON.stringify({ error: message }), {
+        status: status,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // Format the response to return just the customer details
-    const contacts = data?.map(item => item.customers) ?? [];
+    // 5. Format the response payload
+    const contacts = formatResponsePayload(rawData);
 
     // Return the list of contacts
     return new Response(JSON.stringify(contacts), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 200,
     });
+
   } catch (err) {
-    console.error("Internal server error:", err);
+    // Catch errors from parsing, auth, or unexpected issues
+    console.error("Error in list-segment-contacts handler:", err.message);
+    let status = 500;
+    if (err.message === "Method Not Allowed") status = 405;
+    if (err.message === "Segment ID query parameter (segment_id) is required") status = 400;
+    if (err.message.startsWith("Authentication error") || err.message === "User not authenticated.") status = 401;
+
     return new Response(JSON.stringify({ error: err.message }), {
-      status: 500,
+      status: status,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }

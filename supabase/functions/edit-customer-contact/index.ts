@@ -1,8 +1,9 @@
-import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { corsHeaders } from '../_shared/cors.ts';
+/// <reference types="https://esm.sh/@supabase/functions-js/src/edge-runtime.d.ts" />
 
-console.log('Edit Customer Contact function started');
+import { serve } from 'std/http/server.ts'; // Use import map alias
+import { corsHeaders } from '../_shared/cors.ts';
+import { createSupabaseClient, getAuthenticatedUser } from '../_shared/supabaseClient.ts';
+import { parseAndValidateRequest, prepareUpdatePayload, updateCustomerDb } from './utils.ts';
 
 serve(async (req) => {
   // Handle CORS preflight request
@@ -11,103 +12,68 @@ serve(async (req) => {
   }
 
   try {
-    // Ensure the request method is POST
-    if (req.method !== 'POST') {
-      return new Response(JSON.stringify({ error: 'Method Not Allowed' }), {
-        status: 405,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
+    // 1. Parse and Validate Request
+    const updates = await parseAndValidateRequest(req);
+    const customerId = updates.id; // Extract ID for clarity
 
-    // Parse the request body
-    const { id, name, email, phone, company } = await req.json();
+    // 2. Create Authenticated Supabase Client & Get User
+    const user = await getAuthenticatedUser(req); // Throws on error/unauthenticated
+    const supabaseClient = createSupabaseClient(req);
 
-    // Validate required fields
-    if (!id) {
-      return new Response(JSON.stringify({ error: 'Contact ID is required' }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-     if (!name && !email && !phone && !company) {
-      return new Response(JSON.stringify({ error: 'At least one field (name, email, phone, company) must be provided for update' }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
+    // 3. Prepare Update Payload
+    const updateData = prepareUpdatePayload(updates);
 
-
-    // Create Supabase client
-    const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      { global: { headers: { Authorization: req.headers.get('Authorization')! } } }
+    // 4. Update Customer via DB function
+    const { data, error } = await updateCustomerDb(
+      supabaseClient,
+      customerId,
+      user.id,
+      updateData
     );
 
-     // Get the authenticated user
-     const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
-     if (userError || !user) {
-       console.error('User not authenticated:', userError?.message);
-       return new Response(JSON.stringify({ error: 'User not authenticated' }), {
-         status: 401,
-         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-       });
-     }
-     console.log('Authenticated user:', user.id);
-
-
-    // Prepare the update object, only including fields that are provided
-    const updateData: { name?: string; email?: string; phone?: string; company?: string, updated_at: string } = { updated_at: new Date().toISOString() };
-    if (name !== undefined) updateData.name = name;
-    if (email !== undefined) updateData.email = email;
-    if (phone !== undefined) updateData.phone = phone;
-    if (company !== undefined) updateData.company = company;
-
-
-    // Update the customer record
-    const { data, error } = await supabaseClient
-      .from('customers')
-      .update(updateData)
-      .eq('id', id)
-      .eq('user_id', user.id) // Ensure the user owns the contact
-      .select()
-      .single(); // Use single() if you expect only one record to be updated and want it returned
-
+    // 5. Handle Response
     if (error) {
       console.error('Error updating customer:', error);
-      // Check for specific errors, e.g., RLS violation or record not found
-       if (error.code === 'PGRST116') { // PostgREST error code for "No rows found"
-        return new Response(JSON.stringify({ error: 'Contact not found or user does not have permission to edit' }), {
-          status: 404,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
+      let status = 500;
+      let message = typeof error === 'object' && error !== null && 'message' in error
+                      ? error.message
+                      : 'Failed to update contact';
+
+      // Check for specific error code/message from the DB util
+      if (typeof error === 'object' && error !== null && 'message' in error && error.message.includes("Contact not found")) {
+        status = 404;
+        message = "Contact not found or user does not have permission to edit";
+      } else if (typeof error === 'object' && error !== null && 'code' in error && error.code === 'PGRST116') {
+         // Handle potential PostgrestError specifically if needed, though the custom error above covers it
+         status = 404;
+         message = "Contact not found or user does not have permission to edit";
       }
-      return new Response(JSON.stringify({ error: 'Failed to update contact', details: error.message }), {
-        status: 500,
+
+      return new Response(JSON.stringify({ error: message }), {
+        status: status,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
-
-     if (!data) {
-       console.error('No data returned after update, possibly RLS issue or contact not found.');
-       return new Response(JSON.stringify({ error: 'Contact not found or update failed' }), {
-         status: 404, // Or 500 depending on expected behavior
-         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-       });
-     }
-
-    console.log('Customer updated successfully:', data);
 
     // Return the updated customer data
     return new Response(JSON.stringify(data), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      status: 200,
+      status: 200, // OK
     });
-  } catch (e) {
-    console.error('Unexpected error:', e);
-    return new Response(JSON.stringify({ error: e.message }), {
+
+  } catch (err) {
+    // Catch errors from parsing, auth, or unexpected issues
+    console.error('Error in edit-customer-contact handler:', err.message);
+    let status = 500;
+    if (err.message === "Method Not Allowed") status = 405;
+    if (err.message === "Invalid JSON body") status = 400;
+    if (err.message === "Contact ID (id) is required") status = 400;
+    if (err.message === "At least one field (name, email, phone, company) must be provided for update") status = 400;
+    if (err.message.startsWith("Authentication error") || err.message === "User not authenticated.") status = 401;
+
+    return new Response(JSON.stringify({ error: err.message }), {
+      status: status,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      status: 500,
     });
   }
 });

@@ -1,93 +1,61 @@
+/// <reference types="https://esm.sh/@supabase/functions-js/src/edge-runtime.d.ts" />
 
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.39.3'
-import { corsHeaders } from '../_shared/cors.ts'
+import { serve } from 'std/http/server.ts'; // Use import map alias
+import { corsHeaders } from '../_shared/cors.ts';
+import { createSupabaseServiceRoleClient } from '../_shared/supabaseClient.ts'; // Use Service Role for token tracking
+import { openai } from '../_shared/openaiUtils.ts'; // Use shared OpenAI client
+import { parseRequest, summarizeWithOpenAI, trackTokenUsageDb } from './utils.ts';
 
-Deno.serve(async (req) => {
+serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders })
+    return new Response(null, { headers: corsHeaders });
   }
+
+  let supabaseClient; // Define here for potential use in tracking
 
   try {
-    const { messages } = await req.json()
-
-    if (!messages || !Array.isArray(messages) || messages.length === 0) {
-      return new Response(JSON.stringify({ summary: null }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 200,
-      })
+    // 1. Check OpenAI client availability
+    if (!openai) {
+      throw new Error("OpenAI client is not initialized (API key likely missing).");
     }
 
-    const prompt = `
-      You are an expert at summarizing conversations. Please provide a concise summary of the following conversation:
+    // 2. Parse Request
+    const { messages } = await parseRequest(req);
 
-      ${messages.map((message) => `${message.sender_id}: ${message.content}`).join('\n')}
+    // 3. Summarize Conversation with OpenAI
+    const { summary, tokensUsed } = await summarizeWithOpenAI(openai, messages);
 
-      Summary:
-    `
-
-    const apiKey = Deno.env.get('OPENAI_API_KEY')
-    if (!apiKey) {
-      throw new Error('OPENAI_API_KEY is not set in environment variables')
+    // 4. Track Token Usage (async, non-blocking, best effort)
+    if (tokensUsed && tokensUsed > 0) {
+      // Create client only if needed for tracking
+      supabaseClient = createSupabaseServiceRoleClient();
+      // Don't await, let it run in the background. Log errors within the function.
+      trackTokenUsageDb(supabaseClient, messages, tokensUsed).catch(err => {
+          console.error("Background token tracking failed:", err);
+      });
     }
 
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model: 'gpt-3.5-turbo',
-        messages: [{ role: 'user', content: prompt }],
-        max_tokens: 150,
-        temperature: 0.7,
-      }),
-    })
-
-    if (!response.ok) {
-      console.error('OpenAI API Error:', response.status, response.statusText)
-      const errorBody = await response.text()
-      console.error('Error Body:', errorBody)
-      throw new Error(`OpenAI API request failed with status ${response.status}`)
-    }
-
-    const jsonResponse = await response.json()
-    const summary = jsonResponse?.choices?.[0]?.message?.content?.trim() || null
-
-    // Track token usage
-    const tokensUsed = jsonResponse.usage.total_tokens
-    const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    )
-
-    const conversationId = messages[0]?.conversation?.conversation_id
-    const userId = messages[0]?.conversation?.sender_id
-
-    if (userId) {
-      await supabaseClient
-        .from('token_usage')
-        .insert([
-          {
-            user_id: userId,
-            tokens_used: tokensUsed,
-            conversation_id: conversationId
-          }
-        ])
-    }
-
+    // 5. Return Summary
     return new Response(
-      JSON.stringify({ summary }),
+      JSON.stringify({ summary }), // Return summary (which could be null)
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 200, // Always return 200 OK if summarization attempt was made
       },
-    )
+    );
+
   } catch (error) {
-    console.error(error)
+    console.error('Error in summarize-conversation handler:', error.message);
+    let status = 500;
+    if (error.message === "Method Not Allowed") status = 405;
+    if (error.message === "Invalid JSON body") status = 400;
+    if (error.message === "OpenAI client is not initialized (API key likely missing).") status = 503; // Service Unavailable
+    if (error.message.startsWith("OpenAI API error")) status = 502; // Bad Gateway
+
     return new Response(JSON.stringify({ error: error.message }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      status: 400,
-    })
+      status: status,
+    });
   }
-})
+});

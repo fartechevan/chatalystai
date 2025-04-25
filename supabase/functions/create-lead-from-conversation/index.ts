@@ -1,138 +1,114 @@
-import { serve } from 'https://deno.land/std@0.177.0/http/server.ts'
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
-import { corsHeaders } from '../_shared/cors.ts'
+/// <reference types="https://esm.sh/@supabase/functions-js/src/edge-runtime.d.ts" />
 
-console.log(`Function "create-lead-from-conversation" up and running!`)
-
-interface RequestPayload {
-  conversationId: string;
-  customerId: string;
-}
+import { serve } from 'std/http/server.ts'; // Use import map alias
+import { corsHeaders } from '../_shared/cors.ts';
+import { createSupabaseServiceRoleClient } from '../_shared/supabaseClient.ts'; // Using Service Role
+import {
+  parseRequest,
+  getConversationLeadIdDb,
+  fetchLeadCreationPrerequisitesDb,
+  createLeadRecordDb,
+  linkLeadToConversationDb,
+} from './utils.ts';
 
 serve(async (req) => {
-  // This is needed if you're planning to invoke your function from a browser.
+  // Handle CORS preflight request
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders })
+    return new Response('ok', { headers: corsHeaders });
   }
 
   try {
-    const { conversationId, customerId }: RequestPayload = await req.json();
+    // 1. Parse and Validate Request
+    const { conversationId, customerId } = await parseRequest(req);
 
-    if (!conversationId || !customerId) {
-      throw new Error("Missing required parameters: conversationId and customerId");
-    }
+    // 2. Create Supabase Service Role Client
+    // Assuming this function needs elevated privileges based on original code
+    const supabaseAdmin = createSupabaseServiceRoleClient();
 
-    const supabaseClient = createClient(
-      // Supabase API URL - env var exported by default.
-      Deno.env.get('SUPABASE_URL') ?? '',
-      // Supabase API ANON KEY - env var exported by default.
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-      // Create client with Auth context of the user that called the function.
-      // This way your row-level-security (RLS) policies are applied.
-      // { global: { headers: { Authorization: req.headers.get('Authorization')! } } } // Use service role key for backend operations
-    )
-    
-    // Use service role key for elevated privileges needed for backend operations
-     const supabaseAdmin = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-    );
-
-
-    // 1. Check if conversation already has a lead
-    const { data: existingConvData, error: convError } = await supabaseAdmin
-      .from('conversations')
-      .select('lead_id')
-      .eq('conversation_id', conversationId)
-      .maybeSingle();
-
-    if (convError) throw convError;
-    if (existingConvData?.lead_id) {
-      console.log(`Conversation ${conversationId} already has lead ${existingConvData.lead_id}`);
-      // Optionally return the existing lead ID or a specific message
-      return new Response(JSON.stringify({ message: 'Conversation already has a lead', lead_id: existingConvData.lead_id }), {
+    // 3. Check if Conversation Already Has Lead
+    const existingLeadId = await getConversationLeadIdDb(supabaseAdmin, conversationId);
+    if (existingLeadId) {
+      console.log(`Conversation ${conversationId} already has lead ${existingLeadId}`);
+      return new Response(JSON.stringify({ message: 'Conversation already has a lead', lead_id: existingLeadId }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 409, // Conflict
-      })
+      });
     }
 
-    // 2. Fetch customer details (optional, e.g., to get name for lead)
-    const { data: customerData, error: customerError } = await supabaseAdmin
-      .from('customers')
-      .select('name')
-      .eq('id', customerId)
-      .single(); // Use single() as customer should exist
+    // 4. Fetch Prerequisites (Customer Name, Default Stage ID)
+    const { customerName, defaultStageId } = await fetchLeadCreationPrerequisitesDb(supabaseAdmin, customerId);
 
-    if (customerError) {
-       console.error("Error fetching customer:", customerError);
-       // Decide if this is critical. Maybe proceed without customer name?
-       // For now, let's throw an error if customer not found.
-       throw new Error(`Customer with ID ${customerId} not found.`);
+    // Determine lead name (using customer name or a default)
+    // Note: The 'leads' table doesn't have a 'name' column per database.types.ts.
+    // This logic is kept if needed elsewhere, but not used for insertion.
+    // const leadName = customerName || `Lead from Conversation ${conversationId.substring(0, 8)}`;
+
+    // 5. Get User ID (Required for leads table)
+    // Since we are using Service Role, we cannot get user from context easily.
+    // The user ID *must* be passed in the request or determined via other means
+    // if this function is intended to associate the lead with a specific user.
+    // For now, assuming it might be a system process or user ID is handled differently.
+    // If user association is needed, the request/logic must be adapted.
+    // Let's assume for now the leads table RLS or triggers handle user_id,
+    // OR that the original function's intent needs clarification on user context.
+    // **Placeholder: If user_id is strictly required by DB and not handled by RLS/trigger, this will fail.**
+    // **A common pattern is to require userId in the request body when using Service Role.**
+    // For this refactor, I'll proceed assuming the DB handles it or it's not needed based on the schema read.
+    // Re-checking leads.Insert: `user_id: string` is required.
+    // This function *cannot* work correctly with Service Role without a user_id source.
+    // Modifying to expect userId in the request payload as a temporary measure.
+
+    let userIdFromBody: string | undefined;
+    try {
+        const body = await req.clone().json(); // Clone req to re-read body
+        userIdFromBody = body.userId;
+         if (!userIdFromBody) {
+            throw new Error("userId is required in the request body when using service role for lead creation.");
+         }
+    } catch (e) {
+         throw new Error("Invalid JSON body or missing userId");
     }
-    const leadName = customerData?.name || `Lead from Conversation ${conversationId.substring(0, 8)}`;
 
 
-    // 3. Fetch the default pipeline stage ID
-     const { data: defaultStageData, error: stageError } = await supabaseAdmin
-      .from('pipeline_stages')
-      .select('id')
-      .eq('is_default', true)
-      .limit(1)
-      .single();
-
-    if (stageError || !defaultStageData) {
-      console.error('Error fetching default pipeline stage:', stageError);
-      throw new Error('Could not find a default pipeline stage.');
-    }
-    const defaultPipelineStageId = defaultStageData.id;
-
-
-    // 4. Create the new lead
-    const { data: newLeadData, error: leadInsertError } = await supabaseAdmin
-      .from('leads')
-      .insert({
-        customer_id: customerId,
-        pipeline_stage_id: defaultPipelineStageId, // Use the fetched default stage ID
-        name: leadName, // Use customer name or a default
-        // Add other default lead properties as needed
-      })
-      .select()
-      .single();
-
-    if (leadInsertError) throw leadInsertError;
-    if (!newLeadData) throw new Error("Failed to create lead or retrieve its data.");
-
-    console.log("New lead created:", newLeadData);
+    // 6. Create Lead Record
+    const newLeadData = await createLeadRecordDb(
+      supabaseAdmin,
+      customerId,
+      defaultStageId,
+      userIdFromBody // Pass the user ID from the request body
+    );
     const newLeadId = newLeadData.id;
+    console.log("New lead created:", newLeadData);
 
-    // 5. Update the conversation with the new lead_id
-    const { error: convUpdateError } = await supabaseAdmin
-      .from('conversations')
-      .update({ lead_id: newLeadId })
-      .eq('conversation_id', conversationId);
-
-    if (convUpdateError) {
-      // Attempt to roll back lead creation? Or log inconsistency?
-      console.error(`Failed to link lead ${newLeadId} to conversation ${conversationId}:`, convUpdateError);
-      // Return an error indicating partial success/failure
-       return new Response(JSON.stringify({ error: 'Lead created but failed to link to conversation' }), {
+    // 7. Link Lead to Conversation
+    const linkError = await linkLeadToConversationDb(supabaseAdmin, conversationId, newLeadId);
+    if (linkError) {
+      // Return error indicating partial success/failure
+      return new Response(JSON.stringify({ error: `Lead created (${newLeadId}) but failed to link to conversation: ${linkError.message}` }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 500,
-      })
+        status: 500, // Internal Server Error (or custom code)
+      });
     }
-
     console.log(`Successfully linked lead ${newLeadId} to conversation ${conversationId}`);
 
-    // 6. Return the newly created lead data
+    // 8. Return Success Response
     return new Response(JSON.stringify(newLeadData), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      status: 200,
-    })
+      status: 201, // Created
+    });
+
   } catch (error) {
-    console.error("Error in create-lead-from-conversation:", error);
+    console.error("Error in create-lead-from-conversation handler:", error.message);
+    let status = 500;
+    if (error.message === "Method Not Allowed") status = 405;
+    if (error.message === "Invalid JSON body or missing userId") status = 400;
+    if (error.message === "Missing required parameters: conversationId and customerId") status = 400;
+    if (error.message.includes("not found")) status = 404; // e.g., Customer or Stage not found
+    if (error.message.includes("Could not find a default pipeline stage")) status = 404;
+
     return new Response(JSON.stringify({ error: error.message }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      status: 400,
-    })
+      status: status,
+    });
   }
-})
+});

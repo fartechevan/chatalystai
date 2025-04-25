@@ -1,13 +1,13 @@
-// Use imports based on import_map.json
-import { serve } from "std/http/server.ts";
-import { createClient } from "@supabase/supabase-js";
-import { corsHeaders } from "../_shared/cors.ts"; // Assuming cors.ts is correctly located
-import type { Database } from "../_shared/database.types.ts";
+/// <reference types="https://esm.sh/@supabase/functions-js/src/edge-runtime.d.ts" />
 
-type Segment = Database['public']['Tables']['segments']['Row'];
-type SegmentContact = Database['public']['Tables']['segment_contacts']['Row'];
-
-console.log("Function 'create-segment-from-contacts' starting up...");
+import { serve } from "std/http/server.ts"; // Use import map alias
+import { corsHeaders } from "../_shared/cors.ts";
+import { createSupabaseServiceRoleClient } from "../_shared/supabaseClient.ts"; // Using Service Role
+import {
+  parseAndValidateRequest,
+  createSegmentDb,
+  addContactsToSegmentDb,
+} from "./utils.ts";
 
 serve(async (req: Request) => {
   // Handle CORS preflight requests
@@ -16,102 +16,83 @@ serve(async (req: Request) => {
   }
 
   try {
-    // Ensure environment variables are available
-    const supabaseUrl = Deno.env.get('SUPABASE_URL');
-    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-    if (!supabaseUrl || !serviceRoleKey) {
-      throw new Error("Missing Supabase environment variables.");
-    }
+    // 1. Parse and Validate Request
+    const { segmentName, customerIds, userId } = await parseAndValidateRequest(req);
 
-    // Create Supabase client with service role privileges
-    const supabaseAdmin = createClient<Database>(supabaseUrl, serviceRoleKey);
+    // 2. Create Supabase Service Role Client
+    // Using Service Role as per original function and the need to pass userId
+    const supabaseAdmin = createSupabaseServiceRoleClient();
 
-    // Parse request body
-    const { segmentName, customerIds, userId } = await req.json(); // Add userId
-
-    // --- Input Validation ---
-    if (!segmentName || typeof segmentName !== 'string' || segmentName.trim() === '') {
-      return new Response(JSON.stringify({ error: 'Segment name is required and must be a non-empty string.' }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-    if (!Array.isArray(customerIds) || customerIds.length === 0) {
-      return new Response(JSON.stringify({ error: 'Customer IDs must be provided as a non-empty array.' }), {
-        status: 400,
-         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-       });
-     }
-     if (!userId || typeof userId !== 'string') { // Validate userId
-       return new Response(JSON.stringify({ error: 'User ID is required.' }), {
-         status: 400,
-         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-       });
-     }
-     // Optional: Add more validation for customerIds (e.g., check if they are valid UUIDs)
-
-     console.log(`Received request to create segment "${segmentName}" for user ${userId} with ${customerIds.length} contacts.`);
-
-    // --- Database Operations ---
-     // 1. Create the segment
-     const { data: newSegment, error: segmentError } = await supabaseAdmin
-       .from('segments')
-       .insert({ name: segmentName.trim(), user_id: userId }) // Include user_id
-       .select()
-       .single(); // Use .single() to get the created object directly
+    // --- Database Operations (Non-Atomic) ---
+    // 3. Create the segment
+    const { data: newSegment, error: segmentError } = await createSegmentDb(
+      supabaseAdmin,
+      segmentName,
+      userId
+    );
 
     if (segmentError) {
       console.error("Error creating segment:", segmentError);
-      // Handle potential duplicate name error (check error code/message if needed)
+      let status = 500;
+      let message = `Failed to create segment: ${segmentError.message}`;
       if (segmentError.code === '23505') { // Unique violation
-         return new Response(JSON.stringify({ error: `Segment name "${segmentName.trim()}" already exists.` }), {
-           status: 409, // Conflict
-           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-         });
+        status = 409; // Conflict
+        message = `Segment name "${segmentName}" already exists.`;
       }
-      throw new Error(`Failed to create segment: ${segmentError.message}`);
+      return new Response(JSON.stringify({ error: message }), {
+        status: status,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
     if (!newSegment) {
-       throw new Error("Segment creation did not return data.");
+      // Should not happen if error is null, but good practice to check
+      throw new Error("Segment creation did not return data despite no error.");
     }
-
     console.log(`Segment created with ID: ${newSegment.id}`);
 
-    // 2. Prepare contacts for the segment_contacts table
-    // Corrected 'customer_id' to 'contact_id' based on the type error and assuming schema
-    const segmentContactsData: Omit<SegmentContact, 'id' | 'added_at'>[] = customerIds.map(customerId => ({
-      segment_id: newSegment.id,
-      contact_id: customerId, // Corrected field name
-    }));
-
-    // 3. Insert into segment_contacts
-    const { error: contactsError } = await supabaseAdmin
-      .from('segment_contacts')
-      .insert(segmentContactsData);
+    // 4. Add contacts to the new segment
+    const { error: contactsError } = await addContactsToSegmentDb(
+      supabaseAdmin,
+      newSegment.id,
+      customerIds
+    );
 
     if (contactsError) {
       console.error("Error adding contacts to segment:", contactsError);
-      // Attempt to clean up the created segment if contacts fail? (More complex transaction logic needed for true atomicity)
-      // For simplicity now, we'll just report the error.
-      // Consider deleting the segment if contacts fail:
-      // await supabaseAdmin.from('segments').delete().match({ id: newSegment.id });
-      throw new Error(`Failed to add contacts to segment: ${contactsError.message}`);
+      // Note: Segment was already created. This indicates partial failure.
+      // For simplicity, return error but don't attempt rollback here.
+      return new Response(JSON.stringify({
+         error: `Segment created, but failed to add contacts: ${contactsError.message}`,
+         segment: newSegment // Optionally return the created segment info
+        }), {
+        status: 500, // Internal Server Error (or a custom code for partial success)
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
-
-    console.log(`${segmentContactsData.length} contacts added to segment ${newSegment.id}`);
+    console.log(`${customerIds.length} contacts added to segment ${newSegment.id}`);
 
     // --- Return Success Response ---
+    // Return the newly created segment data
     return new Response(JSON.stringify(newSegment), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 201, // Created
     });
 
   } catch (error) {
-    console.error("Error in create-segment-from-contacts function:", error);
+    // Catch errors from parsing or unexpected issues
+    console.error("Error in create-segment-from-contacts handler:", error.message);
+    let status = 500;
+    if (error.message === "Method Not Allowed") status = 405;
+    if (error.message === "Invalid JSON body") status = 400;
+    if (error.message === 'Segment name is required and must be a non-empty string.') status = 400;
+    if (error.message === 'Customer IDs must be provided as a non-empty array.') status = 400;
+    if (error.message === 'User ID is required.') status = 400;
+    if (error.message.includes("already exists")) status = 409; // From re-thrown unique constraint error
+
     return new Response(JSON.stringify({ error: error.message }), {
+      status: status,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      status: 500,
     });
   }
 });

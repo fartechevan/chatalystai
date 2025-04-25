@@ -1,9 +1,9 @@
-import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { corsHeaders } from "../_shared/cors.ts";
-import { Database } from "../_shared/database.types.ts"; // Assuming types are shared
+/// <reference types="https://esm.sh/@supabase/functions-js/src/edge-runtime.d.ts" />
 
-type SegmentInsert = Database["public"]["Tables"]["segments"]["Insert"];
+import { serve } from "std/http/server.ts"; // Use import map alias
+import { corsHeaders } from "../_shared/cors.ts";
+import { createSupabaseClient, getAuthenticatedUser } from "../_shared/supabaseClient.ts";
+import { parseRequest, createSegmentDb } from "./utils.ts";
 
 serve(async (req) => {
   // Handle CORS preflight request
@@ -12,67 +12,27 @@ serve(async (req) => {
   }
 
   try {
-    // Ensure the request method is POST
-    if (req.method !== "POST") {
-      return new Response(JSON.stringify({ error: "Method Not Allowed" }), {
-        status: 405,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+    // 1. Parse and Validate Request
+    const { name } = await parseRequest(req);
 
-    // Parse request body
-    const { name } = (await req.json()) as { name: string };
+    // 2. Create Authenticated Supabase Client & Get User
+    const user = await getAuthenticatedUser(req); // Throws on error/unauthenticated
+    const supabaseClient = createSupabaseClient(req);
 
-    if (!name || typeof name !== "string" || name.trim() === "") {
-      return new Response(JSON.stringify({ error: "Segment name is required" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    // Create Supabase client with auth context
-    const supabaseClient = createClient<Database>(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_ANON_KEY") ?? "",
-      {
-        global: { headers: { Authorization: req.headers.get("Authorization")! } },
-        auth: {
-          persistSession: false, // Important for server-side operations
-        },
-      }
+    // 3. Create Segment via DB function
+    const { data, error } = await createSegmentDb(
+      supabaseClient,
+      name,
+      user.id // Pass authenticated user's ID
     );
 
-    // Get the authenticated user
-    const {
-      data: { user },
-      error: userError,
-    } = await supabaseClient.auth.getUser();
-
-    if (userError || !user) {
-      console.error("User fetch error:", userError);
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    // Prepare segment data
-    const segmentData: SegmentInsert = {
-      name: name.trim(),
-      user_id: user.id, // Associate with the logged-in user
-    };
-
-    // Insert the new segment
-    const { data, error } = await supabaseClient
-      .from("segments")
-      .insert(segmentData)
-      .select()
-      .single();
-
+    // 4. Handle Response
     if (error) {
       console.error("Supabase insert error:", error);
-      return new Response(JSON.stringify({ error: error.message }), {
-        status: 500,
+      // Consider checking for unique constraint violation (e.g., error.code === '23505')
+      // if segment names must be unique per user.
+      return new Response(JSON.stringify({ error: error.message || "Failed to create segment" }), {
+        status: 500, // Or 409 for unique constraint violation
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -82,10 +42,18 @@ serve(async (req) => {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 201, // Created
     });
+
   } catch (err) {
-    console.error("Internal server error:", err);
+    // Catch errors from parsing, auth, or unexpected issues
+    console.error("Error in create-segment handler:", err.message);
+    let status = 500;
+    if (err.message === "Method Not Allowed") status = 405;
+    if (err.message === "Invalid JSON body") status = 400;
+    if (err.message === "Segment name is required") status = 400;
+    if (err.message.startsWith("Authentication error") || err.message === "User not authenticated.") status = 401;
+
     return new Response(JSON.stringify({ error: err.message }), {
-      status: 500,
+      status: status,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }

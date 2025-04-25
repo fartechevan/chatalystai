@@ -1,127 +1,85 @@
+/// <reference types="https://esm.sh/@supabase/functions-js/src/edge-runtime.d.ts" />
 
-// @deno-types="https://esm.sh/@supabase/functions-js/src/edge-runtime.d.ts"
+/// <reference types="https://esm.sh/@supabase/functions-js/src/edge-runtime.d.ts" />
+
 import { serve } from "std/http/server.ts"; // Use import map alias
-import { createClient } from "@supabase/supabase-js"; // Use import map alias
 import { corsHeaders } from "../_shared/cors.ts";
-import { handleMessageEvent } from "./messageHandler.ts"
-import { createErrorResponse } from "./utils.ts"
+import { createSupabaseServiceRoleClient } from "../_shared/supabaseClient.ts"; // Use Service Role
+import { handleMessageEvent, WhatsAppMessageData } from "./messageHandler.ts"; // Import type and handler
+import { createErrorResponse, parseAndValidateWebhookRequest, storeWebhookEventDb } from "./utils.ts";
 
 serve(async (req) => {
-  console.log(`[${new Date().toISOString()}] Received ${req.method} request to WhatsApp webhook`);
-  
+  const requestId = crypto.randomUUID(); // Generate unique ID for logging
+  console.log(`[${requestId}] ${new Date().toISOString()} Received ${req.method} request to WhatsApp webhook`);
+
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
-    console.log('Handling CORS preflight request');
+    console.log(`[${requestId}] Handling CORS preflight request`);
     return new Response(null, { headers: corsHeaders });
   }
 
-  try {
-    if (req.method === 'POST') {
-      const requestId = crypto.randomUUID();
-      console.log(`[${requestId}] Processing webhook request`);
-      
-      // Log the raw request for debugging
-      const rawBody = await req.clone().text();
-      console.log(`[${requestId}] Raw request body:`, rawBody);
-      
-      let body;
-      try {
-        // Parse the JSON body
-        body = JSON.parse(rawBody);
-        console.log(`[${requestId}] Parsed webhook payload:`, JSON.stringify(body, null, 2));
-      } catch (parseError) {
-        console.error(`[${requestId}] Error parsing webhook JSON:`, parseError);
-        return new Response(
-          JSON.stringify({ error: 'Invalid JSON payload' }),
-          { 
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            status: 400 
-          }
-        );
-      }
-
-      // Extract relevant data from the webhook
-      const { event, data, instance } = body;
-      console.log(`[${requestId}] Received ${event} event from instance ${instance}`);
-
-      if (!event || !instance) {
-        console.error(`[${requestId}] Missing required fields in webhook payload`);
-        return new Response(
-          JSON.stringify({ error: 'Missing required fields: event or instance' }),
-          { 
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-            status: 400 
-          }
-        );
-      }
-
-      // Create Supabase client
-      const supabaseClient = createClient(
-        Deno.env.get('SUPABASE_URL') ?? '',
-        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-      );
-
-      // Store the webhook event in evolution_webhook_events table
-      const { error: webhookError } = await supabaseClient
-        .from('evolution_webhook_events')
-        .insert({
-          event_type: event,
-          payload: body,
-          processing_status: 'pending',
-          source_identifier: instance
-        });
-
-      if (webhookError) {
-        console.error(`[${requestId}] Error storing webhook event:`, webhookError);
-      } else {
-        console.log(`[${requestId}] Successfully stored webhook event`);
-      }
-      
-      // If this is a message event, handle conversation linking
-      let processingResult: true | string = true; // Default to success for non-message events
-      if (event === 'messages.upsert' && data) {
-        console.log(`[${requestId}] Processing messages.upsert event`);
-        processingResult = await handleMessageEvent(supabaseClient, data, instance); // Returns true or error string
-        console.log(`[${requestId}] Message event processing result:`, processingResult);
-      } else {
-        console.log(`[${requestId}] Skipping event handling for non-message event: ${event}`);
-        // For non-message events, consider processing successful by default
-        processingResult = true; 
-      }
-
-      // Construct response body based on processing result
-      let responseBody: { success: boolean; processed: boolean; error?: string };
-      if (processingResult === true) {
-        responseBody = { success: true, processed: true };
-      } else {
-        // processingResult is an error string
-        responseBody = { success: true, processed: false, error: processingResult };
-      }
-
-      console.log(`[${requestId}] Webhook processing completed. Response:`, JSON.stringify(responseBody));
-      
-      // Return response (still 200 OK, but body contains error details if processing failed)
+  // Only allow POST requests
+  if (req.method !== 'POST') {
+      console.log(`[${requestId}] Received non-POST request`);
       return new Response(
-        JSON.stringify(responseBody),
-        { 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 200 
-        }
+          JSON.stringify({ error: 'Method not allowed' }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 405 }
       );
+  }
+
+  let supabaseClient; // Define here for potential use in catch block
+
+  try {
+    // 1. Parse and Validate Webhook Payload
+    const payload = await parseAndValidateWebhookRequest(req);
+    const { event, instance, data } = payload;
+    console.log(`[${requestId}] Parsed webhook: Event=${event}, Instance=${instance}`);
+
+    // 2. Create Supabase Service Role Client
+    supabaseClient = createSupabaseServiceRoleClient();
+
+    // 3. Store Webhook Event (async, non-blocking, best effort)
+    storeWebhookEventDb(supabaseClient, payload).catch(err => {
+        console.error(`[${requestId}] Background webhook event storage failed:`, err);
+    });
+
+    // 4. Handle Specific Events (e.g., messages.upsert)
+    let processingResult: true | string = true; // Default to success for unhandled events
+    if (event === 'messages.upsert' && data) {
+      console.log(`[${requestId}] Processing messages.upsert event...`);
+      // Assuming handleMessageEvent contains the core logic for this event type
+      // It should return true on success, or an error message string on failure
+      // Perform type assertion for the 'data' payload before passing
+      processingResult = await handleMessageEvent(supabaseClient, data as WhatsAppMessageData, instance);
+      console.log(`[${requestId}] Message event processing result: ${processingResult === true ? 'Success' : 'Failed ('+processingResult+')'}`);
+    } else {
+      console.log(`[${requestId}] Skipping specific handling for event type: ${event}`);
     }
 
-    // Return method not allowed for non-POST requests
-    console.log('Received non-POST request to webhook endpoint');
+    // 5. Construct and Return Response
+    // Always return 200 OK to acknowledge webhook receipt,
+    // include processing status in the body.
+    const responseBody = (processingResult === true)
+        ? { success: true, processed: true, message: "Webhook received and processed." }
+        : { success: true, processed: false, error: `Webhook received but processing failed: ${processingResult}` };
+
+    console.log(`[${requestId}] Webhook processing completed. Sending response.`);
     return new Response(
-      JSON.stringify({ error: 'Method not allowed' }),
-      { 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 405 
-      }
+      JSON.stringify(responseBody),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
     );
 
   } catch (error) {
-    console.error('Unhandled error in webhook processing:', error);
-    return createErrorResponse(error);
+    // Catch errors from parsing or unexpected issues in the main handler
+    console.error(`[${requestId}] Unhandled error in webhook processing:`, error);
+    // Use the utility to create a standard error response
+    // Determine status code based on error type if possible
+    let status = 500;
+     if (error.message === "Method Not Allowed") status = 405; // Should be caught earlier, but safe check
+     if (error.message === "Invalid JSON payload") status = 400;
+     if (error.message === "Missing required fields: event or instance") status = 400;
+     // Add more specific error checks if needed
+
+    return createErrorResponse(error, status);
   }
 });

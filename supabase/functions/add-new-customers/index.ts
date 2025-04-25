@@ -1,15 +1,9 @@
-// Use imports based on import_map.json
-import { serve } from "std/http/server.ts";
-import { createClient } from "@supabase/supabase-js";
+/// <reference types="https://esm.sh/@supabase/functions-js/src/edge-runtime.d.ts" />
+
+import { serve } from "std/http/server.ts"; // Use import map alias
 import { corsHeaders } from "../_shared/cors.ts";
-import type { Database } from "../_shared/database.types.ts"; // Use type import
-
-type CustomerInsert = Database["public"]["Tables"]["customers"]["Insert"];
-
-interface NewContact {
-  phone_number: string;
-  name?: string; // Optional name
-}
+import { createSupabaseClient, getAuthenticatedUser } from "../_shared/supabaseClient.ts";
+import { parseAndValidateRequest, addNewCustomersDb } from "./utils.ts";
 
 serve(async (req) => {
   // Handle CORS preflight request
@@ -18,102 +12,63 @@ serve(async (req) => {
   }
 
   try {
-    // Ensure the request method is POST
-    if (req.method !== "POST") {
-      return new Response(JSON.stringify({ error: "Method Not Allowed" }), {
-        status: 405,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+    // 1. Parse and Validate Request
+    // This now includes checking the structure and validating phone_number presence
+    const contactsToInsert = await parseAndValidateRequest(req);
 
-    // Parse JSON body
-    const { newContacts } = await req.json() as { newContacts?: NewContact[] };
+    // 2. Create Authenticated Supabase Client & Verify User
+    // Ensure user is authenticated (RLS might depend on this)
+    await getAuthenticatedUser(req);
+    const supabaseClient = createSupabaseClient(req);
 
-    if (!newContacts || !Array.isArray(newContacts) || newContacts.length === 0) {
-      return new Response(JSON.stringify({ error: "Missing or invalid 'newContacts' array in request body" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    // Validate input data
-    const contactsToInsert: CustomerInsert[] = [];
-    for (const contact of newContacts) {
-      if (!contact.phone_number || typeof contact.phone_number !== 'string') {
-        // Log the invalid contact for debugging if needed
-        console.warn("Skipping invalid contact data:", contact);
-        // Return an error response immediately
-        return new Response(JSON.stringify({ error: `Invalid contact data: phone_number is required for entry with name '${contact.name || 'N/A'}'.` }), {
-          status: 400,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
-        // Note: The 'continue' below is now unreachable due to the return,
-        // but kept for clarity if the return is removed for batch error handling.
-        // continue; // Skip this contact if phone_number is invalid
-      }
-      // Push the valid contact data, using '' for missing names
-      contactsToInsert.push({
-        phone_number: contact.phone_number.trim(),
-        name: contact.name?.trim() || '', // Use empty string instead of null/default
-        // Add other required fields for 'customers' table if necessary, e.g., user_id
-      });
-    } // <-- Closing brace for the for...of loop
-
-    // Create Supabase client with auth context
-    const supabaseClient = createClient<Database>(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_ANON_KEY") ?? "",
-      {
-        global: { headers: { Authorization: req.headers.get("Authorization")! } },
-        auth: { persistSession: false },
-      }
+    // 3. Add New Customers via DB function
+    const { data: insertedData, error: insertError } = await addNewCustomersDb(
+      supabaseClient,
+      contactsToInsert
     );
 
-    // Get the authenticated user (optional, but good practice)
-    const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
-    if (userError || !user) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" }
-      });
-    }
-
-    // --- Insert New Customers ---
-    // Use upsert with ignoreDuplicates based on phone_number if it has a unique constraint
-    // Otherwise, use insert. Assuming insert for now.
-    const { data: insertedData, error: insertError } = await supabaseClient
-      .from("customers")
-      .insert(contactsToInsert)
-      .select("id"); // Select IDs of newly inserted rows
-
+    // 4. Handle Response
     if (insertError) {
       console.error("Error inserting new customers:", insertError);
-      // Handle potential unique constraint violation if not using upsert
+      let status = 500;
+      let message = "Failed to insert new customers";
+      // Handle potential unique constraint violation
       if (insertError.code === '23505') { // Unique violation code
-         return new Response(JSON.stringify({ error: "One or more phone numbers already exist." }), {
-           status: 409, headers: { ...corsHeaders, "Content-Type": "application/json" }
-         });
+        status = 409; // Conflict
+        message = "One or more phone numbers already exist.";
       }
-      return new Response(JSON.stringify({ error: "Failed to insert new customers" }), {
-        status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" }
+      return new Response(JSON.stringify({ error: message }), {
+        status: status,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // --- Return Result ---
-    // Rename addedCustomerIds to newCustomerIds to match frontend expectation
+    const addedCount = insertedData?.length || 0;
+    const newCustomerIds = insertedData?.map(c => c.id) || [];
+
+    // Return success result
     return new Response(JSON.stringify({
-      message: `${insertedData?.length || 0} new customers added successfully.`,
-      addedCount: insertedData?.length || 0,
-      newCustomerIds: insertedData?.map(c => c.id) || [], // Renamed key
+      message: `${addedCount} new customers added successfully.`,
+      addedCount: addedCount,
+      newCustomerIds: newCustomerIds,
     }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
-      status: 200, // Use 200 OK or 201 Created
+      status: 200, // Or 201 if preferred for creation
     });
 
   } catch (err) {
-    console.error("Internal server error:", err);
-    return new Response(JSON.stringify({ error: err.message || "An unexpected error occurred" }), {
-      status: 500,
+    // Catch errors from parsing, auth, or unexpected issues
+    console.error("Error in add-new-customers handler:", err.message);
+    let status = 500;
+    if (err.message === "Method Not Allowed") status = 405;
+    if (err.message === "Invalid JSON body") status = 400;
+    if (err.message === "Missing or invalid 'newContacts' array in request body") status = 400;
+    if (err.message.startsWith("Invalid contact data")) status = 400; // Specific validation error
+    if (err.message.startsWith("Authentication error") || err.message === "User not authenticated.") status = 401;
+
+    return new Response(JSON.stringify({ error: err.message }), {
+      status: status,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
-  } // <-- Ensure this closing brace for the main try block is present
-}); // <-- Ensure this closing brace for the serve function is present
+  }
+});
