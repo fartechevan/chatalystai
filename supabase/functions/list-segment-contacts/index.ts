@@ -1,7 +1,7 @@
 
 /// <reference types="https://esm.sh/@supabase/functions-js/src/edge-runtime.d.ts" />
 
-import { serve } from "std/http/server.ts"; // Change this line
+import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { corsHeaders } from "../_shared/cors.ts";
 import { createSupabaseClient, getAuthenticatedUser } from "../_shared/supabaseClient.ts";
 import { parseRequest, listSegmentContactsDb, formatResponsePayload } from "./utils.ts";
@@ -62,4 +62,3 @@ serve(async (req) => {
     });
   }
 });
-
