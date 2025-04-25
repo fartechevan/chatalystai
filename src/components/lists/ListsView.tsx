@@ -1,11 +1,12 @@
 
-import { useState, useEffect } from "react"; // Added useEffect
+import { useState, useEffect } from "react"; // Keep only one import
 import { ContactList } from "./ContactList";
 import { CompanyList } from "./CompanyList";
 import { LeadsList } from "./LeadsList";
+import { SegmentsView } from "./SegmentsView"; // Import SegmentsView
 import { ContactDetails } from "./ContactDetails";
 import { Button } from "@/components/ui/button";
-import { UsersIcon, Building2, Image, Package, Target, PanelLeftClose, PanelLeftOpen, SidebarOpen } from "lucide-react"; // Added icons
+import { UsersIcon, Building2, Image, Package, Target, PanelLeftClose, PanelLeftOpen, SidebarOpen, ListFilter } from "lucide-react"; // Added icons & ListFilter for segments
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"; // Added Sheet
 import { cn } from "@/lib/utils";
@@ -22,6 +23,7 @@ export function ListsView() {
     { id: "contacts", label: "Contacts", icon: UsersIcon }, // Restored
     { id: "companies", label: "Companies", icon: Building2 }, // Restored
     { id: "leads", label: "Leads", icon: Target },
+    { id: "segments", label: "Segments", icon: ListFilter }, // Added Segments tab
     // { id: "all", label: "All Contacts and Companies", icon: Users2 }, // Removed
     { id: "media", label: "Media", icon: Image },
     { id: "products", label: "Products", icon: Package },
@@ -137,15 +139,16 @@ export function ListsView() {
                 {selectedTab === "contacts" && <ContactList onSelectContact={setSelectedContactId} />}
                 {selectedTab === "companies" && <CompanyList />}
                 {selectedTab === "leads" && <LeadsList />}
+                {selectedTab === "segments" && <SegmentsView />} {/* Render SegmentsView */}
                 {selectedTab === "media" && <div className="p-4">Media Content Placeholder</div>}
                 {selectedTab === "products" && <div className="p-4">Products Content Placeholder</div>}
               </div>
 
-              {/* Right Details Panel */}
-              {selectedContactId && (
+              {/* Right Details Panel (Only show for contacts tab for now) */}
+              {isDesktop && selectedTab === "contacts" && selectedContactId && ( // Corrected conditional logic
                 <div className="w-96 border-l flex-shrink-0 overflow-auto"> {/* Added overflow-auto */}
-                  <ContactDetails 
-                    contactId={selectedContactId} 
+                  <ContactDetails
+                    contactId={selectedContactId}
                     // No onClose needed for desktop
                   />
                 </div>
@@ -168,6 +171,7 @@ export function ListsView() {
                   {selectedTab === "contacts" && <ContactList onSelectContact={setSelectedContactId} />}
                   {selectedTab === "companies" && <CompanyList />}
                   {selectedTab === "leads" && <LeadsList />}
+                  {selectedTab === "segments" && <SegmentsView />} {/* Render SegmentsView */}
                   {selectedTab === "media" && <div className="p-4">Media Content Placeholder</div>}
                   {selectedTab === "products" && <div className="p-4">Products Content Placeholder</div>}
                 </div>

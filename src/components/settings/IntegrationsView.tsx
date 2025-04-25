@@ -1,8 +1,8 @@
 
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Plus, ShieldAlert } from "lucide-react";
+import { ShieldAlert } from "lucide-react";
 import { useState, useEffect, useMemo } from "react";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"; // Import Tabs components
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { IntegrationDialog } from "./integration-dialog/IntegrationDialog";
@@ -15,10 +15,10 @@ interface IntegrationsViewProps {
   isActive: boolean; // Prop to control loading
 }
 
-const tabs = ["All", "Connected"];
+// Removed const tabs array
 
 export function IntegrationsView({ isActive }: IntegrationsViewProps) {
-  const [activeTab, setActiveTab] = useState("All");
+  const [activeTab, setActiveTab] = useState("all"); // Default to 'all'
   const [searchQuery, setSearchQuery] = useState("");
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedIntegration, setSelectedIntegration] = useState<Integration | null>(null);
@@ -298,11 +298,12 @@ export function IntegrationsView({ isActive }: IntegrationsViewProps) {
   const filteredIntegrations = useMemo(() => {
     return baseIntegrationsList.filter(integration => {
       const matchesSearch = integration.name.toLowerCase().includes(searchQuery.toLowerCase());
-      if (activeTab === "Connected") {
-        // Ensure connectionStatus exists and is 'open'
-        return matchesSearch && integration.connectionStatus === 'open'; 
+      // Filter based on activeTab value from Tabs component
+      if (activeTab === "connected") { 
+        return matchesSearch && integration.connectionStatus === 'open';
       }
-      return matchesSearch;
+      // Default is 'all' tab
+      return matchesSearch; 
     });
   }, [baseIntegrationsList, searchQuery, activeTab]);
 
@@ -329,54 +330,62 @@ export function IntegrationsView({ isActive }: IntegrationsViewProps) {
         {/* Removed Webhooks and Create Integration buttons */}
       </div>
 
-      {/* Removed duplicated search row */}
+      {/* Use Tabs component */}
+      <Tabs defaultValue="all" value={activeTab} onValueChange={setActiveTab} className="w-full">
+        <TabsList className="grid w-full grid-cols-2 mb-8"> 
+          <TabsTrigger value="all">All</TabsTrigger>
+          <TabsTrigger value="connected">
+            <div className="flex items-center gap-2">
+              <span className="h-2 w-2 rounded-full bg-green-500" />
+              Connected
+            </div>
+          </TabsTrigger>
+        </TabsList>
 
-      {/* Keep margin-bottom */}
-      <div className="flex items-center gap-4 border-b mb-8"> 
-        {tabs.map((tab) => (
-          <button
-            key={tab}
-            onClick={() => setActiveTab(tab)}
-            className={`px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
-              activeTab === tab
-                ? "border-primary text-primary"
-                : "border-transparent text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            {tab === "Connected" && (
-              <div className="flex items-center gap-2">
-                <span className="h-2 w-2 rounded-full bg-green-500" />
-                {tab}
-              </div>
-            )}
-            {tab !== "Connected" && tab}
-          </button>
-        ))}
-      </div>
-
-      {/* Removed px-4 wrapper */}
-      <div> 
-        <h2 className="text-lg font-semibold mb-6">Messengers</h2> 
-        {isLoading ? (
-          <div className="text-center text-muted-foreground py-8">Loading integrations...</div>
-        ) : filteredIntegrations.length > 0 ? (
-          // Re-added gap-4 to grid container
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4"> 
-            {filteredIntegrations.map((integration) => (
-              <IntegrationCard
-                key={integration.id}
-                integration={integration}
-                onConnect={handleIntegrationClick}
-              />
-            ))}
-          </div>
-        ) : (
-           <div className="text-center py-8 text-muted-foreground flex flex-col items-center gap-2">
-             <ShieldAlert className="h-6 w-6" />
-             <span>No integrations found matching your criteria or access rights.</span>
-           </div>
-        )}
-      </div>
+        {/* Content for both tabs - filtering happens in useMemo */}
+        <TabsContent value="all" className="mt-0"> 
+          <h2 className="text-lg font-semibold mb-6">Messengers</h2>
+          {isLoading ? (
+            <div className="text-center text-muted-foreground py-8">Loading integrations...</div>
+          ) : filteredIntegrations.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+              {filteredIntegrations.map((integration) => (
+                <IntegrationCard
+                  key={integration.id}
+                  integration={integration}
+                  onConnect={handleIntegrationClick}
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-8 text-muted-foreground flex flex-col items-center gap-2">
+              <ShieldAlert className="h-6 w-6" />
+              <span>No integrations found matching your criteria or access rights.</span>
+            </div>
+          )}
+        </TabsContent>
+        <TabsContent value="connected" className="mt-0">
+           <h2 className="text-lg font-semibold mb-6">Messengers</h2>
+           {isLoading ? (
+             <div className="text-center text-muted-foreground py-8">Loading integrations...</div>
+           ) : filteredIntegrations.length > 0 ? (
+             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+               {filteredIntegrations.map((integration) => (
+                 <IntegrationCard
+                   key={integration.id}
+                   integration={integration}
+                   onConnect={handleIntegrationClick}
+                 />
+               ))}
+             </div>
+           ) : (
+             <div className="text-center py-8 text-muted-foreground flex flex-col items-center gap-2">
+               <ShieldAlert className="h-6 w-6" />
+               <span>No connected integrations found matching your criteria or access rights.</span>
+             </div>
+           )}
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }
