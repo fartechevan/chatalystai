@@ -12,6 +12,7 @@ import {
   UserRound,
   RadioTower, // Import Broadcast icon
   BookOpen,
+  Bot, // Import AI Agent icon
   LogOut
 } from "lucide-react";
 import {
@@ -43,6 +44,7 @@ const menuItems: MenuItem[] = [
   // { title: "Calendar", icon: Calendar, path: "/dashboard/calendar" },
   { title: "Lists", icon: List, path: "/dashboard/lists" },
   { title: "Knowledge", icon: BookOpen, path: "/dashboard/knowledge" },
+  { title: "AI Agents", icon: Bot, path: "/dashboard/ai-agents" }, // Add AI Agents item
   { title: "Stats", icon: BarChart2, path: "/dashboard/stats" },
   { title: "Settings", icon: Settings, path: "/dashboard/settings" },
   { title: "Help", icon: HelpCircle, path: "/dashboard/help" },

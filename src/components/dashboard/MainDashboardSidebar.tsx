@@ -3,11 +3,15 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import { Rocket, BarChart2 } from "lucide-react"; // Icons for items
 
+// Revert type to original
+type DashboardPanel = "getting-started" | "analytics"; 
+
 interface MainDashboardSidebarProps {
-  selectedPanel: "getting-started" | "analytics";
-  onSelect: (panel: "getting-started" | "analytics") => void;
+  selectedPanel: DashboardPanel;
+  onSelect: (panel: DashboardPanel) => void;
 }
 
+// Remove AI Agents item
 const menuItems = [
   { id: "getting-started", label: "Getting Started", icon: Rocket },
   { id: "analytics", label: "Analytics", icon: BarChart2 },
@@ -29,7 +33,8 @@ export function MainDashboardSidebar({ selectedPanel, onSelect }: MainDashboardS
                 "w-full justify-start gap-2 h-10",
                 selectedPanel === item.id && "bg-muted font-medium"
               )}
-              onClick={() => onSelect(item.id as "getting-started" | "analytics")}
+              // Revert onClick type casting
+              onClick={() => onSelect(item.id as "getting-started" | "analytics")} 
               title={item.label}
             >
               <item.icon className="h-4 w-4 flex-shrink-0" />
