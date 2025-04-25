@@ -1,6 +1,7 @@
+
 /// <reference types="https://esm.sh/@supabase/functions-js/src/edge-runtime.d.ts" />
 
-import OpenAI from "openai"; // Use mapped import
+import OpenAI from "https://esm.sh/openai@4.52.7"; // Use fully qualified URL
 
 interface RequestBody {
   content: string;
