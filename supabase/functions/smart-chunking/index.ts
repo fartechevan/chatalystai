@@ -1,6 +1,7 @@
+
 /// <reference types="https://esm.sh/@supabase/functions-js/src/edge-runtime.d.ts" />
 
-import { serve } from 'std/http/server.ts'; // Use import map alias
+import { serve } from "https://deno.land/std@0.177.0/http/server.ts"; // Updated to use fully-qualified URL
 import { corsHeaders } from '../_shared/cors.ts';
 import { openai } from '../_shared/openaiUtils.ts'; // Use shared OpenAI client
 import { parseRequest, createSmartChunks, fallbackChunking } from './utils.ts';
