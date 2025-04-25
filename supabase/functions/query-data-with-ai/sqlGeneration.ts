@@ -1,4 +1,3 @@
-
 /// <reference types="https://esm.sh/@supabase/functions-js/src/edge-runtime.d.ts" />
 
 import OpenAI from "https://esm.sh/openai@4.52.7";
@@ -23,11 +22,31 @@ export async function generateSqlQuery(
   });
   messages.push({
     role: 'system',
-    content: `You are a SQL generation assistant. Given potentially relevant schema and a user query (potentially referencing conversation history), generate a safe, read-only PostgreSQL query. Use only the provided schema. If impossible, respond with "QUERY_NOT_POSSIBLE". Respond ONLY with the raw SQL query.`
-  });
-  messages.push({
-    role: 'user',
-    content: `Relevant Schema:\n${schemaString}\n\nGenerate SQL for this query: "${query}"`
+    content: `You are a SQL expert that generates safe, read-only PostgreSQL queries. Follow these rules strictly:
+1. ONLY generate SELECT statements
+2. Use only the schema information provided
+3. Always add proper table aliases
+4. Use proper column qualifiers (table.column)
+5. Add WHERE clauses to filter data appropriately
+6. Use JOINs when needed to connect related data
+7. Handle NULL values safely
+8. If the query is impossible, respond with "QUERY_NOT_POSSIBLE"
+
+Examples:
+Schema:
+customers(name) - Customer names and details
+messages(content) - Message content and metadata
+
+Query: "Show me all customers named John"
+Response: SELECT c.name FROM customers c WHERE c.name ILIKE '%John%'
+
+Query: "List messages from last week"
+Response: SELECT m.content, m.created_at FROM messages m WHERE m.created_at >= NOW() - INTERVAL '7 days'
+
+Available Schema:
+${schemaString}
+
+Generate SQL for this query: "${query}"`
   });
 
   console.log("Sending prompt to OpenAI for SQL generation...");

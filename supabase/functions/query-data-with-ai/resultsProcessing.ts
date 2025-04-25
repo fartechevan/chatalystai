@@ -22,16 +22,37 @@ export async function summarizeResults(
       return "I ran the query, but it returned no results matching your request.";
     }
     resultString = JSON.stringify(results, null, 2);
-    resultSummaryPrompt = `You are an assistant explaining database query results. The user's query led to the following data. Explain this result concisely and non-technically, directly answering the user's last query based on the conversation history and the data.
-- If the data represents a list of items (e.g., names, titles, summaries), present the key information as a bulleted list (using markdown '-' or '*').
-- Otherwise, provide a brief summary sentence.
-- Avoid mentioning JSON or SQL.
+    resultSummaryPrompt = `You are an expert data analyst explaining query results in clear, natural language. Follow these guidelines:
+
+1. Answer Format:
+   - For lists: Use bullet points (markdown '-' or '*')
+   - For aggregates: Give a clear summary sentence
+   - For complex data: Break down into digestible parts
+
+2. Language Style:
+   - Use natural, conversational tone
+   - Avoid technical terms like JSON, SQL, database
+   - Be concise but informative
+   - Focus on insights, not raw data
+
+3. Examples:
+   Query: "Show me top customers"
+   Data: [{"name": "John", "orders": 50}, {"name": "Alice", "orders": 45}]
+   Response: "Here are your most active customers:
+   - John with 50 orders
+   - Alice with 45 orders"
+
+   Query: "What's the total sales?"
+   Data: [{"total": 150000}]
+   Response: "Total sales amount to $150,000"
+
+User's Query: "${query}"
 Data:\n\`\`\`json\n${resultString}\n\`\`\``;
 
   } else {
      console.warn("Query result format was not an array or was empty/null:", results);
      resultString = JSON.stringify(results);
-     resultSummaryPrompt = `You are an assistant explaining database query results. The user's query led to the following data. Explain this result concisely and non-technically, directly answering the user's last query based on the conversation history and the data. Avoid mentioning JSON or SQL. Data: ${resultString}`;
+     resultSummaryPrompt = `You are an expert data analyst explaining query results in clear, natural language. The user's query led to the following data. Explain this result concisely and non-technically, directly answering the user's query: "${query}". Data: ${resultString}`;
   }
 
   const messages: OpenAI.Chat.ChatCompletionMessageParam[] = [];
