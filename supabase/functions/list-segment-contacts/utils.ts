@@ -1,6 +1,7 @@
+
 /// <reference types="https://esm.sh/@supabase/functions-js/src/edge-runtime.d.ts" />
 
-import { SupabaseClient, PostgrestError } from "@supabase/supabase-js";
+import { SupabaseClient, PostgrestError } from "https://esm.sh/@supabase/supabase-js@2.43.4";
 import { Database } from "../_shared/database.types.ts";
 
 // Define the structure of the customer data we want to return
