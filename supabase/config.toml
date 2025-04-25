@@ -30,13 +30,3 @@ verify_jwt = false
 
 [functions.smart-chunking]
 verify_jwt = false
-
-[functions.get-evolution-key]
-verify_jwt = false
-
-[functions.check-whatsapp-status]
-verify_jwt = false
-
-# Explicitly disable for connect-whatsapp even if covered by integrations
-[functions.connect-whatsapp] 
-verify_jwt = false

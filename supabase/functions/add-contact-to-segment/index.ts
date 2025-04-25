@@ -1,9 +1,9 @@
-import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { corsHeaders } from "../_shared/cors.ts";
-import { Database } from "../_shared/database.types.ts";
+/// <reference types="https://esm.sh/@supabase/functions-js/src/edge-runtime.d.ts" />
 
-type SegmentContactInsert = Database["public"]["Tables"]["segment_contacts"]["Insert"];
+import { serve } from "std/http/server.ts"; // Use import map alias
+import { corsHeaders } from "../_shared/cors.ts";
+import { createSupabaseClient, getAuthenticatedUser } from "../_shared/supabaseClient.ts";
+import { parseAndValidateRequest, addContactToSegmentDb } from "./utils.ts";
 
 serve(async (req) => {
   // Handle CORS preflight request
@@ -12,96 +12,46 @@ serve(async (req) => {
   }
 
   try {
-    // Ensure the request method is POST
-    if (req.method !== "POST") {
-      return new Response(JSON.stringify({ error: "Method Not Allowed" }), {
-        status: 405,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+    // 1. Parse and Validate Request
+    const { segment_id, contact_id } = await parseAndValidateRequest(req);
 
-    // Parse request body
-    const { segment_id, contact_id } = (await req.json()) as {
-      segment_id: string;
-      contact_id: string;
-    };
+    // 2. Create Authenticated Supabase Client & Verify User
+    // getAuthenticatedUser throws if user is not found or auth error occurs
+    await getAuthenticatedUser(req);
+    const supabaseClient = createSupabaseClient(req); // Create client after ensuring user is authenticated
 
-    if (!segment_id || !contact_id) {
-      return new Response(JSON.stringify({ error: "Segment ID and Contact ID are required" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    // Create Supabase client with auth context
-    const supabaseClient = createClient<Database>(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_ANON_KEY") ?? "",
-      {
-        global: { headers: { Authorization: req.headers.get("Authorization")! } },
-        auth: {
-          persistSession: false,
-        },
-      }
+    // 3. Add Contact to Segment via DB function
+    const { data, error, status } = await addContactToSegmentDb(
+      supabaseClient,
+      segment_id,
+      contact_id
     );
 
-    // Get the authenticated user (needed for RLS check)
-    const {
-      data: { user },
-      error: userError,
-    } = await supabaseClient.auth.getUser();
-
-    if (userError || !user) {
-      console.error("User fetch error:", userError);
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
+    // 4. Handle Response
+    if (error) {
+      return new Response(JSON.stringify({ error: error.message || "Failed to add contact to segment" }), {
+        status: status, // Use status from DB function (e.g., 404, 500)
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
-    }
-
-    // Prepare data for insertion
-    // RLS policy on segment_contacts ensures the user owns the target segment
-    const insertData: SegmentContactInsert = {
-      segment_id: segment_id,
-      contact_id: contact_id,
-    };
-
-    // Insert the relationship
-    // Use upsert with ignoreDuplicates=true to handle potential race conditions or re-adds gracefully
-    const { data, error } = await supabaseClient
-      .from("segment_contacts")
-      .upsert(insertData, { onConflict: 'segment_id, contact_id', ignoreDuplicates: true })
-      .select()
-      .single(); // Select the potentially inserted/existing row
-
-    if (error) {
-        // Check if the error is due to RLS violation on the segments table (user doesn't own segment)
-        // or foreign key violation (contact_id or segment_id doesn't exist)
-        if (error.code === '23503') { // Foreign key violation
-             return new Response(JSON.stringify({ error: "Segment or Contact not found" }), {
-               status: 404,
-               headers: { ...corsHeaders, "Content-Type": "application/json" },
-             });
-        }
-        // RLS check failure might not return a specific code easily distinguishable here,
-        // but the operation would fail if the user doesn't own the segment.
-        // A generic 500 or a more specific check might be needed if granular errors are required.
-        console.error("Supabase insert/upsert error:", error);
-        return new Response(JSON.stringify({ error: error.message }), {
-            status: 500, // Or potentially 403/404 depending on RLS failure reason
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
     }
 
     // Return the created/existing relationship record
     return new Response(JSON.stringify(data), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
-      status: data ? 201 : 200, // 201 if created, 200 if already existed (due to upsert)
+      status: status, // Use status from DB function (e.g., 201)
     });
+
   } catch (err) {
-    console.error("Internal server error:", err);
+    // Catch errors from parsing, auth, or unexpected issues
+    console.error("Error in add-contact-to-segment handler:", err.message);
+    let status = 500;
+    if (err.message === "Method Not Allowed") status = 405;
+    if (err.message === "Invalid JSON body") status = 400;
+    if (err.message === "Segment ID and Contact ID are required") status = 400;
+    if (err.message.startsWith("Authentication error") || err.message === "User not authenticated.") status = 401;
+
     return new Response(JSON.stringify({ error: err.message }), {
-      status: 500,
+      status: status,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }

@@ -5,7 +5,7 @@ import { findOrCreateCustomer } from "./customerHandler.ts"
 import { findOrCreateConversation } from "./conversationHandler.ts"
 
 // Define a minimal interface for the expected message data structure
-interface WhatsAppMessageData {
+export interface WhatsAppMessageData { // Added export
   key: {
     remoteJid: string;
     fromMe?: boolean;

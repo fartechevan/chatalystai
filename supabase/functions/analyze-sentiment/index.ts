@@ -1,142 +1,37 @@
-
 /// <reference types="https://esm.sh/@supabase/functions-js/src/edge-runtime.d.ts" />
 
-// Import using aliases from import_map.json
-import "https://deno.land/x/xhr@0.1.0/mod.ts"; 
-import { serve } from "std/http/server.ts";
-import { createClient, SupabaseClient } from "@supabase/supabase-js"; 
-import { corsHeaders } from "../_shared/cors.ts"; 
-
-// Define the expected type for OpenAI messages
-interface OpenAIMessage {
-  role: 'system' | 'user' | 'assistant';
-  content: string;
-}
-
-// Remove local corsHeaders definition
-/* 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-} 
-*/
+import { serve } from "std/http/server.ts"; // Use import map alias
+import { corsHeaders } from "../_shared/cors.ts";
+import { createSupabaseServiceRoleClient } from "../_shared/supabaseClient.ts"; // Use Service Role for DB access
+import { openai } from "../_shared/openaiUtils.ts"; // Use shared OpenAI client
+import { parseRequest, fetchAndFormatConversation, analyzeSentimentWithOpenAI } from "./utils.ts";
 
 serve(async (req) => {
+  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders })
+    return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const { conversationId } = await req.json()
-    
-    const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
-      // Add Supabase client options if needed, e.g., for schema
-      { global: { headers: { Authorization: `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}` } } }
-    ) as SupabaseClient; 
-
-    // Fetch messages associated with the conversation using the correct table and column
-    const { data: conversationMessages, error: messagesError } = await supabaseClient
-      .from('messages') // Target the 'messages' table
-      .select('content, sender_participant_id, created_at') 
-      .eq('conversation_id', conversationId) // Filter by the correct foreign key
-      .order('created_at', { ascending: true }); 
-
-    if (messagesError) {
-      console.error("Error fetching messages:", messagesError);
-      throw messagesError;
-    }
-    
-    if (!conversationMessages || conversationMessages.length === 0) {
-       // Handle case where conversation has no messages
-       return new Response(
-         JSON.stringify({ conversation_id: conversationId, sentiment: 'unknown', description: 'No messages found for analysis.' }),
-         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-       );
+    // 1. Check if OpenAI client is available
+    if (!openai) {
+      throw new Error("OpenAI client is not initialized (API key likely missing).");
     }
 
-    // Fetch participant details to determine role (user/assistant)
-    const participantIds = conversationMessages.map(msg => msg.sender_participant_id).filter(id => !!id); // Ensure filtering works correctly
-    let formattedMessages: OpenAIMessage[] = []; // Explicitly type the array
+    // 2. Parse Request
+    const { conversationId } = await parseRequest(req);
 
-    if (participantIds.length > 0) {
-        const { data: participants, error: participantError } = await supabaseClient
-          .from('conversation_participants') 
-          .select('id, customer_id') // Select necessary fields
-          .in('id', participantIds);
+    // 3. Create Supabase Service Role Client
+    const supabaseClient = createSupabaseServiceRoleClient();
 
-        if (participantError) {
-          console.error("Error fetching participants:", participantError);
-          // Decide if you want to throw or proceed without participant info
-          throw participantError; 
-        }
+    // 4. Fetch and Format Conversation Transcript
+    const transcript = await fetchAndFormatConversation(supabaseClient, conversationId);
 
-        // Create a map for quick lookup
-        const participantMap = new Map(participants?.map(p => [p.id, p]) || []);
+    // 5. Analyze Sentiment with OpenAI
+    // analyzeSentimentWithOpenAI handles the case where transcript is empty
+    const analysisResult = await analyzeSentimentWithOpenAI(openai, transcript);
 
-        // Format messages for OpenAI, determining role based on participant info
-        formattedMessages = conversationMessages.map((msg): OpenAIMessage => { // Ensure returned object matches OpenAIMessage
-          const participant = participantMap.get(msg.sender_participant_id);
-          // Determine role: 'user' if it's linked to a customer, otherwise 'assistant'
-          const role: 'user' | 'assistant' = participant?.customer_id ? 'user' : 'assistant'; 
-          return {
-            role: role, 
-            content: msg.content || '', // Ensure content is not null/undefined
-          };
-        });
-    } else {
-       // Fallback if no participant IDs found (might indicate an issue)
-       formattedMessages = conversationMessages.map((msg): OpenAIMessage => ({ // Ensure returned object matches OpenAIMessage
-         role: 'user', // Default role if participants can't be determined
-         content: msg.content || '',
-       }));
-     }
-
-    // --- Concatenate messages into a single string ---
-    const fullConversationText = formattedMessages.map(msg => `${msg.role}: ${msg.content}`).join('\n');
-    // --- End Concatenation ---
-
-    const apiKey = Deno.env.get('OPENAI_API_KEY');
-    if (!apiKey) {
-      throw new Error('OPENAI_API_KEY environment variable is not set.');
-    }
-
-    // Analyze sentiment with OpenAI using the concatenated text
-    const openAIResponse = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        model: 'gpt-4o-mini',
-        messages: [
-          {
-            role: 'system',
-             content: 'Analyze the following conversation transcript and determine the overall sentiment. Respond ONLY with a JSON object containing: "sentiment" (string: "bad", "moderate", or "good") and "description" (string: a brief explanation for the sentiment, focusing on the effectiveness of the interaction in helping the customer). Example: {"sentiment": "good", "description": "The assistant effectively resolved the user\'s issue."}'
-           },
-           // Send the full conversation text as a single user message
-           {
-             role: 'user',
-             content: fullConversationText
-           }
-         ],
-         response_format: { type: "json_object" }, // Ensure OpenAI returns JSON
-       }),
-    })
-
-    if (!openAIResponse.ok) {
-      const errorData = await openAIResponse.json();
-      console.error('OpenAI API error:', errorData);
-      throw new Error(`OpenAI API error: ${errorData.error?.message || 'Unknown error'}`);
-    }
-
-    const openAIData = await openAIResponse.json()
-    // Parse the response content directly
-    const analysisResult = JSON.parse(openAIData.choices[0].message.content);
-
-    // Return the analysis result directly, including the conversationId for reference
+    // 6. Format and Return Response
     const responsePayload = {
       conversation_id: conversationId,
       sentiment: analysisResult.sentiment,
@@ -145,16 +40,28 @@ serve(async (req) => {
 
     return new Response(
       JSON.stringify(responsePayload),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    )
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
+    );
+
   } catch (error) {
-    console.error('Error in analyze-sentiment function:', error)
+    console.error('Error in analyze-sentiment handler:', error.message);
+    let status = 500;
+    // Set specific statuses based on error messages from utils
+    if (error.message === "Invalid JSON body") status = 400;
+    if (error.message === "Missing required field: conversationId") status = 400;
+    if (error.message.startsWith("Database error")) status = 500; // Or potentially 404 if specific
+    if (error.message.startsWith("OpenAI API error")) status = 502; // Bad Gateway
+    if (error.message === "OpenAI client is not initialized (API key likely missing).") status = 503; // Service Unavailable
+    if (error.message === "Failed to parse JSON response from OpenAI.") status = 502;
+    if (error.message === "OpenAI returned invalid JSON format for sentiment analysis.") status = 502;
+
+
     return new Response(
       JSON.stringify({ error: error.message }),
-      { 
-        status: 500,
+      {
+        status: status,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       }
-    )
+    );
   }
-})
+});

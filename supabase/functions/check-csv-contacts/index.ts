@@ -1,7 +1,9 @@
-import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+/// <reference types="https://esm.sh/@supabase/functions-js/src/edge-runtime.d.ts" />
+
+import { serve } from "std/http/server.ts"; // Use import map alias
 import { corsHeaders } from "../_shared/cors.ts";
-import { Database } from "../_shared/database.types.ts";
+import { createSupabaseClient, getAuthenticatedUser } from "../_shared/supabaseClient.ts";
+import { parseRequest, findExistingCustomersDb, categorizePhoneNumbers } from "./utils.ts";
 
 serve(async (req) => {
   // Handle CORS preflight request
@@ -10,60 +12,34 @@ serve(async (req) => {
   }
 
   try {
-    // Ensure the request method is POST
-    if (req.method !== "POST") {
-      return new Response(JSON.stringify({ error: "Method Not Allowed" }), {
-        status: 405,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+    // 1. Parse and Validate Request
+    const phoneNumbers = await parseRequest(req);
 
-    // Parse JSON body
-    const { phoneNumbers } = await req.json() as { phoneNumbers?: string[] };
+    // 2. Create Authenticated Supabase Client & Verify User
+    await getAuthenticatedUser(req); // Ensures user is authenticated
+    const supabaseClient = createSupabaseClient(req);
 
-    if (!phoneNumbers || !Array.isArray(phoneNumbers) || phoneNumbers.length === 0) {
-      return new Response(JSON.stringify({ error: "Missing or invalid 'phoneNumbers' array in request body" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    // Create Supabase client with auth context
-    const supabaseClient = createClient<Database>(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_ANON_KEY") ?? "",
-      {
-        global: { headers: { Authorization: req.headers.get("Authorization")! } },
-        auth: { persistSession: false },
-      }
+    // 3. Find Existing Customers via DB function
+    const { data: existingCustomers, error: fetchError } = await findExistingCustomersDb(
+      supabaseClient,
+      phoneNumbers
     );
-
-    // Get the authenticated user (optional, but good practice)
-    const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
-    if (userError || !user) {
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" }
-      });
-    }
-
-    // --- Check Existing Customers ---
-    const { data: existingCustomers, error: fetchError } = await supabaseClient
-      .from("customers")
-      .select("id, phone_number")
-      .in("phone_number", phoneNumbers);
 
     if (fetchError) {
       console.error("Error fetching existing customers:", fetchError);
       return new Response(JSON.stringify({ error: "Failed to check for existing customers" }), {
-        status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" }
+        status: 500,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    const existingPhoneSet = new Set(existingCustomers?.map(c => c.phone_number) || []);
-    const existingCustomerIds = existingCustomers?.map(c => c.id) || [];
-    const newPhoneNumbers = phoneNumbers.filter(num => !existingPhoneSet.has(num));
+    // 4. Categorize Phone Numbers
+    const { existingCustomerIds, newPhoneNumbers } = categorizePhoneNumbers(
+      phoneNumbers,
+      existingCustomers
+    );
 
-    // --- Return Result ---
+    // 5. Return Result
     return new Response(JSON.stringify({
       existingCustomerIds: existingCustomerIds,
       newPhoneNumbers: newPhoneNumbers,
@@ -73,9 +49,16 @@ serve(async (req) => {
     });
 
   } catch (err) {
-    console.error("Internal server error:", err);
-    return new Response(JSON.stringify({ error: err.message || "An unexpected error occurred" }), {
-      status: 500,
+    // Catch errors from parsing, auth, or unexpected issues
+    console.error("Error in check-csv-contacts handler:", err.message);
+    let status = 500;
+    if (err.message === "Method Not Allowed") status = 405;
+    if (err.message === "Invalid JSON body") status = 400;
+    if (err.message === "Missing or invalid 'phoneNumbers' array in request body") status = 400;
+    if (err.message.startsWith("Authentication error") || err.message === "User not authenticated.") status = 401;
+
+    return new Response(JSON.stringify({ error: err.message }), {
+      status: status,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }

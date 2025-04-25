@@ -1,7 +1,9 @@
-import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+/// <reference types="https://esm.sh/@supabase/functions-js/src/edge-runtime.d.ts" />
+
+import { serve } from "std/http/server.ts"; // Use import map alias
 import { corsHeaders } from "../_shared/cors.ts";
-import { Database } from "../_shared/database.types.ts";
+import { createSupabaseClient, getAuthenticatedUser } from "../_shared/supabaseClient.ts";
+import { parseRequest, deleteSegmentDb } from "./utils.ts";
 
 serve(async (req) => {
   // Handle CORS preflight request
@@ -10,71 +12,28 @@ serve(async (req) => {
   }
 
   try {
-    // Ensure the request method is DELETE
-    if (req.method !== "DELETE") {
-      return new Response(JSON.stringify({ error: "Method Not Allowed" }), {
-        status: 405,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+    // 1. Parse and Validate Request
+    const { segmentId } = parseRequest(req); // No await needed for sync function
 
-    // Extract segment_id from the URL path parameters
-    const url = new URL(req.url);
-    const pathParts = url.pathname.split("/");
-    const segmentId = pathParts[pathParts.length - 1]; // Assuming ID is the last part
+    // 2. Create Authenticated Supabase Client & Verify User
+    await getAuthenticatedUser(req); // Ensures user is authenticated
+    const supabaseClient = createSupabaseClient(req);
 
-    if (!segmentId) {
-      return new Response(JSON.stringify({ error: "Segment ID is required in the URL path" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+    // 3. Delete Segment via DB function
+    const { error } = await deleteSegmentDb(supabaseClient, segmentId);
 
-    // Create Supabase client with auth context
-    const supabaseClient = createClient<Database>(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_ANON_KEY") ?? "",
-      {
-        global: { headers: { Authorization: req.headers.get("Authorization")! } },
-        auth: {
-          persistSession: false,
-        },
-      }
-    );
-
-    // Get the authenticated user (needed for RLS check)
-    const {
-      data: { user },
-      error: userError,
-    } = await supabaseClient.auth.getUser();
-
-    if (userError || !user) {
-      console.error("User fetch error:", userError);
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    // Delete the segment (RLS policy ensures user can only delete their own)
-    // Note: The related segment_contacts will be deleted automatically due to ON DELETE CASCADE
-    const { error } = await supabaseClient
-      .from("segments")
-      .delete()
-      .eq("id", segmentId);
-      // RLS implicitly adds .eq("user_id", user.id)
-
+    // 4. Handle Response
     if (error) {
       console.error("Supabase delete error:", error);
+      let status = 500;
+      let message = error.message || "Failed to delete segment";
       // Check if the error is due to RLS violation (segment not found or not owned)
       if (error.code === 'PGRST116') { // PostgREST error code for RLS violation or 0 rows affected
-         return new Response(JSON.stringify({ error: "Segment not found or access denied" }), {
-           status: 404, // Not Found or Forbidden
-           headers: { ...corsHeaders, "Content-Type": "application/json" },
-         });
+        status = 404; // Not Found or Forbidden
+        message = "Segment not found or access denied";
       }
-      return new Response(JSON.stringify({ error: error.message }), {
-        status: 500,
+      return new Response(JSON.stringify({ error: message }), {
+        status: status,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
@@ -84,10 +43,17 @@ serve(async (req) => {
       headers: { ...corsHeaders },
       status: 204, // No Content
     });
+
   } catch (err) {
-    console.error("Internal server error:", err);
+    // Catch errors from parsing, auth, or unexpected issues
+    console.error("Error in delete-segment handler:", err.message);
+    let status = 500;
+    if (err.message === "Method Not Allowed") status = 405;
+    if (err.message === "Segment ID is required in the URL path") status = 400;
+    if (err.message.startsWith("Authentication error") || err.message === "User not authenticated.") status = 401;
+
     return new Response(JSON.stringify({ error: err.message }), {
-      status: 500,
+      status: status,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }

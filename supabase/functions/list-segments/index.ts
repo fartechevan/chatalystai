@@ -1,7 +1,9 @@
-import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+/// <reference types="https://esm.sh/@supabase/functions-js/src/edge-runtime.d.ts" />
+
+import { serve } from "std/http/server.ts"; // Use import map alias
 import { corsHeaders } from "../_shared/cors.ts";
-import { Database } from "../_shared/database.types.ts";
+import { createSupabaseClient, getAuthenticatedUser } from "../_shared/supabaseClient.ts";
+import { validateRequest, listSegmentsDb } from "./utils.ts";
 
 serve(async (req) => {
   // Handle CORS preflight request
@@ -10,64 +12,40 @@ serve(async (req) => {
   }
 
   try {
-    // Ensure the request method is GET
-    if (req.method !== "GET") {
-      return new Response(JSON.stringify({ error: "Method Not Allowed" }), {
-        status: 405,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+    // 1. Validate Request Method
+    validateRequest(req); // Throws on error
 
-    // Create Supabase client with auth context
-    const supabaseClient = createClient<Database>(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_ANON_KEY") ?? "",
-      {
-        global: { headers: { Authorization: req.headers.get("Authorization")! } },
-        auth: {
-          persistSession: false,
-        },
-      }
-    );
+    // 2. Create Authenticated Supabase Client & Get User
+    const user = await getAuthenticatedUser(req); // Throws on error/unauthenticated
+    const supabaseClient = createSupabaseClient(req);
 
-    // Get the authenticated user
-    const {
-      data: { user },
-      error: userError,
-    } = await supabaseClient.auth.getUser();
+    // 3. List Segments via DB function
+    const { data, error } = await listSegmentsDb(supabaseClient, user.id);
 
-    if (userError || !user) {
-      console.error("User fetch error:", userError);
-      return new Response(JSON.stringify({ error: "Unauthorized" }), {
-        status: 401,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
-
-    // Fetch segments belonging to the user
-    const { data, error } = await supabaseClient
-      .from("segments")
-      .select("id, name, created_at")
-      .eq("user_id", user.id) // Filter by the logged-in user
-      .order("created_at", { ascending: false });
-
+    // 4. Handle Response
     if (error) {
       console.error("Supabase select error:", error);
-      return new Response(JSON.stringify({ error: error.message }), {
+      return new Response(JSON.stringify({ error: error.message || "Failed to list segments" }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // Return the list of segments
-    return new Response(JSON.stringify(data ?? []), { // Return empty array if data is null
+    // Return the list of segments (or empty array)
+    return new Response(JSON.stringify(data ?? []), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 200,
     });
+
   } catch (err) {
-    console.error("Internal server error:", err);
+    // Catch errors from validation, auth, or unexpected issues
+    console.error("Error in list-segments handler:", err.message);
+    let status = 500;
+    if (err.message === "Method Not Allowed") status = 405;
+    if (err.message.startsWith("Authentication error") || err.message === "User not authenticated.") status = 401;
+
     return new Response(JSON.stringify({ error: err.message }), {
-      status: 500,
+      status: status,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
