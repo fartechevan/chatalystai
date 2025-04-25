@@ -1,7 +1,7 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
 import { corsHeaders } from '../_shared/cors.ts';
 import { createSupabaseClient } from '../_shared/supabaseClient.ts';
-import OpenAI from 'openai'; // Use OpenAI library
+import OpenAI from 'https://esm.sh/openai@4.52.7'; // Updated import to use fully qualified URL
 
 // Ensure OPENAI_API_KEY is set in Supabase secrets
 const openai = new OpenAI({
