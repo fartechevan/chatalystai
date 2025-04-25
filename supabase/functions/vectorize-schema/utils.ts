@@ -1,8 +1,9 @@
+
 /// <reference types="https://esm.sh/@supabase/functions-js/src/edge-runtime.d.ts" />
 
-import { PoolClient } from "postgres"; // Use import map alias
-import { SupabaseClient } from "@supabase/supabase-js";
-import OpenAI from "openai"; // Use mapped import
+import { PoolClient } from "https://deno.land/x/postgres@v0.17.0/mod.ts"; // Use fully qualified URL
+import { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.43.4"; // Use fully qualified URL
+import OpenAI from "https://esm.sh/openai@4.52.7"; // Use fully qualified URL
 import { Database } from "../_shared/database.types.ts";
 import { generateEmbedding as sharedGenerateEmbedding } from "../_shared/openaiUtils.ts"; // Use shared embedding function
 

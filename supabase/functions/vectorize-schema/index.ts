@@ -1,7 +1,8 @@
+
 /// <reference types="https://esm.sh/@supabase/functions-js/src/edge-runtime.d.ts" />
 
-import { serve } from "std/http/server.ts"; // Use import map alias
-import { Pool, PoolClient } from "postgres"; // Use import map alias, import PoolClient
+import { serve } from "https://deno.land/std@0.177.0/http/server.ts"; // Use fully qualified URL
+import { Pool, PoolClient } from "https://deno.land/x/postgres@v0.17.0/mod.ts"; // Use fully qualified URL
 import { corsHeaders } from "../_shared/cors.ts";
 import { createSupabaseServiceRoleClient } from "../_shared/supabaseClient.ts"; // Use Service Role for insert
 import { openai } from "../_shared/openaiUtils.ts"; // Use shared OpenAI client
