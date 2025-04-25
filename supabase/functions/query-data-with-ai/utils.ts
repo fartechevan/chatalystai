@@ -1,7 +1,7 @@
 /// <reference types="https://esm.sh/@supabase/functions-js/src/edge-runtime.d.ts" />
 
 import { SupabaseClient } from "@supabase/supabase-js";
-import OpenAI from "openai"; // Use mapped import
+import OpenAI from "https://esm.sh/openai@4.52.7"; // Updated to use fully qualified URL
 import { Database, Json } from "../_shared/database.types.ts"; // Import Json type
 import { generateEmbedding as sharedGenerateEmbedding } from "../_shared/openaiUtils.ts"; // Use shared embedding function
 
@@ -186,7 +186,7 @@ export async function generateSqlQuery(
 export async function executeGeneratedSql(
   supabaseClient: SupabaseClient<Database>,
   sql: string
-): Promise<Json> { // Use Json type for return
+): Promise<Json> { 
   console.log("Executing generated SQL via RPC:", sql);
   const { data, error } = await supabaseClient.rpc(
       'execute_dynamic_sql',
@@ -215,7 +215,7 @@ export async function summarizeResults(
   openaiClient: OpenAI,
   query: string,
   history: HistoryMessage[],
-  results: Json // Use Json type for results parameter
+  results: Json
 ): Promise<string> {
   let resultString: string;
   let resultSummaryPrompt: string;
