@@ -1,7 +1,7 @@
 /// <reference types="https://esm.sh/@supabase/functions-js/src/edge-runtime.d.ts" />
 
 import { SupabaseClient, PostgrestError } from "https://esm.sh/@supabase/supabase-js@2.43.4";
-import { parse } from "https://deno.land/std@0.168.0/csv/mod.ts"; // Use full URL
+import { parse } from "https://deno.land/std@0.177.0/csv/mod.ts"; // Updated to a working version
 import { Database } from "../_shared/database.types.ts";
 
 export type CustomerInsert = Database["public"]["Tables"]["customers"]["Insert"]; // Added export
