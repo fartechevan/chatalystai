@@ -1,10 +1,10 @@
 
 /// <reference types="https://esm.sh/@supabase/functions-js/src/edge-runtime.d.ts" />
 
-import { serve } from "https://deno.land/std@0.177.0/http/server.ts"; // Updated import path
+import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { corsHeaders } from "../_shared/cors.ts";
-import { createSupabaseServiceRoleClient } from "../_shared/supabaseClient.ts"; // Use Service Role for RPCs
-import { openai } from "../_shared/openaiUtils.ts"; // Use shared OpenAI client
+import { createSupabaseServiceRoleClient } from "../_shared/supabaseClient.ts";
+import { openai } from "../_shared/openaiUtils.ts";
 import {
   parseRequest,
   generateQueryEmbedding,
