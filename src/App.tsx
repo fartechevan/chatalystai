@@ -23,6 +23,7 @@ import { ChunkView } from "./components/knowledge/ChunkView";
 import Profile from "./pages/Profile";
 import BroadcastsPage from "./pages/Broadcasts"; // Import the actual Broadcasts page
 import BroadcastDetailsView from "./components/broadcasts/BroadcastDetailsView"; // Import the details view
+import AIAgentsPage from "./pages/AIAgents"; // Import the new AI Agents page
 
 const App = () => {
   const queryClient = new QueryClient({
@@ -68,6 +69,7 @@ const App = () => {
                     <Route path="help" element={<ComingSoon />} />
                     <Route path="mail" element={<ComingSoon />} />
                     <Route path="knowledge" element={<KnowledgeBase />} />
+                    <Route path="ai-agents" element={<AIAgentsPage />} /> {/* Add AI Agents route */}
                     <Route path="profile" element={<Profile />} />
                   </Route>
                 </Routes>
