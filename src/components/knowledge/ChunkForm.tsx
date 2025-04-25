@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
@@ -19,6 +18,7 @@ import { saveChunkWithEmbedding } from "@/lib/knowledgebase";
 import { useToast } from "@/hooks/use-toast";
 import { DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { RefetchOptions, QueryObserverResult } from "@tanstack/react-query";
+import { ChunkView } from "./ChunkView";
 
 interface ChunkFormProps {
   content?: string;
@@ -236,4 +236,3 @@ export function ChunkForm({
     </DialogContent>
   );
 }
-
