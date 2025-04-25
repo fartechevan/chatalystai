@@ -1,7 +1,8 @@
+
 /// <reference types="https://esm.sh/@supabase/functions-js/src/edge-runtime.d.ts" />
 
 import { SupabaseClient } from "@supabase/supabase-js";
-import OpenAI from "openai"; // Use mapped import
+import OpenAI from "https://esm.sh/openai@4.52.7"; // Updated to use fully qualified URL
 import { Database } from "../_shared/database.types.ts";
 
 // Define the expected structure of incoming messages
