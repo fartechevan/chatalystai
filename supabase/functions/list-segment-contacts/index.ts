@@ -1,6 +1,7 @@
+
 /// <reference types="https://esm.sh/@supabase/functions-js/src/edge-runtime.d.ts" />
 
-import { serve } from "std/http/server.ts"; // Use import map alias
+import { serve } from "std/http/server.ts"; // Change this line
 import { corsHeaders } from "../_shared/cors.ts";
 import { createSupabaseClient, getAuthenticatedUser } from "../_shared/supabaseClient.ts";
 import { parseRequest, listSegmentContactsDb, formatResponsePayload } from "./utils.ts";
@@ -61,3 +62,4 @@ serve(async (req) => {
     });
   }
 });
+
