@@ -36,7 +36,7 @@ export function SettingsContent({ section }: SettingsContentProps) {
 
   if (section === 'billing') {
     return (
-      <div className="p-6 max-w-5xl mx-auto">
+      <div className="p-6"> {/* Removed max-w-5xl mx-auto */}
         <BillingStats />
       </div>
     );
@@ -44,7 +44,7 @@ export function SettingsContent({ section }: SettingsContentProps) {
 
   if (section === 'users') {
     return (
-      <div className="p-4 md:p-6 max-w-5xl mx-auto"> {/* Use responsive padding */}
+      <div className="p-4 md:p-6"> {/* Removed max-w-5xl mx-auto */}
         {isLoading ? (
           // Loading state for both mobile and desktop
           isMobile ? (
@@ -82,14 +82,14 @@ export function SettingsContent({ section }: SettingsContentProps) {
 
   if (section === 'access') {
     return (
-      <div className="p-6 max-w-5xl mx-auto">
+      <div className="p-6"> {/* Removed max-w-5xl mx-auto */}
         <ProfileAccessManagement />
       </div>
     );
   }
 
   return (
-    <div className="p-6 max-w-5xl mx-auto">
+    <div className="p-6"> {/* Removed max-w-5xl mx-auto */}
       <h2 className="text-lg font-semibold">{section.charAt(0).toUpperCase() + section.slice(1)}</h2>
       <p className="text-muted-foreground">This section is under development.</p>
     </div>

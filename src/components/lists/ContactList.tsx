@@ -7,7 +7,13 @@ import { AddContactDialog } from "./components/AddContactDialog"; // Import the 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
-import { MoreHorizontal, Plus } from "lucide-react";
+import { MoreHorizontal, Plus, Trash2 } from "lucide-react"; // Added Trash2
+import { useState } from "react"; // Added useState
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from '@/components/ui/dialog'; // Added Dialog components
+import { useToast } from "@/hooks/use-toast"; // Added useToast
+import { Database } from "@/integrations/supabase/types"; // Import generated types
+
+type Customer = Database['public']['Tables']['customers']['Row']; // Define Customer type
 
 interface ContactListProps {
   onSelectContact: (contactId: string) => void;
@@ -15,6 +21,8 @@ interface ContactListProps {
 
 export function ContactList({ onSelectContact }: ContactListProps) {
   const queryClient = useQueryClient(); // Get query client instance
+  const { toast } = useToast(); // Initialize toast
+  const [contactToDelete, setContactToDelete] = useState<Customer | null>(null); // State for delete confirmation
   const { data: contacts, isLoading } = useQuery({
     queryKey: ['customers'],
     queryFn: async () => {
@@ -25,11 +33,35 @@ export function ContactList({ onSelectContact }: ContactListProps) {
       
       if (error) throw error;
       return data;
-    },
-  });
-
-  if (isLoading) {
-    return (
+     },
+   });
+ 
+   const handleDeleteContact = async (contactId: string) => {
+     try {
+       const { error } = await supabase
+         .from('customers')
+         .delete()
+         .match({ id: contactId });
+ 
+       if (error) throw error;
+ 
+       toast({ title: 'Contact deleted successfully!' });
+       setContactToDelete(null); // Close confirmation dialog
+       queryClient.invalidateQueries({ queryKey: ['customers'] }); // Refresh the list
+     } catch (error) {
+       const errorMessage = error instanceof Error ? error.message : 'Could not delete the contact.';
+       console.error('Error deleting contact:', error);
+       toast({
+         title: 'Error deleting contact',
+         description: errorMessage,
+         variant: 'destructive',
+       });
+       setContactToDelete(null); // Close confirmation dialog on error too
+     }
+   };
+ 
+   if (isLoading) {
+     return (
       <div className="space-y-2 p-4">
         <Skeleton className="h-12 w-full" />
         <Skeleton className="h-12 w-full" />
@@ -82,12 +114,15 @@ export function ContactList({ onSelectContact }: ContactListProps) {
                 <th className="text-left p-3 text-sm font-medium text-muted-foreground">
                   PHONE
                 </th>
-                <th className="text-left p-3 text-sm font-medium text-muted-foreground">
-                  EMAIL
-                </th>
-              </tr>
-            </thead>
-            <tbody>
+                 <th className="text-left p-3 text-sm font-medium text-muted-foreground">
+                   EMAIL
+                 </th>
+                 <th className="text-right p-3 text-sm font-medium text-muted-foreground">
+                   ACTIONS
+                 </th>
+               </tr>
+             </thead>
+             <tbody>
               {contacts?.map((contact) => (
                 <tr 
                   key={contact.id}
@@ -108,12 +143,39 @@ export function ContactList({ onSelectContact }: ContactListProps) {
                   <td className="p-3">
                     {contact.phone_number}
                   </td>
-                  <td className="p-3">
-                    {contact.email}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
+                   <td className="p-3">
+                     {contact.email}
+                   </td>
+                   <td className="p-3 text-right">
+                     <Dialog open={contactToDelete?.id === contact.id} onOpenChange={(isOpen) => !isOpen && setContactToDelete(null)}>
+                       <DialogTrigger asChild>
+                         <Button 
+                           variant="ghost" 
+                           size="icon" 
+                           onClick={(e) => {
+                             e.stopPropagation(); // Prevent row click
+                             setContactToDelete(contact);
+                           }}
+                           title="Delete Contact"
+                         >
+                           <Trash2 className="h-4 w-4 text-destructive" />
+                         </Button>
+                       </DialogTrigger>
+                       <DialogContent onClick={(e) => e.stopPropagation()}> {/* Prevent row click */}
+                         <DialogHeader>
+                           <DialogTitle>Delete Contact</DialogTitle>
+                         </DialogHeader>
+                         <p>Are you sure you want to delete the contact "{contactToDelete?.name}"? This action cannot be undone.</p>
+                         <DialogFooter>
+                           <Button variant="outline" onClick={(e) => { e.stopPropagation(); setContactToDelete(null); }}>Cancel</Button>
+                           <Button variant="destructive" onClick={(e) => { e.stopPropagation(); handleDeleteContact(contactToDelete!.id); }}>Delete</Button>
+                         </DialogFooter>
+                       </DialogContent>
+                     </Dialog>
+                   </td>
+                 </tr>
+               ))}
+             </tbody>
           </table>
         </ScrollArea>
       </div>

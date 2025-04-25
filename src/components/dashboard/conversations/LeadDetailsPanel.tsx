@@ -2,12 +2,15 @@ import { useState, useEffect } from "react";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { cn } from "@/lib/utils";
 import type { Conversation } from "./types";
+import { Button } from "@/components/ui/button"; // Import Button
+import { Check, LinkIcon, Trash2 } from "lucide-react"; // Import icons
 import { 
   LeadHeader,
   LeadTags,
   PipelineSelector,
   LeadContactInfo,
-  LeadTabContent
+  LeadDetailsInfo // Import LeadDetailsInfo directly
+  // LeadTabContent removed
 } from "./leadDetails";
 import { EmptyLeadState } from "./leadDetails/EmptyLeadState";
 import {
@@ -146,58 +149,104 @@ export function LeadDetailsPanel({
                     <TabsTrigger value="setup" className="py-3 rounded-none data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:shadow-none">Setup</TabsTrigger>
                   </TabsList>
                 </div>
-                
-                <TabsContent value="main" className="flex-1 overflow-auto p-0 m-0">
-                  <LeadContactInfo 
-                    customer={customer} 
-                    lead={lead} 
-                  />
-                  
-                  <LeadTabContent 
-                    activeTab={activeTab}
-                    profiles={profiles}
-                    selectedAssignee={selectedAssignee}
-                    onAssigneeChange={handleAssigneeChange}
-                    customer={customer}
-                    lead={lead}
-                    isLoading={isLoading}
-                  />
+
+                {/* Main Tab Content */}
+                <TabsContent value="main" className="flex-1 overflow-auto p-0 m-0 flex flex-col"> 
+                  <div className="flex-1 overflow-auto"> {/* Scrollable area for content */}
+                    <LeadContactInfo 
+                      customer={customer} 
+                      lead={lead} 
+                    />
+                    <LeadDetailsInfo 
+                      profiles={profiles}
+                      selectedAssignee={selectedAssignee}
+                      onAssigneeChange={handleAssigneeChange}
+                      customer={customer}
+                      lead={lead}
+                      isLoading={isLoading}
+                    />
+                  </div>
+                  {/* Common Footer */}
+                  <div className="mt-auto border-t p-4">
+                    <div className="flex items-center justify-between gap-2">
+                      <Button variant="outline" size="sm" className="flex-1">
+                        <Check className="h-4 w-4 mr-2" />
+                        Accept
+                      </Button>
+                      <Button variant="outline" size="icon" className="shrink-0">
+                        <LinkIcon className="h-4 w-4" />
+                      </Button>
+                      <Button variant="outline" size="icon" className="shrink-0">
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
                 </TabsContent>
-                
-                <TabsContent value="statistics" className="flex-1 p-4 m-0">
-                  <LeadTabContent 
-                    activeTab={activeTab}
-                    profiles={profiles}
-                    selectedAssignee={selectedAssignee}
-                    onAssigneeChange={handleAssigneeChange}
-                    customer={customer}
-                    lead={lead}
-                    isLoading={isLoading}
-                  />
+
+                {/* Statistics Tab Content */}
+                <TabsContent value="statistics" className="flex-1 p-4 m-0 flex flex-col">
+                  <div className="flex-1 flex items-center justify-center h-full"> {/* Placeholder */}
+                    <p className="text-sm text-muted-foreground">Statistics will appear here</p>
+                  </div>
+                   {/* Common Footer */}
+                   <div className="mt-auto border-t p-4">
+                    <div className="flex items-center justify-between gap-2">
+                      <Button variant="outline" size="sm" className="flex-1">
+                        <Check className="h-4 w-4 mr-2" />
+                        Accept
+                      </Button>
+                      <Button variant="outline" size="icon" className="shrink-0">
+                        <LinkIcon className="h-4 w-4" />
+                      </Button>
+                      <Button variant="outline" size="icon" className="shrink-0">
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
                 </TabsContent>
-                
-                <TabsContent value="media" className="flex-1 p-4 m-0">
-                  <LeadTabContent 
-                    activeTab={activeTab}
-                    profiles={profiles}
-                    selectedAssignee={selectedAssignee}
-                    onAssigneeChange={handleAssigneeChange}
-                    customer={customer}
-                    lead={lead}
-                    isLoading={isLoading}
-                  />
+
+                {/* Media Tab Content */}
+                <TabsContent value="media" className="flex-1 p-4 m-0 flex flex-col">
+                  <div className="flex-1 flex items-center justify-center h-full"> {/* Placeholder */}
+                    <p className="text-sm text-muted-foreground">Media files will appear here</p>
+                  </div>
+                   {/* Common Footer */}
+                   <div className="mt-auto border-t p-4">
+                    <div className="flex items-center justify-between gap-2">
+                      <Button variant="outline" size="sm" className="flex-1">
+                        <Check className="h-4 w-4 mr-2" />
+                        Accept
+                      </Button>
+                      <Button variant="outline" size="icon" className="shrink-0">
+                        <LinkIcon className="h-4 w-4" />
+                      </Button>
+                      <Button variant="outline" size="icon" className="shrink-0">
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
                 </TabsContent>
-                
-                <TabsContent value="setup" className="flex-1 p-4 m-0">
-                  <LeadTabContent 
-                    activeTab={activeTab}
-                    profiles={profiles}
-                    selectedAssignee={selectedAssignee}
-                    onAssigneeChange={handleAssigneeChange}
-                    customer={customer}
-                    lead={lead}
-                    isLoading={isLoading}
-                  />
+
+                {/* Setup Tab Content */}
+                <TabsContent value="setup" className="flex-1 p-4 m-0 flex flex-col">
+                  <div className="flex-1 flex items-center justify-center h-full"> {/* Placeholder */}
+                    <p className="text-sm text-muted-foreground">Setup options will appear here</p>
+                  </div>
+                   {/* Common Footer */}
+                   <div className="mt-auto border-t p-4">
+                    <div className="flex items-center justify-between gap-2">
+                      <Button variant="outline" size="sm" className="flex-1">
+                        <Check className="h-4 w-4 mr-2" />
+                        Accept
+                      </Button>
+                      <Button variant="outline" size="icon" className="shrink-0">
+                        <LinkIcon className="h-4 w-4" />
+                      </Button>
+                      <Button variant="outline" size="icon" className="shrink-0">
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
                 </TabsContent>
               </Tabs>
             </>

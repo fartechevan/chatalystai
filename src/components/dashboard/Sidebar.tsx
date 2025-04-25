@@ -40,7 +40,7 @@ const menuItems: MenuItem[] = [
   { title: "Leads", icon: Target, path: "/dashboard/leads" },
   { title: "Chat", icon: MessageSquare, path: "/dashboard/conversations" },
   { title: "Broadcasts", icon: RadioTower, path: "/dashboard/broadcasts" }, // Add Broadcasts item
-  { title: "Calendar", icon: Calendar, path: "/dashboard/calendar" },
+  // { title: "Calendar", icon: Calendar, path: "/dashboard/calendar" },
   { title: "Lists", icon: List, path: "/dashboard/lists" },
   { title: "Knowledge", icon: BookOpen, path: "/dashboard/knowledge" },
   { title: "Stats", icon: BarChart2, path: "/dashboard/stats" },
