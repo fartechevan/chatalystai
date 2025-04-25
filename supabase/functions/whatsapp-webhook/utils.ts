@@ -1,7 +1,7 @@
 
 /// <reference types="https://esm.sh/@supabase/functions-js/src/edge-runtime.d.ts" />
 
-import { SupabaseClient } from "@supabase/supabase-js";
+import { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { Database, Json } from "../_shared/database.types.ts";
 import { corsHeaders } from "../_shared/cors.ts";
 
