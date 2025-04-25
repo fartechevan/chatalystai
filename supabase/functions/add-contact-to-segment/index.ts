@@ -1,7 +1,7 @@
 
 /// <reference types="https://esm.sh/@supabase/functions-js/src/edge-runtime.d.ts" />
 
-import { serve } from "std/http/server.ts"; // Use import map alias
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { corsHeaders } from "../_shared/cors.ts";
 import { createSupabaseClient, getAuthenticatedUser } from "../_shared/supabaseClient.ts";
 import { parseAndValidateRequest, addContactToSegmentDb } from "./utils.ts";
