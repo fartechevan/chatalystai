@@ -1,5 +1,5 @@
 
-import { SupabaseClient } from "@supabase/supabase-js";
+import { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { extractMessageContent } from "./utils.ts"
 import { findOrCreateCustomer } from "./customerHandler.ts"
 import { findOrCreateConversation } from "./conversationHandler.ts"
