@@ -1,6 +1,6 @@
 /// <reference types="https://esm.sh/@supabase/functions-js/src/edge-runtime.d.ts" />
 
-import { SupabaseClient, PostgrestError } from "@supabase/supabase-js";
+import { SupabaseClient, PostgrestError } from "https://esm.sh/@supabase/supabase-js@2.43.4";
 import { parse } from "https://deno.land/std@0.168.0/csv/mod.ts"; // Use full URL
 import { Database } from "../_shared/database.types.ts";
 
