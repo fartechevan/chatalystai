@@ -1,6 +1,7 @@
+
 /// <reference types="https://esm.sh/@supabase/functions-js/src/edge-runtime.d.ts" />
 
-import { serve } from 'std/http/server.ts'; // Use import map alias
+import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'; // Updated import path
 import { corsHeaders } from '../_shared/cors.ts';
 import { createSupabaseServiceRoleClient } from '../_shared/supabaseClient.ts'; // Using Service Role
 import {
