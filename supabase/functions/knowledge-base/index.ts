@@ -72,7 +72,7 @@ serve(async (req) => {
         );
       }
 
-      console.log('Received save_chunk request with content length:', content.length);
+      console.log('Received save_chunk request for document_id:', document_id);
 
       if (!OPENAI_API_KEY) {
         console.error('OPENAI_API_KEY is not set in edge function environment');
@@ -85,9 +85,32 @@ serve(async (req) => {
         );
       }
 
-      // Generate embedding for the content
-      console.log('Generating embedding...');
-      const contentEmbedding = await generateEmbedding(content);
+      // --- Removed fetching full document content ---
+
+      // Generate embedding for the *individual chunk content*
+      console.log('Generating embedding for chunk content...');
+      // Ensure content is not empty before generating embedding
+      if (!content || typeof content !== 'string' || content.trim().length === 0) {
+         throw new Error("Chunk content is empty or invalid, cannot generate embedding.");
+      }
+      const contentEmbedding = await generateEmbedding(content); // <<< Use chunk content here
+
+        return new Response(
+          JSON.stringify({ error: 'Failed to fetch document content for embedding: ' + (docError?.message || 'Document not found or content missing') }),
+          {
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          }
+        );
+      }
+      const fullDocumentContent = documentData.content;
+      console.log('Fetched full document content length:', fullDocumentContent.length);
+      // --- End Fetch ---
+
+
+      // Generate embedding for the *full document content*
+      console.log('Generating embedding for full document...');
+      const contentEmbedding = await generateEmbedding(fullDocumentContent); // Use full document content here
 
       // Convert the embedding to a string for storage
       const embeddingString = JSON.stringify(contentEmbedding);

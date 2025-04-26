@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react'; // Import useState
+import React, { useEffect, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
@@ -7,27 +7,43 @@ import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Terminal, Trash2, Sparkles } from 'lucide-react';
+import { Terminal, Trash2, Sparkles, Send, Loader2 } from 'lucide-react'; // Added Send, Loader2
+import { Separator } from '@/components/ui/separator'; // Added Separator
 import { getAIAgent, createAIAgent, updateAIAgent, deleteAIAgent } from '@/services/aiAgents/agentService';
-import { listKnowledgeDocuments, KnowledgeDocument } from '@/services/knowledge/documentService'; // Import document service and type
+import { listKnowledgeDocuments, KnowledgeDocument } from '@/services/knowledge/documentService';
 import { AIAgent, NewAIAgent, UpdateAIAgent } from '@/types/aiAgents';
+import { supabase } from '@/integrations/supabase/client'; // Import supabase client for function invocation
 import { useToast } from '@/hooks/use-toast';
 import PromptSuggestionDialog from './PromptSuggestionDialog';
-import DocumentSelector from '@/components/knowledge/DocumentSelector'; // Import the selector
+import DocumentSelector from '@/components/knowledge/DocumentSelector';
+import { ArrowLeft } from 'lucide-react';
+import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable';
+import { cn } from '@/lib/utils'; // Import cn
+
 // TODO: Import form handling libraries (e.g., react-hook-form, zod) later
 
 interface AgentDetailsPanelProps {
   selectedAgentId: string | null;
   onAgentUpdate: () => void; // Callback after create/update/delete
+  onNavigateBack: () => void; // Callback to navigate back to list
 }
 
-const AgentDetailsPanel: React.FC<AgentDetailsPanelProps> = ({ selectedAgentId, onAgentUpdate }) => {
+// Remove DetailSubView type
+// type DetailSubView = 'details' | 'test';
+
+const AgentDetailsPanel: React.FC<AgentDetailsPanelProps> = ({ selectedAgentId, onAgentUpdate, onNavigateBack }) => {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [agentName, setAgentName] = useState('');
   const [promptText, setPromptText] = useState('');
-  const [selectedDocumentIds, setSelectedDocumentIds] = useState<string[]>([]); // State for selected docs
+  const [selectedDocumentIds, setSelectedDocumentIds] = useState<string[]>([]);
   const [isSuggestDialogOpen, setIsSuggestDialogOpen] = useState(false);
+  // --- State for Testing ---
+  const [testQuery, setTestQuery] = useState('');
+  // Replace testResponse/testError with chat history state
+  // const [testResponse, setTestResponse] = useState<string | null>(null);
+  // const [testError, setTestError] = useState<string | null>(null);
+  const [chatHistory, setChatHistory] = useState<{ sender: 'user' | 'agent' | 'error'; message: string }[]>([]);
 
   // --- Data Fetching ---
   // Fetch available knowledge documents
@@ -51,8 +67,8 @@ const AgentDetailsPanel: React.FC<AgentDetailsPanelProps> = ({ selectedAgentId, 
     },
     onError: (error) => {
       toast({ variant: "destructive", title: "Error", description: `Failed to create agent: ${error.message}` });
-     },
-   });
+    },
+  });
 
   const updateMutation = useMutation({
     mutationFn: ({ agentId, updates }: { agentId: string; updates: UpdateAIAgent }) =>
@@ -285,31 +301,299 @@ const AgentDetailsPanel: React.FC<AgentDetailsPanelProps> = ({ selectedAgentId, 
 
        console.log("Updating agent", selectedAgentId, "with data:", updates);
        updateMutation.mutate({ agentId: selectedAgentId, updates });
-     }
-   };
+    }
+  };
 
   const handleDelete = () => {
-     if (selectedAgentId) {
-       console.log("Delete clicked for:", selectedAgentId);
-       // Call deleteAIAgent mutation here
-       // On success, invalidate queries and call onAgentUpdate()
-     }
+    if (selectedAgentId) {
+      console.log("Delete clicked for:", selectedAgentId);
+      // TODO: Implement delete mutation
+      // Call deleteAIAgent mutation here
+      // On success, invalidate queries and call onAgentUpdate()
+    }
   };
+
+  // --- Test Agent Mutation ---
+  const testAgentMutation = useMutation({
+    mutationFn: async ({ agentId, query }: { agentId: string; query: string }) => {
+      // TODO: Replace 'query-agent' with the actual Supabase function name when created
+      const { data, error } = await supabase.functions.invoke('query-agent', {
+        body: { agentId, query },
+      });
+
+      if (error) {
+        console.error("Error invoking query-agent function:", error);
+        throw new Error(error.message || 'Failed to query agent.');
+      }
+      // Assuming the function returns { response: "..." } on success
+      if (data && typeof data.response === 'string') {
+        return data.response;
+      } else {
+        throw new Error('Invalid response format from agent function.');
+      }
+    },
+    onMutate: (variables) => {
+      // Add user query to chat history immediately
+      setChatHistory(prev => [...prev, { sender: 'user', message: variables.query }]);
+      setTestQuery(''); // Clear input field
+    },
+    onSuccess: (response) => {
+      // Add agent response to chat history
+      setChatHistory(prev => [...prev, { sender: 'agent', message: response }]);
+      // toast({ title: "Test Complete", description: "Agent responded successfully." }); // Optional: remove toast for chat
+    },
+    onError: (error) => {
+       // Add error message to chat history
+      setChatHistory(prev => [...prev, { sender: 'error', message: `Error: ${error.message}` }]);
+      // toast({ variant: "destructive", title: "Test Error", description: `Agent query failed: ${error.message}` }); // Optional: remove toast for chat
+    },
+  });
+
+  const handleTestQuery = () => {
+    if (!selectedAgentId) {
+      toast({ variant: "destructive", title: "Error", description: "No agent selected." });
+      return;
+    }
+    if (!testQuery.trim()) {
+      toast({ variant: "destructive", title: "Validation Error", description: "Test query cannot be empty." });
+      return;
+    }
+    testAgentMutation.mutate({ agentId: selectedAgentId, query: testQuery });
+  };
+
+
+  // --- Render Agent Details Form ---
+  const renderAgentDetailsForm = () => (
+    <div className="space-y-4">
+      {/* Existing form content goes here */}
+      <div className="space-y-2">
+        <Label htmlFor="agent-name">Agent Name</Label>
+        <Input id="agent-name" defaultValue={selectedAgent?.name} placeholder="e.g., Customer Support Bot" disabled={isCreating || updateMutation.isPending || isLoadingAgent} />
+      </div>
+      <div className="space-y-2">
+        <div className="flex justify-between items-center">
+          <Label htmlFor="agent-prompt">System Prompt</Label>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setIsSuggestDialogOpen(true)}
+            disabled={isCreating || updateMutation.isPending || isLoadingAgent}
+          >
+            <Sparkles className="h-3 w-3 mr-1" />
+            Suggest
+          </Button>
+        </div>
+        <Textarea
+          id="agent-prompt"
+          value={promptText}
+          onChange={(e) => setPromptText(e.target.value)}
+          placeholder="Define the agent's role and instructions..."
+          rows={6}
+          disabled={isCreating || updateMutation.isPending || isLoadingAgent}
+        />
+      </div>
+      <div className="space-y-2">
+        <Label>Knowledge Documents</Label>
+        <DocumentSelector
+          availableDocuments={availableDocuments}
+          selectedDocumentIds={selectedDocumentIds}
+          onSelectionChange={setSelectedDocumentIds}
+          isLoading={isLoadingDocuments}
+          isError={isDocumentsError}
+          error={documentsError}
+          disabled={isCreating || updateMutation.isPending || isLoadingAgent}
+        />
+      </div>
+    </div>
+  );
+
+  // --- Render Create Agent Form ---
+   const renderCreateAgentForm = () => (
+     <div className="space-y-4">
+       <div className="space-y-2">
+         <Label htmlFor="agent-name-create">Agent Name</Label>
+         <Input
+           id="agent-name-create"
+           value={agentName}
+           onChange={(e) => setAgentName(e.target.value)}
+           placeholder="e.g., Customer Support Bot"
+           disabled={createMutation.isPending}
+         />
+       </div>
+       <div className="space-y-2">
+         <div className="flex justify-between items-center">
+           <Label htmlFor="agent-prompt-create">System Prompt</Label>
+           <Button
+             variant="outline"
+             size="sm"
+             onClick={() => setIsSuggestDialogOpen(true)}
+             disabled={createMutation.isPending}
+           >
+             <Sparkles className="h-3 w-3 mr-1" />
+             Suggest
+           </Button>
+         </div>
+         <Textarea
+           id="agent-prompt-create"
+           value={promptText}
+           onChange={(e) => setPromptText(e.target.value)}
+           placeholder="Define the agent's role and instructions..."
+           rows={6}
+           disabled={createMutation.isPending}
+         />
+       </div>
+       <div className="space-y-2">
+         <Label>Knowledge Documents</Label>
+         <DocumentSelector
+           availableDocuments={availableDocuments}
+           selectedDocumentIds={selectedDocumentIds}
+           onSelectionChange={setSelectedDocumentIds}
+           isLoading={isLoadingDocuments}
+           isError={isDocumentsError}
+           error={documentsError}
+           disabled={createMutation.isPending}
+         />
+       </div>
+     </div>
+   );
+
+
+  // --- Render Test Agent Section (Chat Interface) ---
+  const renderTestAgentSection = () => (
+    <div className="flex flex-col h-full">
+      {/* Chat History Area */}
+      <div className="flex-grow overflow-y-auto p-4 space-y-4 border rounded-md mb-4 bg-background">
+        {chatHistory.map((entry, index) => (
+          <div
+            key={index}
+            className={cn(
+              "flex",
+              entry.sender === 'user' ? 'justify-end' : 'justify-start'
+            )}
+          >
+            <div
+              className={cn(
+                "p-3 rounded-lg max-w-[75%] whitespace-pre-wrap", // Allow wrapping
+                entry.sender === 'user' ? 'bg-primary text-primary-foreground' : '',
+                entry.sender === 'agent' ? 'bg-muted' : '',
+                entry.sender === 'error' ? 'bg-destructive text-destructive-foreground' : ''
+              )}
+            >
+              {entry.message}
+            </div>
+          </div>
+        ))}
+        {/* Loading indicator */}
+        {testAgentMutation.isPending && (
+          <div className="flex justify-start">
+             <div className="p-3 rounded-lg bg-muted flex items-center text-sm text-muted-foreground">
+               <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+               Thinking...
+             </div>
+          </div>
+        )}
+      </div>
+
+      {/* Input Area */}
+      <div className="flex items-center space-x-2">
+        <Textarea
+          id="test-query-input"
+          value={testQuery}
+          onChange={(e) => setTestQuery(e.target.value)}
+          placeholder="Send a message..."
+          rows={2} // Adjust rows as needed
+          className="flex-grow resize-none"
+          disabled={testAgentMutation.isPending || isLoadingAgent}
+          onKeyDown={(e) => {
+             // Optional: Send on Enter, Shift+Enter for newline
+             if (e.key === 'Enter' && !e.shiftKey) {
+               e.preventDefault();
+               handleTestQuery();
+             }
+           }}
+        />
+        <Button
+          onClick={handleTestQuery}
+          disabled={testAgentMutation.isPending || createMutation.isPending || updateMutation.isPending || isLoadingAgent || !testQuery.trim()}
+          size="icon"
+          aria-label="Send message"
+        >
+          <Send className="h-4 w-4" />
+        </Button>
+      </div>
+    </div>
+  );
+
+
+  // Determine main content based on state
+  let mainContent;
+  if (selectedAgentId && isLoadingAgent) {
+    mainContent = (
+      <div className="space-y-4 p-4">
+        <Skeleton className="h-8 w-1/2" /> <Skeleton className="h-6 w-1/4" /> <Skeleton className="h-10 w-full" /> <Skeleton className="h-6 w-1/4" /> <Skeleton className="h-20 w-full" /> <Skeleton className="h-6 w-1/4" /> <Skeleton className="h-16 w-full" />
+      </div>
+    );
+  } else if (selectedAgentId && isFetchError) {
+    mainContent = (
+      <Alert variant="destructive" className="m-4">
+        <Terminal className="h-4 w-4" /> <AlertTitle>Error Fetching Agent Details</AlertTitle> <AlertDescription>{fetchError?.message || "An unknown error occurred."}</AlertDescription>
+      </Alert>
+    );
+  } else if (isCreating) {
+     mainContent = renderCreateAgentForm();
+  }
+  // Removed conditional rendering based on detailView for existing agent
+  // else if (selectedAgent) { ... }
 
 
   return (
     <Card className="w-full h-full flex flex-col">
-      <CardHeader>
-        <CardTitle>{isCreating ? 'Create New Agent' : (isLoadingAgent ? 'Loading...' : `Edit Agent: ${selectedAgent?.name ?? ''}`)}</CardTitle>
+      {/* Header with Back Button and Title */}
+      <CardHeader className="flex flex-row items-center space-x-4 border-b pb-4">
+        <Button variant="outline" size="icon" onClick={onNavigateBack} aria-label="Back to list">
+          <ArrowLeft className="h-4 w-4" />
+        </Button>
+        <CardTitle className="flex-grow">{isCreating ? 'Create New Agent' : (isLoadingAgent ? 'Loading...' : `Agent: ${selectedAgent?.name ?? ''}`)}</CardTitle>
       </CardHeader>
-      <CardContent className="flex-grow overflow-auto">
-        {content}
+
+      {/* Main Content Area */}
+      <CardContent className="flex-grow overflow-auto p-0"> {/* Remove padding here, add to inner panels */}
+        {isCreating ? (
+          // Render create form directly if creating
+          <div className="p-6"> {/* Add padding back for create view */}
+             {mainContent}
+          </div>
+        ) : selectedAgentId && isLoadingAgent ? (
+           // Loading Skeleton for detail view
+           <div className="p-6"> {mainContent} </div>
+        ) : selectedAgentId && isFetchError ? (
+           // Error Alert for detail view
+           <div className="p-6"> {mainContent} </div>
+        ) : selectedAgent ? (
+          // Side-by-side layout for existing agent details and testing
+          <ResizablePanelGroup direction="horizontal" className="h-full w-full">
+            <ResizablePanel defaultSize={50} minSize={30}>
+              <div className="h-full overflow-auto p-6"> {/* Add padding */}
+                {renderAgentDetailsForm()}
+              </div>
+            </ResizablePanel>
+            <ResizableHandle withHandle />
+            <ResizablePanel defaultSize={50} minSize={30}>
+              <div className="h-full overflow-auto p-6"> {/* Add padding */}
+                {renderTestAgentSection()}
+              </div>
+            </ResizablePanel>
+          </ResizablePanelGroup>
+        ) : null /* Should not happen if layout logic is correct */}
       </CardContent>
+
+      {/* Footer with Save/Delete Buttons - Enable buttons based on main state */}
       <CardFooter className="border-t pt-4 flex justify-between">
           <Button
             variant="outline"
             onClick={handleSave}
-            disabled={createMutation.isPending || updateMutation.isPending || isLoadingAgent} // Disable during mutations or loading
+            // Disable only during mutations/loading, not based on view
+            disabled={createMutation.isPending || updateMutation.isPending || isLoadingAgent}
           >
             {createMutation.isPending ? 'Creating...' : (updateMutation.isPending ? 'Saving...' : (isCreating ? 'Create Agent' : 'Save Changes'))}
           </Button>
@@ -318,7 +602,8 @@ const AgentDetailsPanel: React.FC<AgentDetailsPanelProps> = ({ selectedAgentId, 
               variant="destructive"
               size="icon"
               onClick={handleDelete}
-              disabled={/* deleteMutation.isPending || */ updateMutation.isPending || isLoadingAgent} // Disable during mutations or loading
+               // Disable only during mutations/loading
+              disabled={/* deleteMutation.isPending || */ updateMutation.isPending || isLoadingAgent}
               aria-label="Delete Agent"
             >
              {/* TODO: Add loading spinner for delete */}
