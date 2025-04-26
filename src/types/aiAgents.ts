@@ -5,7 +5,9 @@ export interface AIAgent {
   id: string; // Unique identifier for the agent (e.g., UUID from Supabase)
   name: string; // User-defined name for the agent
   prompt: string; // The system prompt defining the agent's behavior
+  keyword_trigger?: string | null; // Optional keyword to trigger the agent in a channel
   knowledge_document_ids?: string[]; // Optional array of knowledge document IDs linked to this agent
+  integration_ids?: string[]; // Optional array of integration IDs linked to this agent
   created_at: string; // Timestamp of creation
   updated_at: string; // Timestamp of last update
   // Add any other relevant fields as needed, e.g., user_id, organization_id

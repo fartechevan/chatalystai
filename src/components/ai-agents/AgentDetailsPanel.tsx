@@ -11,6 +11,8 @@ import { Terminal, Trash2, Sparkles, Send, Loader2 } from 'lucide-react'; // Add
 import { Separator } from '@/components/ui/separator'; // Added Separator
 import { getAIAgent, createAIAgent, updateAIAgent, deleteAIAgent } from '@/services/aiAgents/agentService';
 import { listKnowledgeDocuments, KnowledgeDocument } from '@/services/knowledge/documentService';
+// Import the updated integration service and type
+import { listIntegrations, ConfiguredIntegration } from '@/services/integrations/integrationService';
 import { AIAgent, NewAIAgent, UpdateAIAgent } from '@/types/aiAgents';
 import { supabase } from '@/integrations/supabase/client'; // Import supabase client for function invocation
 import { useToast } from '@/hooks/use-toast';
@@ -36,7 +38,9 @@ const AgentDetailsPanel: React.FC<AgentDetailsPanelProps> = ({ selectedAgentId, 
   const { toast } = useToast();
   const [agentName, setAgentName] = useState('');
   const [promptText, setPromptText] = useState('');
+  const [keywordTrigger, setKeywordTrigger] = useState<string | null>(''); // Added state
   const [selectedDocumentIds, setSelectedDocumentIds] = useState<string[]>([]);
+  const [selectedIntegrationIds, setSelectedIntegrationIds] = useState<string[]>([]); // Added state
   const [isSuggestDialogOpen, setIsSuggestDialogOpen] = useState(false);
   // --- State for Testing ---
   const [testQuery, setTestQuery] = useState('');
@@ -56,6 +60,18 @@ const AgentDetailsPanel: React.FC<AgentDetailsPanelProps> = ({ selectedAgentId, 
     queryKey: ['knowledgeDocuments'],
     queryFn: listKnowledgeDocuments,
   });
+
+  // Placeholder: Fetch available integrations
+  const {
+    data: availableIntegrations,
+    isLoading: isLoadingIntegrations,
+    isError: isIntegrationsError,
+    error: integrationsError,
+  } = useQuery<ConfiguredIntegration[], Error>({ // Use ConfiguredIntegration here
+    queryKey: ['integrations'],
+    queryFn: listIntegrations,
+  });
+
 
   // --- Mutations ---
   const createMutation = useMutation({
@@ -77,7 +93,7 @@ const AgentDetailsPanel: React.FC<AgentDetailsPanelProps> = ({ selectedAgentId, 
       queryClient.invalidateQueries({ queryKey: ['aiAgents'] }); // Refresh list
       queryClient.invalidateQueries({ queryKey: ['aiAgent', updatedAgent.id] }); // Refresh details view
       toast({ title: "Success", description: `Agent "${updatedAgent.name}" updated.` });
-      onAgentUpdate(); // Reset selection/form (or maybe just refetch?)
+      // Remove onAgentUpdate() call here - let query invalidation handle UI update via useEffect
     },
     onError: (error, variables) => {
       toast({
@@ -108,12 +124,19 @@ const AgentDetailsPanel: React.FC<AgentDetailsPanelProps> = ({ selectedAgentId, 
       // Populate form for editing
       setAgentName(selectedAgent.name || '');
       setPromptText(selectedAgent.prompt || '');
-      setSelectedDocumentIds(selectedAgent.knowledge_document_ids || []); // Set selected docs
+      setKeywordTrigger(selectedAgent.keyword_trigger || '');
+      setSelectedDocumentIds(selectedAgent.knowledge_document_ids || []);
+      // Use the base_integration_id from the fetched agent data if available
+      // Note: The AIAgent type might need updating if it doesn't include base_integration_id directly
+      // For now, assuming integration_ids on AIAgent *are* the base IDs (needs verification if still failing)
+      setSelectedIntegrationIds(selectedAgent.integration_ids || []);
     } else if (!selectedAgentId) {
       // Reset form for creating
       setAgentName('');
       setPromptText('');
-      setSelectedDocumentIds([]); // Reset selected docs
+      setKeywordTrigger(''); // Added
+      setSelectedDocumentIds([]);
+      setSelectedIntegrationIds([]); // Added
     }
   }, [selectedAgentId, selectedAgent]);
 
@@ -252,6 +275,8 @@ const AgentDetailsPanel: React.FC<AgentDetailsPanelProps> = ({ selectedAgentId, 
 
   // TODO: Implement handleSave and handleDelete using mutations
   const handleSave = () => {
+    // Logging removed
+
     if (isCreating) {
       // --- Create Agent ---
       if (!agentName.trim()) {
@@ -266,7 +291,9 @@ const AgentDetailsPanel: React.FC<AgentDetailsPanelProps> = ({ selectedAgentId, 
       const newAgentData: NewAIAgent = {
         name: agentName,
         prompt: promptText,
-        knowledge_document_ids: selectedDocumentIds.length > 0 ? selectedDocumentIds : null, // Add selected IDs or null
+        knowledge_document_ids: selectedDocumentIds.length > 0 ? selectedDocumentIds : null,
+        keyword_trigger: keywordTrigger?.trim() || null, // Added
+        integration_ids: selectedIntegrationIds.length > 0 ? selectedIntegrationIds : [], // Added
       };
       console.log("Creating agent with data:", newAgentData);
       createMutation.mutate(newAgentData);
@@ -288,9 +315,12 @@ const AgentDetailsPanel: React.FC<AgentDetailsPanelProps> = ({ selectedAgentId, 
          name: currentName, // Assuming name might be uncontrolled for edit for now
          prompt: promptText,
          knowledge_document_ids: selectedDocumentIds.length > 0 ? selectedDocumentIds : null,
+         keyword_trigger: keywordTrigger?.trim() || null, // Added
+         integration_ids: selectedIntegrationIds.length > 0 ? selectedIntegrationIds : [], // Added
        };
 
        // Only send update if something actually changed (optional optimization)
+       // Consider comparing keyword_trigger and integration_ids as well
        // const hasChanged = updates.name !== selectedAgent.name ||
        //                    updates.prompt !== selectedAgent.prompt ||
        //                    JSON.stringify(updates.knowledge_document_ids?.sort()) !== JSON.stringify(selectedAgent.knowledge_document_ids?.sort());
@@ -299,7 +329,8 @@ const AgentDetailsPanel: React.FC<AgentDetailsPanelProps> = ({ selectedAgentId, 
        //   return;
        // }
 
-       console.log("Updating agent", selectedAgentId, "with data:", updates);
+       // Logging removed
+       // console.log("Updating agent", selectedAgentId, "with data:", updates); // Remove this log as well
        updateMutation.mutate({ agentId: selectedAgentId, updates });
     }
   };
@@ -404,6 +435,61 @@ const AgentDetailsPanel: React.FC<AgentDetailsPanelProps> = ({ selectedAgentId, 
           disabled={isCreating || updateMutation.isPending || isLoadingAgent}
         />
       </div>
+      {/* Keyword Trigger Input */}
+      <div className="space-y-2">
+        <Label htmlFor="agent-keyword-trigger">Keyword Trigger (Optional)</Label>
+        <Input
+          id="agent-keyword-trigger"
+          value={keywordTrigger ?? ''}
+          onChange={(e) => setKeywordTrigger(e.target.value)}
+          placeholder="e.g., !support"
+          disabled={isCreating || updateMutation.isPending || isLoadingAgent}
+        />
+         <p className="text-sm text-muted-foreground">
+           If set, the agent will only respond in connected channels when a message starts with this keyword.
+         </p>
+      </div>
+      {/* Connected Integrations Selector (Placeholder) */}
+      <div className="space-y-2">
+         <Label>Connected Integrations</Label>
+         {isLoadingIntegrations ? (
+           <Skeleton className="h-10 w-full" />
+         ) : isIntegrationsError ? (
+           <Alert variant="destructive">
+             <Terminal className="h-4 w-4" />
+             <AlertTitle>Error Loading Integrations</AlertTitle>
+             <AlertDescription>{integrationsError?.message}</AlertDescription>
+           </Alert>
+         ) : availableIntegrations && availableIntegrations.length > 0 ? (
+           <div className="space-y-2 rounded-md border p-4">
+             {/* Replace with actual multi-select component later */}
+             {availableIntegrations.map((integration) => (
+               // Use base_integration_id as the key and value for selection
+               <div key={integration.base_integration_id} className="flex items-center space-x-2">
+                 <input
+                   type="checkbox"
+                   id={`integration-${integration.base_integration_id}`} // Use base ID for unique ID
+                   checked={selectedIntegrationIds.includes(integration.base_integration_id)} // Check against base ID
+                   onChange={(e) => {
+                     const id = integration.base_integration_id; // Use base ID
+                     setSelectedIntegrationIds(prev =>
+                       e.target.checked ? [...prev, id] : prev.filter(i => i !== id)
+                     );
+                   }}
+                   disabled={isCreating || updateMutation.isPending || isLoadingAgent}
+                 />
+                 {/* Use base ID for label association */}
+                 <Label htmlFor={`integration-${integration.base_integration_id}`} className="font-normal">
+                   {/* Display instance name if available, otherwise base name */}
+                   {integration.instance_display_name || integration.name}
+                 </Label>
+               </div>
+             ))}
+           </div>
+         ) : (
+           <p className="text-sm text-muted-foreground">No integrations found or available to connect.</p>
+         )}
+       </div>
     </div>
   );
 
@@ -451,11 +537,66 @@ const AgentDetailsPanel: React.FC<AgentDetailsPanelProps> = ({ selectedAgentId, 
            isLoading={isLoadingDocuments}
            isError={isDocumentsError}
            error={documentsError}
+          disabled={createMutation.isPending}
+        />
+      </div>
+       {/* Keyword Trigger Input - Create */}
+       <div className="space-y-2">
+         <Label htmlFor="agent-keyword-trigger-create">Keyword Trigger (Optional)</Label>
+         <Input
+           id="agent-keyword-trigger-create"
+           value={keywordTrigger ?? ''}
+           onChange={(e) => setKeywordTrigger(e.target.value)}
+           placeholder="e.g., !support"
            disabled={createMutation.isPending}
          />
+          <p className="text-sm text-muted-foreground">
+            If set, the agent will only respond in connected channels when a message starts with this keyword.
+          </p>
        </div>
-     </div>
-   );
+       {/* Connected Integrations Selector (Placeholder) - Create */}
+       <div className="space-y-2">
+          <Label>Connected Integrations</Label>
+          {isLoadingIntegrations ? (
+            <Skeleton className="h-10 w-full" />
+          ) : isIntegrationsError ? (
+            <Alert variant="destructive">
+              <Terminal className="h-4 w-4" />
+              <AlertTitle>Error Loading Integrations</AlertTitle>
+              <AlertDescription>{integrationsError?.message}</AlertDescription>
+            </Alert>
+          ) : availableIntegrations && availableIntegrations.length > 0 ? (
+            <div className="space-y-2 rounded-md border p-4">
+              {/* Replace with actual multi-select component later */}
+              {availableIntegrations.map((integration) => (
+                 // Use base_integration_id as the key and value for selection
+                <div key={integration.base_integration_id} className="flex items-center space-x-2">
+                  <input
+                    type="checkbox"
+                    id={`integration-create-${integration.base_integration_id}`} // Use base ID for unique ID
+                    checked={selectedIntegrationIds.includes(integration.base_integration_id)} // Check against base ID
+                    onChange={(e) => {
+                      const id = integration.base_integration_id; // Use base ID
+                      setSelectedIntegrationIds(prev =>
+                        e.target.checked ? [...prev, id] : prev.filter(i => i !== id)
+                      );
+                    }}
+                    disabled={createMutation.isPending}
+                  />
+                   {/* Use base ID for label association */}
+                  <Label htmlFor={`integration-create-${integration.base_integration_id}`} className="font-normal">
+                     {/* Display instance name if available, otherwise base name */}
+                    {integration.instance_display_name || integration.name}
+                  </Label>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground">No integrations found or available to connect.</p>
+          )}
+        </div>
+    </div>
+  );
 
 
   // --- Render Test Agent Section (Chat Interface) ---
@@ -591,7 +732,7 @@ const AgentDetailsPanel: React.FC<AgentDetailsPanelProps> = ({ selectedAgentId, 
       <CardFooter className="border-t pt-4 flex justify-between">
           <Button
             variant="outline"
-            onClick={handleSave}
+            onClick={handleSave} // Revert to direct handler call
             // Disable only during mutations/loading, not based on view
             disabled={createMutation.isPending || updateMutation.isPending || isLoadingAgent}
           >

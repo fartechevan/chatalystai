@@ -1,5 +1,5 @@
 
-import { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { SupabaseClient } from "@supabase/supabase-js"; // Use mapped import
 import { extractMessageContent } from "./utils.ts"
 import { findOrCreateCustomer } from "./customerHandler.ts"
 import { findOrCreateConversation } from "./conversationHandler.ts"
@@ -144,7 +144,71 @@ export async function handleMessageEvent(supabaseClient: SupabaseClient, data: W
     }
 
     console.log(`[MessageHandler] Successfully created message in conversation ${appConversationId} from participant ${participantId}`);
-    return true; // Indicate success
+
+    // --- Agent Trigger Logic ---
+    if (!fromMe && messageText) { // Only trigger for incoming messages with content
+      console.log(`[MessageHandler] Checking for agent triggers for integration ID: ${hardcodedIntegrationId}`);
+      try {
+        const { data: agentLinks, error: agentLinkError } = await supabaseClient
+          .from('ai_agent_integrations')
+          .select(`
+            agent_id,
+            ai_agents ( id, keyword_trigger )
+          `)
+          .eq('integration_id', hardcodedIntegrationId)
+          .not('ai_agents.keyword_trigger', 'is', null) // Only agents with triggers
+          .neq('ai_agents.keyword_trigger', ''); // Ensure trigger is not empty
+
+        if (agentLinkError) {
+          console.error(`[MessageHandler] Error fetching agent links: ${agentLinkError.message}`);
+          // Don't return error, just log it. Webhook acknowledged, agent trigger is secondary.
+        } else if (agentLinks && agentLinks.length > 0) {
+          console.log(`[MessageHandler] Found ${agentLinks.length} potential agent link(s) for this integration.`);
+          for (const link of agentLinks) {
+            // Force type assertion via unknown to bypass potential TS inference issue
+            const agent = link.ai_agents as unknown as ({ id: string; keyword_trigger: string | null } | null);
+
+            // Check if agent exists and has a trigger before proceeding
+            if (agent && agent.keyword_trigger) {
+               const trigger = agent.keyword_trigger;
+               // Case-insensitive check if message starts with the trigger
+               if (messageText.toLowerCase().startsWith(trigger.toLowerCase())) {
+                 console.log(`[MessageHandler] Matched trigger "${trigger}" for agent ${agent.id}`);
+                 const query = messageText.substring(trigger.length).trim(); // Extract query after trigger
+
+                 if (query) {
+                   console.log(`[MessageHandler] Invoking query-agent for agent ${agent.id} with query: "${query}"`);
+                   // Invoke asynchronously - don't await, don't block webhook response
+                   supabaseClient.functions.invoke('query-agent', {
+                     body: { agentId: agent.id, query: query },
+                   }).then(({ data, error }) => {
+                     if (error) {
+                       console.error(`[MessageHandler] Async query-agent invocation failed for agent ${agent.id}:`, error);
+                     } else {
+                       console.log(`[MessageHandler] Async query-agent invocation succeeded for agent ${agent.id}. Response:`, data?.response);
+                       // TODO: Add logic here to send the agent's response back via WhatsApp API
+                     }
+                   });
+                 } else {
+                    console.log(`[MessageHandler] Trigger matched for agent ${agent.id}, but query is empty. Skipping invocation.`);
+                 }
+                 // Trigger only the first matched agent
+                 break;
+               }
+            }
+          }
+        } else {
+           console.log(`[MessageHandler] No agents with keyword triggers found linked to integration ${hardcodedIntegrationId}`);
+        }
+      } catch (agentCheckError) {
+         console.error(`[MessageHandler] Error during agent trigger check: ${agentCheckError.message}`);
+         // Log error but don't fail the webhook response
+      }
+    }
+    // --- End Agent Trigger Logic ---
+
+
+    return true; // Indicate success (webhook acknowledged, message stored)
   } catch (error) {
     const errorMsg = `[MessageHandler] Error during conversation handling or message creation: ${error.message}`;
     console.error(errorMsg, error);
