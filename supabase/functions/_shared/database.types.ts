@@ -13,6 +13,7 @@ export type Database = {
         Row: {
           created_at: string
           id: string
+          keyword_trigger: string | null
           knowledge_document_ids: string[] | null
           name: string
           prompt: string
@@ -22,6 +23,7 @@ export type Database = {
         Insert: {
           created_at?: string
           id?: string
+          keyword_trigger?: string | null
           knowledge_document_ids?: string[] | null
           name: string
           prompt: string
@@ -31,6 +33,7 @@ export type Database = {
         Update: {
           created_at?: string
           id?: string
+          keyword_trigger?: string | null
           knowledge_document_ids?: string[] | null
           name?: string
           prompt?: string
@@ -393,6 +396,7 @@ export type Database = {
           created_at: string | null
           document_id: string | null
           embedding: string | null
+          enabled: boolean
           id: string
           metadata: string | null
           sequence: number | null
@@ -403,6 +407,7 @@ export type Database = {
           created_at?: string | null
           document_id?: string | null
           embedding?: string | null
+          enabled?: boolean
           id?: string
           metadata?: string | null
           sequence?: number | null
@@ -413,6 +418,7 @@ export type Database = {
           created_at?: string | null
           document_id?: string | null
           embedding?: string | null
+          enabled?: boolean
           id?: string
           metadata?: string | null
           sequence?: number | null
@@ -1086,10 +1092,9 @@ export type Database = {
         }
         Returns: {
           id: string
+          document_id: string
           content: string
           similarity: number
-          document_id: string
-          document_title: string
         }[]
       }
       match_knowledge_chunks: {

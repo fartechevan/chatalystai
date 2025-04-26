@@ -1,4 +1,4 @@
-import { serve } from 'https://deno.land/std@0.190.0/http/server.ts';
+import { serve } from 'std/http/server.ts'; // Use mapped path
 import { corsHeaders } from '../_shared/cors.ts';
 import { createSupabaseClient } from '../_shared/supabaseClient.ts';
 import { Database } from '../_shared/database.types.ts';
@@ -9,13 +9,17 @@ type AIAgent = Database['public']['Tables']['ai_agents']['Row'];
 interface NewAgentPayload {
   name: string;
   prompt: string;
+  keyword_trigger?: string | null;
   knowledge_document_ids?: string[];
+  integration_ids?: string[]; // Added
 }
 
 interface UpdateAgentPayload {
   name?: string;
   prompt?: string;
+  keyword_trigger?: string | null;
   knowledge_document_ids?: string[];
+  integration_ids?: string[]; // Added
 }
 
 // Helper function to create consistent JSON responses with CORS headers
@@ -63,18 +67,60 @@ serve(async (req: Request) => {
     // --- LIST AGENTS (GET /) ---
     if (req.method === 'GET' && !agentId) {
       console.log(`[${requestStartTime}] Routing to: List Agents`);
-      const { data: agents, error: fetchError } = await supabase
+      // 1. Fetch base agent data
+      const { data: agentsData, error: fetchAgentsError } = await supabase
         .from('ai_agents')
-        .select('*')
+        .select('*') // Select all agent fields now that types should be correct
         .eq('user_id', user.id)
         .order('created_at', { ascending: false });
 
-      if (fetchError) {
-        console.error(`[${requestStartTime}] List Agents Error:`, fetchError.message);
-        return createJsonResponse({ error: 'Failed to fetch AI agents', details: fetchError.message }, 500);
+      if (fetchAgentsError) {
+        console.error(`[${requestStartTime}] List Agents Error (Agents):`, fetchAgentsError.message);
+        return createJsonResponse({ error: 'Failed to fetch AI agents', details: fetchAgentsError.message }, 500);
       }
-      console.log(`[${requestStartTime}] Found ${agents?.length ?? 0} agents for user ${user.id}`);
-      return createJsonResponse({ agents: agents as AIAgent[] }, 200);
+
+      if (!agentsData || agentsData.length === 0) {
+        console.log(`[${requestStartTime}] No agents found for user ${user.id}`);
+        return createJsonResponse({ agents: [] }, 200);
+      }
+
+      // 2. Fetch integrations for all fetched agents
+      const agentIds = agentsData.map(a => a.id);
+      const { data: integrationsData, error: fetchIntegrationsError } = await supabase
+        .from('ai_agent_integrations')
+        .select('agent_id, integration_id')
+        .in('agent_id', agentIds);
+
+      if (fetchIntegrationsError) {
+         // Log the error but proceed, returning agents without integrations if this fails
+         console.error(`[${requestStartTime}] List Agents Warning (Integrations):`, fetchIntegrationsError.message);
+         // Return agents without integrations in case of error fetching links
+         const agentsWithoutIntegrations = agentsData.map(agent => ({
+            ...agent,
+            integration_ids: [], // Default to empty array on error
+         }));
+         return createJsonResponse({ agents: agentsWithoutIntegrations as any[] }, 200);
+      }
+
+      // 3. Map integrations to agents
+      const integrationsMap = new Map<string, string[]>();
+      if (integrationsData) {
+        for (const link of integrationsData) {
+          const currentIds = integrationsMap.get(link.agent_id) || [];
+          currentIds.push(link.integration_id);
+          integrationsMap.set(link.agent_id, currentIds);
+        }
+      }
+
+      // 4. Combine data
+      const agentsWithIntegrations = agentsData.map(agent => ({
+        ...agent,
+        integration_ids: integrationsMap.get(agent.id) || [], // Add integration_ids array
+      }));
+
+      console.log(`[${requestStartTime}] Found ${agentsWithIntegrations.length} agents with integrations for user ${user.id}`);
+      // Use 'any[]' cast as frontend type expects integration_ids which might not be in backend AIAgent type
+      return createJsonResponse({ agents: agentsWithIntegrations as any[] }, 200);
     }
 
     // --- CREATE AGENT (POST /) ---
@@ -97,48 +143,99 @@ serve(async (req: Request) => {
         user_id: user.id,
         name: payload.name,
         prompt: payload.prompt,
+        keyword_trigger: payload.keyword_trigger || null, // Added
         knowledge_document_ids: payload.knowledge_document_ids || null,
       };
 
-      const { data: newAgent, error: insertError } = await supabase
+      // Perform operations sequentially (no transaction)
+      // 1. Insert the agent
+      const { data: insertedAgent, error: agentInsertError } = await supabase
         .from('ai_agents')
         .insert(agentToInsert)
         .select()
         .single();
 
-      if (insertError) {
-         console.error(`[${requestStartTime}] Create Agent DB Error:`, insertError.message);
-         return createJsonResponse({ error: 'Failed to create AI agent', details: insertError.message }, 500);
+      if (agentInsertError) {
+        console.error(`[${requestStartTime}] Create Agent DB Error (Agent Insert):`, agentInsertError.message);
+        return createJsonResponse({ error: 'Failed to insert agent', details: agentInsertError.message }, 500);
       }
-      console.log(`[${requestStartTime}] Created agent with ID: ${newAgent.id} for user ${user.id}`);
-      return createJsonResponse({ agent: newAgent as AIAgent }, 201);
+      if (!insertedAgent) {
+         console.error(`[${requestStartTime}] Create Agent DB Error: No agent data returned after insert.`);
+         return createJsonResponse({ error: 'Failed to retrieve created agent data' }, 500);
+      }
+
+      // 2. Insert integrations if provided
+      let integrationIds: string[] = [];
+      if (payload.integration_ids && payload.integration_ids.length > 0) {
+        integrationIds = payload.integration_ids;
+        const integrationLinks = integrationIds.map(intId => ({
+          agent_id: insertedAgent.id,
+          integration_id: intId,
+        }));
+
+        const { error: integrationInsertError } = await supabase
+          .from('ai_agent_integrations')
+          .insert(integrationLinks);
+
+        if (integrationInsertError) {
+          // Log error but don't fail the whole request, agent was created
+          console.error(`[${requestStartTime}] Create Agent Warning (Integrations Insert):`, integrationInsertError.message);
+          // Proceed without integrations in the response
+          integrationIds = []; // Reset integrationIds as they failed to insert
+        }
+      }
+
+      // 3. Return the complete agent data (potentially without integrations if insert failed)
+      const newAgentResponse = { ...insertedAgent, integration_ids: integrationIds };
+      console.log(`[${requestStartTime}] Created agent with ID: ${newAgentResponse.id} for user ${user.id}`);
+      // Use 'as any' for response due to added integration_ids
+      return createJsonResponse({ agent: newAgentResponse as any }, 201);
     }
 
     // --- GET AGENT (GET /:id) ---
     else if (req.method === 'GET' && agentId) {
       console.log(`[${requestStartTime}] Routing to: Get Agent (ID: ${agentId})`);
-       const { data: agent, error: fetchError } = await supabase
+
+      // 1. Fetch agent data
+      const { data: agentData, error: agentFetchError } = await supabase
         .from('ai_agents')
-        .select('*')
+        .select('*') // Select all columns now
         .eq('id', agentId)
-        .eq('user_id', user.id) // RLS also enforces this, but good practice
+        .eq('user_id', user.id) // RLS also enforces this
         .single();
 
-       if (fetchError) {
-         console.error(`[${requestStartTime}] Get Agent Error (ID: ${agentId}):`, fetchError.message);
-         const status = fetchError.code === 'PGRST116' ? 404 : 500;
-         const message = status === 404 ? 'AI Agent not found or access denied' : 'Failed to fetch AI agent';
-         return createJsonResponse({ error: message, details: fetchError.message }, status);
-       }
-
-       // PGRST116 should cover not found, but double-check
-       if (!agent) {
+      if (agentFetchError) {
+        console.error(`[${requestStartTime}] Get Agent Error (Agent Fetch - ID: ${agentId}):`, agentFetchError.message);
+        const status = agentFetchError.code === 'PGRST116' ? 404 : 500;
+        const message = status === 404 ? 'AI Agent not found or access denied' : 'Failed to fetch AI agent';
+        return createJsonResponse({ error: message, details: agentFetchError.message }, status);
+      }
+      if (!agentData) {
+         // Should be caught by PGRST116, but as fallback
          console.warn(`[${requestStartTime}] Get Agent (ID: ${agentId}): Agent not found after successful query (unexpected).`);
          return createJsonResponse({ error: 'AI Agent not found' }, 404);
-       }
+      }
 
-       console.log(`[${requestStartTime}] Found agent: ${agent.name} (ID: ${agentId}) for user ${user.id}`);
-       return createJsonResponse({ agent: agent as AIAgent }, 200);
+      // 2. Fetch integrations
+      let integrationIds: string[] = [];
+      const { data: integrationsData, error: integrationsFetchError } = await supabase
+        .from('ai_agent_integrations')
+        .select('integration_id')
+        .eq('agent_id', agentId);
+
+      if (integrationsFetchError) {
+         // Log error but proceed, returning agent without integrations
+         console.error(`[${requestStartTime}] Get Agent Warning (Integrations Fetch - ID: ${agentId}):`, integrationsFetchError.message);
+      } else if (integrationsData) {
+         integrationIds = integrationsData.map(link => link.integration_id);
+      }
+
+      // 3. Combine data
+      const agentWithIntegrations = { ...agentData, integration_ids: integrationIds };
+
+      console.log(`[${requestStartTime}] Found agent: ${agentWithIntegrations.name} (ID: ${agentId}) with ${agentWithIntegrations.integration_ids.length} integrations for user ${user.id}`);
+      // Use 'as any' for the response object to avoid potential type conflicts
+      return createJsonResponse({ agent: agentWithIntegrations as any }, 200);
     }
 
     // --- UPDATE AGENT (PUT /:id or PATCH /:id) ---
@@ -163,9 +260,14 @@ serve(async (req: Request) => {
       if (payload.knowledge_document_ids !== undefined) {
         agentToUpdate.knowledge_document_ids = payload.knowledge_document_ids;
       }
-      // 'updated_at' is handled by the database trigger
+      if (payload.keyword_trigger !== undefined) { // Added
+        agentToUpdate.keyword_trigger = payload.keyword_trigger;
+      }
+      // 'updated_at' is handled by the database trigger for ai_agents
 
-      const { data: updatedAgent, error: updateError } = await supabase
+      // Perform operations sequentially (no transaction)
+      // 1. Update the agent table
+      const { data: updatedAgentData, error: agentUpdateError } = await supabase
         .from('ai_agents')
         .update(agentToUpdate)
         .eq('id', agentId)
@@ -173,21 +275,76 @@ serve(async (req: Request) => {
         .select()
         .single();
 
-      if (updateError) {
-        console.error(`[${requestStartTime}] Update Agent DB Error (ID: ${agentId}):`, updateError.message);
-        const status = updateError.code === 'PGRST116' ? 404 : 500;
+      if (agentUpdateError) {
+        console.error(`[${requestStartTime}] Update Agent DB Error (Agent Update - ID: ${agentId}):`, agentUpdateError.message);
+        const status = agentUpdateError.code === 'PGRST116' ? 404 : 500;
         const message = status === 404 ? 'AI Agent not found or access denied' : 'Failed to update AI agent';
-        return createJsonResponse({ error: message, details: updateError.message }, status);
+        return createJsonResponse({ error: message, details: agentUpdateError.message }, status);
       }
-
-      // PGRST116 should cover not found, but double-check
-      if (!updatedAgent) {
+      if (!updatedAgentData) {
          console.warn(`[${requestStartTime}] Update Agent (ID: ${agentId}): Agent not found after successful update (unexpected).`);
          return createJsonResponse({ error: 'AI Agent not found after update attempt' }, 404);
       }
 
-      console.log(`[${requestStartTime}] Updated agent: ${updatedAgent.name} (ID: ${agentId}) for user ${user.id}`);
-      return createJsonResponse({ agent: updatedAgent as AIAgent }, 200);
+      // 2. Update integrations if provided
+      let finalIntegrationIds: string[] = [];
+      let integrationUpdateError: Error | null = null;
+
+      if (payload.integration_ids !== undefined) {
+         finalIntegrationIds = payload.integration_ids || []; // Use provided list or empty if null/undefined
+
+         // Delete existing integrations for this agent
+         const { error: deleteIntegrationsError } = await supabase
+           .from('ai_agent_integrations')
+           .delete()
+           .eq('agent_id', agentId);
+
+         if (deleteIntegrationsError) {
+            console.error(`[${requestStartTime}] Update Agent Warning (Delete Integrations - ID: ${agentId}):`, deleteIntegrationsError.message);
+            integrationUpdateError = new Error('Failed to clear existing agent integrations');
+            // Continue, but integrations might be inconsistent
+         } else if (finalIntegrationIds.length > 0) {
+            // Insert new integrations if the list is not empty and delete was successful
+            const newIntegrationLinks = finalIntegrationIds.map(intId => ({
+              agent_id: agentId,
+              integration_id: intId,
+            }));
+            const { error: insertIntegrationsError } = await supabase
+              .from('ai_agent_integrations')
+              .insert(newIntegrationLinks);
+
+            if (insertIntegrationsError) {
+              console.error(`[${requestStartTime}] Update Agent Warning (Insert Integrations - ID: ${agentId}):`, insertIntegrationsError.message);
+              integrationUpdateError = new Error('Failed to insert new agent integrations');
+              // Continue, but integrations might be inconsistent
+            } else {
+               console.log(`[${requestStartTime}] Updated integrations for agent (ID: ${agentId}) to: [${finalIntegrationIds.join(', ')}]`);
+            }
+         }
+      } else {
+         // If integration_ids was *not* in the payload, fetch existing ones to return the current state
+          const { data: currentIntegrations, error: fetchCurrentIntegrationsError } = await supabase
+            .from('ai_agent_integrations')
+            .select('integration_id')
+            .eq('agent_id', agentId);
+
+          if (fetchCurrentIntegrationsError) {
+             console.error(`[${requestStartTime}] Update Agent Warning (Fetch Current Integrations - ID: ${agentId}):`, fetchCurrentIntegrationsError.message);
+             integrationUpdateError = new Error('Failed to fetch current integrations after update');
+             // Continue, but integrations might be missing from response
+          } else {
+             finalIntegrationIds = currentIntegrations ? currentIntegrations.map(link => link.integration_id) : [];
+          }
+      }
+
+      // 3. Return combined data (even if integration update had issues)
+      const finalAgentResponse = { ...updatedAgentData, integration_ids: finalIntegrationIds };
+      console.log(`[${requestStartTime}] Updated agent: ${finalAgentResponse.name} (ID: ${agentId}) for user ${user.id}`);
+      if (integrationUpdateError) {
+         console.warn(`[${requestStartTime}] Update Agent completed with integration errors for agent ID ${agentId}: ${integrationUpdateError.message}`);
+      }
+      // Use 'as any' for response due to added integration_ids
+      return createJsonResponse({ agent: finalAgentResponse as any }, 200);
     }
 
     // --- DELETE AGENT (DELETE /:id) ---
