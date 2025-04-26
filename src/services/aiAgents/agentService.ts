@@ -5,19 +5,20 @@ import { AIAgent, NewAIAgent, UpdateAIAgent } from '@/types/aiAgents';
  * Fetches all AI agents for the authenticated user.
  */
 export const listAIAgents = async (): Promise<AIAgent[]> => {
-  // Explicitly set the method to GET
-  const { data, error } = await supabase.functions.invoke('list-ai-agents', {
-    method: 'GET',
+  // Call the new handler with the base path
+  const { data, error } = await supabase.functions.invoke('ai-agent-handler', {
+    method: 'GET', // Method determines the action (list)
   });
 
   if (error) {
-    console.error('Error listing AI agents:', error);
-    throw new Error(error.message || 'Failed to fetch AI agents');
+    console.error('Error listing AI agents:', error); // Keep detailed error log
+    // Throw the original error for better debugging upstream
+    throw error;
   }
 
   // The function returns { agents: AIAgent[] }
   if (!data || !Array.isArray(data.agents)) {
-     console.error('Invalid data structure returned from list-ai-agents:', data);
+     console.error('Invalid data structure returned from ai-agent-handler (list):', data);
      throw new Error('Invalid response format from server.');
   }
 
@@ -33,23 +34,25 @@ export const getAIAgent = async (agentId: string): Promise<AIAgent | null> => {
     return null;
   }
 
-  // Explicitly set the method to GET
-  const { data, error } = await supabase.functions.invoke(`get-ai-agent/${agentId}`, {
-    method: 'GET',
+  // Call the handler with the agent ID in the path
+  const { data, error } = await supabase.functions.invoke(`ai-agent-handler/${agentId}`, {
+    method: 'GET', // Method + path determines the action (get specific)
   });
 
   if (error) {
     // Handle 404 specifically - agent not found or access denied
-    if (error.context?.status === 404) {
+    // Check context if available, otherwise rely on message (less reliable)
+    const status = error.context?.status;
+    if (status === 404) {
       console.warn(`AI Agent with ID ${agentId} not found or access denied.`);
       return null; // Return null if not found
     }
     console.error(`Error fetching AI agent ${agentId}:`, error);
-    throw new Error(error.message || 'Failed to fetch AI agent');
+    throw error; // Throw original error
   }
 
   if (!data || !data.agent) {
-     console.error('Invalid data structure returned from get-ai-agent:', data);
+     console.error('Invalid data structure returned from ai-agent-handler (get):', data);
      throw new Error('Invalid response format from server.');
   }
 
@@ -85,16 +88,18 @@ export const suggestAIPrompt = async (currentPrompt: string, agentPurpose?: stri
  * Creates a new AI agent.
  */
 export const createAIAgent = async (agentData: NewAIAgent): Promise<AIAgent> => {
-  const { data, error } = await supabase.functions.invoke('create-ai-agent', {
+  // Call the handler with POST method
+  const { data, error } = await supabase.functions.invoke('ai-agent-handler', {
+    method: 'POST', // Method determines the action (create)
     body: agentData,
   });
 
   if (error) {
     console.error('Error creating AI agent:', error);
-    throw new Error(error.message || 'Failed to create AI agent');
+    throw error; // Throw original error
   }
    if (!data || !data.agent) {
-     console.error('Invalid data structure returned from create-ai-agent:', data);
+     console.error('Invalid data structure returned from ai-agent-handler (create):', data);
      throw new Error('Invalid response format from server.');
   }
 
@@ -105,17 +110,18 @@ export const createAIAgent = async (agentData: NewAIAgent): Promise<AIAgent> => 
  * Updates an existing AI agent.
  */
 export const updateAIAgent = async (agentId: string, updates: UpdateAIAgent): Promise<AIAgent> => {
-   const { data, error } = await supabase.functions.invoke(`update-ai-agent/${agentId}`, {
-    method: 'PUT', // or PATCH
+   // Call the handler with PUT/PATCH and agent ID in the path
+   const { data, error } = await supabase.functions.invoke(`ai-agent-handler/${agentId}`, {
+    method: 'PUT', // or PATCH - handler supports both
     body: updates,
   });
 
    if (error) {
     console.error('Error updating AI agent:', error);
-    throw new Error(error.message || 'Failed to update AI agent');
+    throw error; // Throw original error
   }
    if (!data || !data.agent) {
-     console.error('Invalid data structure returned from update-ai-agent:', data);
+     console.error('Invalid data structure returned from ai-agent-handler (update):', data);
      throw new Error('Invalid response format from server.');
   }
   return data.agent as AIAgent;
@@ -125,13 +131,14 @@ export const updateAIAgent = async (agentId: string, updates: UpdateAIAgent): Pr
  * Deletes an AI agent.
  */
 export const deleteAIAgent = async (agentId: string): Promise<void> => {
-  const { error } = await supabase.functions.invoke(`delete-ai-agent/${agentId}`, {
-    method: 'DELETE',
+  // Call the handler with DELETE and agent ID in the path
+  const { error } = await supabase.functions.invoke(`ai-agent-handler/${agentId}`, {
+    method: 'DELETE', // Method + path determines the action (delete)
   });
 
   if (error) {
     console.error('Error deleting AI agent:', error);
-    throw new Error(error.message || 'Failed to delete AI agent');
+    throw error; // Throw original error
   }
   // No data expected on successful delete (204 No Content)
 };
