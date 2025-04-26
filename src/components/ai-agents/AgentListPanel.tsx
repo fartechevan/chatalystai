@@ -8,16 +8,16 @@ import { Terminal } from 'lucide-react'; // Icon for error alert
 import { listAIAgents } from '@/services/aiAgents/agentService';
 import { AIAgent } from '@/types/aiAgents';
 import { cn } from '@/lib/utils';
+import { CardDescription } from '@/components/ui/card'; // Import CardDescription
 
-// TODO: Define props if selection needs to be passed up/down
 interface AgentListPanelProps {
-  selectedAgentId: string | null;
-  onSelectAgent: (agentId: string | null) => void;
-  // Add onCreateNew callback later
+  selectedAgentId: string | null; // Keep for highlighting
+  onSelectAgent: (agentId: string) => void; // Changed to only accept string ID
+  onInitiateCreate: () => void; // New prop for triggering create view
 }
 
 
-const AgentListPanel: React.FC<AgentListPanelProps> = ({ selectedAgentId, onSelectAgent }) => {
+const AgentListPanel: React.FC<AgentListPanelProps> = ({ selectedAgentId, onSelectAgent, onInitiateCreate }) => {
   const { data: agents, isLoading, error, isError } = useQuery<AIAgent[], Error>({
     queryKey: ['aiAgents'], // Unique key for this query
     queryFn: listAIAgents, // Function to fetch data
@@ -27,13 +27,17 @@ const AgentListPanel: React.FC<AgentListPanelProps> = ({ selectedAgentId, onSele
     // TODO: Implement logic to show the creation form in the details panel
     onSelectAgent(null); // Deselect any current agent to show create form
     console.log("Create New Agent clicked");
+    // Remove handleCreateNew function as it's now directly in onClick
+    // onSelectAgent(null); // This logic is moved to the layout
+    console.log("Create New Agent clicked");
   }
 
   return (
     <Card className="w-full h-full flex flex-col">
       <CardHeader className="flex flex-row items-center justify-between pb-2 space-x-2">
         <CardTitle className="text-lg font-medium">AI Agents</CardTitle>
-        <Button size="sm" onClick={handleCreateNew}>Create New</Button>
+        {/* Call onInitiateCreate directly */}
+        <Button size="sm" onClick={onInitiateCreate}>Create New</Button>
       </CardHeader>
       <CardContent className="flex-grow overflow-auto p-4">
         {isLoading && (
@@ -55,22 +59,30 @@ const AgentListPanel: React.FC<AgentListPanelProps> = ({ selectedAgentId, onSele
         {!isLoading && !isError && agents && (
           <>
             {agents.length === 0 ? (
-              <p className="text-center text-muted-foreground mt-4">No agents created yet.</p>
+              <p className="text-center text-muted-foreground mt-4">No agents created yet. Click "Create New" to get started.</p>
             ) : (
-              <ul className="space-y-2">
+              // Use a grid layout for cards
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 {agents.map((agent) => (
-                  <li
+                  <Card
                     key={agent.id}
                     className={cn(
-                      "p-2 border rounded hover:bg-accent cursor-pointer",
-                      selectedAgentId === agent.id && "bg-muted ring-2 ring-primary" // Highlight selected
+                      "hover:shadow-md hover:border-primary cursor-pointer transition-all",
+                      selectedAgentId === agent.id && "ring-2 ring-primary border-primary" // Highlight selected card
                     )}
                     onClick={() => onSelectAgent(agent.id)}
                   >
-                    {agent.name}
-                  </li>
+                    <CardHeader>
+                      <CardTitle className="text-base truncate">{agent.name}</CardTitle>
+                      {/* Optional: Add description, e.g., prompt snippet or doc count */}
+                      {/* <CardDescription className="text-xs truncate h-8">
+                        {agent.prompt ? `${agent.prompt.substring(0, 50)}...` : 'No prompt defined'}
+                      </CardDescription> */}
+                    </CardHeader>
+                    {/* Optional: Add CardContent for more details if needed */}
+                  </Card>
                 ))}
-              </ul>
+              </div>
             )}
           </>
         )}

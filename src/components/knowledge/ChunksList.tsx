@@ -1,13 +1,32 @@
 
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
-import { FileText, Download, Hash, Search, SlidersHorizontal } from "lucide-react";
+import { FileText, Download, Hash, Search, SlidersHorizontal, Pencil, Trash2 } from "lucide-react"; // Added Pencil, Trash2
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea"; // Added Textarea
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog"; // Added AlertDialog
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"; // Added Dialog
 import {
   Table,
   TableBody,
@@ -23,6 +42,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch"; // Added Switch import
 import { useState } from "react";
 
 interface ChunkMetadata {
@@ -44,6 +64,7 @@ interface Chunk {
   created_at: string;
   sequence: number;
   metadata: string;
+  enabled: boolean; // Added enabled field
 }
 
 interface ChunksListProps {
@@ -54,18 +75,24 @@ export function ChunksList({ documentId }: ChunksListProps) {
   const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState("");
   const [filterStatus, setFilterStatus] = useState("all");
-  
+  const queryClient = useQueryClient();
+  const [chunkToDelete, setChunkToDelete] = useState<Chunk | null>(null);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [chunkToEdit, setChunkToEdit] = useState<Chunk | null>(null);
+  const [editedContent, setEditedContent] = useState("");
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+
   const { data: chunks = [], isLoading } = useQuery({
     queryKey: ['knowledge-chunks', documentId],
     queryFn: async () => {
       if (!documentId) return [];
-      
+
       const { data, error } = await supabase
         .from('knowledge_chunks')
-        .select('id, content, created_at, sequence, metadata')
+        .select('id, content, created_at, sequence, metadata, enabled') // Added enabled to select
         .eq('document_id', documentId)
         .order('sequence', { ascending: true });
-      
+
       if (error) {
         toast({
           variant: "destructive",
@@ -79,6 +106,123 @@ export function ChunksList({ documentId }: ChunksListProps) {
     },
     enabled: !!documentId,
   });
+
+  // --- Mutation for updating chunk status ---
+  const updateChunkStatusMutation = useMutation({
+    mutationFn: async ({ chunkId, enabled }: { chunkId: string; enabled: boolean }) => {
+      const { error } = await supabase
+        .from('knowledge_chunks')
+        .update({ enabled })
+        .eq('id', chunkId);
+
+      if (error) {
+        throw new Error(error.message);
+      }
+    },
+    onSuccess: () => {
+      // Invalidate and refetch the chunks query to update the UI
+      queryClient.invalidateQueries({ queryKey: ['knowledge-chunks', documentId] });
+      toast({
+        title: "Chunk status updated",
+      });
+    },
+    onError: (error) => {
+      toast({
+        variant: "destructive",
+        title: "Error updating chunk status",
+        description: error.message,
+      });
+    },
+  });
+
+  const handleToggleChunk = (chunkId: string, currentStatus: boolean) => {
+    updateChunkStatusMutation.mutate({ chunkId, enabled: !currentStatus });
+  };
+  // --- End Toggle Mutation ---
+
+  // --- Mutation for deleting chunk ---
+  const deleteChunkMutation = useMutation({
+    mutationFn: async (chunkId: string) => {
+      const { error } = await supabase
+        .from('knowledge_chunks')
+        .delete()
+        .eq('id', chunkId);
+
+      if (error) {
+        throw new Error(error.message);
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['knowledge-chunks', documentId] });
+      toast({ title: "Chunk deleted successfully" });
+      setIsDeleteDialogOpen(false);
+      setChunkToDelete(null);
+    },
+    onError: (error) => {
+      toast({
+        variant: "destructive",
+        title: "Error deleting chunk",
+        description: error.message,
+      });
+    },
+  });
+
+  const handleDeleteClick = (chunk: Chunk) => {
+    setChunkToDelete(chunk);
+    setIsDeleteDialogOpen(true);
+  };
+
+  const handleConfirmDelete = () => {
+    if (chunkToDelete) {
+      deleteChunkMutation.mutate(chunkToDelete.id);
+    }
+  };
+  // --- End Delete Mutation ---
+
+  // --- Mutation for editing chunk ---
+   const editChunkMutation = useMutation({
+    mutationFn: async ({ chunkId, content }: { chunkId: string; content: string }) => {
+      // Only update the content, not the embedding
+      const { error } = await supabase
+        .from('knowledge_chunks')
+        .update({ content: content, updated_at: new Date().toISOString() }) // Also update updated_at
+        .eq('id', chunkId);
+
+      if (error) {
+        throw new Error(error.message);
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['knowledge-chunks', documentId] });
+      toast({ title: "Chunk updated successfully" });
+      setIsEditDialogOpen(false);
+      setChunkToEdit(null);
+    },
+    onError: (error) => {
+      toast({
+        variant: "destructive",
+        title: "Error updating chunk",
+        description: error.message,
+      });
+    },
+  });
+
+  const handleEditClick = (chunk: Chunk) => {
+    setChunkToEdit(chunk);
+    setEditedContent(chunk.content); // Pre-fill textarea
+    setIsEditDialogOpen(true);
+  };
+
+  const handleSaveEdit = () => {
+    if (chunkToEdit && editedContent !== chunkToEdit.content) {
+      editChunkMutation.mutate({ chunkId: chunkToEdit.id, content: editedContent });
+    } else {
+      // Close dialog if no changes were made
+      setIsEditDialogOpen(false);
+      setChunkToEdit(null);
+    }
+  };
+  // --- End Edit Mutation ---
 
   const { data: documentData } = useQuery({
     queryKey: ['knowledge-document-detail', documentId],
@@ -146,9 +290,15 @@ export function ChunksList({ documentId }: ChunksListProps) {
     return content.substring(0, maxLength) + "...";
   };
 
-  const filteredChunks = chunks.filter(chunk => 
-    chunk.content.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  // Updated filtering logic
+  const filteredChunks = chunks.filter(chunk => {
+    const matchesSearch = chunk.content.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesStatus = filterStatus === 'all' ||
+                          (filterStatus === 'enabled' && chunk.enabled) ||
+                          (filterStatus === 'disabled' && !chunk.enabled);
+    return matchesSearch && matchesStatus;
+  });
+
 
   if (!documentId) {
     return (
@@ -254,9 +404,10 @@ export function ChunksList({ documentId }: ChunksListProps) {
           <TableHeader>
             <TableRow className="hover:bg-transparent">
               <TableHead>Chunk</TableHead>
-              <TableHead className="w-[180px]">Characters</TableHead>
-              <TableHead className="w-[180px]">Retrieval count</TableHead>
-              <TableHead className="w-[120px] text-right">Status</TableHead>
+              <TableHead className="w-[150px]">Characters</TableHead>
+              {/* <TableHead className="w-[180px]">Retrieval count</TableHead> */}
+              <TableHead className="w-[80px] text-center">Status</TableHead>
+              <TableHead className="w-[100px] text-right">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -308,11 +459,22 @@ export function ChunksList({ documentId }: ChunksListProps) {
                     {retrievalCount} Retrieval count
                   </TableCell>
                   <TableCell className="text-right">
-                    <Badge 
-                      className="ml-auto bg-green-100 text-green-800 hover:bg-green-100"
-                    >
-                      Enabled
-                    </Badge>
+                    <Switch
+                      checked={chunk.enabled}
+                      onCheckedChange={() => handleToggleChunk(chunk.id, chunk.enabled)}
+                      disabled={updateChunkStatusMutation.isPending} // Disable while updating
+                      aria-label={chunk.enabled ? "Disable chunk" : "Enable chunk"}
+                    />
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                       <Button variant="ghost" size="icon" onClick={() => handleEditClick(chunk)} title="Edit Chunk">
+                         <Pencil className="h-4 w-4" />
+                       </Button>
+                       <Button variant="ghost" size="icon" onClick={() => handleDeleteClick(chunk)} title="Delete Chunk">
+                         <Trash2 className="h-4 w-4 text-destructive" />
+                       </Button>
+                    </div>
                   </TableCell>
                 </TableRow>
               );
@@ -320,6 +482,59 @@ export function ChunksList({ documentId }: ChunksListProps) {
           </TableBody>
         </Table>
       </div>
+
+      {/* Delete Confirmation Dialog */}
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This action cannot be undone. This will permanently delete the chunk.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setChunkToDelete(null)}>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmDelete}
+              disabled={deleteChunkMutation.isPending}
+              className="bg-destructive hover:bg-destructive/90"
+            >
+              {deleteChunkMutation.isPending ? "Deleting..." : "Delete"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Edit Chunk Dialog */}
+      <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+        <DialogContent className="sm:max-w-[600px]">
+          <DialogHeader>
+            <DialogTitle>Edit Chunk</DialogTitle>
+            <DialogDescription>
+              Modify the content of the chunk below. Note: Changing content does not re-generate the embedding.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="grid gap-4 py-4">
+             <Textarea
+               value={editedContent}
+               onChange={(e) => setEditedContent(e.target.value)}
+               rows={10}
+               className="min-h-[200px]"
+               placeholder="Chunk content..."
+             />
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setIsEditDialogOpen(false)}>Cancel</Button>
+            <Button
+              onClick={handleSaveEdit}
+              disabled={editChunkMutation.isPending || editedContent === chunkToEdit?.content}
+            >
+              {editChunkMutation.isPending ? "Saving..." : "Save Changes"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
     </div>
   );
 }
