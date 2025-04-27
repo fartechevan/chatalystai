@@ -50,7 +50,7 @@ export function createErrorResponse(error: Error, status = 500): Response {
  * Checks for POST method and required fields in the JSON body.
  *
  * @param req The incoming request object.
- * @returns The *nested* payload object containing event, instance, and data.
+ * @returns The webhook payload object containing event, instance, and data.
  * @throws Error if validation fails, JSON is invalid, or structure is wrong.
  */
 export async function parseAndValidateWebhookRequest(req: Request): Promise<WebhookPayload> {
@@ -58,37 +58,30 @@ export async function parseAndValidateWebhookRequest(req: Request): Promise<Webh
     throw new Error("Method Not Allowed"); // Caught by handler for 405
   }
 
-  let requestBody: { payload?: Partial<WebhookPayload> }; // Expect the top-level 'payload' key
+  let requestBody: Partial<WebhookPayload>; // Expect the payload directly
   try {
     requestBody = await req.json();
   } catch (e) {
     throw new Error("Invalid JSON payload"); // Caught for 400
   }
 
-  // Validate the nested structure
-  if (!requestBody || !requestBody.payload) {
-    console.error("Invalid webhook structure received:", requestBody);
-    throw new Error("Invalid webhook structure: Missing top-level 'payload' object");
+  // Validate the direct structure
+  if (!requestBody) {
+    console.error("Invalid webhook structure received (empty body?):", requestBody);
+    throw new Error("Invalid webhook structure: Empty request body");
   }
 
-  const nestedPayload = requestBody.payload;
-
-  // Destructure from the NESTED payload
-  const { event, instance, data } = nestedPayload;
+  // Destructure directly from the request body
+  const { event, instance, data } = requestBody;
 
   if (!event || !instance) {
-    console.error("Missing required fields within nested payload:", nestedPayload);
+    console.error("Missing required fields in webhook payload:", requestBody);
     throw new Error("Missing required fields in payload: event or instance"); // Caught for 400
   }
 
-  // Return the nested payload object, which should match the WebhookPayload interface
-  // Ensure the interface matches the fields within requestBody.payload
-  return {
-      event: event,
-      instance: instance,
-      data: data, // Pass the actual message data object
-      // Add any other fields from nestedPayload if WebhookPayload interface requires them
-  } as WebhookPayload; // Cast might be needed if interface isn't exact match
+  // Return the request body itself, cast to the expected interface
+  // Ensure the WebhookPayload interface includes all necessary fields from the root level
+  return requestBody as WebhookPayload;
 }
 
 /**
