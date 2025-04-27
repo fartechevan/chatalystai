@@ -1,4 +1,4 @@
-import { serve } from "https://esm.sh/stable/http@0.190.0/server.ts"; // Try esm.sh CDN with specific version
+import { serve } from "std/http/server.ts"; // Use import map alias
 import { corsHeaders } from "../_shared/cors.ts";
 // Import both client creation functions
 import { createSupabaseClient, createSupabaseServiceRoleClient } from "../_shared/supabaseClient.ts";

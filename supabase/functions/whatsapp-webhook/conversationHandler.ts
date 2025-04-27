@@ -1,5 +1,5 @@
 
-import { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { SupabaseClient } from "@supabase/supabase-js";
 import { findOrCreateCustomer } from "./customerHandler.ts";
 
 // Define minimal types for Supabase query results within this function
@@ -49,15 +49,12 @@ export async function findOrCreateConversation(
     // 1. Check if a conversation exists for this specific remoteJid and integration config
     const { data: existingConversations, error: conversationError } = await supabaseClient
       .from('conversations')
-      .select<`
-        conversation_id,
-        lead_id,
-        integrations_id
-      `, ConversationQueryResult[]>(`
+      .select(`
         conversation_id,
         lead_id,
         integrations_id
       `)
+      // No explicit type assertion here, let TS infer from select string
       .eq('integrations_id', config.integration_id); // Assuming config now holds integration_id
 
     if (conversationError) {
@@ -72,22 +69,25 @@ export async function findOrCreateConversation(
     if (existingConversations && existingConversations.length > 0) {
       for (const conv of existingConversations) {
         // Query conversation participants to find a matching member
-        const { data: conversationParticipants, error: participantsError } = await supabaseClient
+        // Use maybeSingle() as we only need to know if at least one exists
+        const { data: matchingMemberParticipant, error: participantsError } = await supabaseClient
           .from('conversation_participants')
-          .select<`*`, ParticipantQueryResult[]>(`*`)
+          .select('id') // Only need to know if one exists
           .eq('conversation_id', conv.conversation_id)
           .eq('role', 'member')
-          .eq('external_user_identifier', phoneNumber);
+          .eq('external_user_identifier', phoneNumber)
+          .maybeSingle(); // Check if at least one exists
 
         if (participantsError) {
           console.error('Error finding conversation participants:', participantsError);
-          continue; // Skip to the next conversation
+          continue; // Skip to the next conversation on error
         }
 
-        if (conversationParticipants && conversationParticipants.length > 0) {
+        // If a matching participant was found for this conversation
+        if (matchingMemberParticipant) {
           console.log(`Found existing conversation for phoneNumber ${phoneNumber}: ${conv.conversation_id}`);
-          matchingConversation = conv;
-          break;
+          matchingConversation = conv; // Assign the conversation object
+          break; // Exit the loop once a match is found
         }
       }
     }
@@ -99,24 +99,32 @@ export async function findOrCreateConversation(
       // Determine participant ID based on message sender
       const participantRole = fromMe ? 'admin' : 'member';
       
-      // Query conversation participants to find the appropriate participant ID
-      const { data: participants, error: participantError } = await supabaseClient
+      // Query the specific participant (admin or member) using maybeSingle
+      const { data: participant, error: participantError } = await supabaseClient
         .from('conversation_participants')
-        .select<'id, role', { id: string; role: 'admin' | 'member' }[]>('id, role')
-        .eq('conversation_id', matchingConversation.conversation_id)
-        .eq('role', participantRole);
+        .select('id') // Select only the ID
+        .eq('conversation_id', appConversationId) // Use appConversationId directly
+        .eq('role', participantRole)
+        // If role is 'member', also match on external_user_identifier (phoneNumber)
+        // If role is 'member', also match on external_user_identifier (phoneNumber)
+        // If role is 'admin', match on external_user_identifier (user_reference_id) - though this might be less reliable if not set
+        .eq('external_user_identifier', fromMe ? config.user_reference_id : phoneNumber) // Use config value
+        .maybeSingle(); // Expecting one or none
 
       if (participantError) {
-        console.error('Error finding participant:', participantError);
-        return { appConversationId: null, participantId: null };
+        console.error(`Error finding ${participantRole} participant:`, participantError);
+        return { appConversationId, participantId: null }; // Return conversation ID even if participant lookup fails? Or null? Returning null for participant.
       }
 
-      if (!participants || participants.length === 0) {
-        console.error(`No ${participantRole} participant found for conversation ${matchingConversation.conversation_id}`);
-        return { appConversationId: null, participantId: null };
+      if (!participant) {
+        // This is the critical point for 'fromMe' messages if the admin participant wasn't found/created correctly
+        console.error(`No ${participantRole} participant found for conversation ${appConversationId} with identifier ${fromMe ? config.user_reference_id || 'HARDCODED_ID' : phoneNumber}`);
+        // Attempt to find *any* participant of the role if the identifier match failed? (Might be risky)
+        // For now, return null.
+        return { appConversationId, participantId: null };
       }
 
-      const participantId = participants[0].id;
+      const participantId = participant.id;
       console.log(`Using participant ID: ${participantId} for ${participantRole} message`);
 
       return { appConversationId, participantId };
@@ -129,67 +137,81 @@ export async function findOrCreateConversation(
     const { data: appConversation, error: appConversationError } = await supabaseClient
       .from('conversations')
       .insert({
-        integrations_id: config.integration_id, // Assuming config now holds integration_id
+        integrations_id: config.integration_id,
       })
-      .select<"conversation_id, lead_id, integrations_id", ConversationQueryResult[]>("conversation_id, lead_id, integrations_id"); // Explicit columns in select
+      .select("conversation_id, lead_id, integrations_id") // Select desired fields
+      .single(); // Expect a single row back
 
     if (appConversationError) {
       console.error('Error creating app conversation:', appConversationError);
       return { appConversationId: null, participantId: null };
     }
 
-    if (!appConversation || appConversation.length === 0) {
-      console.error('No conversation created, empty result');
+    // appConversation is now an object or null, not an array
+    if (!appConversation) {
+      console.error('No conversation created or returned after insert.');
       return { appConversationId: null, participantId: null };
     }
 
-    const appConversationId = appConversation[0].conversation_id;
+    const appConversationId = appConversation.conversation_id;
     console.log(`Created new conversation with ID: ${appConversationId}`);
 
-    // 2.2 Create admin participant (the owner of the WhatsApp)
+    // 2.2 Create admin participant (the owner of the WhatsApp) using the hardcoded ID
     let adminParticipantId: string | null = null;
+    // Use the user_reference_id from config if available
     if (config.user_reference_id) {
+      const adminIdentifier = config.user_reference_id;
+      console.log(`Attempting to create admin participant with identifier from config: ${adminIdentifier}`);
       const { data: adminParticipant, error: adminParticipantError } = await supabaseClient
         .from('conversation_participants')
         .insert({
           conversation_id: appConversationId,
           role: 'admin',
-          external_user_identifier: config.user_reference_id, // Use external_user_identifier for admin
+          external_user_identifier: adminIdentifier, // Use identifier from config
         })
-        .select<"id, role, conversation_id, external_user_identifier, customer_id", ParticipantQueryResult[]>("id, role, conversation_id, external_user_identifier, customer_id"); // Explicit columns
+        .select("id") // Select only the ID
+        .single(); // Expect a single row back
 
       if (adminParticipantError) {
+        // Handle potential unique constraint violation if admin already exists for this conversation?
+        // Or assume it's a real error for now.
         console.error('Error creating admin participant:', adminParticipantError);
-      } else if (adminParticipant && adminParticipant.length > 0) {
-        adminParticipantId = adminParticipant[0].id;
+        // Decide if we should continue without admin participant? For now, log and proceed.
+      } else if (adminParticipant) {
+        adminParticipantId = adminParticipant.id;
         console.log(`Created admin participant with ID: ${adminParticipantId}`);
+      } else {
+         console.error('Admin participant insert did not return data.');
       }
     } else {
-      console.log('No user_reference_id in config, skipping admin participant creation');
+      // Log if user_reference_id is missing, as admin participant cannot be created
+      console.warn(`No user_reference_id found in config for integration ${config.integration_id}. Cannot create admin participant.`);
     }
 
     // 2.3 Create member participant (the WhatsApp contact)
-      const { data: memberParticipant, error: memberParticipantError } = await supabaseClient
-        .from('conversation_participants')
-        .insert({
+    const { data: memberParticipant, error: memberParticipantError } = await supabaseClient
+      .from('conversation_participants')
+      .insert({
         conversation_id: appConversationId,
         role: 'member',
         external_user_identifier: phoneNumber,
-          customer_id: customerId,
-        })
-        .select<"id, role, conversation_id, external_user_identifier, customer_id", ParticipantQueryResult[]>("id, role, conversation_id, external_user_identifier, customer_id"); // Explicit columns
+        customer_id: customerId, // Link to customer record if available
+      })
+      .select("id") // Select only the ID
+      .single(); // Expect a single row back
 
     if (memberParticipantError) {
       console.error('Error creating member participant:', memberParticipantError);
-      return { appConversationId: null, participantId: null };
+      // If member creation fails, the conversation is likely unusable
+      return { appConversationId, participantId: null }; // Return conv ID but null participant
     }
 
-    if (!memberParticipant || memberParticipant.length === 0) {
-      console.error('No member participant created, empty result');
-      return { appConversationId: null, participantId: null };
+    if (!memberParticipant) {
+      console.error('Member participant insert did not return data.');
+      return { appConversationId, participantId: null };
     }
 
-    const memberParticipantId = memberParticipant[0].id;
+    const memberParticipantId = memberParticipant.id;
     console.log(`Created member participant with ID: ${memberParticipantId}`);
 
     // Return the appropriate participant ID based on message sender
