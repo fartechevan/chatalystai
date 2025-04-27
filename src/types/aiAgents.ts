@@ -8,6 +8,7 @@ export interface AIAgent {
   keyword_trigger?: string | null; // Optional keyword to trigger the agent in a channel
   knowledge_document_ids?: string[]; // Optional array of knowledge document IDs linked to this agent
   integration_ids?: string[]; // Optional array of integration IDs linked to this agent
+  is_enabled?: boolean; // Added: Whether the agent is globally enabled
   created_at: string; // Timestamp of creation
   updated_at: string; // Timestamp of last update
   // Add any other relevant fields as needed, e.g., user_id, organization_id

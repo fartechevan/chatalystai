@@ -15,9 +15,9 @@ serve(async (req) => {
   const url = new URL(req.url);
   const pathParts = url.pathname.split('/').filter(Boolean);
   // Assumes URL path like /functions/v1/evolution-api-handler/action
-  const action = pathParts[3]; // Get the action part of the path
+  const actionFromPath = pathParts[3]; // Get the action part from the path
 
-  console.log(`Processing evolution-api-handler request for action: ${action}`);
+  console.log(`Processing evolution-api-handler request... Path action: ${actionFromPath}`);
 
   let body = {};
   try {
@@ -31,6 +31,13 @@ serve(async (req) => {
       status: 400
     });
   }
+
+  // Determine action: prioritize body, fallback to path
+  const actionFromBody = (body as { action?: string })?.action;
+  const action = actionFromBody || actionFromPath; // Use action from body if present
+
+  console.log(`Determined action: ${action} (from body: ${!!actionFromBody}, from path: ${!!actionFromPath})`);
+
 
   try {
     // --- Route based on action ---
@@ -129,57 +136,90 @@ serve(async (req) => {
         });
       }
 
-      // Fetch credentials AND name using the instanceId (DB ID)
+      // Fetch credentials and display name by joining integrations and integrations_config
       const { data: instanceData, error: instanceError } = await supabaseClient
         .from('integrations')
-        .select('name, api_key, base_url') // Fetch name along with credentials
+        .select(`
+          api_key,
+          base_url,
+          integrations_config ( instance_display_name )
+        `)
         .eq('id', instanceId)
         .single();
 
-      if (instanceError || !instanceData || !instanceData.api_key || !instanceData.base_url || !instanceData.name) {
-        const errorMsg = instanceError?.message || "Instance not found or missing required fields (name, api_key, base_url).";
-        console.error(`Failed to get instance data/credentials for ID ${instanceId}: ${errorMsg}`);
-        return new Response(JSON.stringify({ error: `Failed to get instance details: ${errorMsg}` }), {
+      // Extract nested data and check for existence
+      const configData = instanceData?.integrations_config as { instance_display_name: string } | null; // Type assertion
+      const instanceNameForApi = configData?.instance_display_name;
+      const apiKey = instanceData?.api_key;
+      const baseUrl = instanceData?.base_url;
+
+      if (instanceError || !instanceData || !apiKey || !baseUrl || !instanceNameForApi) {
+         const errorMsg = instanceError?.message || "Instance not found or missing required fields (instance_display_name from config, api_key, base_url).";
+         console.error(`Failed to get instance data/credentials for ID ${instanceId}: ${errorMsg}`);
+         return new Response(JSON.stringify({ error: `Failed to get instance details: ${errorMsg}` }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           status: instanceError?.code === 'PGRST116' ? 404 : 500 // Use 404 if not found
         });
       }
 
-      const { name: instanceNameForApi, api_key: apiKey, base_url: baseUrl } = instanceData;
-      console.log(`Sending message to ${number} via instance name "${instanceNameForApi}" (ID: ${instanceId}) using ${baseUrl}`);
+      // Now we have the correct instanceNameForApi, apiKey, and baseUrl
+      // Format the recipient number for the Evolution API
+      const recipientNumber = number.includes('@') ? number : `${number}@c.us`;
+      console.log(`Sending message to ${recipientNumber} via instance name "${instanceNameForApi}" (ID: ${instanceId}) using ${baseUrl}`);
 
-      // --- Placeholder for Evolution API Call ---
-      // Use instanceNameForApi in the URL path
-      // const evolutionApiUrl = `${baseUrl}/message/sendText/${instanceNameForApi}`;
-      // try {
-      //   const response = await fetch(evolutionApiUrl, {
-      //     method: 'POST',
-      //     headers: {
-      //       'Content-Type': 'application/json',
-      //       'apikey': apiKey
-      //     },
-      //     body: JSON.stringify({ number, options: { delay: 1200, presence: 'composing' }, textMessage: { text } })
-      //   });
-      //   const result = await response.json();
-      //   if (!response.ok) {
-      //     throw new Error(`Evolution API error (${response.status}): ${JSON.stringify(result)}`);
-      //   }
-      //   console.log(`Evolution API sendText response for instance name "${instanceNameForApi}":`, result);
-      //   return new Response(JSON.stringify({ success: true, message: 'Message sent successfully via Evolution API', data: result }), {
-      //     headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200
-      //   });
-      // } catch (apiError) {
-      //   console.error(`Evolution API call failed for send-text (Name: "${instanceNameForApi}", ID: ${instanceId}):`, apiError);
-      //   return new Response(JSON.stringify({ error: `Evolution API call failed: ${apiError.message}` }), {
-      //     headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 502 // Bad Gateway
-      //   });
-      // }
-      // --- End Placeholder ---
+      // --- Actual Evolution API Call ---
+      const evolutionApiUrl = `${baseUrl}/message/sendText/${instanceNameForApi}`; // Use the correct name here
+      try {
+        const response = await fetch(evolutionApiUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': apiKey
+          },
+          // Simplified body structure matching common Evolution API usage for sendText
+          body: JSON.stringify({
+             number: recipientNumber, // Use the formatted recipient number
+             text: text
+             // Removed options object for simplicity, add back if needed and supported
+           })
+        });
+        // Check if response is ok before trying to parse JSON
+        if (!response.ok) {
+           let errorBody = `(Failed to read error response body)`;
+           try {
+               errorBody = await response.text(); // Get raw text for non-JSON errors or details
+           } catch (_) { /* Ignore read error */ }
+           console.error(`Evolution API error response (Status: ${response.status}):`, errorBody);
+           throw new Error(`Evolution API error (${response.status}): ${errorBody}`);
+        }
 
-      // Return simulated success for now
-      return new Response(JSON.stringify({ success: true, message: 'Message sending simulation successful', messageId: `simulated_${Date.now()}` }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200
-      });
+        // Attempt to parse JSON only if response is OK and likely JSON
+        let result = {}; // Default result if no body or not JSON
+        const contentType = response.headers.get('content-type');
+        if (response.body && contentType && contentType.includes('application/json')) {
+            result = await response.json();
+        } else {
+            console.log(`Evolution API response was not JSON (Status: ${response.status}, Content-Type: ${contentType})`);
+            // Handle non-JSON success response if necessary, otherwise empty object is fine
+        }
+
+        if (!response.ok) {
+          // Log the detailed error from the API if available
+          console.error(`Evolution API error response (Status: ${response.status}):`, result);
+          throw new Error(`Evolution API error (${response.status}): ${JSON.stringify(result)}`);
+        }
+
+        console.log(`Evolution API sendText response for instance name "${instanceNameForApi}":`, result);
+        return new Response(JSON.stringify({ success: true, message: 'Message sent successfully via Evolution API', data: result }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200
+        });
+      } catch (apiError) {
+        console.error(`Evolution API call failed for send-text (Name: "${instanceNameForApi}", ID: ${instanceId}):`, apiError);
+        return new Response(JSON.stringify({ error: `Evolution API call failed: ${apiError.message}` }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 502 // Bad Gateway indicates upstream issue
+        });
+      }
+      // --- End Actual API Call ---
 
     }
 

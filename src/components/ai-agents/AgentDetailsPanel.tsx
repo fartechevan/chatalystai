@@ -7,8 +7,10 @@ import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Terminal, Trash2, Sparkles, Send, Loader2 } from 'lucide-react'; // Added Send, Loader2
-import { Separator } from '@/components/ui/separator'; // Added Separator
+import { Switch } from "@/components/ui/switch";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"; // Import RadioGroup
+import { Terminal, Trash2, Sparkles, Send, Loader2 } from 'lucide-react';
+import { Separator } from '@/components/ui/separator';
 import { getAIAgent, createAIAgent, updateAIAgent, deleteAIAgent } from '@/services/aiAgents/agentService';
 import { listKnowledgeDocuments, KnowledgeDocument } from '@/services/knowledge/documentService';
 // Import the updated integration service and type
@@ -40,7 +42,9 @@ const AgentDetailsPanel: React.FC<AgentDetailsPanelProps> = ({ selectedAgentId, 
   const [promptText, setPromptText] = useState('');
   const [keywordTrigger, setKeywordTrigger] = useState<string | null>(''); // Added state
   const [selectedDocumentIds, setSelectedDocumentIds] = useState<string[]>([]);
-  const [selectedIntegrationIds, setSelectedIntegrationIds] = useState<string[]>([]); // Added state
+  const [selectedIntegrationIds, setSelectedIntegrationIds] = useState<string[]>([]);
+  const [isEnabled, setIsEnabled] = useState<boolean>(true);
+  const [activationMode, setActivationMode] = useState<'keyword' | 'always_on'>('keyword'); // Added state for activation mode
   const [isSuggestDialogOpen, setIsSuggestDialogOpen] = useState(false);
   // --- State for Testing ---
   const [testQuery, setTestQuery] = useState('');
@@ -126,17 +130,27 @@ const AgentDetailsPanel: React.FC<AgentDetailsPanelProps> = ({ selectedAgentId, 
       setPromptText(selectedAgent.prompt || '');
       setKeywordTrigger(selectedAgent.keyword_trigger || '');
       setSelectedDocumentIds(selectedAgent.knowledge_document_ids || []);
-      // Use the base_integration_id from the fetched agent data if available
-      // Note: The AIAgent type might need updating if it doesn't include base_integration_id directly
-      // For now, assuming integration_ids on AIAgent *are* the base IDs (needs verification if still failing)
       setSelectedIntegrationIds(selectedAgent.integration_ids || []);
+      setIsEnabled(selectedAgent.is_enabled ?? true);
+      // Assuming activation_mode is fetched with the agent or integration details
+      // Need to adjust the query/type if activation_mode isn't directly on selectedAgent
+      // For now, let's assume it might be missing and default
+      // TODO: Adjust this based on where activation_mode is actually stored/fetched from
+      // Fetching activation_mode requires joining ai_agent_integrations. For now, keep default.
+      // setActivationMode((selectedAgent as any)?.activation_mode || 'keyword'); // Default to 'keyword'
+      // Keep default setting logic for now until data fetching is updated
+       if (!selectedAgentId) { // Only reset if creating
+         setActivationMode('keyword');
+       }
     } else if (!selectedAgentId) {
       // Reset form for creating
       setAgentName('');
       setPromptText('');
-      setKeywordTrigger(''); // Added
+      setKeywordTrigger('');
       setSelectedDocumentIds([]);
-      setSelectedIntegrationIds([]); // Added
+      setSelectedIntegrationIds([]);
+      setIsEnabled(true);
+      setActivationMode('keyword'); // Default for new agents
     }
   }, [selectedAgentId, selectedAgent]);
 
@@ -292,11 +306,15 @@ const AgentDetailsPanel: React.FC<AgentDetailsPanelProps> = ({ selectedAgentId, 
         name: agentName,
         prompt: promptText,
         knowledge_document_ids: selectedDocumentIds.length > 0 ? selectedDocumentIds : null,
-        keyword_trigger: keywordTrigger?.trim() || null, // Added
-        integration_ids: selectedIntegrationIds.length > 0 ? selectedIntegrationIds : [], // Added
-      };
-      console.log("Creating agent with data:", newAgentData);
-      createMutation.mutate(newAgentData);
+        keyword_trigger: keywordTrigger?.trim() || null,
+         integration_ids: selectedIntegrationIds.length > 0 ? selectedIntegrationIds : [],
+         is_enabled: isEnabled,
+         // TODO: activation_mode needs to be saved to ai_agent_integrations, not ai_agents.
+         // The createAIAgent service needs modification or a separate call.
+         // activation_mode: activationMode,
+       };
+       console.log("Creating agent with data:", newAgentData);
+       createMutation.mutate(newAgentData);
 
     } else if (selectedAgentId && selectedAgent) {
        // --- Update Agent ---
@@ -315,8 +333,12 @@ const AgentDetailsPanel: React.FC<AgentDetailsPanelProps> = ({ selectedAgentId, 
          name: currentName, // Assuming name might be uncontrolled for edit for now
          prompt: promptText,
          knowledge_document_ids: selectedDocumentIds.length > 0 ? selectedDocumentIds : null,
-         keyword_trigger: keywordTrigger?.trim() || null, // Added
-         integration_ids: selectedIntegrationIds.length > 0 ? selectedIntegrationIds : [], // Added
+         keyword_trigger: keywordTrigger?.trim() || null,
+         integration_ids: selectedIntegrationIds.length > 0 ? selectedIntegrationIds : [],
+         is_enabled: isEnabled,
+          // TODO: activation_mode needs to be saved to ai_agent_integrations, not ai_agents.
+          // The updateAIAgent service needs modification or a separate call.
+         // activation_mode: activationMode,
        };
 
        // Only send update if something actually changed (optional optimization)
@@ -395,8 +417,49 @@ const AgentDetailsPanel: React.FC<AgentDetailsPanelProps> = ({ selectedAgentId, 
 
   // --- Render Agent Details Form ---
   const renderAgentDetailsForm = () => (
-    <div className="space-y-4">
-      {/* Existing form content goes here */}
+    <div className="space-y-6"> {/* Increased spacing */}
+       {/* Enable/Disable Switch */}
+       <div className="flex items-center justify-between space-x-2 rounded-lg border p-4">
+         <Label htmlFor="agent-enabled" className="flex flex-col space-y-1">
+           <span>Agent Status</span>
+           <span className="font-normal leading-snug text-muted-foreground">
+             Enable or disable this agent globally.
+           </span>
+         </Label>
+         <Switch
+           id="agent-enabled"
+           checked={isEnabled}
+           onCheckedChange={setIsEnabled}
+           disabled={isCreating || updateMutation.isPending || isLoadingAgent}
+           aria-readonly={isCreating || updateMutation.isPending || isLoadingAgent}
+         />
+       </div>
+
+       {/* Activation Mode */}
+        <div className="space-y-3">
+           <Label>Activation Mode</Label>
+           <RadioGroup
+             value={activationMode}
+             onValueChange={(value: 'keyword' | 'always_on') => setActivationMode(value)}
+             className="flex space-x-4"
+             disabled={isCreating || updateMutation.isPending || isLoadingAgent}
+           >
+             <div className="flex items-center space-x-2">
+               <RadioGroupItem value="keyword" id="mode-keyword" />
+               <Label htmlFor="mode-keyword" className="font-normal">Keyword Trigger</Label>
+             </div>
+             <div className="flex items-center space-x-2">
+               <RadioGroupItem value="always_on" id="mode-always" />
+               <Label htmlFor="mode-always" className="font-normal">Always On</Label>
+             </div>
+           </RadioGroup>
+           <p className="text-sm text-muted-foreground">
+             Choose how the agent activates in connected channels. 'Always On' responds to every message.
+           </p>
+         </div>
+
+
+      {/* Agent Name */}
       <div className="space-y-2">
         <Label htmlFor="agent-name">Agent Name</Label>
         <Input id="agent-name" defaultValue={selectedAgent?.name} placeholder="e.g., Customer Support Bot" disabled={isCreating || updateMutation.isPending || isLoadingAgent} />
@@ -554,6 +617,28 @@ const AgentDetailsPanel: React.FC<AgentDetailsPanelProps> = ({ selectedAgentId, 
             If set, the agent will only respond in connected channels when a message starts with this keyword.
           </p>
        </div>
+        {/* Activation Mode - Create */}
+        <div className="space-y-3">
+           <Label>Activation Mode</Label>
+           <RadioGroup
+             value={activationMode}
+             onValueChange={(value: 'keyword' | 'always_on') => setActivationMode(value)}
+             className="flex space-x-4"
+             disabled={createMutation.isPending}
+           >
+             <div className="flex items-center space-x-2">
+               <RadioGroupItem value="keyword" id="mode-keyword-create" />
+               <Label htmlFor="mode-keyword-create" className="font-normal">Keyword Trigger</Label>
+             </div>
+             <div className="flex items-center space-x-2">
+               <RadioGroupItem value="always_on" id="mode-always-create" />
+               <Label htmlFor="mode-always-create" className="font-normal">Always On</Label>
+             </div>
+           </RadioGroup>
+            <p className="text-sm text-muted-foreground">
+             Choose how the agent activates in connected channels. 'Always On' responds to every message.
+           </p>
+         </div>
        {/* Connected Integrations Selector (Placeholder) - Create */}
        <div className="space-y-2">
           <Label>Connected Integrations</Label>
