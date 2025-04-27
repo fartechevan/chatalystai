@@ -1,9 +1,8 @@
-/// <reference types="https://esm.sh/@supabase/functions-js/src/edge-runtime.d.ts" />
-
-import { serve } from "https://deno.land/std@0.177.0/http/server.ts"; // Updated to fully qualified URL
+import { serve } from "https://esm.sh/stable/http@0.190.0/server.ts"; // Try esm.sh CDN with specific version
 import { corsHeaders } from "../_shared/cors.ts";
-import { createSupabaseServiceRoleClient } from "../_shared/supabaseClient.ts"; // Use Service Role
-import { handleMessageEvent, WhatsAppMessageData } from "./messageHandler.ts"; // Import type and handler
+// Import both client creation functions
+import { createSupabaseClient, createSupabaseServiceRoleClient } from "../_shared/supabaseClient.ts";
+import { handleMessageEvent, WhatsAppMessageData } from "./messageHandler.ts";
 import { createErrorResponse, parseAndValidateWebhookRequest, storeWebhookEventDb } from "./utils.ts";
 
 serve(async (req) => {
@@ -33,20 +32,23 @@ serve(async (req) => {
     const { event, instance, data } = payload;
     console.log(`[${requestId}] Parsed webhook: Event=${event}, Instance=${instance}`);
 
-    // 2. Create Supabase Service Role Client
+    // 2. Create Supabase Service Role Client (needed for DB operations within this function)
+    // We will use this client specifically for invoking other functions as well.
     supabaseClient = createSupabaseServiceRoleClient();
 
-    // 3. Store Webhook Event (async, non-blocking, best effort)
+    // 3. Store Webhook Event (async, non-blocking, best effort) - Use service role client
     storeWebhookEventDb(supabaseClient, payload).catch(err => {
         console.error(`[${requestId}] Background webhook event storage failed:`, err);
     });
 
-    // 4. Handle Specific Events (e.g., messages.upsert)
+    // 4. Handle Specific Message Events (messages.upsert or send.message)
     let processingResult: true | string = true; // Default to success for unhandled events
-    if (event === 'messages.upsert' && data) {
-      console.log(`[${requestId}] Processing messages.upsert event...`);
-      // Assuming handleMessageEvent contains the core logic for this event type
-      // It should return true on success, or an error message string on failure
+    // Check if the event is one we want to process for messages and if data exists
+    if ((event === 'messages.upsert' || event === 'send.message') && data) {
+      console.log(`[${requestId}] Processing ${event} event...`);
+      // Assuming handleMessageEvent contains the core logic for these event types
+      // It should return true on success, or an error message string on failure.
+      // It uses the 'fromMe' flag within the data payload to distinguish direction.
       // Perform type assertion for the 'data' payload before passing
       processingResult = await handleMessageEvent(supabaseClient, data as WhatsAppMessageData, instance);
       console.log(`[${requestId}] Message event processing result: ${processingResult === true ? 'Success' : 'Failed ('+processingResult+')'}`);

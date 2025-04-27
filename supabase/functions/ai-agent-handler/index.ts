@@ -1,7 +1,8 @@
-import { serve } from 'std/http/server.ts'; // Use mapped path
+import { serve } from 'std/http/server.ts';
 import { corsHeaders } from '../_shared/cors.ts';
 import { createSupabaseClient } from '../_shared/supabaseClient.ts';
 import { Database } from '../_shared/database.types.ts';
+import OpenAI from "openai"; // Use mapped import from import_map.json
 
 // Define types based on database schema and expected payloads
 type AIAgent = Database['public']['Tables']['ai_agents']['Row'];
@@ -12,6 +13,7 @@ interface NewAgentPayload {
   keyword_trigger?: string | null;
   knowledge_document_ids?: string[];
   integration_ids?: string[]; // Added
+  is_enabled?: boolean; // Added for create
 }
 
 interface UpdateAgentPayload {
@@ -19,11 +21,35 @@ interface UpdateAgentPayload {
   prompt?: string;
   keyword_trigger?: string | null;
   knowledge_document_ids?: string[];
-  integration_ids?: string[]; // Added
+  integration_ids?: string[];
+  is_enabled?: boolean; // Added for update
 }
 
+// Combined type for responses including integrations
+interface AgentWithIntegrations extends AIAgent {
+  integration_ids: string[];
+}
+
+
+// Payload for direct invocation
+interface AgentQueryPayload {
+  agentId: string;
+  query: string;
+  sessionId: string;
+  contactIdentifier: string;
+  // conversationHistory?: any; // Optional history
+}
+
+// Response type for direct invocation
+interface AgentQueryResponse {
+  response?: string;
+  knowledge_used?: string[] | null; // IDs of chunks used
+  error?: string;
+}
+
+
 // Helper function to create consistent JSON responses with CORS headers
-function createJsonResponse(body: unknown, status: number = 200) {
+function createJsonResponse(body: unknown, status: number = 200): Response {
   // For 204 No Content, body should be null
   const responseBody = status === 204 ? null : JSON.stringify(body);
   const headers = { ...corsHeaders };
@@ -32,6 +58,33 @@ function createJsonResponse(body: unknown, status: number = 200) {
   }
   return new Response(responseBody, { status, headers });
 }
+
+// Implementation for generateEmbedding using OpenAI
+async function generateEmbedding(text: string): Promise<number[]> {
+  try {
+    // Supabase Edge Functions provide env vars via Deno.env
+    const apiKey = Deno.env.get("OPENAI_API_KEY");
+    if (!apiKey) throw new Error("OPENAI_API_KEY environment variable not set.");
+    const openai = new OpenAI({ apiKey });
+
+    const embeddingResponse = await openai.embeddings.create({
+      model: "text-embedding-ada-002",
+      input: text.replaceAll("\n", " "), // API recommends replacing newlines
+    });
+
+    if (embeddingResponse.data.length === 0 || !embeddingResponse.data[0].embedding) {
+        throw new Error("OpenAI embedding response did not contain embedding data.");
+    }
+
+    return embeddingResponse.data[0].embedding;
+  } catch (error) {
+      console.error("Error generating embedding:", error);
+      // Decide how to handle: re-throw, return null, or return dummy vector?
+      // Re-throwing for now to make the failure explicit upstream.
+      throw new Error(`Failed to generate embedding: ${error.message}`);
+  }
+}
+
 
 serve(async (req: Request) => {
   // Immediately handle CORS preflight requests
@@ -44,34 +97,155 @@ serve(async (req: Request) => {
   console.log(`[${requestStartTime}] Handling ${req.method} request for ${req.url}`);
 
   try {
-    // --- Authentication ---
+    // --- Authentication & Client Initialization ---
+    // Always initialize client with request context for user auth
     const supabase = createSupabaseClient(req);
+    // Attempt to get user for REST API calls
     const { data: { user }, error: userError } = await supabase.auth.getUser();
-
-    if (userError || !user) {
-      console.error(`[${requestStartTime}] Auth Error:`, userError?.message || 'User not found');
-      return createJsonResponse({ error: 'User authentication failed' }, 401);
-    }
-    console.log(`[${requestStartTime}] Authenticated user: ${user.id}`);
+    const userId = user?.id; // Store userId if available
 
     // --- Routing Logic ---
     const url = new URL(req.url);
-    // Extract path segments *after* the function name (ai-agent-handler)
     const pathSegments = url.pathname.split('/').filter(Boolean);
     const functionNameIndex = pathSegments.indexOf('ai-agent-handler');
     const relevantPathSegments = functionNameIndex !== -1 ? pathSegments.slice(functionNameIndex + 1) : [];
-    const agentId = relevantPathSegments.length === 1 ? relevantPathSegments[0] : null;
+    const agentIdFromPath = relevantPathSegments.length === 1 ? relevantPathSegments[0] : null;
 
-    console.log(`[${requestStartTime}] Parsed agentId: ${agentId}`);
+    console.log(`[${requestStartTime}] Parsed agentId from path: ${agentIdFromPath}`);
+
+    // --- DIRECT INVOCATION (POST / without agentId in path) ---
+    if (req.method === 'POST' && !agentIdFromPath) {
+        console.log(`[${requestStartTime}] Routing to: Direct Agent Invocation`);
+        // No user auth check here, assuming invocation comes from trusted source (service role)
+
+        let payload: AgentQueryPayload;
+        try {
+            payload = await req.json();
+            if (!payload.agentId || !payload.query || !payload.sessionId || !payload.contactIdentifier) {
+                throw new Error("Missing required fields in invocation payload: agentId, query, sessionId, contactIdentifier");
+            }
+        } catch (jsonError) {
+            console.error(`[${requestStartTime}] Agent Invocation JSON Parse/Validation Error:`, jsonError.message);
+            return createJsonResponse({ error: 'Invalid or incomplete JSON payload for invocation', details: jsonError.message }, 400);
+        }
+
+        console.log(`[${requestStartTime}] Processing query for Agent ID: ${payload.agentId}, Session ID: ${payload.sessionId}`);
+
+        try {
+            // 1. Fetch Agent Details (Prompt, linked knowledge)
+            // Use a service role client ONLY if necessary to bypass RLS for internal calls.
+            // For now, assume the invoking function's service role allows reading ai_agents.
+            const { data: agentData, error: agentFetchError } = await supabase
+                .from('ai_agents')
+                .select('id, name, prompt, knowledge_document_ids')
+                .eq('id', payload.agentId)
+                .single();
+
+            if (agentFetchError || !agentData) {
+                console.error(`[${requestStartTime}] Agent Invocation Error: Failed to fetch agent ${payload.agentId}`, agentFetchError?.message);
+                return createJsonResponse({ error: `Agent not found or fetch failed: ${payload.agentId}` }, 404);
+            }
+            console.log(`[${requestStartTime}] Fetched agent: ${agentData.name}`);
+
+            // 2. Fetch Relevant Knowledge
+            let knowledgeContext = "";
+            let knowledgeUsedIds: string[] | null = null;
+            if (agentData.knowledge_document_ids && agentData.knowledge_document_ids.length > 0) {
+                console.log(`[${requestStartTime}] Agent ${payload.agentId} has linked knowledge. Querying knowledge base...`);
+                try {
+                    const embedding = await generateEmbedding(payload.query);
+                    const { data: chunks, error: chunkError } = await supabase.rpc('match_chunks', {
+                        query_embedding: embedding,
+                        match_threshold: 0.75,
+                        match_count: 5,
+                        document_ids: agentData.knowledge_document_ids,
+                        filter_enabled: true
+                    });
+
+                    if (chunkError) {
+                        console.error(`[${requestStartTime}] Knowledge query error for agent ${payload.agentId}:`, chunkError.message);
+                    } else if (chunks && chunks.length > 0) {
+                        knowledgeContext = chunks.map((c: { content: string }) => c.content).join("\n\n");
+                        knowledgeUsedIds = chunks.map((c: { id: string }) => c.id);
+                        console.log(`[${requestStartTime}] Found ${chunks.length} relevant knowledge chunks.`);
+                    } else {
+                         console.log(`[${requestStartTime}] No relevant knowledge chunks found.`);
+                    }
+                } catch (knowledgeError) {
+                     console.error(`[${requestStartTime}] Error during knowledge retrieval for agent ${payload.agentId}:`, knowledgeError.message);
+                }
+            } else {
+                 console.log(`[${requestStartTime}] Agent ${payload.agentId} has no linked knowledge documents.`);
+            }
+
+            // 3. Construct Prompt for LLM
+            const finalPrompt = `
+${agentData.prompt}
+
+Context from Knowledge Base:
+---
+${knowledgeContext || "No relevant context found."}
+---
+
+User Query: ${payload.query}
+
+Response:`;
+
+            // 4. Call LLM
+            console.log(`[${requestStartTime}] Calling LLM for agent ${payload.agentId}...`);
+            let llmResponseText: string;
+            try {
+                const apiKey = Deno.env.get("OPENAI_API_KEY");
+                if (!apiKey) throw new Error("OPENAI_API_KEY environment variable not set.");
+                const openai = new OpenAI({ apiKey });
+
+                console.log(`[${requestStartTime}] Sending prompt to OpenAI...`);
+
+                const chatCompletion = await openai.chat.completions.create({
+                    messages: [{ role: "user", content: finalPrompt }],
+                    model: "gpt-3.5-turbo",
+                    temperature: 0.7,
+                });
+
+                llmResponseText = chatCompletion.choices[0]?.message?.content?.trim() || "Sorry, I couldn't generate a response.";
+                console.log(`[${requestStartTime}] LLM response received.`);
+
+            } catch (llmError) {
+                console.error(`[${requestStartTime}] LLM call failed for agent ${payload.agentId}:`, llmError);
+                 return createJsonResponse({ error: 'LLM processing failed', details: llmError.message }, 500);
+            }
+
+            // 5. Return Success Response
+            const successResponse: AgentQueryResponse = {
+                response: llmResponseText,
+                knowledge_used: knowledgeUsedIds
+            };
+            console.log(`[${requestStartTime}] Agent ${payload.agentId} processed query successfully. Knowledge Used: ${knowledgeUsedIds?.length || 0}`);
+            return createJsonResponse(successResponse, 200);
+
+        } catch (processingError) {
+            console.error(`[${requestStartTime}] Error during agent query processing for agent ${payload.agentId}:`, processingError.message);
+            return createJsonResponse({ error: 'Failed to process agent query', details: processingError.message }, 500);
+        }
+    }
+
+    // --- REST API Calls (Require User Authentication) ---
+    // Check for user authentication for all subsequent routes
+    if (!userId) {
+      console.error(`[${requestStartTime}] Auth Error: User authentication required for REST API call.`);
+      return createJsonResponse({ error: 'User authentication required' }, 401);
+    }
+    console.log(`[${requestStartTime}] Authenticated user for REST API: ${userId}`);
+
 
     // --- LIST AGENTS (GET /) ---
-    if (req.method === 'GET' && !agentId) {
-      console.log(`[${requestStartTime}] Routing to: List Agents`);
+    if (req.method === 'GET' && !agentIdFromPath) {
+      console.log(`[${requestStartTime}] Routing to: List Agents (REST)`);
       // 1. Fetch base agent data
       const { data: agentsData, error: fetchAgentsError } = await supabase
         .from('ai_agents')
-        .select('*') // Select all agent fields now that types should be correct
-        .eq('user_id', user.id)
+        .select('*')
+        .eq('user_id', userId) // Use authenticated userId
         .order('created_at', { ascending: false });
 
       if (fetchAgentsError) {
@@ -80,7 +254,7 @@ serve(async (req: Request) => {
       }
 
       if (!agentsData || agentsData.length === 0) {
-        console.log(`[${requestStartTime}] No agents found for user ${user.id}`);
+        console.log(`[${requestStartTime}] No agents found for user ${userId}`);
         return createJsonResponse({ agents: [] }, 200);
       }
 
@@ -92,14 +266,12 @@ serve(async (req: Request) => {
         .in('agent_id', agentIds);
 
       if (fetchIntegrationsError) {
-         // Log the error but proceed, returning agents without integrations if this fails
          console.error(`[${requestStartTime}] List Agents Warning (Integrations):`, fetchIntegrationsError.message);
-         // Return agents without integrations in case of error fetching links
          const agentsWithoutIntegrations = agentsData.map(agent => ({
             ...agent,
-            integration_ids: [], // Default to empty array on error
+            integration_ids: [],
          }));
-         return createJsonResponse({ agents: agentsWithoutIntegrations as any[] }, 200);
+         return createJsonResponse({ agents: agentsWithoutIntegrations as AgentWithIntegrations[] }, 200);
       }
 
       // 3. Map integrations to agents
@@ -115,104 +287,32 @@ serve(async (req: Request) => {
       // 4. Combine data
       const agentsWithIntegrations = agentsData.map(agent => ({
         ...agent,
-        integration_ids: integrationsMap.get(agent.id) || [], // Add integration_ids array
+        integration_ids: integrationsMap.get(agent.id) || [],
       }));
 
-      console.log(`[${requestStartTime}] Found ${agentsWithIntegrations.length} agents with integrations for user ${user.id}`);
-      // Use 'any[]' cast as frontend type expects integration_ids which might not be in backend AIAgent type
-      return createJsonResponse({ agents: agentsWithIntegrations as any[] }, 200);
-    }
-
-    // --- CREATE AGENT (POST /) ---
-    else if (req.method === 'POST' && !agentId) {
-      console.log(`[${requestStartTime}] Routing to: Create Agent`);
-      let payload: NewAgentPayload;
-      try {
-        payload = await req.json();
-      } catch (jsonError) {
-        console.error(`[${requestStartTime}] Create Agent JSON Parse Error:`, jsonError.message);
-        return createJsonResponse({ error: 'Invalid JSON payload', details: jsonError.message }, 400);
-      }
-
-      if (!payload.name || !payload.prompt) {
-         console.warn(`[${requestStartTime}] Create Agent Bad Request: Missing name or prompt`);
-         return createJsonResponse({ error: 'Missing required fields: name and prompt' }, 400);
-      }
-
-      const agentToInsert = {
-        user_id: user.id,
-        name: payload.name,
-        prompt: payload.prompt,
-        keyword_trigger: payload.keyword_trigger || null, // Added
-        knowledge_document_ids: payload.knowledge_document_ids || null,
-      };
-
-      // Perform operations sequentially (no transaction)
-      // 1. Insert the agent
-      const { data: insertedAgent, error: agentInsertError } = await supabase
-        .from('ai_agents')
-        .insert(agentToInsert)
-        .select()
-        .single();
-
-      if (agentInsertError) {
-        console.error(`[${requestStartTime}] Create Agent DB Error (Agent Insert):`, agentInsertError.message);
-        return createJsonResponse({ error: 'Failed to insert agent', details: agentInsertError.message }, 500);
-      }
-      if (!insertedAgent) {
-         console.error(`[${requestStartTime}] Create Agent DB Error: No agent data returned after insert.`);
-         return createJsonResponse({ error: 'Failed to retrieve created agent data' }, 500);
-      }
-
-      // 2. Insert integrations if provided
-      let integrationIds: string[] = [];
-      if (payload.integration_ids && payload.integration_ids.length > 0) {
-        integrationIds = payload.integration_ids;
-        const integrationLinks = integrationIds.map(intId => ({
-          agent_id: insertedAgent.id,
-          integration_id: intId,
-        }));
-
-        const { error: integrationInsertError } = await supabase
-          .from('ai_agent_integrations')
-          .insert(integrationLinks);
-
-        if (integrationInsertError) {
-          // Log error but don't fail the whole request, agent was created
-          console.error(`[${requestStartTime}] Create Agent Warning (Integrations Insert):`, integrationInsertError.message);
-          // Proceed without integrations in the response
-          integrationIds = []; // Reset integrationIds as they failed to insert
-        }
-      }
-
-      // 3. Return the complete agent data (potentially without integrations if insert failed)
-      const newAgentResponse = { ...insertedAgent, integration_ids: integrationIds };
-      console.log(`[${requestStartTime}] Created agent with ID: ${newAgentResponse.id} for user ${user.id}`);
-      // Use 'as any' for response due to added integration_ids
-      return createJsonResponse({ agent: newAgentResponse as any }, 201);
+      console.log(`[${requestStartTime}] Found ${agentsWithIntegrations.length} agents with integrations for user ${userId}`);
+      return createJsonResponse({ agents: agentsWithIntegrations as AgentWithIntegrations[] }, 200);
     }
 
     // --- GET AGENT (GET /:id) ---
-    else if (req.method === 'GET' && agentId) {
-      console.log(`[${requestStartTime}] Routing to: Get Agent (ID: ${agentId})`);
-
+    else if (req.method === 'GET' && agentIdFromPath) {
+      console.log(`[${requestStartTime}] Routing to: Get Agent (REST - ID: ${agentIdFromPath})`);
       // 1. Fetch agent data
       const { data: agentData, error: agentFetchError } = await supabase
         .from('ai_agents')
-        .select('*') // Select all columns now
-        .eq('id', agentId)
-        .eq('user_id', user.id) // RLS also enforces this
+        .select('*')
+        .eq('id', agentIdFromPath)
+        .eq('user_id', userId) // Use authenticated userId
         .single();
 
       if (agentFetchError) {
-        console.error(`[${requestStartTime}] Get Agent Error (Agent Fetch - ID: ${agentId}):`, agentFetchError.message);
+        console.error(`[${requestStartTime}] Get Agent Error (Agent Fetch - ID: ${agentIdFromPath}):`, agentFetchError.message);
         const status = agentFetchError.code === 'PGRST116' ? 404 : 500;
         const message = status === 404 ? 'AI Agent not found or access denied' : 'Failed to fetch AI agent';
         return createJsonResponse({ error: message, details: agentFetchError.message }, status);
       }
       if (!agentData) {
-         // Should be caught by PGRST116, but as fallback
-         console.warn(`[${requestStartTime}] Get Agent (ID: ${agentId}): Agent not found after successful query (unexpected).`);
+         console.warn(`[${requestStartTime}] Get Agent (ID: ${agentIdFromPath}): Agent not found after successful query (unexpected).`);
          return createJsonResponse({ error: 'AI Agent not found' }, 404);
       }
 
@@ -221,11 +321,10 @@ serve(async (req: Request) => {
       const { data: integrationsData, error: integrationsFetchError } = await supabase
         .from('ai_agent_integrations')
         .select('integration_id')
-        .eq('agent_id', agentId);
+        .eq('agent_id', agentIdFromPath);
 
       if (integrationsFetchError) {
-         // Log error but proceed, returning agent without integrations
-         console.error(`[${requestStartTime}] Get Agent Warning (Integrations Fetch - ID: ${agentId}):`, integrationsFetchError.message);
+         console.error(`[${requestStartTime}] Get Agent Warning (Integrations Fetch - ID: ${agentIdFromPath}):`, integrationsFetchError.message);
       } else if (integrationsData) {
          integrationIds = integrationsData.map(link => link.integration_id);
       }
@@ -233,56 +332,56 @@ serve(async (req: Request) => {
       // 3. Combine data
       const agentWithIntegrations = { ...agentData, integration_ids: integrationIds };
 
-      console.log(`[${requestStartTime}] Found agent: ${agentWithIntegrations.name} (ID: ${agentId}) with ${agentWithIntegrations.integration_ids.length} integrations for user ${user.id}`);
-      // Use 'as any' for the response object to avoid potential type conflicts
-      return createJsonResponse({ agent: agentWithIntegrations as any }, 200);
+      console.log(`[${requestStartTime}] Found agent: ${agentWithIntegrations.name} (ID: ${agentIdFromPath}) with ${agentWithIntegrations.integration_ids.length} integrations for user ${userId}`);
+      return createJsonResponse({ agent: agentWithIntegrations as AgentWithIntegrations }, 200);
     }
 
     // --- UPDATE AGENT (PUT /:id or PATCH /:id) ---
-    else if ((req.method === 'PUT' || req.method === 'PATCH') && agentId) {
-      console.log(`[${requestStartTime}] Routing to: Update Agent (ID: ${agentId})`);
+    else if ((req.method === 'PUT' || req.method === 'PATCH') && agentIdFromPath) {
+      console.log(`[${requestStartTime}] Routing to: Update Agent (REST - ID: ${agentIdFromPath})`);
       let payload: UpdateAgentPayload;
        try {
         payload = await req.json();
       } catch (jsonError) {
-        console.error(`[${requestStartTime}] Update Agent JSON Parse Error (ID: ${agentId}):`, jsonError.message);
-        return createJsonResponse({ error: 'Invalid JSON payload', details: jsonError.message }, 400);
+        console.error(`[${requestStartTime}] Update Agent JSON Parse Error (ID: ${agentIdFromPath}):`, jsonError.message);
+        return createJsonResponse({ error: 'Invalid JSON payload for agent update', details: jsonError.message }, 400);
       }
 
       if (Object.keys(payload).length === 0) {
-         console.warn(`[${requestStartTime}] Update Agent Bad Request (ID: ${agentId}): No update fields provided`);
-         return createJsonResponse({ error: 'No update fields provided' }, 400);
+         console.warn(`[${requestStartTime}] Update Agent Bad Request (ID: ${agentIdFromPath}): No update fields provided`);
+         return createJsonResponse({ error: 'No update fields provided for agent update' }, 400);
       }
 
-      const agentToUpdate: Partial<AIAgent> = {};
+      const agentToUpdate: Partial<AIAgent & { is_enabled?: boolean }> = {};
       if (payload.name !== undefined) agentToUpdate.name = payload.name;
       if (payload.prompt !== undefined) agentToUpdate.prompt = payload.prompt;
       if (payload.knowledge_document_ids !== undefined) {
         agentToUpdate.knowledge_document_ids = payload.knowledge_document_ids;
       }
-      if (payload.keyword_trigger !== undefined) { // Added
+      if (payload.keyword_trigger !== undefined) {
         agentToUpdate.keyword_trigger = payload.keyword_trigger;
       }
-      // 'updated_at' is handled by the database trigger for ai_agents
+      if (payload.is_enabled !== undefined) {
+        agentToUpdate.is_enabled = payload.is_enabled;
+      }
 
-      // Perform operations sequentially (no transaction)
       // 1. Update the agent table
       const { data: updatedAgentData, error: agentUpdateError } = await supabase
         .from('ai_agents')
         .update(agentToUpdate)
-        .eq('id', agentId)
-        .eq('user_id', user.id) // RLS also enforces this
+        .eq('id', agentIdFromPath)
+        .eq('user_id', userId) // Use authenticated userId
         .select()
         .single();
 
       if (agentUpdateError) {
-        console.error(`[${requestStartTime}] Update Agent DB Error (Agent Update - ID: ${agentId}):`, agentUpdateError.message);
+        console.error(`[${requestStartTime}] Update Agent DB Error (Agent Update - ID: ${agentIdFromPath}):`, agentUpdateError.message);
         const status = agentUpdateError.code === 'PGRST116' ? 404 : 500;
         const message = status === 404 ? 'AI Agent not found or access denied' : 'Failed to update AI agent';
         return createJsonResponse({ error: message, details: agentUpdateError.message }, status);
       }
       if (!updatedAgentData) {
-         console.warn(`[${requestStartTime}] Update Agent (ID: ${agentId}): Agent not found after successful update (unexpected).`);
+         console.warn(`[${requestStartTime}] Update Agent (ID: ${agentIdFromPath}): Agent not found after successful update (unexpected).`);
          return createJsonResponse({ error: 'AI Agent not found after update attempt' }, 404);
       }
 
@@ -291,94 +390,94 @@ serve(async (req: Request) => {
       let integrationUpdateError: Error | null = null;
 
       if (payload.integration_ids !== undefined) {
-         finalIntegrationIds = payload.integration_ids || []; // Use provided list or empty if null/undefined
+         finalIntegrationIds = payload.integration_ids || [];
 
          // Delete existing integrations for this agent
          const { error: deleteIntegrationsError } = await supabase
            .from('ai_agent_integrations')
            .delete()
-           .eq('agent_id', agentId);
+           .eq('agent_id', agentIdFromPath);
 
          if (deleteIntegrationsError) {
-            console.error(`[${requestStartTime}] Update Agent Warning (Delete Integrations - ID: ${agentId}):`, deleteIntegrationsError.message);
+            console.error(`[${requestStartTime}] Update Agent Warning (Delete Integrations - ID: ${agentIdFromPath}):`, deleteIntegrationsError.message);
             integrationUpdateError = new Error('Failed to clear existing agent integrations');
-            // Continue, but integrations might be inconsistent
          } else if (finalIntegrationIds.length > 0) {
-            // Insert new integrations if the list is not empty and delete was successful
+            // Insert new integrations
             const newIntegrationLinks = finalIntegrationIds.map(intId => ({
-              agent_id: agentId,
+              agent_id: agentIdFromPath,
               integration_id: intId,
+               // TODO: Add activation_mode here if passed from frontend and save it
             }));
             const { error: insertIntegrationsError } = await supabase
               .from('ai_agent_integrations')
               .insert(newIntegrationLinks);
 
             if (insertIntegrationsError) {
-              console.error(`[${requestStartTime}] Update Agent Warning (Insert Integrations - ID: ${agentId}):`, insertIntegrationsError.message);
+              console.error(`[${requestStartTime}] Update Agent Warning (Insert Integrations - ID: ${agentIdFromPath}):`, insertIntegrationsError.message);
               integrationUpdateError = new Error('Failed to insert new agent integrations');
-              // Continue, but integrations might be inconsistent
             } else {
-               console.log(`[${requestStartTime}] Updated integrations for agent (ID: ${agentId}) to: [${finalIntegrationIds.join(', ')}]`);
+               console.log(`[${requestStartTime}] Updated integrations for agent (ID: ${agentIdFromPath}) to: [${finalIntegrationIds.join(', ')}]`);
             }
          }
       } else {
-         // If integration_ids was *not* in the payload, fetch existing ones to return the current state
+         // If integration_ids was *not* in the payload, fetch existing ones
           const { data: currentIntegrations, error: fetchCurrentIntegrationsError } = await supabase
             .from('ai_agent_integrations')
             .select('integration_id')
-            .eq('agent_id', agentId);
+            .eq('agent_id', agentIdFromPath);
 
           if (fetchCurrentIntegrationsError) {
-             console.error(`[${requestStartTime}] Update Agent Warning (Fetch Current Integrations - ID: ${agentId}):`, fetchCurrentIntegrationsError.message);
+             console.error(`[${requestStartTime}] Update Agent Warning (Fetch Current Integrations - ID: ${agentIdFromPath}):`, fetchCurrentIntegrationsError.message);
              integrationUpdateError = new Error('Failed to fetch current integrations after update');
-             // Continue, but integrations might be missing from response
           } else {
              finalIntegrationIds = currentIntegrations ? currentIntegrations.map(link => link.integration_id) : [];
           }
       }
 
-      // 3. Return combined data (even if integration update had issues)
+      // 3. Return combined data
       const finalAgentResponse = { ...updatedAgentData, integration_ids: finalIntegrationIds };
-      console.log(`[${requestStartTime}] Updated agent: ${finalAgentResponse.name} (ID: ${agentId}) for user ${user.id}`);
+      console.log(`[${requestStartTime}] Updated agent: ${finalAgentResponse.name} (ID: ${agentIdFromPath}) for user ${userId}`);
       if (integrationUpdateError) {
-         console.warn(`[${requestStartTime}] Update Agent completed with integration errors for agent ID ${agentId}: ${integrationUpdateError.message}`);
+         console.warn(`[${requestStartTime}] Update Agent completed with integration errors for agent ID ${agentIdFromPath}: ${integrationUpdateError.message}`);
       }
-      // Use 'as any' for response due to added integration_ids
-      return createJsonResponse({ agent: finalAgentResponse as any }, 200);
+      return createJsonResponse({ agent: finalAgentResponse as AgentWithIntegrations }, 200);
     }
 
     // --- DELETE AGENT (DELETE /:id) ---
-    else if (req.method === 'DELETE' && agentId) {
-      console.log(`[${requestStartTime}] Routing to: Delete Agent (ID: ${agentId})`);
+    else if (req.method === 'DELETE' && agentIdFromPath) {
+      console.log(`[${requestStartTime}] Routing to: Delete Agent (REST - ID: ${agentIdFromPath})`);
+       // Ensure userId is available for REST API calls
+       if (!userId) {
+         console.error(`[${requestStartTime}] Auth Error: userId is null for DELETE call.`);
+         return createJsonResponse({ error: 'User authentication required for this operation' }, 401);
+       }
       const { error: deleteError } = await supabase
         .from('ai_agents')
         .delete()
-        .eq('id', agentId)
-        .eq('user_id', user.id); // RLS also enforces this
+        .eq('id', agentIdFromPath)
+        .eq('user_id', userId);
 
       if (deleteError) {
-        console.error(`[${requestStartTime}] Delete Agent DB Error (ID: ${agentId}):`, deleteError.message);
-        // Note: PGRST116 (Not Found) is often NOT treated as an error for DELETE,
-        // as the desired state (resource doesn't exist) is achieved.
-        // We return 204 even if it didn't exist. Only return 500 for other errors.
+        console.error(`[${requestStartTime}] Delete Agent DB Error (ID: ${agentIdFromPath}):`, deleteError.message);
         if (deleteError.code !== 'PGRST116') {
            return createJsonResponse({ error: 'Failed to delete AI agent', details: deleteError.message }, 500);
         }
-         console.warn(`[${requestStartTime}] Delete Agent (ID: ${agentId}): Agent not found (PGRST116), proceeding with 204.`);
+         console.warn(`[${requestStartTime}] Delete Agent (ID: ${agentIdFromPath}): Agent not found (PGRST116), proceeding with 204.`);
       }
 
-      console.log(`[${requestStartTime}] Deleted agent (ID: ${agentId}) or agent did not exist for user ${user.id}.`);
-      return createJsonResponse(null, 204); // 204 No Content
+      console.log(`[${requestStartTime}] Deleted agent (ID: ${agentIdFromPath}) or agent did not exist for user ${userId}.`);
+      return createJsonResponse(null, 204);
     }
 
     // --- METHOD/ROUTE NOT ALLOWED ---
+    // This handles cases like POST /:id or other invalid combinations
     else {
-      console.warn(`[${requestStartTime}] Method Not Allowed: ${req.method} for path with agentId=${agentId}`);
-      return createJsonResponse({ error: 'Method Not Allowed for this route combination' }, 405);
+      console.warn(`[${requestStartTime}] Method Not Allowed: ${req.method} for path with agentId=${agentIdFromPath}`);
+      return createJsonResponse({ error: 'Method Not Allowed or Invalid Route' }, 405);
     }
 
   } catch (error) {
-    // Catch unexpected errors (e.g., issues within shared modules)
+    // Catch unexpected errors
     console.error(`[${requestStartTime}] Unhandled Top-Level Error:`, error.message, error.stack);
     return createJsonResponse({ error: 'Internal server error', details: error.message }, 500);
   } finally {
