@@ -8,8 +8,13 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { List } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { Database } from '@/types/supabase';
+import { Badge } from '@/components/ui/badge'; // Import Badge for status
 
-type SessionRow = Database['public']['Tables']['ai_agent_sessions']['Row'] & {
+// Define the possible statuses based on the ENUM type in the database
+type SessionStatus = 'active' | 'closed' | 'error';
+
+type SessionRow = Omit<Database['public']['Tables']['ai_agent_sessions']['Row'], 'status'> & { // Omit the original status type if it exists
+  status: SessionStatus; // Use the defined SessionStatus type
   ai_agents: { name: string | null } | null; // Include joined agent name
 };
 
@@ -19,16 +24,19 @@ interface SessionListPanelProps {
 }
 
 const fetchRecentSessions = async (): Promise<SessionRow[]> => {
-  // @ts-expect-error - Bypassing persistent "No overload matches" error
+  // @ts-expect-error - Keep this to bypass potential type mismatch until types are regenerated
   const { data, error } = await supabase
-    .from('ai_agent_sessions')
+    .from('ai_agent_sessions') // This line might error if types are outdated
     .select(`
       id,
       contact_identifier,
       last_interaction_timestamp,
       created_at,
+      status, 
       ai_agents ( name )
     `)
+    // Optional: Prioritize active sessions, then by time
+    .order('status', { ascending: true }) // 'active' comes first alphabetically
     .order('last_interaction_timestamp', { ascending: false, nullsFirst: false })
     .limit(50); // Limit to recent 50 sessions for performance
 
@@ -36,7 +44,7 @@ const fetchRecentSessions = async (): Promise<SessionRow[]> => {
     console.error("Error fetching recent sessions:", error);
     throw new Error(error.message || 'Failed to fetch sessions.');
   }
-  // Explicitly cast the result to match the Promise return type
+  // Explicitly cast the result to match the Promise return type - This might still be needed if types are incorrect
   return (data || []) as SessionRow[];
 };
 
@@ -77,11 +85,20 @@ const SessionListPanel: React.FC<SessionListPanelProps> = ({
                     selectedSessionId === session.id ? 'bg-muted ring-2 ring-primary' : 'bg-card'
                   )}
                 >
-                  <div>
-                    <p className="font-medium text-sm truncate">
-                      {session.contact_identifier || 'Unknown Contact'}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
+                  <div className="flex-grow overflow-hidden">
+                    <div className="flex items-center space-x-2">
+                       {/* Status Indicator Dot */}
+                       <span className={cn(
+                         "inline-block h-2 w-2 rounded-full",
+                         session.status === 'active' ? 'bg-green-500' :
+                         session.status === 'closed' ? 'bg-gray-400' :
+                         session.status === 'error' ? 'bg-red-500' : 'bg-gray-300' // Fallback
+                       )} title={`Status: ${session.status}`}></span>
+                       <p className="font-medium text-sm truncate">
+                         {session.contact_identifier || 'Unknown Contact'}
+                       </p>
+                    </div>
+                    <p className="text-xs text-muted-foreground pl-4"> {/* Indent agent name */}
                       Agent: {session.ai_agents?.name || 'N/A'}
                     </p>
                   </div>

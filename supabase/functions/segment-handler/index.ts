@@ -1,6 +1,6 @@
-import { serve } from 'https://deno.land/std@0.190.0/http/server.ts'; // Using consistent version
-import { SupabaseClient, PostgrestError } from "https://esm.sh/@supabase/supabase-js@2.43.4";
-import { parse as parseCsv } from "https://deno.land/x/csv@v0.9.2/mod.ts";
+import { serve } from 'std/http/server.ts'; // Using import map alias (std@0.177.0)
+import { SupabaseClient, PostgrestError } from "supabase"; // Using import map alias
+import * as csv from "csv"; // Import entire module namespace (csv@v0.9.2)
 
 import { corsHeaders } from "../_shared/cors.ts";
 import { createSupabaseClient, getAuthenticatedUser } from "../_shared/supabaseClient.ts";
@@ -50,6 +50,11 @@ interface CreateSegmentFromContactsRequestPayload {
   userId: string; // Required when using Service Role client
 }
 
+// For Bulk Add Contacts
+interface BulkAddContactsRequestPayload {
+  contactIds: string[];
+}
+
 // --- Helper Functions ---
 
 function createJsonResponse(body: unknown, status: number = 200) {
@@ -68,11 +73,19 @@ function validateListSegmentsRequest(req: Request): void {
   if (req.method !== "GET") throw new Error("Method Not Allowed");
 }
 async function listSegmentsDb(supabase: SupabaseClient<Database>, userId: string): Promise<{ data: SegmentInfo[] | null; error: PostgrestError | null }> {
+  console.log(`[listSegmentsDb] Fetching segments for user: ${userId}`); // Add entry log
   const { data, error } = await supabase
     .from("segments")
     .select("id, name, created_at")
     .eq("user_id", userId)
     .order("created_at", { ascending: false });
+
+  if (error) {
+    console.error(`[listSegmentsDb] DB Error for user ${userId}:`, JSON.stringify(error)); // Log the specific DB error
+  } else {
+    console.log(`[listSegmentsDb] Successfully fetched ${data?.length ?? 0} segments for user ${userId}.`); // Log success
+  }
+
   return { data, error };
 }
 
@@ -171,6 +184,26 @@ async function removeContactFromSegmentDb(supabase: SupabaseClient<Database>, se
   return { error };
 }
 
+// --- Bulk Add Contacts to Segment Utils ---
+async function parseBulkAddContactsRequest(req: Request, pathSegments: string[]): Promise<{ segmentId: string; contactIds: string[] }> {
+  if (req.method !== "POST") throw new Error("Method Not Allowed");
+  // Assumes path like /segments/{segmentId}/contacts/bulk
+  const segmentId = pathSegments[pathSegments.length - 3]; // segmentId is third from last
+  if (!segmentId) throw new Error("Segment ID is required in the URL path (e.g., /segments/{segId}/contacts/bulk)");
+
+  let body: Partial<BulkAddContactsRequestPayload>;
+  try { body = await req.json(); } catch (e) { throw new Error("Invalid JSON body"); }
+
+  const { contactIds } = body;
+  if (!Array.isArray(contactIds)) throw new Error("contactIds must be provided as an array in the request body.");
+  // Optional: Add validation that IDs are strings, non-empty array etc.
+  if (contactIds.length === 0) throw new Error("contactIds array cannot be empty.");
+
+  return { segmentId, contactIds };
+}
+// Uses addContactsToSegmentDb (defined above)
+
+
 // --- Create Segment From Contacts Utils ---
 async function parseCreateSegmentFromContactsRequest(req: Request): Promise<CreateSegmentFromContactsRequestPayload> {
   if (req.method !== "POST") throw new Error("Method Not Allowed");
@@ -210,8 +243,9 @@ async function parseCsvUtil(csvString: string, columnMapping?: { [key: string]: 
     let parsedData: CsvRow[];
     let headers: string[];
     try {
-        const result = await parseCsv(csvString, { skipFirstRow: true });
-        const rawHeaders = await parseCsv(csvString, { skipFirstRow: false, parse: (input) => input });
+        const result = await csv.parse(csvString, { skipFirstRow: true }); // Use csv.parse
+        // Removed the potentially problematic 'parse' option here
+        const rawHeaders = await csv.parse(csvString, { skipFirstRow: false }); // Use csv.parse
         if (!rawHeaders || rawHeaders.length === 0) throw new Error("CSV is empty or header row is missing.");
         headers = (rawHeaders[0] as string[]).map(h => h.trim().toLowerCase());
         const phoneHeader = headers.find(h => h === EXPECTED_PHONE_HEADER || (columnMapping && columnMapping[h] === EXPECTED_PHONE_HEADER));
@@ -295,11 +329,13 @@ serve(async (req: Request) => {
       if (routeSegments.length === 1) {
         // GET /segments -> List Segments
         if (req.method === 'GET') {
-          console.log(`[${requestStartTime}] Routing to: List Segments`);
+          console.log(`[${requestStartTime}] Routing to: List Segments for user ${user.id}`); // Log user ID
         validateListSegmentsRequest(req); // Basic method check
+        console.log(`[${requestStartTime}] Calling listSegmentsDb...`); // Log before call
         const { data, error } = await listSegmentsDb(supabaseClient, user.id);
+        console.log(`[${requestStartTime}] listSegmentsDb returned. Error: ${!!error}`); // Log after call
         if (error) {
-          console.error(`[${requestStartTime}] List Segments DB Error:`, error.message);
+          console.error(`[${requestStartTime}] List Segments DB Error caught in handler:`, error.message); // Log error in handler
           return createJsonResponse({ error: error.message || "Failed to list segments" }, 500);
         }
           return createJsonResponse(data ?? [], 200);
@@ -412,15 +448,25 @@ serve(async (req: Request) => {
         // GET /segments/{segmentId}/contacts -> List Segment Contacts
         if (req.method === 'GET') {
           console.log(`[${requestStartTime}] Routing to: List Segment Contacts`);
-        const { segmentId } = parseListSegmentContactsRequest(req, routeSegments);
-        const { data: rawData, error } = await listSegmentContactsDb(supabaseClient, segmentId);
-        if (error) {
-          console.error(`[${requestStartTime}] List Segment Contacts DB Error (ID: ${segmentId}):`, error.message);
-          const status = error.code === 'PGRST116' ? 404 : 500;
+          const { segmentId } = parseListSegmentContactsRequest(req, routeSegments);
+          console.log(`[${requestStartTime}] Fetching contacts for segment ID: ${segmentId}`); // Added log
+          const { data: rawData, error } = await listSegmentContactsDb(supabaseClient, segmentId);
+
+          // --- BEGIN ADDED LOGGING ---
+          console.log(`[${requestStartTime}] Raw data from listSegmentContactsDb for segment ${segmentId}:`, JSON.stringify(rawData, null, 2));
+          if (rawData && rawData.length > 0) {
+            console.log(`[${requestStartTime}] First raw item's customers object:`, JSON.stringify(rawData[0].customers, null, 2));
+          }
+          // --- END ADDED LOGGING ---
+
+          if (error) {
+            console.error(`[${requestStartTime}] List Segment Contacts DB Error (ID: ${segmentId}):`, error.message);
+            const status = error.code === 'PGRST116' ? 404 : 500;
           const message = status === 404 ? "Segment not found or access denied" : "Failed to list segment contacts";
           return createJsonResponse({ error: message }, status);
         }
         const contacts = formatListSegmentContactsResponse(rawData);
+        console.log(`[${requestStartTime}] Formatted contacts for segment ${segmentId}:`, JSON.stringify(contacts, null, 2)); // Added log for formatted output
           return createJsonResponse(contacts, 200);
         }
         // POST /segments/{segmentId}/contacts -> Add Contact to Segment
@@ -436,9 +482,28 @@ serve(async (req: Request) => {
         }
       } // End /segments/{segId}/contacts (length 3)
 
+      // Path: /segments/{segmentId}/contacts/bulk
+      else if (routeSegments.length === 4 && routeSegments[2] === 'contacts' && routeSegments[3] === 'bulk') {
+          // POST /segments/{segmentId}/contacts/bulk -> Bulk add contacts to segment
+          if (req.method === 'POST') {
+              console.log(`[${requestStartTime}] Routing to: Bulk Add Contacts to Segment`);
+              const { segmentId, contactIds } = await parseBulkAddContactsRequest(req, routeSegments);
+              const { error } = await addContactsToSegmentDb(supabaseClient, segmentId, contactIds); // Reuse existing DB function
+              if (error) {
+                  console.error(`[${requestStartTime}] Bulk Add Contacts DB Error (SegID: ${segmentId}):`, error.message);
+                  // Determine status based on error code (e.g., 404 if segment not found)
+                  const status = error.code === '23503' ? 404 : 500;
+                  const message = status === 404 ? "Segment not found or some contacts invalid" : "Failed to bulk add contacts to segment";
+                  return createJsonResponse({ error: message }, status);
+              }
+              return createJsonResponse({ message: `Successfully added ${contactIds.length} contacts to segment ${segmentId}` }, 200); // 200 OK for bulk operation
+          }
+      } // End /segments/{segId}/contacts/bulk (length 4)
+
       // Path: /segments/{segmentId}/contacts/{contactId}
       else if (routeSegments.length === 4 && routeSegments[2] === 'contacts') {
           // DELETE /segments/{segmentId}/contacts/{contactId} -> Remove contact from segment
+          // Note: This check now correctly comes *after* the more specific '/bulk' check.
           if (req.method === 'DELETE') {
               console.log(`[${requestStartTime}] Routing to: Remove Contact from Segment`);
             const { segmentId, contactId } = parseRemoveContactRequest(req, routeSegments);
@@ -452,6 +517,7 @@ serve(async (req: Request) => {
               return createJsonResponse(null, 204);
           }
       } // End /segments/{segId}/contacts/{contactId} (length 4)
+
 
     } // End base path /segments
 

@@ -29,7 +29,10 @@ export const LoginForm = () => {
   }, [navigate]);
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center bg-gradient-to-br from-[#1C2434] to-background">
+    <div 
+      className="min-h-screen flex flex-col items-center justify-center bg-cover bg-center"
+      style={{ backgroundImage: `url('https://vezdxxqzzcjkunoaxcxc.supabase.co/storage/v1/object/sign/fartech/Chatalyst_BG.png?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1cmwiOiJmYXJ0ZWNoL0NoYXRhbHlzdF9CRy5wbmciLCJpYXQiOjE3NDU4MTk2NDIsImV4cCI6NDg2Nzg4MzY0Mn0.czUQsVuBqH4Ge7-ME48fiL1TBdC_racgRHDcE2zmd5k')` }}
+    >
       <div className="w-full max-w-md px-8 py-12 rounded-xl bg-card/90 backdrop-blur-sm shadow-2xl animate-enter">
         <div className="flex flex-col items-center mb-8 space-y-4">
           <div className="w-12 h-12 rounded-xl bg-primary flex items-center justify-center animate-logo-spin">

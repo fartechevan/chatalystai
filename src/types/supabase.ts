@@ -131,6 +131,7 @@ export type Database = {
           integration_id: string | null
           is_active: boolean | null
           last_interaction_timestamp: string | null
+          status: Database["public"]["Enums"]["ai_session_status"]
           updated_at: string | null
         }
         Insert: {
@@ -142,6 +143,7 @@ export type Database = {
           integration_id?: string | null
           is_active?: boolean | null
           last_interaction_timestamp?: string | null
+          status?: Database["public"]["Enums"]["ai_session_status"]
           updated_at?: string | null
         }
         Update: {
@@ -153,6 +155,7 @@ export type Database = {
           integration_id?: string | null
           is_active?: boolean | null
           last_interaction_timestamp?: string | null
+          status?: Database["public"]["Enums"]["ai_session_status"]
           updated_at?: string | null
         }
         Relationships: [
@@ -780,6 +783,7 @@ export type Database = {
           is_read: boolean
           message_id: string
           sender_participant_id: string
+          wamid: string | null
         }
         Insert: {
           content: string
@@ -788,6 +792,7 @@ export type Database = {
           is_read?: boolean
           message_id?: string
           sender_participant_id: string
+          wamid?: string | null
         }
         Update: {
           content?: string
@@ -796,6 +801,7 @@ export type Database = {
           is_read?: boolean
           message_id?: string
           sender_participant_id?: string
+          wamid?: string | null
         }
         Relationships: [
           {
@@ -1333,6 +1339,7 @@ export type Database = {
       }
     }
     Enums: {
+      ai_session_status: "active" | "closed" | "error"
       app_role: "admin" | "user" | "customer"
       integration_status: "available" | "coming_soon"
       new_app_role: "user" | "admin"
@@ -1457,6 +1464,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      ai_session_status: ["active", "closed", "error"],
       app_role: ["admin", "user", "customer"],
       integration_status: ["available", "coming_soon"],
       new_app_role: ["user", "admin"],
