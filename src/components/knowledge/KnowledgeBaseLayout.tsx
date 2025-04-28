@@ -62,7 +62,8 @@ export function KnowledgeBaseLayout() {
       description: "Your document has been created. Now you can add chunks to it.",
     });
 
-    navigate(`/dashboard/knowledge/document/${documentId}/edit`);
+    // Select the newly created document instead of navigating away
+    handleSelectDocument(documentId); 
   };
 
   // Ensure this handler explicitly sets showImportForm to true

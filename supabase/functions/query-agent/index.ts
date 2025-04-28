@@ -1,11 +1,12 @@
 // Follow https://supabase.com/docs/guides/functions/quickstart#create-a-function
 
-import { serve } from "https://deno.land/std@0.190.0/http/server.ts"; // Revert to full URL
+// Use imports based on import_map.json
+import { serve } from "std/http/server.ts"; // Using alias from import_map.json
 import { corsHeaders } from "../_shared/cors.ts";
 import { createSupabaseServiceRoleClient } from "../_shared/supabaseClient.ts";
 import { openai, generateEmbedding } from "../_shared/openaiUtils.ts";
-// Revert to specific type import via URL
-import type { ChatCompletionMessageParam } from "https://esm.sh/openai@4.52.7/resources/chat/completions";
+// Import type using the alias defined in import_map.json
+import type { ChatCompletionMessageParam } from "openai/resources/chat/completions";
 
 const MATCH_THRESHOLD = 0.70; // Lowered similarity threshold
 const MATCH_COUNT = 5;       // Max number of chunks to retrieve
@@ -42,11 +43,14 @@ serve(async (req) => {
     // 2. Create Supabase client
     const supabaseClient = createSupabaseServiceRoleClient();
 
-    // 3. Fetch Agent Details
-    console.log(`Fetching details for agent ${agentId}...`);
+    // 3. Fetch Agent Details and associated Knowledge Document IDs
+    console.log(`Fetching details and linked documents for agent ${agentId}...`);
     const { data: agentData, error: agentError } = await supabaseClient
       .from('ai_agents')
-      .select('prompt, knowledge_document_ids')
+      .select(`
+        prompt,
+        ai_agent_knowledge_documents ( document_id )
+      `)
       .eq('id', agentId)
       .single();
 
@@ -54,7 +58,12 @@ serve(async (req) => {
       console.error("Error fetching agent details:", agentError);
       throw new Error(`Agent with ID ${agentId} not found or error fetching details.`);
     }
-    const { prompt: systemPrompt, knowledge_document_ids: documentIds } = agentData;
+
+    // Extract prompt and document IDs
+    const systemPrompt = agentData.prompt;
+    // Supabase returns related data as an array of objects, map to get just the IDs
+    const documentIds = agentData.ai_agent_knowledge_documents.map((link: { document_id: string }) => link.document_id);
+
     console.log(`Agent prompt length: ${systemPrompt?.length || 0}, Document IDs: ${documentIds?.join(', ') || 'None'}`);
 
     // 4. Generate query embedding
@@ -68,13 +77,13 @@ serve(async (req) => {
     // 5. Find relevant knowledge chunks (only if document IDs are linked)
     let contextText = "";
     if (documentIds && documentIds.length > 0) {
-      // console.log("Matching chunks for document IDs:", documentIds); // Temporarily remove logging for filter
-      // Call simplified RPC function (without document_ids_filter)
+      console.log("Matching chunks for document IDs:", documentIds);
+      // Call RPC function with the document_ids filter
       const { data: chunks, error: matchError } = await supabaseClient.rpc('match_chunks', {
-        match_count: MATCH_COUNT,         // int
-        match_threshold: MATCH_THRESHOLD, // float
-        query_embedding: queryEmbedding   // vector(1536)
-        // Removed document_ids_filter
+        match_count: MATCH_COUNT,           // int
+        match_threshold: MATCH_THRESHOLD,   // float
+        query_embedding: queryEmbedding,    // vector(1536)
+        filter_document_ids: documentIds    // uuid[] - Pass the fetched document IDs
       });
 
       if (matchError) {

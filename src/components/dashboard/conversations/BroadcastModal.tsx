@@ -145,8 +145,8 @@ export function BroadcastModal({
       const fetchSegments = async () => {
         setIsLoadingSegments(true);
         try {
-          // Explicitly use GET method for list-segments
-          const { data, error } = await supabase.functions.invoke('list-segments', { method: 'GET' });
+          // Explicitly use GET method for segment-handler
+          const { data, error } = await supabase.functions.invoke('segment-handler', { method: 'GET' });
           if (error) throw error;
           setAvailableSegments((data as Segment[]) || []);
           // Reset segment selection if list is empty or changes

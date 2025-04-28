@@ -19,7 +19,8 @@ interface AgentIntegrationSettings {
 
 interface AgentSession {
   id: string;
-  is_active: boolean;
+  // is_active: boolean; // Replaced by status
+  status: 'active' | 'closed' | 'error'; // Use the new status enum
   last_interaction_timestamp: string;
   conversation_history: unknown; // Use unknown instead of any
 }
@@ -238,7 +239,8 @@ export async function handleMessageEvent(supabaseClient: SupabaseClient, data: W
         console.log(`[MessageHandler] Fetching session for contact: ${remoteJid}, agent: ${agentId}, integration: ${hardcodedIntegrationId}`);
         const { data: session, error: sessionFetchError } = await supabaseClient // Use const
           .from('ai_agent_sessions')
-          .select('id, is_active, last_interaction_timestamp, conversation_history')
+          // Select the new 'status' column instead of 'is_active'
+          .select('id, status, last_interaction_timestamp, conversation_history')
           .eq('contact_identifier', remoteJid)
           .eq('agent_id', agentId)
           .eq('integration_id', hardcodedIntegrationId)
@@ -247,11 +249,15 @@ export async function handleMessageEvent(supabaseClient: SupabaseClient, data: W
         if (sessionFetchError) throw new Error(`Error fetching agent session: ${sessionFetchError.message}`);
 
         let sessionId: string | null = session?.id || null;
-        let isActive = session?.is_active || false;
+        // Get current status from the fetched session, default to 'closed' if no session
+        const currentStatus: 'active' | 'closed' | 'error' = session?.status || 'closed';
         const lastInteraction = session?.last_interaction_timestamp ? new Date(session.last_interaction_timestamp) : null;
         const now = new Date();
 
-        console.log(`[MessageHandler] Current session state: ID=${sessionId}, Active=${isActive}, LastInteraction=${lastInteraction}`);
+        // Use a variable to track the intended status after processing this message
+        let nextStatus = currentStatus;
+
+        console.log(`[MessageHandler] Current session state: ID=${sessionId}, Status=${currentStatus}, LastInteraction=${lastInteraction}`);
 
         // 3. Log Incoming User Message to agent_conversations
         // Do this early, regardless of whether the AI responds
@@ -272,73 +278,74 @@ export async function handleMessageEvent(supabaseClient: SupabaseClient, data: W
 
         // 4. Session State Logic
         let shouldAiRespond = false;
-        let sessionNeedsUpdate = false;
-        let newSessionData: Partial<AgentSession> & { contact_identifier: string; agent_id: string; integration_id: string } | null = null;
+        let sessionNeedsUpdate = false; // Flag to indicate if DB needs update
 
-        // Check for timeout first
-        if (isActive && lastInteraction && agentSettings.session_timeout_minutes > 0) {
+        // Check for timeout first if currently active
+        if (currentStatus === 'active' && lastInteraction && agentSettings.session_timeout_minutes > 0) {
           const timeoutMillis = agentSettings.session_timeout_minutes * 60 * 1000;
           if (now.getTime() - lastInteraction.getTime() > timeoutMillis) {
             console.log(`[MessageHandler] Session ${sessionId} timed out.`);
-            isActive = false;
-            sessionNeedsUpdate = true;
+            nextStatus = 'closed'; // Set intended status to closed
           }
         }
 
-        // Check for stop keywords if active
-        if (isActive && agentSettings.stop_keywords?.some(kw => messageText.toLowerCase() === kw.toLowerCase())) {
-          console.log(`[MessageHandler] Stop keyword detected in message. Deactivating session ${sessionId}.`);
-          isActive = false;
-          sessionNeedsUpdate = true;
+        // Check for stop keywords if currently active
+        if (nextStatus === 'active' && agentSettings.stop_keywords?.some(kw => messageText.toLowerCase() === kw.toLowerCase())) {
+          console.log(`[MessageHandler] Stop keyword detected in message. Closing session ${sessionId}.`);
+          nextStatus = 'closed'; // Set intended status to closed
           // Optionally send a confirmation message here via Evolution API
-        } else if (isActive) {
+        } else if (nextStatus === 'active') {
           // Session is active and not stopped/timed out
           console.log(`[MessageHandler] Session ${sessionId} is active. AI should respond.`);
           shouldAiRespond = true;
-          sessionNeedsUpdate = true; // Need to update last_interaction_timestamp
-        } else {
+          // No status change, but timestamp needs update
+        } else if (nextStatus === 'closed' || nextStatus === 'error') {
           // Session is inactive, check for activation
           if (agentSettings.activation_mode === 'always_on') {
             console.log(`[MessageHandler] Activation mode is 'always_on'. Activating session.`);
-            isActive = true;
+            nextStatus = 'active'; // Set intended status to active
             shouldAiRespond = true;
-            sessionNeedsUpdate = true;
           } else if (agentSettings.activation_mode === 'keyword' && triggerKeyword && messageText.toLowerCase().startsWith(triggerKeyword.toLowerCase())) {
             console.log(`[MessageHandler] Trigger keyword "${triggerKeyword}" matched. Activating session.`);
-            isActive = true;
+            nextStatus = 'active'; // Set intended status to active
             shouldAiRespond = true;
-            sessionNeedsUpdate = true;
           } else {
              console.log(`[MessageHandler] Session inactive and no activation condition met.`);
           }
         }
 
+        // Determine if DB update is needed
+        // Update if status changed OR if it's active (to update timestamp)
+        sessionNeedsUpdate = (nextStatus !== currentStatus) || (nextStatus === 'active');
+
         // 5. Update or Create Session in DB if needed
         if (sessionNeedsUpdate) {
-          const updatePayload = {
-            is_active: isActive,
+          const sessionPayload = {
+            status: nextStatus, // Use the determined next status
             last_interaction_timestamp: now.toISOString(),
             // TODO: Add conversation_history update logic if needed
           };
 
           if (sessionId) {
-            console.log(`[MessageHandler] Updating session ${sessionId}:`, updatePayload);
+            // Update existing session
+            console.log(`[MessageHandler] Updating session ${sessionId}:`, sessionPayload);
             const { error: updateError } = await supabaseClient
               .from('ai_agent_sessions')
-              .update(updatePayload)
+              .update(sessionPayload)
               .eq('id', sessionId);
             if (updateError) throw new Error(`Error updating session: ${updateError.message}`);
-          } else if (isActive) { // Create session only if activating
-             newSessionData = {
-               ...updatePayload,
+          } else if (nextStatus === 'active') {
+            // Create new session only if it's being activated
+            const createPayload = {
+               ...sessionPayload, // Includes status: 'active' and timestamp
                contact_identifier: remoteJid,
                agent_id: agentId,
                integration_id: hardcodedIntegrationId,
              };
-             console.log(`[MessageHandler] Creating new session:`, newSessionData);
+             console.log(`[MessageHandler] Creating new session:`, createPayload);
              const { data: newSession, error: createError } = await supabaseClient
                .from('ai_agent_sessions')
-               .insert(newSessionData)
+               .insert(createPayload)
                .select('id')
                .single();
              if (createError) throw new Error(`Error creating session: ${createError.message}`);

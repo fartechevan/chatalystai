@@ -29,14 +29,10 @@ export function SettingsSidebar({
   onCollapse, // Added prop
 }: SettingsSidebarProps) {
   const sidebarItems = [
-    { id: "account", label: "Account", icon: Settings },
     { id: "billing", label: "Billing", icon: CreditCard },
     { id: "users", label: "Users", icon: Users },
     { id: "access", label: "Access Control", icon: Shield },
     { id: "integrations", label: "Integrations", icon: MessageCircle },
-    { id: "store", label: "Store", icon: ShoppingBag },
-    { id: "webhooks", label: "Webhooks", icon: Webhook },
-    { id: "subscriptions", label: "Subscriptions", icon: CircleDollarSign },
   ];
 
   return (
