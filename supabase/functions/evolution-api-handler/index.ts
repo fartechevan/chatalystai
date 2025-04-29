@@ -125,7 +125,7 @@ serve(async (req) => {
 
     // Action: Send Text Message via Evolution API
     else if (action === 'send-text') {
-      console.log('Action: send-text');
+      console.log('Action: send-text - Entering block.'); // <-- ADDED LOG
       // Expect instanceId (DB ID) in the request body to fetch credentials
       const { instanceId, number, text } = body as { instanceId?: string; number?: string; text?: string };
 
@@ -136,6 +136,7 @@ serve(async (req) => {
         });
       }
 
+      console.log(`Action: send-text - Attempting to fetch credentials for instanceId: ${instanceId}`); // <-- ADDED LOG
       // Fetch credentials and display name by joining integrations and integrations_config
       const { data: instanceData, error: instanceError } = await supabaseClient
         .from('integrations')
@@ -155,7 +156,7 @@ serve(async (req) => {
 
       if (instanceError || !instanceData || !apiKey || !baseUrl || !instanceNameForApi) {
          const errorMsg = instanceError?.message || "Instance not found or missing required fields (instance_display_name from config, api_key, base_url).";
-         console.error(`Failed to get instance data/credentials for ID ${instanceId}: ${errorMsg}`);
+         console.error(`Action: send-text - Failed to get instance data/credentials for ID ${instanceId}: ${errorMsg}`); // <-- Enhanced Log
          return new Response(JSON.stringify({ error: `Failed to get instance details: ${errorMsg}` }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           status: instanceError?.code === 'PGRST116' ? 404 : 500 // Use 404 if not found
@@ -169,6 +170,7 @@ serve(async (req) => {
 
       // --- Actual Evolution API Call ---
       const evolutionApiUrl = `${baseUrl}/message/sendText/${instanceNameForApi}`; // Use the correct name here
+      console.log(`Action: send-text - Preparing to call Evolution API: ${evolutionApiUrl}`); // <-- ADDED LOG
       try {
         const response = await fetch(evolutionApiUrl, {
           method: 'POST',
@@ -214,8 +216,14 @@ serve(async (req) => {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200
         });
       } catch (apiError) {
-        console.error(`Evolution API call failed for send-text (Name: "${instanceNameForApi}", ID: ${instanceId}):`, apiError);
-        return new Response(JSON.stringify({ error: `Evolution API call failed: ${apiError.message}` }), {
+        // Ensure the caught error object is logged thoroughly
+        console.error(`Action: send-text - Evolution API call failed (Name: "${instanceNameForApi}", ID: ${instanceId}). Error:`, apiError); // <-- Enhanced Log
+        // Log the error message specifically if it's an Error instance
+        if (apiError instanceof Error) {
+            console.error(`Action: send-text - API Error Message: ${apiError.message}`);
+            console.error(`Action: send-text - API Error Stack: ${apiError.stack}`);
+        }
+        return new Response(JSON.stringify({ error: `Evolution API call failed: ${apiError instanceof Error ? apiError.message : String(apiError)}` }), { // Ensure message is string
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 502 // Bad Gateway indicates upstream issue
         });
       }
