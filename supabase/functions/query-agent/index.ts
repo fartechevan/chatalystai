@@ -1,11 +1,13 @@
 // Follow https://supabase.com/docs/guides/functions/quickstart#create-a-function
 
+// Follow https://supabase.com/docs/guides/functions/quickstart#create-a-function
+
 // Use imports based on import_map.json
-import { serve } from "https://deno.land/std@0.190.0/http/server.ts"; // Using full URL instead of alias
+import { serve } from "std/http/server.ts"; // Use alias from import_map.json
 import { corsHeaders } from "../_shared/cors.ts";
 import { createSupabaseServiceRoleClient } from "../_shared/supabaseClient.ts";
-import { openai, generateEmbedding } from "../_shared/openaiUtils.ts";
-// Import type using the alias defined in import_map.json
+import { openai, generateEmbedding } from "../_shared/openaiUtils.ts"; // Reverted to original import
+// Import type using the alias defined in import_map.json - Reverted to original import path
 import type { ChatCompletionMessageParam } from "openai/resources/chat/completions";
 
 const MATCH_THRESHOLD = 0.70; // Lowered similarity threshold
@@ -36,6 +38,7 @@ serve(async (req) => {
     if (!agentId || !query) {
       throw new Error("Missing 'agentId' or 'query' in request body.");
     }
+    // Reverted check for imported openai object
     if (!openai) {
       throw new Error("OpenAI client is not initialized (API key likely missing).");
     }
@@ -75,7 +78,9 @@ serve(async (req) => {
     console.log("Embedding generated.");
 
     // 5. Find relevant knowledge chunks (only if document IDs are linked)
-    let contextText = "";
+    let contextText = ""; // Initialize contextText
+    let contextFound = false; // Flag to track if context was successfully found
+
     if (documentIds && documentIds.length > 0) {
       // --- Added Detailed Logging ---
       console.log(`Attempting to match chunks for specific document IDs: [${documentIds.join(', ')}]`);
@@ -90,9 +95,10 @@ serve(async (req) => {
 
       if (matchError) {
         console.error("Error matching chunks:", matchError);
-        // Don't throw, just proceed without context if matching fails
-        contextText = "Could not retrieve relevant context due to an error.";
+        // Context retrieval failed - Keep flag as false
+        contextText = "Error: Could not retrieve relevant context."; // Internal message for logging
       } else if (chunks && chunks.length > 0) {
+        contextFound = true; // Set flag to true only when chunks are found
         // --- Added Detailed Logging ---
         const returnedDocIds = chunks.map((c: MatchedChunk) => c.document_id);
         console.log(`Found ${chunks.length} relevant chunks. Document IDs returned: [${[...new Set(returnedDocIds)].join(', ')}]`); // Log unique doc IDs
@@ -103,17 +109,36 @@ serve(async (req) => {
           .join("\n\n---\n\n");
       } else {
         console.log("No relevant chunks found for the specified document IDs.");
-        contextText = "No specific context found for this query in the linked documents.";
+        // No context found for query - Keep flag as false
+        contextText = "Info: No specific context found for this query."; // Internal message for logging
       }
     } else {
       console.log("Agent has no linked knowledge documents.");
-      contextText = "No knowledge documents are linked to this agent.";
+      // No documents linked - Keep flag as false
+      contextText = "Info: No knowledge documents linked to agent."; // Internal message for logging
     }
 
-    // Log the retrieved context before sending to OpenAI
-    console.log("Retrieved Context Text:\n---\n", contextText, "\n---");
+    // Log the internal state before deciding the response
+    console.log("Internal Context State:", contextText); // Log the internal message
+    console.log("Context Found Flag:", contextFound);
 
-    // 6. Construct the final prompt
+    // --- START: Custom Response for No Context ---
+    // Check the flag instead of the text content
+    if (!contextFound) {
+      console.log("Context not found or error retrieving. Returning custom response.");
+      const customResponse = "I'll get back to you on this. Are there any other questions you would like to know?";
+      return new Response(
+        JSON.stringify({ response: customResponse }),
+        {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 200,
+        }
+      );
+    }
+    // --- END: Custom Response for No Context ---
+
+
+    // 6. Construct the final prompt (Only if context was found)
     // Use the directly imported type
     const messages: ChatCompletionMessageParam[] = [
       {
