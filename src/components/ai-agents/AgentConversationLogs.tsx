@@ -25,28 +25,19 @@ import { Label } from '@/components/ui/label'; // Added Label
 import { Textarea } from '@/components/ui/textarea'; // Added Textarea import
 import { listKnowledgeDocuments, KnowledgeDocument } from '@/services/knowledge/documentService'; // Added import for fetching documents
 
-// Define type alias for the table row from generated types - Corrected table name
-type ConversationRow = Database['public']['Tables']['conversations']['Row'];
+// Define type alias for the table row from generated types - Use agent_conversations
+type AgentConversationRow = Database['public']['Tables']['agent_conversations']['Row'];
 // Define type for the structure returned by the query, including joins
 // We explicitly define the expected shape of the joined data
-// Assuming 'conversations' links to 'ai_agent_sessions' correctly
-type AgentConversationWithDetails = ConversationRow & {
+// Based on agent_conversations linking to ai_agent_sessions
+type AgentConversationWithDetails = AgentConversationRow & { // Use AgentConversationRow
   ai_agent_sessions: {
     contact_identifier: string | null;
-    ai_agents: {
+    ai_agents: { // Restore nested agent type
       name: string | null;
     } | null;
   } | null;
 };
-// Removed duplicate type definition below
-/* type AgentConversationWithDetails = ConversationRow & { // Corrected AgentConversationRow to ConversationRow here too
-  ai_agent_sessions: {
-    contact_identifier: string | null;
-    ai_agents: {
-      name: string | null;
-    } | null;
-  } | null;
-}; */
 
 // Props for the component
 interface AgentConversationLogsProps {
@@ -69,16 +60,16 @@ const fetchConversationLogs = async (
   const from = page * pageSize;
   const to = from + pageSize - 1;
 
-  // Base query - Corrected table name
+  // Base query - Use the correct table 'agent_conversations'
   const query = supabase
-    .from('conversations') // Use the correct table name
+    .from('agent_conversations') // Use the correct table name
     .select(`
       *,
       ai_agent_sessions (
         contact_identifier,
         ai_agents ( name )
       )
-    `, { count: 'exact' })
+    `, { count: 'exact' }) // Removed comments from select string
     .eq('session_id', sessionId) // Filter by session ID
     .order('message_timestamp', { ascending: false })
     .range(from, to);
@@ -89,10 +80,14 @@ const fetchConversationLogs = async (
   // Removed console.log for result
 
   if (error) {
-    console.error("Error fetching conversation logs for session:", sessionId, error);
-    // Keep the specific error check for debugging if needed, but the primary fix is the table name
-    // if (error.message.includes('relation "conversations" does not exist')) {
-    //    console.error("Type generation might be out of sync or table name incorrect.");
+    // Log more detailed error information from Supabase/PostgREST
+    console.error("Error fetching conversation logs for session:", sessionId);
+    console.error("Error Message:", error.message);
+    console.error("Error Details:", error.details);
+    console.error("Error Hint:", error.hint);
+    console.error("Full Error Object:", error);
+    // if (error.message.includes('relation "conversations" does not exist')) { // Keep this check if needed
+    //    console.error("Type generation might be out of sync or table name incorrect."); // Keep this check if needed
     // }
     throw new Error(error.message || 'Failed to fetch conversation logs.');
   }
@@ -256,7 +251,8 @@ const AgentConversationLogs: React.FC<AgentConversationLogsProps> = ({ sessionId
       <Card className="w-full h-full flex flex-col">
         <CardHeader className="flex flex-row items-center justify-between space-x-4">
           <CardTitle className="flex-grow">
-            {sessionId ? `Conversation Logs (Session: ${sessionId.substring(0, 8)}...)` : 'Select a Session'}
+            {/* Display the full session ID */}
+            {sessionId ? `Conversation Logs (Session: ${sessionId})` : 'Select a Session'}
           </CardTitle>
           {sessionId && (
             <Button
@@ -323,6 +319,7 @@ const AgentConversationLogs: React.FC<AgentConversationLogsProps> = ({ sessionId
                       <BookPlus className="absolute top-1 right-1 h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
                       <div className="flex justify-between items-center mb-1 text-xs opacity-70">
                         <span>
+                          {/* Restore original logic using joined data */}
                           {log.sender_type === 'user' ? (log.ai_agent_sessions?.contact_identifier || 'User') : (log.ai_agent_sessions?.ai_agents?.name || 'AI')}
                         </span>
                         <span>

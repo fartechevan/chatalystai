@@ -1,7 +1,7 @@
 // Follow https://supabase.com/docs/guides/functions/quickstart#create-a-function
 
 // Use imports based on import_map.json
-import { serve } from "std/http/server.ts"; // Using alias from import_map.json
+import { serve } from "https://deno.land/std@0.190.0/http/server.ts"; // Using full URL instead of alias
 import { corsHeaders } from "../_shared/cors.ts";
 import { createSupabaseServiceRoleClient } from "../_shared/supabaseClient.ts";
 import { openai, generateEmbedding } from "../_shared/openaiUtils.ts";
@@ -9,7 +9,7 @@ import { openai, generateEmbedding } from "../_shared/openaiUtils.ts";
 import type { ChatCompletionMessageParam } from "openai/resources/chat/completions";
 
 const MATCH_THRESHOLD = 0.70; // Lowered similarity threshold
-const MATCH_COUNT = 5;       // Max number of chunks to retrieve
+const MATCH_COUNT = 10;      // Max number of chunks to retrieve (Increased from 5)
 
 // Define expected chunk structure from match_chunks RPC
 interface MatchedChunk {
@@ -49,7 +49,7 @@ serve(async (req) => {
       .from('ai_agents')
       .select(`
         prompt,
-        ai_agent_knowledge_documents ( document_id )
+        ai_agent_knowledge_documents!agent_id(document_id)
       `)
       .eq('id', agentId)
       .single();
@@ -77,7 +77,9 @@ serve(async (req) => {
     // 5. Find relevant knowledge chunks (only if document IDs are linked)
     let contextText = "";
     if (documentIds && documentIds.length > 0) {
-      console.log("Matching chunks for document IDs:", documentIds);
+      // --- Added Detailed Logging ---
+      console.log(`Attempting to match chunks for specific document IDs: [${documentIds.join(', ')}]`);
+      // --- End Added Logging ---
       // Call RPC function with the document_ids filter
       const { data: chunks, error: matchError } = await supabaseClient.rpc('match_chunks', {
         match_count: MATCH_COUNT,           // int
@@ -91,13 +93,16 @@ serve(async (req) => {
         // Don't throw, just proceed without context if matching fails
         contextText = "Could not retrieve relevant context due to an error.";
       } else if (chunks && chunks.length > 0) {
-        console.log(`Found ${chunks.length} relevant chunks.`);
+        // --- Added Detailed Logging ---
+        const returnedDocIds = chunks.map((c: MatchedChunk) => c.document_id);
+        console.log(`Found ${chunks.length} relevant chunks. Document IDs returned: [${[...new Set(returnedDocIds)].join(', ')}]`); // Log unique doc IDs
+        // --- End Added Logging ---
         // Apply the MatchedChunk type here
         contextText = chunks
-          .map((chunk: MatchedChunk) => `Context from document ${chunk.document_id}:\n${chunk.content}`)
+          .map((chunk: MatchedChunk) => `Context from document ${chunk.document_id}:\n${chunk.content}`) // Keep original mapping
           .join("\n\n---\n\n");
       } else {
-        console.log("No relevant chunks found.");
+        console.log("No relevant chunks found for the specified document IDs.");
         contextText = "No specific context found for this query in the linked documents.";
       }
     } else {
@@ -135,7 +140,7 @@ Query: ${query}`,
     const completionResponse = await openai.chat.completions.create({
       model: "gpt-3.5-turbo", // Or specify another model like gpt-4
       messages: messages,
-      temperature: 0.7, // Adjust creativity vs. factuality
+      temperature: 0.2, // Lowered temperature for more deterministic response
       max_tokens: 500, // Limit response length
     });
     console.log("OpenAI API response received.");

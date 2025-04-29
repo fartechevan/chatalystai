@@ -424,7 +424,11 @@ Response:`;
          return createJsonResponse({ error: 'Failed to create AI agent, no data returned.' }, 500);
       }
 
-      // 3. Insert integrations if provided
+      // 3. Log received knowledge IDs for Create
+      const knowledgeDocIdsToLink = knowledgeIdsToLink || [];
+      console.log(`[${requestStartTime}] Create Agent (ID: ${newAgentData.id}): Received knowledge_document_ids: [${knowledgeDocIdsToLink.join(', ')}]`);
+
+      // 4. Insert integrations if provided
       const integrationIdsToLink = payload.integration_ids || [];
       let integrationInsertError: Error | null = null;
       if (integrationIdsToLink.length > 0) {
@@ -442,25 +446,30 @@ Response:`;
         }
       }
 
-      // 4. Insert knowledge document links if provided
-      const knowledgeDocIdsToLink = knowledgeIdsToLink || [];
+      // 5. Insert knowledge document links if provided
+      // const knowledgeDocIdsToLink = knowledgeIdsToLink || []; // Already defined above
       let knowledgeInsertError: Error | null = null;
       if (knowledgeDocIdsToLink.length > 0) {
         const newKnowledgeLinks = knowledgeDocIdsToLink.map(docId => ({
-          agent_id: newAgentData.id,
+          agent_id: newAgentData.id, // Use the newly created agent's ID
           document_id: docId,
         }));
+        console.log(`[${requestStartTime}] Create Agent (ID: ${newAgentData.id}): Attempting to insert knowledge links:`, JSON.stringify(newKnowledgeLinks));
         const { error: insertError } = await supabase
           .from('ai_agent_knowledge_documents')
           .insert(newKnowledgeLinks);
 
         if (insertError) {
-          console.error(`[${requestStartTime}] Create Agent Warning (Insert Knowledge Links - ID: ${newAgentData.id}):`, insertError.message);
+          console.error(`[${requestStartTime}] Create Agent DB Error (Insert Knowledge Links - ID: ${newAgentData.id}):`, insertError.message);
           knowledgeInsertError = new Error('Failed to link knowledge documents during agent creation');
+        } else {
+          console.log(`[${requestStartTime}] Create Agent (ID: ${newAgentData.id}): Successfully inserted knowledge links.`);
         }
+      } else {
+         console.log(`[${requestStartTime}] Create Agent (ID: ${newAgentData.id}): No knowledge documents provided to link.`);
       }
 
-      // 5. Return combined data
+      // 6. Return combined data
       // Remove the old knowledge_document_ids column if it exists on the newAgentData object
       const { knowledge_document_ids, ...baseNewAgentData } = newAgentData;
       const finalAgentResponse = {
@@ -493,6 +502,7 @@ Response:`;
 
       // Separate knowledge IDs from the main payload
       const { knowledge_document_ids: knowledgeIdsToUpdate, ...agentPayload } = payload;
+      console.log(`[${requestStartTime}] Update Agent (ID: ${agentIdFromPath}): Received knowledge_document_ids for update: [${(knowledgeIdsToUpdate || []).join(', ')}]`); // Log received IDs
 
       // Prepare update object for ai_agents table (excluding knowledge_document_ids)
       const agentToUpdate: Partial<BaseAIAgent & { is_enabled?: boolean }> = {};
@@ -576,22 +586,30 @@ Response:`;
       // 3. Update knowledge document links if provided
       let finalKnowledgeDocIds: string[] = [];
       let knowledgeUpdateError: Error | null = null;
-      if (knowledgeIdsToUpdate !== undefined) {
-         finalKnowledgeDocIds = knowledgeIdsToUpdate || [];
-         // Delete existing links
+      if (knowledgeIdsToUpdate !== undefined) { // Only update links if the key was present in the payload
+         finalKnowledgeDocIds = knowledgeIdsToUpdate || []; // Use the provided IDs (or empty array if null/empty)
+         // Delete existing links first
+         console.log(`[${requestStartTime}] Update Agent (ID: ${agentIdFromPath}): Attempting to delete existing knowledge links...`);
          const { error: deleteError } = await supabase.from('ai_agent_knowledge_documents').delete().eq('agent_id', agentIdFromPath);
+
          if (deleteError) {
-            console.error(`[${requestStartTime}] Update Agent Warning (Delete Knowledge Links - ID: ${agentIdFromPath}):`, deleteError.message);
+            console.error(`[${requestStartTime}] Update Agent DB Error (Delete Knowledge Links - ID: ${agentIdFromPath}):`, deleteError.message);
             knowledgeUpdateError = new Error('Failed to clear existing knowledge document links');
-         } else if (finalKnowledgeDocIds.length > 0) {
-            // Insert new links
-            const links = finalKnowledgeDocIds.map(id => ({ agent_id: agentIdFromPath, document_id: id }));
-            const { error: insertError } = await supabase.from('ai_agent_knowledge_documents').insert(links);
+            // Decide if we should proceed if delete fails? For now, we will, but log the error.
+         } else {
+             console.log(`[${requestStartTime}] Update Agent (ID: ${agentIdFromPath}): Successfully deleted existing knowledge links.`);
+         }
+
+         // Insert new links only if there are IDs to insert and delete didn't fail catastrophically (or we decide to proceed anyway)
+         if (finalKnowledgeDocIds.length > 0 && !knowledgeUpdateError) { // Added check for knowledgeUpdateError
+            const newLinks = finalKnowledgeDocIds.map(id => ({ agent_id: agentIdFromPath, document_id: id }));
+            console.log(`[${requestStartTime}] Update Agent (ID: ${agentIdFromPath}): Attempting to insert new knowledge links:`, JSON.stringify(newLinks));
+            const { error: insertError } = await supabase.from('ai_agent_knowledge_documents').insert(newLinks);
             if (insertError) {
-               console.error(`[${requestStartTime}] Update Agent Warning (Insert Knowledge Links - ID: ${agentIdFromPath}):`, insertError.message);
-               knowledgeUpdateError = new Error('Failed to insert new knowledge document links');
+               console.error(`[${requestStartTime}] Update Agent DB Error (Insert Knowledge Links - ID: ${agentIdFromPath}):`, insertError.message);
+               knowledgeUpdateError = new Error('Failed to insert new knowledge document links'); // Overwrite or append error? Append for now.
             } else {
-               console.log(`[${requestStartTime}] Updated knowledge links for agent (ID: ${agentIdFromPath}) to: [${finalKnowledgeDocIds.join(', ')}]`);
+               console.log(`[${requestStartTime}] Update Agent (ID: ${agentIdFromPath}): Successfully inserted new knowledge links: [${finalKnowledgeDocIds.join(', ')}]`);
             }
          }
       } else {
