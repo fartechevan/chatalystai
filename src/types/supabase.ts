@@ -479,6 +479,8 @@ export type Database = {
           name: string
           status: Database["public"]["Enums"]["integration_status"]
           updated_at: string | null
+          webhook_events: Json | null // Add webhook_events
+          webhook_url: string | null // Add webhook_url
         }
         Insert: {
           api_key?: string | null
@@ -491,6 +493,8 @@ export type Database = {
           name: string
           status?: Database["public"]["Enums"]["integration_status"]
           updated_at?: string | null
+          webhook_events?: Json | null // Add webhook_events
+          webhook_url?: string | null // Add webhook_url
         }
         Update: {
           api_key?: string | null
@@ -503,6 +507,8 @@ export type Database = {
           name?: string
           status?: Database["public"]["Enums"]["integration_status"]
           updated_at?: string | null
+          webhook_events?: Json | null // Add webhook_events
+          webhook_url?: string | null // Add webhook_url
         }
         Relationships: []
       }
@@ -518,8 +524,6 @@ export type Database = {
           token: string | null
           updated_at: string
           user_reference_id: string | null
-          webhook_events: string[] | null
-          webhook_url: string | null
         }
         Insert: {
           created_at?: string
@@ -532,8 +536,6 @@ export type Database = {
           token?: string | null
           updated_at?: string
           user_reference_id?: string | null
-          webhook_events?: string[] | null
-          webhook_url?: string | null
         }
         Update: {
           created_at?: string
@@ -546,8 +548,6 @@ export type Database = {
           token?: string | null
           updated_at?: string
           user_reference_id?: string | null
-          webhook_events?: string[] | null
-          webhook_url?: string | null
         }
         Relationships: [
           {

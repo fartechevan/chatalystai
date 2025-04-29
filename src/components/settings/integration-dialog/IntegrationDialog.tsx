@@ -12,19 +12,21 @@ declare global {
 }
 
 import { Dialog, DialogContent } from "@/components/ui/dialog";
-import { useState } from "react";
+import React, { useState } from "react";
 import type { Integration } from "../types";
 import { useFacebookSDK } from "./hooks/useFacebookSDK";
 import { QRCodeScreen } from "./components/QRCodeScreen";
 import { DeviceSelect } from "./components/DeviceSelect";
 import { IntegrationTabs } from "./components/IntegrationTabs";
 import { DialogMain } from "./components/DialogMain";
-import { useIntegrationConnectionState } from "./hooks/useIntegrationConnectionState";
+// import { useIntegrationConnectionState } from "./hooks/useIntegrationConnectionState"; // Remove hook import
 import { Button } from "@/components/ui/button";
+import { WebhookSetupForm } from "./components/WebhookSetupForm";
+// import { EvolutionInstance, ConnectionState } from "@/integrations/evolution-api/types"; // Remove type imports if not needed here
 
 interface IntegrationDialogProps {
   open: boolean;
-  onOpenChange: (connected: boolean) => void;
+  onOpenChange: (open: boolean) => void; // Changed signature back
   selectedIntegration: Integration | null;
 }
 
@@ -35,91 +37,37 @@ export function IntegrationDialog({
 }: IntegrationDialogProps) {
   const { handleConnectWithFacebook } = useFacebookSDK();
 
-  const {
-    showDeviceSelect,
-    setShowDeviceSelect,
-    integrationMainPopup,
-    setIntegrationMainPopup,
-    integrationQRPopup,
-    setIntegrationQRPopup,
-    isConnected,
-    connectionState,
-    isLoading,
-    checkCurrentConnectionState,
-    qrCodeBase64,
-    pairingCode,
-    handleConnect,
-  } = useIntegrationConnectionState(selectedIntegration, open, () => handleDialogChange(false));
+  // Remove the hook call and related state destructuring
+  // const { ... } = useIntegrationConnectionState(selectedIntegration, open);
 
-  const handleDialogChange = (open: boolean) => {
-    if (!open) {
-      if (integrationQRPopup) {
-        setIntegrationQRPopup(false);
-        setIntegrationMainPopup(true);
-        return;
-      }
-      if (showDeviceSelect) {
-        setShowDeviceSelect(false);
-        setIntegrationMainPopup(true);
-        return;
-      }
-    }
-    onOpenChange(isConnected || connectionState === 'open');
+  // Simplified dialog change handler
+  const handleDialogChange = (isOpen: boolean) => {
+    onOpenChange(isOpen);
   };
 
-  // Create a wrapper function to handle the connect call
-  const handleConnectWrapper = () => {
-    // Call handleConnect with no arguments, it will handle any required parameters internally
-    handleConnect(null);
-  };
-
-  if (integrationQRPopup) {
-    return (
-      <QRCodeScreen
-        open={open}
-        onOpenChange={handleDialogChange}
-        onClose={() => {
-          setIntegrationQRPopup(false);
-          setIntegrationMainPopup(true);
-        }}
-        qrCodeBase64={qrCodeBase64}
-        pairingCode={pairingCode}
-      />
-    );
-  }
-
-  if (showDeviceSelect) {
-    return (
-      <DeviceSelect
-        open={open}
-        onOpenChange={handleDialogChange}
-        onClose={() => {
-          setShowDeviceSelect(false);
-          setIntegrationMainPopup(true);
-        }}
-        handleConnect={handleConnectWrapper}
-      />
-    );
-  }
+  // Remove conditional rendering based on hook state (showDeviceSelect, showWebhookSetup)
+  // This logic needs to move to IntegrationTabs
 
   return (
     <Dialog open={open} onOpenChange={handleDialogChange}>
       <DialogContent className="max-w-5xl w-4/5 flex space-x-4">
-        {/* Left Column */}
+        {/* Left Column - Now only needs selectedIntegration */}
         <DialogMain
           selectedIntegration={selectedIntegration}
-          connectionState={connectionState}
-          isLoading={isLoading}
-          onOpenChange={handleDialogChange}
+          // Remove all other props passed previously
         />
 
-        {/* Right Column */}
+        {/* Right Column - Will now contain the core logic */}
         <div className="w-1/2">
           <IntegrationTabs
             selectedIntegration={selectedIntegration}
-            handleConnectWithFacebook={handleConnectWithFacebook}
-            onClose={() => handleDialogChange(false)}
-            onConnect={handleConnectWrapper}
+            handleConnectWithFacebook={handleConnectWithFacebook} // Keep if needed for FB
+            onClose={() => handleDialogChange(false)} // Keep close handler
+            // Remove props that are now managed internally by IntegrationTabs
+            // onConnect={handleConnect}
+            // liveConnectionState={connectionState as ConnectionState}
+            open={open} // Pass open state if needed by the hook inside IntegrationTabs
+            onOpenChange={onOpenChange} // Pass onOpenChange if needed by the hook inside IntegrationTabs
           />
         </div>
 

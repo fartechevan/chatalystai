@@ -23,69 +23,78 @@ export function useEvolutionApiConnection(selectedIntegration: Integration | nul
   const checkCurrentConnectionState = useCallback(async () => {
     // Use instance_display_name instead of instance_id
     const instanceNameToCheck = config?.instance_display_name;
-    const baseUrlToCheck = config?.base_url;
-    const tokenToUse = config?.token;
+    const integrationId = selectedIntegration?.id; // Get integration ID
 
     // Check if we have the necessary config values
-    if (instanceNameToCheck && tokenToUse && baseUrlToCheck) {
-      console.log(`Checking status for configured instance: ${instanceNameToCheck}`); // Log display name
+    if (instanceNameToCheck && integrationId) { // Check for integrationId instead of token/baseUrl
+      console.log(`Checking status for configured instance: ${instanceNameToCheck} (Integration: ${integrationId})`);
       try {
-        // Call checkInstanceStatus with instanceName (display name)
-        const currentState = await checkInstanceStatus(instanceNameToCheck, tokenToUse, baseUrlToCheck);
-        setConnectionState(currentState);
-        return true;
+        // Call checkInstanceStatus with instanceName and integrationId
+        const currentState = await checkInstanceStatus(instanceNameToCheck, integrationId);
+        console.log("[LOG] checkCurrentConnectionState: currentState from checkInstanceStatus:", currentState); // Log the returned state
+        // Ensure the state is valid before setting (and assert type for setConnectionState)
+        if (['open', 'connecting', 'close', 'qrcode', 'pairingCode', 'idle', 'unknown'].includes(currentState)) {
+             setConnectionState(currentState as ConnectionState); // Assert type here
+        } else {
+             console.warn(`[LOG] checkCurrentConnectionState: Received invalid state '${currentState}' from checkInstanceStatus. Setting to 'unknown'.`);
+             setConnectionState('unknown');
+        }
+        return true; // Indicate check was performed
       } catch (error) {
-        console.error("Polling: Error checking instance status:", error);
-        setConnectionState('close');
-        return false;
+        console.error("Polling: Error calling checkInstanceStatus:", error);
+        setConnectionState('unknown'); // Set to unknown on error
+        return false; // Indicate check failed
       }
     } else {
-      // Update log message to reflect required fields
-      console.log('Status Check: Necessary details not available (Instance Display Name, Token, or Base URL missing).');
+      // Update log message
+      console.log('Status Check: Necessary details not available (Instance Display Name or Integration ID missing).');
+      setConnectionState('unknown'); // Set to unknown if details missing
+      return false; // Indicate check couldn't be performed
     }
-    return false;
-  }, [config]); // Keep config dependency
-
-  // Note: startPolling still uses newInstanceId. This might need adjustment later
-  // if instance creation/identification relies solely on display name going forward.
-  const startPolling = useCallback((newInstanceId: string, newToken: string) => {
+  }, [config, selectedIntegration?.id]); // Add selectedIntegration?.id dependency
+  // Remove startPolling as it's likely redundant now that checkCurrentConnectionState handles polling logic implicitly via useIntegrationConnectionState
+  /*
+  const startPolling = useCallback((instanceNameToPoll: string) => { // Changed param name
     if (pollingInterval) {
       clearInterval(pollingInterval);
       setPollingInterval(null);
     }
- 
-     console.log(`Starting connection status polling for NEW instance: ${newInstanceId}`);
-     const intervalId = setInterval(async () => {
-       // console.log(`Polling for NEW instance status: ${newInstanceId}`); // Removed log
-       const baseUrlToCheck = config?.base_url;
- 
-       if (!baseUrlToCheck) {
-        console.error("Polling Error: Base URL not available from config.");
-        clearInterval(intervalId);
-        setPollingInterval(null);
-        setConnectionState('close');
+    const integrationId = selectedIntegration?.id;
+    if (!integrationId) {
+        console.error("Start Polling Error: Integration ID missing.");
         return;
-      }
+    }
+
+     console.log(`Starting connection status polling for instance: ${instanceNameToPoll}`);
+     const intervalId = setInterval(async () => {
+       console.log(`Polling status for: ${instanceNameToPoll}`);
 
       try {
-        const currentState = await checkInstanceStatus(newInstanceId, newToken, baseUrlToCheck);
-        setConnectionState(currentState);
+        const currentState = await checkInstanceStatus(instanceNameToPoll, integrationId);
+         if (['open', 'connecting', 'close', 'qrcode', 'pairingCode', 'idle', 'unknown'].includes(currentState)) {
+             setConnectionState(currentState);
+         } else {
+             console.warn(`[Polling] Received invalid state '${currentState}' from checkInstanceStatus. Setting to 'unknown'.`);
+             setConnectionState('unknown');
+         }
 
-        if (currentState === 'open') {
-          console.log(`Polling successful: Instance ${newInstanceId} is open. Stopping polling.`);
+
+        if (currentState === 'open' || currentState === 'close') { // Stop polling if definitively open or closed
+          console.log(`Polling successful: Instance ${instanceNameToPoll} is ${currentState}. Stopping polling.`);
           clearInterval(intervalId);
           setPollingInterval(null);
         }
       } catch (error) {
-        console.error(`Polling Error for instance ${newInstanceId}:`, error);
+        console.error(`Polling Error for instance ${instanceNameToPoll}:`, error);
         clearInterval(intervalId);
         setPollingInterval(null);
-        setConnectionState('close');
+        setConnectionState('unknown'); // Set to unknown on error
       }
-    }, 3000);
+    }, 5000); // Poll every 5 seconds
 
     setPollingInterval(intervalId);
-  }, [pollingInterval, config?.base_url, connectionState]);
+  }, [pollingInterval, selectedIntegration?.id]); // Depend on integrationId
+  */
 
   const connectToWhatsApp = async () => {
     setConnectionState('connecting');

@@ -5,7 +5,8 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Skeleton } from '@/components/ui/skeleton';
 import { MessageSquare, Loader2, PowerOff, BookPlus } from 'lucide-react'; // Added BookPlus
 import { supabase } from '@/integrations/supabase/client';
-import type { Database } from '@/types/supabase';
+// Correct the import path for the Database type to match the client's type source
+import type { Database } from '@/integrations/supabase/types';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';

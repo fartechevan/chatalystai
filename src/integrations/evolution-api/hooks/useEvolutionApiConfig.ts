@@ -2,7 +2,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
 import type { Integration } from "@/components/settings/types"; // Correct path
 // Config import no longer needed as API key is handled server-side
-import type { EvolutionApiConfig } from "../types"; // Correct path
+import type { EvolutionApiConfig } from "@/integrations/evolution-api/types"; // Use alias path
 
 export function useEvolutionApiConfig(selectedIntegration: Integration | null) {
   // Destructure refetch from useQuery result
@@ -58,14 +58,18 @@ export function useEvolutionApiConfig(selectedIntegration: Integration | null) {
       // 2. Check if data exists in the result
       if (!configResult.data) {
         // This means no config row was found (PGRST116 or null data)
-        console.log('No existing config found, returning default structure.');
-        return {
-          integration_id: selectedIntegration.id,
-          base_url: integration.base_url,
-          instance_id: '', // Default empty instance_id
-          instance_display_name: '', // Default empty display name
-          // token is intentionally omitted for default
+        console.log('No existing config found, returning default structure matching EvolutionApiConfig.');
+        // Ensure all fields from EvolutionApiConfig are present, setting missing ones to null/undefined
+        const defaultConfig: EvolutionApiConfig = {
+          integration_id: selectedIntegration.id, // Required
+          base_url: integration.base_url,         // Required (fetched from integration)
+          instance_id: null,                      // Set to null
+          instance_display_name: null,            // Set to null
+          token: null,                            // Set to null
+          user_reference_id: null,                // Set to null (as it's optional)
+          id: undefined,                          // Set to undefined (as it's optional row id)
         };
+        return defaultConfig;
       } else {
         // 3. If we reach here, there was no error and configResult.data is not null.
         console.log('Existing config found, constructing final config:', configResult.data);
@@ -90,5 +94,5 @@ export function useEvolutionApiConfig(selectedIntegration: Integration | null) {
   });
 
   // Return refetch along with config and isLoading
-  return { config, isLoading, refetchConfig: refetch };
+  return { config, isLoading, refetch };
 }

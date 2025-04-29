@@ -9,10 +9,211 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      agent_conversations: {
+        Row: {
+          added_to_knowledge_base: boolean | null
+          created_at: string | null
+          id: string
+          knowledge_chunk_id: string | null
+          knowledge_document_id: string | null
+          knowledge_used: Json | null
+          message_content: string | null
+          message_timestamp: string | null
+          needs_review: boolean | null
+          sender_type: Database["public"]["Enums"]["sender_type"]
+          session_id: string | null
+        }
+        Insert: {
+          added_to_knowledge_base?: boolean | null
+          created_at?: string | null
+          id?: string
+          knowledge_chunk_id?: string | null
+          knowledge_document_id?: string | null
+          knowledge_used?: Json | null
+          message_content?: string | null
+          message_timestamp?: string | null
+          needs_review?: boolean | null
+          sender_type: Database["public"]["Enums"]["sender_type"]
+          session_id?: string | null
+        }
+        Update: {
+          added_to_knowledge_base?: boolean | null
+          created_at?: string | null
+          id?: string
+          knowledge_chunk_id?: string | null
+          knowledge_document_id?: string | null
+          knowledge_used?: Json | null
+          message_content?: string | null
+          message_timestamp?: string | null
+          needs_review?: boolean | null
+          sender_type?: Database["public"]["Enums"]["sender_type"]
+          session_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_conversations_knowledge_chunk_id_fkey"
+            columns: ["knowledge_chunk_id"]
+            isOneToOne: false
+            referencedRelation: "knowledge_chunks"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agent_conversations_knowledge_document_id_fkey"
+            columns: ["knowledge_document_id"]
+            isOneToOne: false
+            referencedRelation: "knowledge_documents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agent_conversations_session_id_fkey"
+            columns: ["session_id"]
+            isOneToOne: false
+            referencedRelation: "ai_agent_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_agent_integrations: {
+        Row: {
+          activation_mode: string | null
+          agent_id: string
+          created_at: string
+          error_message: string | null
+          integration_id: string
+          session_timeout_minutes: number | null
+          stop_keywords: string[] | null
+          updated_at: string
+        }
+        Insert: {
+          activation_mode?: string | null
+          agent_id: string
+          created_at?: string
+          error_message?: string | null
+          integration_id: string
+          session_timeout_minutes?: number | null
+          stop_keywords?: string[] | null
+          updated_at?: string
+        }
+        Update: {
+          activation_mode?: string | null
+          agent_id?: string
+          created_at?: string
+          error_message?: string | null
+          integration_id?: string
+          session_timeout_minutes?: number | null
+          stop_keywords?: string[] | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_agent_integrations_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "ai_agents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_agent_integrations_integration_id_fkey"
+            columns: ["integration_id"]
+            isOneToOne: false
+            referencedRelation: "integrations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_agent_knowledge_documents: {
+        Row: {
+          agent_id: string
+          created_at: string
+          document_id: string
+        }
+        Insert: {
+          agent_id: string
+          created_at?: string
+          document_id: string
+        }
+        Update: {
+          agent_id?: string
+          created_at?: string
+          document_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_agent_knowledge_documents_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "ai_agents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_agent_knowledge_documents_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "knowledge_documents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      ai_agent_sessions: {
+        Row: {
+          agent_id: string | null
+          contact_identifier: string
+          conversation_history: Json | null
+          created_at: string | null
+          id: string
+          integration_id: string | null
+          is_active: boolean | null
+          last_interaction_timestamp: string | null
+          status: Database["public"]["Enums"]["ai_session_status"]
+          updated_at: string | null
+        }
+        Insert: {
+          agent_id?: string | null
+          contact_identifier: string
+          conversation_history?: Json | null
+          created_at?: string | null
+          id?: string
+          integration_id?: string | null
+          is_active?: boolean | null
+          last_interaction_timestamp?: string | null
+          status?: Database["public"]["Enums"]["ai_session_status"]
+          updated_at?: string | null
+        }
+        Update: {
+          agent_id?: string | null
+          contact_identifier?: string
+          conversation_history?: Json | null
+          created_at?: string | null
+          id?: string
+          integration_id?: string | null
+          is_active?: boolean | null
+          last_interaction_timestamp?: string | null
+          status?: Database["public"]["Enums"]["ai_session_status"]
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_agent_sessions_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "ai_agents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_agent_sessions_integration_id_fkey"
+            columns: ["integration_id"]
+            isOneToOne: false
+            referencedRelation: "integrations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ai_agents: {
         Row: {
           created_at: string
           id: string
+          is_enabled: boolean | null
+          keyword_trigger: string | null
           knowledge_document_ids: string[] | null
           name: string
           prompt: string
@@ -22,6 +223,8 @@ export type Database = {
         Insert: {
           created_at?: string
           id?: string
+          is_enabled?: boolean | null
+          keyword_trigger?: string | null
           knowledge_document_ids?: string[] | null
           name: string
           prompt: string
@@ -31,6 +234,8 @@ export type Database = {
         Update: {
           created_at?: string
           id?: string
+          is_enabled?: boolean | null
+          keyword_trigger?: string | null
           knowledge_document_ids?: string[] | null
           name?: string
           prompt?: string
@@ -307,6 +512,8 @@ export type Database = {
           name: string
           status: Database["public"]["Enums"]["integration_status"]
           updated_at: string | null
+          webhook_events: Json | null
+          webhook_url: string | null
         }
         Insert: {
           api_key?: string | null
@@ -319,6 +526,8 @@ export type Database = {
           name: string
           status?: Database["public"]["Enums"]["integration_status"]
           updated_at?: string | null
+          webhook_events?: Json | null
+          webhook_url?: string | null
         }
         Update: {
           api_key?: string | null
@@ -331,6 +540,8 @@ export type Database = {
           name?: string
           status?: Database["public"]["Enums"]["integration_status"]
           updated_at?: string | null
+          webhook_events?: Json | null
+          webhook_url?: string | null
         }
         Relationships: []
       }
@@ -346,8 +557,6 @@ export type Database = {
           token: string | null
           updated_at: string
           user_reference_id: string | null
-          webhook_events: string[] | null
-          webhook_url: string | null
         }
         Insert: {
           created_at?: string
@@ -360,8 +569,6 @@ export type Database = {
           token?: string | null
           updated_at?: string
           user_reference_id?: string | null
-          webhook_events?: string[] | null
-          webhook_url?: string | null
         }
         Update: {
           created_at?: string
@@ -374,8 +581,6 @@ export type Database = {
           token?: string | null
           updated_at?: string
           user_reference_id?: string | null
-          webhook_events?: string[] | null
-          webhook_url?: string | null
         }
         Relationships: [
           {
@@ -393,6 +598,7 @@ export type Database = {
           created_at: string | null
           document_id: string | null
           embedding: string | null
+          enabled: boolean
           id: string
           metadata: string | null
           sequence: number | null
@@ -403,6 +609,7 @@ export type Database = {
           created_at?: string | null
           document_id?: string | null
           embedding?: string | null
+          enabled?: boolean
           id?: string
           metadata?: string | null
           sequence?: number | null
@@ -413,6 +620,7 @@ export type Database = {
           created_at?: string | null
           document_id?: string | null
           embedding?: string | null
+          enabled?: boolean
           id?: string
           metadata?: string | null
           sequence?: number | null
@@ -608,6 +816,7 @@ export type Database = {
           is_read: boolean
           message_id: string
           sender_participant_id: string
+          wamid: string | null
         }
         Insert: {
           content: string
@@ -616,6 +825,7 @@ export type Database = {
           is_read?: boolean
           message_id?: string
           sender_participant_id: string
+          wamid?: string | null
         }
         Update: {
           content?: string
@@ -624,6 +834,7 @@ export type Database = {
           is_read?: boolean
           message_id?: string
           sender_participant_id?: string
+          wamid?: string | null
         }
         Relationships: [
           {
@@ -1079,17 +1290,23 @@ export type Database = {
         Returns: string
       }
       match_chunks: {
-        Args: {
-          query_embedding: string
-          match_threshold: number
-          match_count: number
-        }
+        Args:
+          | {
+              query_embedding: string
+              match_threshold: number
+              match_count: number
+            }
+          | {
+              query_embedding: string
+              match_threshold: number
+              match_count: number
+              filter_document_ids?: string[]
+            }
         Returns: {
           id: string
+          document_id: string
           content: string
           similarity: number
-          document_id: string
-          document_title: string
         }[]
       }
       match_knowledge_chunks: {
@@ -1162,10 +1379,12 @@ export type Database = {
       }
     }
     Enums: {
+      ai_session_status: "active" | "closed" | "error"
       app_role: "admin" | "user" | "customer"
       integration_status: "available" | "coming_soon"
       new_app_role: "user" | "admin"
       role_enum: "admin" | "member"
+      sender_type: "user" | "ai"
       sentiment_level: "bad" | "moderate" | "good"
       sentiment_type: "bad" | "moderate" | "good"
       sync_status: "pending" | "completed" | "failed"
@@ -1285,10 +1504,12 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      ai_session_status: ["active", "closed", "error"],
       app_role: ["admin", "user", "customer"],
       integration_status: ["available", "coming_soon"],
       new_app_role: ["user", "admin"],
       role_enum: ["admin", "member"],
+      sender_type: ["user", "ai"],
       sentiment_level: ["bad", "moderate", "good"],
       sentiment_type: ["bad", "moderate", "good"],
       sync_status: ["pending", "completed", "failed"],
