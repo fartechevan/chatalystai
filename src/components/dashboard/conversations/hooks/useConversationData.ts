@@ -142,15 +142,20 @@ export function useConversationData(selectedConversation?: Conversation | null) 
         }
       }
 
-      // If WhatsApp message was successful or not a WhatsApp conversation,
-      // save the message to our database
-      const result = await sendMessage(
-        selectedConversation.conversation_id,
-        adminParticipantId,
-        content
-      );
-
-      return result;
+      // If it's NOT a WhatsApp conversation, save the message to our database directly.
+      // If it WAS a WhatsApp conversation, the webhook handler is responsible for saving.
+      if (!selectedConversation.integrations_id) {
+        const result = await sendMessage(
+          selectedConversation.conversation_id,
+          adminParticipantId,
+          content
+        );
+        return result;
+      } else {
+        // For WhatsApp, return a simple success indicator or null,
+        // as the actual message data comes from the webhook upsert.
+        return { success: true }; // Indicate the API call part was successful
+      }
     },
     onSuccess: (data) => {
       if (data) {

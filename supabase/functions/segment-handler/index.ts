@@ -1,6 +1,6 @@
-import { serve } from 'std/http/server.ts'; // Using import map alias (std@0.177.0)
-import { SupabaseClient, PostgrestError } from "supabase"; // Using import map alias
-import * as csv from "csv"; // Import entire module namespace (csv@v0.9.2)
+import { serve } from "std/http/server.ts"; // Revert to alias
+import { SupabaseClient, PostgrestError } from "https://esm.sh/@supabase/supabase-js@2.43.4"; // Use full URL again
+import * as csv from "csv"; // Revert to alias
 
 import { corsHeaders } from "../_shared/cors.ts";
 import { createSupabaseClient, getAuthenticatedUser } from "../_shared/supabaseClient.ts";
@@ -99,11 +99,17 @@ async function parseCreateSegmentRequest(req: Request): Promise<{ name: string }
   return { name: name.trim() };
 }
 async function createSegmentDb(supabase: SupabaseClient<Database>, name: string, userId: string): Promise<{ data: Segment | null; error: PostgrestError | null }> {
+  console.log(`[createSegmentDb] Attempting to insert segment with name: "${name}" for user: ${userId}`); // Log input
   const { data, error } = await supabase
     .from("segments")
     .insert({ name: name, user_id: userId })
     .select()
     .single();
+  if (error) {
+    console.error(`[createSegmentDb] DB Insert Error:`, JSON.stringify(error)); // Log specific error
+  } else {
+    console.log(`[createSegmentDb] Successfully inserted segment. Result ID: ${data?.id}`); // Log success
+  }
   return { data, error };
 }
 
@@ -222,7 +228,13 @@ async function addContactsToSegmentDb(supabase: SupabaseClient<Database>, segmen
      segment_id: segmentId,
      contact_id: contactId,
    }));
+   console.log(`[addContactsToSegmentDb] Attempting to insert ${segmentContactsData.length} contacts for segment: ${segmentId}`); // Log input
    const { error } = await supabase.from('segment_contacts').insert(segmentContactsData); // Consider upsert
+   if (error) {
+     console.error(`[addContactsToSegmentDb] DB Insert Error (Segment ${segmentId}):`, JSON.stringify(error)); // Log specific error
+   } else {
+     console.log(`[addContactsToSegmentDb] Successfully inserted ${segmentContactsData.length} contacts for segment: ${segmentId}`); // Log success
+   }
    return { error };
 }
 
@@ -317,6 +329,9 @@ serve(async (req: Request) => {
     const pathSegments = url.pathname.split('/').filter(Boolean); // e.g., ['functions', 'v1', 'segment-handler', 'segments', 'segId', 'contacts', 'contactId']
     const handlerIndex = pathSegments.indexOf('segment-handler');
     const routeSegments = handlerIndex !== -1 ? pathSegments.slice(handlerIndex + 1) : []; // e.g., ['segments', 'segId', 'contacts', 'contactId']
+
+    // Log routeSegments immediately after calculation
+    console.log(`[${requestStartTime}] Calculated routeSegments: [${routeSegments.join(', ')}], Length: ${routeSegments.length}`);
 
     console.log(`[${requestStartTime}] Handling ${req.method} for route segments: ${routeSegments.join('/')}`);
 
@@ -520,6 +535,42 @@ serve(async (req: Request) => {
 
 
     } // End base path /segments
+
+    // --- Direct POST to base path handler (for specific actions like create from contacts) ---
+    console.log(`[${requestStartTime}] Checking for direct POST: Method=${req.method}, RouteSegmentsLength=${routeSegments.length}`); // Added log
+    if (req.method === 'POST' && routeSegments.length === 0) {
+        console.log(`[${requestStartTime}] Condition met. Handling direct POST to base path.`); // Added log
+        // Try parsing as Create Segment From Contacts request
+        try {
+            const body = await req.clone().json(); // Clone request to read body safely
+            if (body.segmentName && Array.isArray(body.customerIds) && body.userId) {
+                console.log(`[${requestStartTime}] Routing direct POST to: Create Segment From Contacts`);
+                const { segmentName, customerIds, userId: requestUserId } = body as CreateSegmentFromContactsRequestPayload;
+                 // Security check: Ensure the userId in the payload matches the authenticated user
+                if (requestUserId !== user.id) {
+                    console.warn(`[${requestStartTime}] Create Segment From Contacts Auth Mismatch: Payload user ${requestUserId} != Auth user ${user.id}`);
+                    return createJsonResponse({ error: "User ID mismatch" }, 403); // Forbidden
+                }
+                // Create segment
+                const { data: segmentData, error: segmentError } = await createSegmentDb(supabaseClient, segmentName, user.id);
+                if (segmentError || !segmentData) {
+                    console.error(`[${requestStartTime}] Create Segment From Contacts - Segment Creation Error:`, segmentError?.message);
+                    return createJsonResponse({ error: segmentError?.message || "Failed to create segment" }, 500);
+                }
+                // Add contacts
+                const { error: addError } = await addContactsToSegmentDb(supabaseClient, segmentData.id, customerIds);
+                if (addError) {
+                    const errorMessage = (addError && typeof addError === 'object' && 'message' in addError) ? addError.message : 'Unknown error';
+                    console.error(`[${requestStartTime}] Create Segment From Contacts - Add Contacts Error (SegID: ${segmentData.id}):`, errorMessage);
+                    return createJsonResponse({ error: "Segment created but failed to add some contacts: " + errorMessage, segmentId: segmentData.id }, 500);
+                }
+                return createJsonResponse(segmentData, 201);
+            }
+        } catch (parseError) {
+             console.log(`[${requestStartTime}] Direct POST body parsing failed or didn't match CreateSegmentFromContacts: ${parseError.message}`);
+             // Fall through to Not Found if parsing fails or doesn't match expected structure
+        }
+    }
 
     // --- Fallback for Unmatched Routes ---
     console.warn(`[${requestStartTime}] Route Not Found: ${req.method} ${url.pathname}`);

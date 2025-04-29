@@ -492,15 +492,16 @@ export function BroadcastModal({
     }
 
     let customerIdsForSegment: string[] = [];
+    const initialMode = targetMode; // Store the mode when the button was clicked
 
-    if (targetMode === 'csv') {
+    if (initialMode === 'csv') { // Check initial mode here
       // Combine existing customer IDs and newly added customer IDs from CSV
       customerIdsForSegment = [...new Set([...existingContactIdsFromCsv, ...addedCustomerIdsFromCsv])];
       if (customerIdsForSegment.length === 0) {
         toast({ title: "Error", description: "No customers identified from the CSV to add to the segment.", variant: "destructive" });
         return;
       }
-    } else if (targetMode === 'customers') {
+    } else if (initialMode === 'customers') { // Check initial mode here
       customerIdsForSegment = selectedCustomers;
        if (customerIdsForSegment.length === 0) {
         toast({ title: "Error", description: "No customers selected to add to the segment.", variant: "destructive" });
@@ -512,12 +513,10 @@ export function BroadcastModal({
        return;
     }
 
-
-
     setIsCreatingSegment(true);
     try {
       // Call the Supabase function (ensure it exists)
-      const { data: newSegment, error } = await supabase.functions.invoke<Segment>('create-segment-from-contacts', {
+      const { data: newSegment, error } = await supabase.functions.invoke<Segment>('segment-handler', {
         body: {
           segmentName: newSegmentName,
           customerIds: customerIdsForSegment, // Use the determined list of IDs
@@ -533,21 +532,27 @@ export function BroadcastModal({
         description: `Segment "${newSegment.name}" created with ${customerIdsForSegment.length} contacts.`,
       });
 
-      // Update local state
+      // Update local state - Always add the new segment to the list
       setAvailableSegments(prev => [...prev, newSegment]);
-      setTargetMode('segment'); // Switch mode to segment
-      setSelectedSegmentId(newSegment.id); // Select the new segment
+
+      // Conditionally switch mode and select ONLY if created from CSV mode
+      if (initialMode === 'csv') {
+        setTargetMode('segment'); // Switch mode to segment
+        setSelectedSegmentId(newSegment.id); // Select the new segment
+      }
+      // Always clear name and hide prompt regardless of initial mode
       setNewSegmentName(''); // Clear input
       setShowCreateSegmentPrompt(false); // Hide the create segment UI
 
     } catch (error) {
       const message = error instanceof Error ? error.message : "Failed to create segment.";
-      console.error("Error creating segment from CSV:", error);
+      console.error("Error creating segment:", error); // Changed log context slightly
       toast({ title: "Segment Creation Failed", description: message, variant: "destructive" });
     } finally {
       setIsCreatingSegment(false);
     }
   };
+
 
   // --- Helper Functions ---
 

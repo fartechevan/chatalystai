@@ -1,6 +1,7 @@
 
 import { useState } from "react";
 import { Loader2, Send } from "lucide-react";
+import { UseMutationResult } from "@tanstack/react-query"; // Import UseMutationResult
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/components/ui/use-toast";
@@ -9,7 +10,7 @@ interface MessageInputProps {
   newMessage: string;
   setNewMessage: (message: string) => void;
   handleSendMessage: () => void;
-  sendMessageMutation: any;
+  sendMessageMutation: UseMutationResult<unknown, Error, string, unknown>; // Use specific type
   isWhatsAppConversation?: boolean;
 }
 
