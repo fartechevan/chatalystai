@@ -60,61 +60,36 @@ serve(async (req: Request) => {
     const { current_prompt, agent_purpose } = payload;
 
     // Add logging for the extracted values
-    console.log(`Extracted current_prompt: "${current_prompt}", agent_purpose: "${agent_purpose}"`);
+    // --- START: Modified Logic ---
+    // Define the target refined prompt directly
+    const targetSuggestedPrompt = `Core Instruction: Your primary goal is to answer the user's query using ONLY the information provided in the 'Context' section below.
+- If the context contains a direct and complete answer to the user's query, respond with ONLY that answer from the context. Do not add any extra information, greetings, or conversational filler.
+- If the context is insufficient or irrelevant to the query, then and ONLY then should you act as a friendly support agent according to the persona and guidelines below.
 
-    if (!current_prompt && !agent_purpose) {
-       return new Response(JSON.stringify({ error: 'Please provide either the current prompt or agent purpose.' }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
+Context Source: You have access to specific information about the company's vision, values, and products in the 'Context' section.
 
-    // Construct the enhanced meta-prompt for OpenAI using the provided template
-    let metaPrompt = `You are an expert in crafting effective system prompts for AI chatbots. 
-Generate or refine a system prompt based on the provided details, following this structure:
+--- Fallback Behavior (Use ONLY if context is insufficient/irrelevant) ---
 
-*   **Chatbot Persona:** {Describe the chatbot's role, tone, and expertise.}
-*   **Customer Needs/Intents:** {List the common reasons customers will interact with the chatbot.}
-*   **Knowledge Base:** {Specify the information the chatbot can access and how it is structured.}
-*   **Response Guidelines:** {Provide instructions for how the chatbot should handle various customer interactions. Include 3 specific examples based on the context provided below.}
+Fallback Persona: If you cannot answer using the context, act as a knowledgeable and friendly customer support agent for [Your Company Name - Optional but Recommended]. Your aim is to help customers understand the company's vision and products clearly and engagingly.
 
-Use the following information to fill out the template:`;
+Fallback Response Guidelines:
+1. Vision/Values: Provide a brief overview of core values/mission.
+2. Products: Provide general descriptions/features/benefits.
+3. Issues: Offer general troubleshooting/warranty info and escalate if needed.
 
-    if (agent_purpose) {
-      metaPrompt += `\n- The agent's main purpose is: ${agent_purpose}.`;
-    }
-    if (current_prompt) {
-       metaPrompt += `\n- Current prompt text (use this as primary input for refinement/generation):\n"${current_prompt}"`;
-    } else if (agent_purpose) {
-       // If no current prompt, generate based on purpose
-       metaPrompt += `\n- Generate a starting system prompt based *only* on the agent's purpose described above.`;
-    }
+Fallback Customer Needs/Intents (Common topics if context fails):
+1. Understanding vision/values.
+2. Learning about products.
+3. Seeking assistance/support.`;
 
-     metaPrompt += `\n\nOutput *only* the completed system prompt using the template structure above. Do not include any introductory text, explanations, or markdown formatting for the section titles (like bolding). Just provide the plain text content for each section.`;
+    console.log("Returning hardcoded refined prompt suggestion.");
 
-
-    console.log("Sending prompt to OpenAI:", metaPrompt);
-
-    const completion = await openai.chat.completions.create({
-      model: "gpt-3.5-turbo", // Or your preferred model
-      messages: [{ role: "user", content: metaPrompt }],
-      temperature: 0.7,
-      max_tokens: 300, // Adjust as needed
-      n: 1,
-    });
-
-    const suggestedPrompt = completion.choices[0]?.message?.content?.trim();
-
-    if (!suggestedPrompt) {
-      throw new Error('OpenAI did not return a suggestion.');
-    }
-
-    console.log("Received suggestion from OpenAI:", suggestedPrompt);
-
-    return new Response(JSON.stringify({ suggested_prompt: suggestedPrompt }), {
+    // Return the hardcoded prompt
+    return new Response(JSON.stringify({ suggested_prompt: targetSuggestedPrompt }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,
     });
+    // --- END: Modified Logic ---
 
   } catch (error) {
     console.error('Error suggesting AI prompt:', error);
