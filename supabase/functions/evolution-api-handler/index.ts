@@ -1,10 +1,41 @@
-import { serve } from "std/http/server.ts"; // Use import map
+import { serve } from "std/http/server.ts"; // Revert back to import map alias
 import { corsHeaders } from "../_shared/cors.ts";
 import { createSupabaseServiceRoleClient } from "../_shared/supabaseClient.ts";
 import { fetchIntegrationCredentialsById } from "../_shared/integrationUtils.ts";
 
+// Define interfaces for API responses and DB data
+interface EvolutionFetchInstance {
+  id: string; // This is the instance_id from Evolution API
+  name: string; // This is the instanceName assigned by Evolution API
+  connectionStatus: string;
+  ownerJid: string | null;
+  token: string;
+  // Add other relevant fields if needed
+}
+
+interface EvolutionCreateInstanceResponse {
+  instance: {
+    instanceName: string; // Name returned immediately after creation attempt
+    instanceId: string; // The crucial unique ID
+    status: string;
+    // Add other relevant fields if needed
+  };
+  hash: string; // Assuming this is the token
+}
+
+interface IntegrationConfigUpsertData {
+  integration_id: string;
+  status?: string | null;
+  owner_id?: string | null;
+  instance_display_name?: string | null; // Name user intended/sees
+  token?: string | null;
+  user_reference_id?: string | null;
+  instance_id?: string | null; // The unique ID from Evolution API
+}
+
+
 // Main function handler
-serve(async (req) => {
+serve(async (req: Request) => { // Add Request type
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     console.log('Handling CORS preflight request for evolution-api-handler');
@@ -44,7 +75,8 @@ serve(async (req) => {
 
     // Action: List configured integration instances from DB and fetch LIVE status
     if (action === 'list-instances') {
-      console.log('Action: list-instances - Fetching from DB and live status from API');
+      // ... (Keep existing list-instances logic as it seems correct) ...
+       console.log('Action: list-instances - Fetching from DB and live status from API');
 
       // 1. Fetch basic instance data from DB
       const { data: dbInstances, error: dbError } = await supabaseClient
@@ -125,7 +157,8 @@ serve(async (req) => {
 
     // Action: Send Text Message via Evolution API
     else if (action === 'send-text') {
-      console.log('Action: send-text - Entering block.'); // <-- ADDED LOG
+      // ... (Keep existing send-text logic as it seems correct) ...
+       console.log('Action: send-text - Entering block.'); // <-- ADDED LOG
       // Expect instanceId (DB ID) in the request body to fetch credentials
       const { instanceId, number, text } = body as { instanceId?: string; number?: string; text?: string };
 
@@ -136,7 +169,8 @@ serve(async (req) => {
         });
       }
 
-      console.log(`Action: send-text - Attempting to fetch credentials for instanceId: ${instanceId}`); // <-- ADDED LOG
+      console.log(`Action: send-text - Attempting to fetch credentials for instanceId: ${instanceId}`);
+      console.log(`Action: send-text - Querying Supabase for instance details...`); // <-- ADDED LOG
       // Fetch credentials and display name by joining integrations and integrations_config
       const { data: instanceData, error: instanceError } = await supabaseClient
         .from('integrations')
@@ -156,13 +190,21 @@ serve(async (req) => {
 
       if (instanceError || !instanceData || !apiKey || !baseUrl || !instanceNameForApi) {
          const errorMsg = instanceError?.message || "Instance not found or missing required fields (instance_display_name from config, api_key, base_url).";
-         console.error(`Action: send-text - Failed to get instance data/credentials for ID ${instanceId}: ${errorMsg}`); // <-- Enhanced Log
+         // Log the specific reason for failure
+         if (instanceError) console.error(`Action: send-text - Supabase query error for ID ${instanceId}:`, instanceError);
+         if (!instanceData) console.error(`Action: send-text - No instanceData found for ID ${instanceId}.`);
+         if (!apiKey) console.error(`Action: send-text - Missing apiKey for ID ${instanceId}.`);
+         if (!baseUrl) console.error(`Action: send-text - Missing baseUrl for ID ${instanceId}.`);
+         if (!instanceNameForApi) console.error(`Action: send-text - Missing instance_display_name (from config) for ID ${instanceId}.`);
+
+         console.error(`Action: send-text - Overall failure fetching credentials for ID ${instanceId}: ${errorMsg}`); // Keep overall summary
          return new Response(JSON.stringify({ error: `Failed to get instance details: ${errorMsg}` }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
           status: instanceError?.code === 'PGRST116' ? 404 : 500 // Use 404 if not found
         });
       }
 
+      console.log(`Action: send-text - Successfully fetched credentials for instance ID ${instanceId}. Name: ${instanceNameForApi}`); // <-- ADDED LOG
       // Now we have the correct instanceNameForApi, apiKey, and baseUrl
       // Format the recipient number for the Evolution API
       const recipientNumber = number.includes('@') ? number : `${number}@c.us`;
@@ -221,18 +263,18 @@ serve(async (req) => {
         // Log the error message specifically if it's an Error instance
         if (apiError instanceof Error) {
             console.error(`Action: send-text - API Error Message: ${apiError.message}`);
-            console.error(`Action: send-text - API Error Stack: ${apiError.stack}`);
+            console.error(`Action: send-text - API Error Stack: ${apiError.stack}`); // <-- ADDED THIS LINE
         }
         return new Response(JSON.stringify({ error: `Evolution API call failed: ${apiError instanceof Error ? apiError.message : String(apiError)}` }), { // Ensure message is string
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 502 // Bad Gateway indicates upstream issue
         });
       }
       // --- End Actual API Call ---
-
     }
 
     // Action: Get Instance Status from Evolution API
     else if (action === 'get-status') {
+      // ... (Keep existing get-status logic) ...
         console.log('Action: get-status');
         // Allow instanceId (DB ID) from query param or body
         const instanceId = url.searchParams.get('instanceId') || (body as { instanceId?: string }).instanceId;
@@ -295,6 +337,7 @@ serve(async (req) => {
 
     // Action: Connect Instance and get QR Code
     else if (action === 'connect-instance') {
+      // ... (Keep existing connect-instance logic) ...
         console.log('Action: connect-instance');
         // Allow instanceId (DB ID) from query param or body
         const instanceId = url.searchParams.get('instanceId') || (body as { instanceId?: string }).instanceId;
@@ -360,6 +403,193 @@ serve(async (req) => {
         }), {
             headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200
         });
+    }
+
+    // Action: Sync Instance Config (Fetch/Create & Store in DB)
+    else if (action === 'sync-instance-config') {
+      console.log('Action: sync-instance-config');
+      // Extract integrationId and optional instanceName from the body
+      const { integrationId, instanceName: instanceNameFromBody } = body as { integrationId?: string; instanceName?: string };
+
+      if (!integrationId) {
+        return new Response(JSON.stringify({ error: 'Missing required parameter: integrationId in body' }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 400
+        });
+      }
+
+      // 1. Fetch integration details (global API key, base URL, instance name)
+      console.log(`Fetching integration details for ID: ${integrationId}`);
+      const { data: integrationData, error: integrationError } = await supabaseClient
+        .from('integrations')
+        .select('api_key, base_url, name') // Assuming api_key here is the GLOBAL key
+        .eq('id', integrationId)
+        .single();
+
+      if (integrationError || !integrationData || !integrationData.api_key || !integrationData.base_url || !integrationData.name) {
+        const errorMsg = integrationError?.message || "Integration not found or missing required fields (api_key, base_url, name).";
+        console.error(`Failed to get integration details for ID ${integrationId}: ${errorMsg}`);
+        return new Response(JSON.stringify({ error: `Failed to get integration details: ${errorMsg}` }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: integrationError?.code === 'PGRST116' ? 404 : 500
+        });
+      }
+
+      const { api_key: globalApiKey, base_url: baseUrl, name: defaultInstanceNameFromDb } = integrationData;
+      console.log(`Integration details fetched for default name "${defaultInstanceNameFromDb}" (ID: ${integrationId}). Base URL: ${baseUrl}`);
+
+      // --- Start Refined Logic ---
+      const fetchUrl = `${baseUrl}/instance/fetchInstances`;
+      let finalInstanceData: EvolutionFetchInstance | null = null; // Will hold the data to upsert
+
+      try {
+        // Function to fetch all instances
+        const fetchAllInstances = async (): Promise<EvolutionFetchInstance[]> => {
+          console.log(`Fetching instances from Evolution API: ${fetchUrl}`);
+          const response = await fetch(fetchUrl, { method: 'GET', headers: { 'apikey': globalApiKey } });
+          if (!response.ok) {
+            let errorBody = `(Failed to read error response body)`;
+            try { errorBody = await response.text(); } catch (_) { /* Ignore */ }
+            throw new Error(`Evolution API fetchInstances error (${response.status}): ${errorBody}`);
+          }
+          const instances = await response.json();
+          console.log(`Successfully fetched ${instances?.length || 0} instances from API.`);
+          return instances;
+        };
+
+        // Initial fetch
+        let currentInstances = await fetchAllInstances();
+
+        // --- Determine Flow: Create or Sync ---
+        if (instanceNameFromBody) {
+          // --- CREATE Flow ---
+          console.log(`CREATE flow initiated for name: "${instanceNameFromBody}"`);
+          const existingInstance = currentInstances.find(inst => inst.name === instanceNameFromBody);
+
+          if (existingInstance) {
+            // Instance with the desired creation name already exists. Use it.
+            console.warn(`Instance named "${instanceNameFromBody}" already exists on provider. Using existing instance data.`);
+            finalInstanceData = existingInstance;
+          } else {
+            // Instance does not exist, proceed with creation attempt
+            console.log(`Creating instance with name: "${instanceNameFromBody}"...`);
+            const createUrl = `${baseUrl}/instance/create`;
+            const createResponse = await fetch(createUrl, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'apikey': globalApiKey },
+              body: JSON.stringify({ instanceName: instanceNameFromBody, integration: "WHATSAPP-BAILEYS" })
+            });
+
+            if (!createResponse.ok) {
+              let errorBody = `(Failed to read error response body)`;
+              try { errorBody = await createResponse.text(); } catch (_) { /* Ignore */ }
+              throw new Error(`Evolution API create instance error (${createResponse.status}): ${errorBody}`);
+            }
+            const creationResult = await createResponse.json() as EvolutionCreateInstanceResponse;
+            console.log(`Successfully initiated creation via API for: "${creationResult?.instance?.instanceName}"`);
+
+            // IMPORTANT: Re-fetch after creation to get the definitive state
+            console.log(`Re-fetching instances after creation attempt...`);
+            currentInstances = await fetchAllInstances(); // Re-fetch the list
+            finalInstanceData = currentInstances.find(inst => inst.name === instanceNameFromBody) || null;
+
+            if (!finalInstanceData) {
+              console.error(`Failed to find instance "${instanceNameFromBody}" after successful creation call.`);
+              throw new Error(`Instance "${instanceNameFromBody}" was reported as created but could not be found immediately after.`);
+            }
+            console.log(`Successfully re-fetched created instance data for "${finalInstanceData.name}" (ID: ${finalInstanceData.id})`);
+          }
+        } else {
+          // --- SYNC Flow ---
+          console.log(`SYNC flow initiated for default name: "${defaultInstanceNameFromDb}"`);
+          const foundInstance = currentInstances.find(inst => inst.name === defaultInstanceNameFromDb);
+
+          if (foundInstance) {
+            // Instance found matching default name, use its data
+            finalInstanceData = foundInstance;
+            console.log(`Sync: Found matching instance "${finalInstanceData.name}".`);
+          } else {
+            // Instance not found matching default name, clear local config
+            console.log(`Sync: Instance "${defaultInstanceNameFromDb}" not found on provider. Clearing local config.`);
+            const { error: updateError } = await supabaseClient
+              .from('integrations_config')
+              .update({
+                instance_id: null, token: null, status: 'disconnected',
+                instance_display_name: null, owner_id: null, user_reference_id: null
+              })
+              .eq('integration_id', integrationId);
+
+            if (updateError) {
+              console.error(`Sync: Failed to clear local config for integration ID ${integrationId}:`, updateError);
+              throw new Error(`Instance not found on provider, and failed to clear local config: ${updateError.message}`);
+            }
+            // Return success, indicating sync completed and config cleared
+            return new Response(JSON.stringify({ success: true, message: `Sync: Instance "${defaultInstanceNameFromDb}" not found on provider. Local config cleared.`, data: null }), {
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200
+            });
+          }
+        } // End of SYNC flow else
+
+      } catch (apiError) {
+        // Use the name that was attempted (either default or from body) in the error message
+        const nameAttempted = instanceNameFromBody || defaultInstanceNameFromDb;
+        console.error(`Evolution API call failed during sync (Fetch/Create for "${nameAttempted}", ID: ${integrationId}):`, apiError);
+        return new Response(JSON.stringify({ error: `Evolution API call failed: ${apiError instanceof Error ? apiError.message : String(apiError)}` }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 502
+        });
+      }
+
+      // 5. Map data and prepare for DB upsert (Only if finalInstanceData is not null)
+      if (!finalInstanceData) {
+         // This should only happen if creation succeeded but re-fetch failed, which is handled in the catch block now.
+         console.error("Error: finalInstanceData is null before mapping. This indicates an unexpected state.");
+         return new Response(JSON.stringify({ error: 'Internal processing error: Failed to determine instance data for upsert.' }), {
+           headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500
+         });
+      }
+
+      console.log(`Mapping data for instance: "${finalInstanceData.name}" (ID: ${finalInstanceData.id})`);
+      // Prepare data for upsert. Use the user's requested name for display if it was provided (CREATE flow).
+      const configToUpsert: IntegrationConfigUpsertData = {
+        integration_id: integrationId,
+        status: finalInstanceData.connectionStatus,
+        owner_id: finalInstanceData.ownerJid,
+        instance_display_name: instanceNameFromBody || finalInstanceData.name, // Prioritize user input name for display
+        token: finalInstanceData.token,
+        user_reference_id: finalInstanceData.ownerJid,
+        instance_id: finalInstanceData.id // Use the actual ID from the provider
+      };
+
+      // Remove null/undefined values before upserting
+      Object.keys(configToUpsert).forEach(keyStr => {
+         const key = keyStr as keyof IntegrationConfigUpsertData; // Type assertion
+         if (configToUpsert[key] === undefined || configToUpsert[key] === null) {
+           // delete configToUpsert[key]; // Keep nulls for now, assuming DB handles them
+         }
+       });
+
+      console.log('Final data prepared for upsert:', JSON.stringify(configToUpsert, null, 2));
+
+      // 6. Upsert into integrations_config
+      const { error: upsertError } = await supabaseClient
+        .from('integrations_config')
+        .upsert(configToUpsert, { onConflict: 'integration_id' });
+
+      if (upsertError) {
+        console.error(`Failed to upsert integration config for integration ID ${integrationId}:`, upsertError);
+        return new Response(JSON.stringify({ error: `Database error saving instance config: ${upsertError.message}` }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 500
+        });
+      }
+
+      console.log(`Successfully synced and saved config for integration ID ${integrationId} (Instance: ${configToUpsert.instance_display_name})`);
+      // 7. Return success
+      return new Response(JSON.stringify({ success: true, message: `Instance config synced successfully for ${configToUpsert.instance_display_name}`, data: configToUpsert }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200
+      });
+      // --- End Refined Logic ---
+
     }
 
     // Handle unknown actions

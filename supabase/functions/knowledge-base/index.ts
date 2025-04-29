@@ -95,23 +95,6 @@ serve(async (req) => {
       }
       const contentEmbedding = await generateEmbedding(content); // <<< Use chunk content here
 
-        return new Response(
-          JSON.stringify({ error: 'Failed to fetch document content for embedding: ' + (docError?.message || 'Document not found or content missing') }),
-          {
-            status: 500,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          }
-        );
-      }
-      const fullDocumentContent = documentData.content;
-      console.log('Fetched full document content length:', fullDocumentContent.length);
-      // --- End Fetch ---
-
-
-      // Generate embedding for the *full document content*
-      console.log('Generating embedding for full document...');
-      const contentEmbedding = await generateEmbedding(fullDocumentContent); // Use full document content here
-
       // Convert the embedding to a string for storage
       const embeddingString = JSON.stringify(contentEmbedding);
       console.log('Generated embedding of length:', contentEmbedding.length);

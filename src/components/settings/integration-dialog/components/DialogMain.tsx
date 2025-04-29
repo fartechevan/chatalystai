@@ -1,49 +1,42 @@
 import { Integration } from "../../types";
 import { DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Loader2 } from "lucide-react";
-import { ConnectionStatus } from "./ConnectionStatus";
-import { ConnectionState } from "@/integrations/evolution-api/types"; // Corrected import path
+// Remove unused imports if ConnectionStatus is no longer rendered here
+// import { ConnectionStatus } from "./ConnectionStatus";
+// import { ConnectionState, EvolutionInstance } from "@/integrations/evolution-api/types";
 
 interface DialogMainProps {
   selectedIntegration: Integration | null;
-  connectionState: ConnectionState;
-  isLoading: boolean;
-  // onConnect: () => void; // Removed prop
-  onOpenChange: (open: boolean) => void;
+  // Remove all other props
 }
 
 export function DialogMain({
   selectedIntegration,
-  connectionState,
-  isLoading,
-  // onConnect, // Removed prop
-   onOpenChange
- }: DialogMainProps) {
-   // Log the connectionState being received by DialogMain
-   // console.log(`[DialogMain] Rendering with connectionState: ${connectionState}, isLoading: ${isLoading}`); // Removed log
- 
-   return (
-     <div className="w-1/2">
+}: DialogMainProps) {
+  // Keep only the static rendering logic for the left column
+  return (
+    <div className="w-1/2">
       <DialogHeader>
-        <DialogTitle>Connect WhatsApp</DialogTitle>
+        {/* Dynamically set title based on integration? */}
+        <DialogTitle>Connect {selectedIntegration?.name || 'Integration'}</DialogTitle>
         <DialogDescription>
-          Connect multiple WhatsApp numbers to send important conversations straight to your inbox.
-          Then nurture them with tools like templates and Salesbot!
+          {/* Static description or potentially dynamic based on integration */}
+          Connect multiple WhatsApp numbers to send important conversations straight to your inbox. Then nurture them with tools like templates and Salesbot!
         </DialogDescription>
       </DialogHeader>
-      
-      {isLoading ? (
-        <div className="flex items-center justify-center p-8">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        </div>
-      ) : (
-        <ConnectionStatus
-          connectionState={connectionState}
-          selectedIntegration={selectedIntegration}
-          // onConnect={onConnect} // Prop removed, ConnectionStatus doesn't need it if button is moved
-          onOpenChange={onOpenChange}
-        />
-      )}
+
+      {/* Remove conditional rendering based on connectionState/isLoading */}
+      {/* Display static content or integration icon */}
+      {selectedIntegration && (
+         <div className="aspect-video rounded-md bg-gradient-to-br from-green-50 to-green-100 mt-4 flex items-center justify-center p-8">
+           <img
+             src={selectedIntegration.icon_url || selectedIntegration.icon}
+             alt={selectedIntegration.name}
+             className="object-contain max-h-32"
+           />
+         </div>
+       )}
+       {/* Add any other static content for the left column here */}
     </div>
   );
 }
