@@ -45,11 +45,13 @@ type TargetMode = 'customers' | 'segment' | 'csv'; // Added 'csv' mode
 interface BroadcastModalProps {
   isOpen: boolean;
   onClose: () => void;
+  initialMessage?: string; // Add optional prop for initial message
 }
 
 export function BroadcastModal({
   isOpen,
-  onClose
+  onClose,
+  initialMessage // Destructure the new prop
 }: BroadcastModalProps) {
   const { toast } = useToast();
   const { userData } = useAuthUser(); // Correctly destructure userData based on TS error
@@ -108,16 +110,20 @@ export function BroadcastModal({
       setAddedCustomerIdsFromCsv([]); // Reset added IDs
       setShowAddContactsPrompt(false); // Reset prompt state
       setIsAddingContacts(false); // Reset adding state
-      setShowCreateSegmentPrompt(false); // Reset create segment prompt
-      setNewSegmentName(''); // Reset segment name
-      setIsCreatingSegment(false); // Reset segment creation loading
-      setBroadcastMessage('');
+      setShowCreateSegmentPrompt(false);
+      setNewSegmentName('');
+      setIsCreatingSegment(false);
+      setBroadcastMessage(initialMessage || ''); // Set initial message if provided
       setIsSending(false);
       setSelectedIntegrationId('');
       setAvailableIntegrations([]);
       setIsLoadingIntegrations(false);
+    } else {
+      // If closing, ensure message is cleared even if initialMessage was set
+      setBroadcastMessage('');
     }
-  }, [isOpen]);
+  // Add initialMessage to dependency array
+  }, [isOpen, initialMessage]);
 
   // Fetch customers when mode is 'customers'
   useEffect(() => {
