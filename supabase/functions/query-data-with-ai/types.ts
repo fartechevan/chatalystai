@@ -26,3 +26,11 @@ export interface RelevantSchemaPart {
 }
 
 export type SqlQueryResult = Json;
+
+/**
+ * Structure for data intended for chart rendering (e.g., pie chart).
+ */
+export type ChartData = {
+  name: string; // Category label
+  value: number; // Numeric value for the category
+};

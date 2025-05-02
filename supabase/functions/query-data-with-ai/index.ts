@@ -54,17 +54,23 @@ serve(async (req) => {
     // 7. Execute Generated SQL via RPC
     const queryResult = await executeGeneratedSql(supabaseClient, generatedSql);
 
-    // 8. Summarize Results via OpenAI
-    const finalResponse = await summarizeResults(openai, query, history || [], queryResult);
+    // 8. Summarize Results via OpenAI (potentially including chart data)
+    const { summary, chartData } = await summarizeResults(openai, query, history || [], queryResult);
 
-    // 9. Return Final Response
+    // 9. Return Final Response (including chart data if available)
+    const responsePayload = {
+        response: summary,
+        ...(chartData && { chartData: chartData }) // Conditionally add chartData
+    };
+
     return new Response(
-      JSON.stringify({ response: finalResponse }),
+      JSON.stringify(responsePayload),
       { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
     );
 
   } catch (error) {
-    console.error("Error in query-data-with-ai handler:", error.message);
+    // Log the full error object for better debugging
+    console.error("Caught error in query-data-with-ai handler:", error);
     let status = 500;
     // Set specific statuses based on error messages from utils
     if (error.message === "Method Not Allowed") status = 405;
@@ -75,12 +81,18 @@ serve(async (req) => {
     if (error.message.startsWith("Failed to query schema embeddings via RPC")) status = 500; // Internal DB/RPC issue
     if (error.message === "SQL generation failed or deemed unsafe/impossible.") {
         // Return a user-friendly message instead of just the error
+        // Ensure this error response also follows the { response: string } structure
         return new Response(
             JSON.stringify({ response: "Sorry, I couldn't construct a valid query to answer that based on the available data." }),
             { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 } // Return 200 OK with explanation
         );
     }
     if (error.message.startsWith("OpenAI API error during SQL generation")) status = 502;
+    if (error.message.startsWith("Failed to execute the data query via RPC")) status = 500; // Internal DB/RPC issue
+    // Note: summarizeResults now returns an object, so errors during summarization are handled internally
+    // and return { summary: errorMessage, chartData: potentialChartData }
+
+    // Default error response (keep simple error structure for unexpected issues)
     if (error.message.startsWith("Failed to execute the data query via RPC")) status = 500; // Internal DB/RPC issue
     if (error.message.startsWith("OpenAI API error during sentiment analysis")) status = 502; // Error during summarization
 
