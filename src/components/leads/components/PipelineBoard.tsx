@@ -5,14 +5,16 @@ import { LeadsStage } from "../LeadsStage";
 import { StageLeads, PipelineStage } from "../hooks/usePipelineData";
 import { moveLead } from "../services/leadService";
 import { useToast } from "@/hooks/use-toast";
+import type { Lead } from "@/components/dashboard/conversations/types"; // Import Lead type
 
 interface PipelineBoardProps {
   stages: PipelineStage[];
   stageLeads: StageLeads;
   onLeadMoved: () => void;
+  onLeadClick: (lead: Lead) => void; // Add onLeadClick prop
 }
 
-export function PipelineBoard({ stages, stageLeads, onLeadMoved }: PipelineBoardProps) {
+export function PipelineBoard({ stages, stageLeads, onLeadMoved, onLeadClick }: PipelineBoardProps) { // Add onLeadClick
   const { toast } = useToast();
  
    const handleDragEnd = async (result: DropResult) => {
@@ -70,15 +72,20 @@ export function PipelineBoard({ stages, stageLeads, onLeadMoved }: PipelineBoard
         {/* Inner container handles horizontal scrolling and padding */}
         <div className="h-full overflow-x-auto p-6"> 
           <div className="flex gap-6 min-w-max h-full"> {/* Ensure inner flex container also takes height */}
-            {stages.map((stage, index) => (
-              <LeadsStage
-              key={stage.id}
-              id={stage.id}
-              name={stage.name}
-              index={index}
-              leads={stageLeads[stage.id] || []}
-            />
-          ))}
+            {stages.map((stage, index) => {
+              const leadsForStage = stageLeads[stage.id] || [];
+              console.log(`Leads passed to stage "${stage.name}" (ID: ${stage.id}):`, JSON.stringify(leadsForStage, null, 2)); // Add log here
+              return (
+                <LeadsStage
+                  key={stage.id}
+                  id={stage.id}
+                  name={stage.name}
+                  index={index}
+                  leads={leadsForStage}
+                  onLeadClick={onLeadClick} // Pass onLeadClick down
+                />
+              );
+            })}
           </div>
         </div>
       </div>

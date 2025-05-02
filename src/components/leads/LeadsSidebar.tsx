@@ -55,7 +55,8 @@ export function LeadsSidebar({
 
   useEffect(() => {
     loadPipelines();
-  }, [selectedPipelineId, onPipelineSelect]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps 
+  }, []); // Run only once on mount
 
   // Added 'h-full' for use within SheetContent/Layout containers
   return (

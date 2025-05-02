@@ -168,11 +168,8 @@ export function LeadDetailsPanel({
                   </div>
                   {/* Common Footer */}
                   <div className="mt-auto border-t p-4">
-                    <div className="flex items-center justify-between gap-2">
-                      <Button variant="outline" size="sm" className="flex-1">
-                        <Check className="h-4 w-4 mr-2" />
-                        Accept
-                      </Button>
+                    <div className="flex items-center justify-end gap-2"> {/* Adjusted justify-between to justify-end */}
+                      {/* Removed Accept Button */}
                       <Button variant="outline" size="icon" className="shrink-0">
                         <LinkIcon className="h-4 w-4" />
                       </Button>
@@ -190,11 +187,8 @@ export function LeadDetailsPanel({
                   </div>
                    {/* Common Footer */}
                    <div className="mt-auto border-t p-4">
-                    <div className="flex items-center justify-between gap-2">
-                      <Button variant="outline" size="sm" className="flex-1">
-                        <Check className="h-4 w-4 mr-2" />
-                        Accept
-                      </Button>
+                    <div className="flex items-center justify-end gap-2"> {/* Adjusted justify-between to justify-end */}
+                      {/* Removed Accept Button */}
                       <Button variant="outline" size="icon" className="shrink-0">
                         <LinkIcon className="h-4 w-4" />
                       </Button>
@@ -212,11 +206,8 @@ export function LeadDetailsPanel({
                   </div>
                    {/* Common Footer */}
                    <div className="mt-auto border-t p-4">
-                    <div className="flex items-center justify-between gap-2">
-                      <Button variant="outline" size="sm" className="flex-1">
-                        <Check className="h-4 w-4 mr-2" />
-                        Accept
-                      </Button>
+                    <div className="flex items-center justify-end gap-2"> {/* Adjusted justify-between to justify-end */}
+                      {/* Removed Accept Button */}
                       <Button variant="outline" size="icon" className="shrink-0">
                         <LinkIcon className="h-4 w-4" />
                       </Button>
@@ -234,11 +225,8 @@ export function LeadDetailsPanel({
                   </div>
                    {/* Common Footer */}
                    <div className="mt-auto border-t p-4">
-                    <div className="flex items-center justify-between gap-2">
-                      <Button variant="outline" size="sm" className="flex-1">
-                        <Check className="h-4 w-4 mr-2" />
-                        Accept
-                      </Button>
+                    <div className="flex items-center justify-end gap-2"> {/* Adjusted justify-between to justify-end */}
+                      {/* Removed Accept Button */}
                       <Button variant="outline" size="icon" className="shrink-0">
                         <LinkIcon className="h-4 w-4" />
                       </Button>
