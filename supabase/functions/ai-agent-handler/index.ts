@@ -167,7 +167,7 @@ serve(async (req: Request) => {
                     // Use the fetched knowledgeDocumentIds for filtering
                     const { data: chunks, error: chunkError } = await supabase.rpc('match_chunks', {
                         query_embedding: embedding,
-                        match_threshold: 0.75, // Consider making this configurable per agent?
+                        match_threshold: 0.70, // Lowered threshold from 0.75
                         match_count: 5,       // Consider making this configurable per agent?
                         filter_document_ids: knowledgeDocumentIds // Pass the correct IDs
                     });

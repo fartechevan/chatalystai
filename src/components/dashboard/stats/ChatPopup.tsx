@@ -13,6 +13,17 @@ import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Send } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client'; // Import supabase client
+import {
+  PieChart,
+  Pie,
+  Cell,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+} from 'recharts'; // Import recharts components
+
+// Define some colors for the pie chart slices
+const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#8884D8', '#82CA9D'];
 
 interface ChatPopupProps {
   isOpen: boolean;
@@ -20,10 +31,18 @@ interface ChatPopupProps {
 }
 
 // Simple message type for demonstration
+// Define the structure for chart data items
+type ChartDataItem = {
+  name: string;
+  value: number;
+};
+
+// Update ChatMessage type to include optional chart data
 type ChatMessage = {
   id: string;
   sender: 'user' | 'bot';
   text: string;
+  chartData?: ChartDataItem[]; // Optional array for chart data
 };
 
 export function ChatPopup({ isOpen, onOpenChange }: ChatPopupProps) {
@@ -69,13 +88,15 @@ export function ChatPopup({ isOpen, onOpenChange }: ChatPopupProps) {
         botText = data.response;
       }
 
+      // Include chartData if it exists in the response
       const botResponse: ChatMessage = {
         id: (Date.now() + 1).toString(),
         sender: 'bot',
         text: botText,
+        chartData: data?.chartData, // Add chartData from the response
       };
       // Update messages state with the bot response
-      setMessages(prev => [...prev, botResponse]); 
+      setMessages(prev => [...prev, botResponse]);
 
     } catch (invokeError) {
       // Catch potential errors during the invoke call itself
@@ -127,6 +148,32 @@ export function ChatPopup({ isOpen, onOpenChange }: ChatPopupProps) {
                 >
                   {message.text}
                 </div>
+                {/* Render Pie Chart if chartData exists for this bot message */}
+                {message.sender === 'bot' && message.chartData && message.chartData.length > 0 && (
+                  <div className="mt-2 w-full max-w-[75%] h-64"> {/* Chart container */}
+                    <ResponsiveContainer width="100%" height="100%">
+                      <PieChart>
+                        <Pie
+                          data={message.chartData}
+                          cx="50%"
+                          cy="50%"
+                          labelLine={false}
+                          // label={({ name, percent }) => `${name}: ${(percent * 100).toFixed(0)}%`} // Optional: Add labels
+                          outerRadius={80}
+                          fill="#8884d8"
+                          dataKey="value"
+                          nameKey="name"
+                        >
+                          {message.chartData.map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                          ))}
+                        </Pie>
+                        <Tooltip />
+                        <Legend />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </div>
+                )}
               </div>
             ))}
              {isLoading && (

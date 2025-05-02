@@ -234,6 +234,47 @@ export function useIntegrationConnectionState(
        console.log("[refetchInstances] Manual fetch valid instances after filtering", validInstances);
       setFetchedInstances(validInstances);
 
+      // --- BEGIN: Upsert fetched instances into integrations_config ---
+      if (validInstances.length > 0) {
+        console.log("[refetchInstances] Upserting fetched instances into DB...");
+        const upsertPromises = validInstances.map(async (instance) => {
+          const instanceId = instance.id;
+          const instanceDisplayName = instance.name;
+          const ownerId = instance.ownerJid; // May be undefined
+          const userReferenceId = ownerId ? ownerId.replace(/@s\.whatsapp\.net$/, '') : null;
+
+          try {
+            const { error: upsertError } = await supabase
+              .from('integrations_config')
+              .upsert(
+                {
+                  integration_id: integrationId, // integrationId from function scope
+                  instance_id: instanceId,
+                  instance_display_name: instanceDisplayName,
+                  owner_id: ownerId, // Store original JID if available
+                  user_reference_id: userReferenceId, // Store sanitized ID if available
+                  // Add other default/required fields if necessary
+                 },
+                 {
+                   onConflict: 'integration_id', // Corrected: Use integration_id as the conflict target
+                   ignoreDuplicates: false, // Ensure updates happen
+                 }
+              );
+            if (upsertError) {
+              console.error(`[refetchInstances] Error upserting instance ${instanceId} for integration ${integrationId}:`, upsertError);
+              // Optionally throw or collect errors
+            } else {
+               console.log(`[refetchInstances] Successfully upserted instance ${instanceId} for integration ${integrationId}`);
+            }
+          } catch (err) {
+            console.error(`[refetchInstances] Exception during upsert for instance ${instanceId}:`, err);
+          }
+        });
+        await Promise.all(upsertPromises);
+        console.log("[refetchInstances] Finished upserting instances.");
+      }
+      // --- END: Upsert fetched instances ---
+
       if (validInstances.length > 0 && !validInstances.some(inst => inst.name === selectedInstanceName)) {
          setSelectedInstanceName(validInstances[0].name);
       } else if (validInstances.length === 0) {
@@ -264,6 +305,47 @@ export function useIntegrationConnectionState(
           typeof inst.token === 'string'
       );
       setFetchedInstances(validInstances);
+
+      // --- BEGIN: Upsert fetched instances into integrations_config ---
+      if (validInstances.length > 0) {
+        console.log("[fetchInstancesAndSetState] Upserting fetched instances into DB...");
+        const upsertPromises = validInstances.map(async (instance) => {
+          const instanceId = instance.id;
+          const instanceDisplayName = instance.name;
+          const ownerId = instance.ownerJid; // May be undefined
+          const userReferenceId = ownerId ? ownerId.replace(/@s\.whatsapp\.net$/, '') : null;
+
+          try {
+            const { error: upsertError } = await supabase
+              .from('integrations_config')
+              .upsert(
+                {
+                  integration_id: integrationId, // integrationId from function scope
+                  instance_id: instanceId,
+                  instance_display_name: instanceDisplayName,
+                  owner_id: ownerId, // Store original JID if available
+                  user_reference_id: userReferenceId, // Store sanitized ID if available
+                  // Add other default/required fields if necessary
+                 },
+                 {
+                   onConflict: 'integration_id', // Corrected: Use integration_id as the conflict target
+                   ignoreDuplicates: false, // Ensure updates happen
+                 }
+              );
+            if (upsertError) {
+              console.error(`[fetchInstancesAndSetState] Error upserting instance ${instanceId} for integration ${integrationId}:`, upsertError);
+              // Optionally throw or collect errors
+            } else {
+               console.log(`[fetchInstancesAndSetState] Successfully upserted instance ${instanceId} for integration ${integrationId}`);
+            }
+          } catch (err) {
+            console.error(`[fetchInstancesAndSetState] Exception during upsert for instance ${instanceId}:`, err);
+          }
+        });
+        await Promise.all(upsertPromises);
+        console.log("[fetchInstancesAndSetState] Finished upserting instances.");
+      }
+      // --- END: Upsert fetched instances ---
 
       if (validInstances.length > 0) {
         let currentSelectedInstanceName = selectedInstanceName;
