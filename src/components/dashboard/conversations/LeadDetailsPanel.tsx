@@ -156,6 +156,7 @@ export function LeadDetailsPanel({
                     <LeadContactInfo 
                       customer={customer} 
                       lead={lead} 
+                      isLoadingCustomer={isLoading} // Pass the main loading state here
                     />
                     <LeadDetailsInfo 
                       profiles={profiles}

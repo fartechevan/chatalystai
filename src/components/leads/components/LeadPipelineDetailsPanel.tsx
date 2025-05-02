@@ -1,194 +1,229 @@
-import React, { useState, useEffect } from 'react'; // Import useState, useEffect
+import React, { useState, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
-import { X, Tag, Building, User } from 'lucide-react'; // Import necessary icons
-import { Badge } from "@/components/ui/badge"; // Import Badge for tags
-import type { Lead, Profile } from "@/components/dashboard/conversations/types"; // Import Profile type
-import { supabase } from "@/integrations/supabase/client"; // Import supabase client
+import { X, LinkIcon, Trash2, Tag, Building, User } from 'lucide-react'; // Keep original icons + add new ones
+import { Badge } from "@/components/ui/badge";
+import type { Lead, Profile, Customer } from "@/components/dashboard/conversations/types"; // Import Customer type
+import { supabase } from "@/integrations/supabase/client";
+import { QueryClient } from '@tanstack/react-query';
+import { cn } from "@/lib/utils";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+// Import only the necessary reusable components and hooks
+import { 
+  LeadTags,
+  PipelineSelector,
+  LeadContactInfo,
+  LeadDetailsInfo
+} from "@/components/dashboard/conversations/leadDetails"; 
+import {
+  useLeadPipeline,
+  useLeadTags,
+  useAssignee
+} from "@/components/dashboard/conversations/leadDetails/hooks"; 
+import { calculateDaysSinceCreation } from "@/components/dashboard/conversations/leadDetails/hooks/utils/leadUtils"; // Import utility
 
 interface LeadPipelineDetailsPanelProps {
   lead: Lead | null;
   onClose: () => void;
+  queryClient: QueryClient;
 }
 
-export function LeadPipelineDetailsPanel({ lead, onClose }: LeadPipelineDetailsPanelProps) {
+export function LeadPipelineDetailsPanel({ lead: initialLead, onClose, queryClient }: LeadPipelineDetailsPanelProps) {
   const [profiles, setProfiles] = useState<Profile[]>([]);
-  const [assigneeName, setAssigneeName] = useState<string>('Loading...');
-  const [customerName, setCustomerName] = useState<string>('Loading...');
-  const [companyName, setCompanyName] = useState<string>('Loading...');
-  const [tags, setTags] = useState<{ id: string; name: string }[]>([]);
-  const [isLoadingTags, setIsLoadingTags] = useState<boolean>(true);
+  const [isLoadingProfiles, setIsLoadingProfiles] = useState<boolean>(true); // Add loading state for profiles
+  // Restore customer state and loading state
+  const [customer, setCustomer] = useState<Customer | null>(null); 
+  const [isLoadingCustomer, setIsLoadingCustomer] = useState<boolean>(true);
+  const [activeTab, setActiveTab] = useState("main");
+  
+  // --- Reusable Hooks (excluding useLeadData) ---
+  const {
+    selectedAssignee,
+    handleAssigneeChange,
+    fetchProfiles
+  } = useAssignee(profiles, initialLead, customer); // Pass customer state
 
-  // Fetch profiles and customer data when component mounts or lead changes
+  // Use useLeadPipeline hook
+  const {
+    allPipelines,
+    selectedPipeline,
+    selectedStage,
+    handlePipelineChange,
+    handleStageChange
+  } = useLeadPipeline(initialLead, null, true); // Pass initialLead, null for conversation
+  
+  // Use useLeadTags hook
+  const {
+    tags,
+    setTags,
+    isTagsLoading,
+    handleAddTag,
+    handleRemoveTag
+  } = useLeadTags(initialLead); // Pass initialLead
+
+  // --- Data Fetching (Profiles & Customer) ---
   useEffect(() => {
-    const fetchData = async () => {
-      if (!lead) {
-        setAssigneeName('N/A');
-        setCustomerName('N/A');
-        setCompanyName('N/A');
-        setTags([]);
-        setIsLoadingTags(false);
+    // console.log("[Effect Profiles] Running for lead:", initialLead?.id); 
+    const getProfiles = async () => {
+      // console.log("[Effect Profiles] Fetching profiles..."); 
+      setIsLoadingProfiles(true); // Set loading true before fetch
+      try {
+        const profilesData = await fetchProfiles();
+        // console.log("[Effect Profiles] Fetched profiles data:", profilesData); 
+        setProfiles(profilesData as Profile[]); 
+      } catch (error) {
+        console.error("Error fetching profiles:", error); // Keep error log
+        setProfiles([]); // Set empty on error
+      } finally {
+        setIsLoadingProfiles(false); // Set loading false after fetch/error
+      }
+    };
+    if (initialLead) { 
+      getProfiles();
+    } else {
+      setProfiles([]); 
+    }
+  }, [fetchProfiles, initialLead]); 
+
+  // Restore customer fetching useEffect
+  useEffect(() => {
+    const fetchCustomerData = async () => {
+      // Explicitly reset state if no valid ID before starting
+      if (!initialLead || !initialLead.customer_id) {
+        setCustomer(null); 
+        setIsLoadingCustomer(false); 
         return;
       }
-
-      setAssigneeName('Loading...'); 
-      setCustomerName('Loading...');
-      setCompanyName('Loading...');
-      setTags([]); // Reset tags
-      setIsLoadingTags(true);
-      setProfiles([]); // Reset profiles
-
-      // --- Fetch Profiles (for Assignee) ---
+      
+      // Set loading true and ensure customer is null before fetch starts
+      setCustomer(null); 
+      setIsLoadingCustomer(true); 
+      
       try {
-        const { data: profilesData, error: profilesError } = await supabase
-          .from('profiles')
-          .select('*');
+        const { data: customerData, error } = await supabase
+          .from('customers')
+          .select('*')
+          .eq('id', initialLead.customer_id)
+          .single();
         
-        if (profilesError) {
-          console.error('Error fetching profiles:', profilesError);
-          setProfiles([]);
-          setAssigneeName('Error loading user');
-        } else if (profilesData) {
-          setProfiles(profilesData);
-          // Find assignee name after profiles are fetched
-          if (lead?.assignee_id) {
-            const assignee = profilesData.find(p => p.id === lead.assignee_id);
-            setAssigneeName(assignee?.name || 'Unknown User');
-          } else {
-            setAssigneeName('Unassigned');
-          }
+        if (error) {
+          console.error("Error fetching customer:", error); 
+          setCustomer(null);
         } else {
-          setProfiles([]);
-          setAssigneeName('Unassigned');
+          setCustomer(customerData);
         }
-      } catch (profilesError) {
-        console.error('Error fetching profiles:', profilesError);
-        setProfiles([]);
-        setAssigneeName('Error loading user');
-      }
-
-      // --- Fetch Customer Data ---
-      if (lead.customer_id) {
-        try {
-          const { data: customerData, error: customerError } = await supabase
-            .from('customers')
-            .select('name, company_name')
-            .eq('id', lead.customer_id)
-            .maybeSingle(); // Use maybeSingle as customer might not exist
-
-          if (customerError) {
-            console.error('Error fetching customer:', customerError);
-            setCustomerName('Error');
-            setCompanyName('Error');
-          } else if (customerData) {
-            setCustomerName(customerData.name || 'N/A');
-            setCompanyName(customerData.company_name || 'N/A');
-          } else {
-            setCustomerName('Not Found');
-            setCompanyName('Not Found');
-          }
-        } catch (customerError) {
-          console.error('Error fetching customer:', customerError);
-          setCustomerName('Error');
-          setCompanyName('Error');
-        }
-      } else {
-        setCustomerName('No Customer ID');
-        setCompanyName('No Customer ID');
-      }
-
-      // --- Fetch Tags ---
-      try {
-        const { data: tagData, error: tagError } = await supabase
-          .from('lead_tags')
-          .select('tags (id, name)') // Select id and name from the related tags table
-          .eq('lead_id', lead.id);
-
-        if (tagError) {
-          console.error('Error fetching tags:', tagError);
-          setTags([]);
-        } else if (tagData) {
-          // Extract the nested tag objects
-          const extractedTags = tagData
-            .map(item => item.tags)
-            .filter(tag => tag !== null) as { id: string; name: string }[];
-          setTags(extractedTags);
-        } else {
-          setTags([]);
-        }
-      } catch (tagError) {
-        console.error('Error fetching tags:', tagError);
-        setTags([]);
+      } catch (err) {
+        console.error("Error fetching customer:", err); 
+        setCustomer(null);
       } finally {
-        setIsLoadingTags(false);
+        setIsLoadingCustomer(false);
       }
     };
 
-    fetchData();
-  }, [lead]); // Re-run when lead changes
+    fetchCustomerData();
+    // Add initialLead.id explicitly to dependency array
+  }, [initialLead?.id, initialLead]); 
 
-  if (!lead) {
-    return null; // Don't render anything if no lead is selected
+  // --- Render Logic ---
+  if (!initialLead) { 
+    return null; 
   }
 
-  // Basic display for now, can be expanded later
+  const daysSinceCreation = calculateDaysSinceCreation(initialLead.created_at);
+  // Remove combined loading state - let children handle their own
+  // const isLoading = isLoadingCustomer || isTagsLoading || isLoadingProfiles; 
+
   return (
-    <div className="h-full flex flex-col">
+    <div className={cn("border-l bg-background flex flex-col h-full")}> 
+      {/* Reinstate original CardHeader */}
       <CardHeader className="flex flex-row items-center justify-between p-4 border-b">
-        <CardTitle className="text-lg font-semibold">Lead Details</CardTitle>
+        <CardTitle className="text-lg font-semibold">
+          {/* Restore customer name logic in title */}
+          {customer?.name || initialLead?.name || 'Lead Details'} 
+        </CardTitle>
         <Button variant="ghost" size="icon" onClick={onClose}>
           <X className="h-5 w-5" />
         </Button>
       </CardHeader>
-      <CardContent className="p-4 flex-1 overflow-auto">
-        <div className="space-y-3">
-          <div>
-            {/* Display fetched customer name */}
-            <h4 className="font-medium mb-1">{customerName}</h4> 
-            <p className="text-xs text-muted-foreground">ID: {lead.id}</p>
-          </div>
 
-          <div>
-            <h5 className="text-xs font-semibold text-muted-foreground mb-1 uppercase tracking-wider">Value</h5>
-            <p className="text-sm">{lead.value ? `${lead.value.toLocaleString()} RM` : 'N/A'}</p>
+      {/* Remove top-level loading check - render structure directly */}
+      <div className="flex-1 overflow-auto flex flex-col"> 
+        <> 
+          <div className="p-4 space-y-4">
+            {/* Pass isTagsLoading to LeadTags */}
+            <LeadTags 
+              tags={tags} 
+              setTags={setTags} 
+              onAddTag={handleAddTag} 
+              onRemoveTag={handleRemoveTag}
+              isLoading={isTagsLoading} 
+            />
+            {/* Correct PipelineSelector usage */}
+            <PipelineSelector 
+              selectedPipeline={selectedPipeline}
+              selectedStage={selectedStage}
+              allPipelines={allPipelines}
+              daysSinceCreation={daysSinceCreation}
+              onPipelineChange={handlePipelineChange}
+              onStageChange={handleStageChange}
+            />
           </div>
+            
+          <Tabs defaultValue="main" className="w-full flex flex-col flex-1" value={activeTab} onValueChange={setActiveTab}>
+              <div className="border-t border-b">
+                <TabsList className="w-full h-auto grid grid-cols-4 rounded-none bg-background p-0">
+                  <TabsTrigger value="main" className="py-3 rounded-none data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:shadow-none">Main</TabsTrigger>
+                  <TabsTrigger value="statistics" disabled className="py-3 rounded-none data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:shadow-none">Statistics</TabsTrigger>
+                  <TabsTrigger value="media" disabled className="py-3 rounded-none data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:shadow-none">Media</TabsTrigger>
+                  <TabsTrigger value="setup" disabled className="py-3 rounded-none data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:shadow-none">Setup</TabsTrigger>
+                </TabsList>
+              </div>
 
-          <div>
-            <h5 className="text-xs font-semibold text-muted-foreground mb-1 uppercase tracking-wider flex items-center">
-              <Building className="h-3 w-3 mr-1.5" /> Company
-            </h5>
-            {/* Display fetched company name */}
-            <p className="text-sm">{companyName}</p> 
-            {/* TODO: Add more company details if available */}
-          </div>
+              {/* Let TabsContent handle scrolling directly */}
+              <TabsContent value="main" className="flex-1 overflow-auto p-0 m-0 flex flex-col"> 
+                {/* Remove inner scrollable div */}
+                {/* <div className="flex-1 overflow-auto">  */}
+                  <LeadContactInfo 
+                    customer={customer} // Restore customer prop
+                    lead={initialLead} // Pass initialLead
+                    isLoadingCustomer={isLoadingCustomer} // Restore isLoadingCustomer prop
+                  />
+                  <LeadDetailsInfo 
+                    profiles={profiles}
+                    selectedAssignee={selectedAssignee}
+                    onAssigneeChange={handleAssigneeChange}
+                    customer={customer} // Restore customer prop
+                    lead={initialLead} // Pass initialLead
+                    isLoading={isLoadingProfiles} // Pass profile loading state
+                  />
+                {/* </div> */}
+                {/* Remove the fixed footer section */}
+                {/* <div className="mt-auto border-t p-4"> 
+                  <div className="flex items-center justify-end gap-2"> 
+                    <Button variant="outline" size="icon" className="shrink-0" disabled>
+                      <LinkIcon className="h-4 w-4" />
+                    </Button>
+                    <Button variant="outline" size="icon" className="shrink-0" disabled>
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div> */}
+              </TabsContent>
 
-          <div>
-            <h5 className="text-xs font-semibold text-muted-foreground mb-1 uppercase tracking-wider flex items-center">
-              <User className="h-3 w-3 mr-1.5" /> Responsible User
-            </h5>
-            <p className="text-sm">{assigneeName}</p> 
-          </div>
-
-          <div>
-            <h5 className="text-xs font-semibold text-muted-foreground mb-1 uppercase tracking-wider flex items-center">
-              <Tag className="h-3 w-3 mr-1.5" /> Tags
-            </h5>
-            <div className="flex flex-wrap gap-1">
-              {isLoadingTags ? (
-                <p className="text-xs text-muted-foreground">Loading tags...</p>
-              ) : tags.length > 0 ? (
-                tags.map(tag => (
-                  <Badge key={tag.id} variant="secondary">
-                    {tag.name}
-                  </Badge>
-                ))
-              ) : (
-                <p className="text-xs text-muted-foreground">No tags</p>
-              )}
-            </div>
-          </div>
-        </div>
-      </CardContent>
-    </div>
+              {/* Remove placeholder tabs */}
+              {/* <TabsContent value="statistics" className="flex-1 p-4 m-0 flex flex-col">
+                 <p className="text-sm text-muted-foreground">Statistics (Not Implemented)</p>
+              </TabsContent>
+              <TabsContent value="media" className="flex-1 p-4 m-0 flex flex-col">
+                 <p className="text-sm text-muted-foreground">Media (Not Implemented)</p>
+              </TabsContent>
+              <TabsContent value="setup" className="flex-1 p-4 m-0 flex flex-col">
+                 <p className="text-sm text-muted-foreground">Setup (Not Implemented)</p>
+              </TabsContent> */}
+            </Tabs>
+         </> 
+        {/* )} <- This closing parenthesis belongs to the removed isLoading check */}
+      </div> 
+    </div> 
   );
 }
