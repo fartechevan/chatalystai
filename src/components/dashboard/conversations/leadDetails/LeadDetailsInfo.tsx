@@ -9,7 +9,7 @@ interface LeadDetailsInfoProps {
   onAssigneeChange: (userId: string) => void;
   customer: Customer | null;
   lead: Lead | null;
-  isLoading: boolean;
+  isLoading: boolean; // This prop represents isLoadingProfiles in the parent
 }
 
 export function LeadDetailsInfo({ 
@@ -18,9 +18,11 @@ export function LeadDetailsInfo({
   onAssigneeChange, 
   customer, 
   lead, 
-  isLoading 
+  isLoading // Represents isLoadingProfiles from parent
 }: LeadDetailsInfoProps) {
+  // console.log("[Render LeadDetailsInfo] Props:", { profiles, selectedAssignee, customer, lead, isLoading }); // Remove log
   const selectedProfile = profiles.find(profile => profile.id === selectedAssignee);
+  // console.log("[Render LeadDetailsInfo] Found selectedProfile:", selectedProfile); // Remove log
 
   return (
     <div className="p-4 space-y-6">
@@ -29,20 +31,24 @@ export function LeadDetailsInfo({
         <div className="text-sm">
           {isLoading ? (
             <div className="h-5 w-24 bg-muted animate-pulse rounded"></div>
+          ) : profiles.length === 0 ? (
+             <p className="text-xs text-muted-foreground italic">No users available</p>
           ) : (
             <Select 
-              value={selectedAssignee || undefined} 
+              value={selectedAssignee || undefined} // Use undefined if null for placeholder
               onValueChange={onAssigneeChange}
+              disabled={profiles.length === 0} // Disable if no profiles
             >
-              <SelectTrigger className="h-auto py-1 px-2 text-sm border-none shadow-none">
+              <SelectTrigger className="h-auto py-1 px-2 text-sm border-none shadow-none data-[disabled]:opacity-100 data-[disabled]:cursor-not-allowed">
                 <SelectValue placeholder="Select user">
-                  {selectedProfile?.name || "Select user"}
+                  {/* Show selected name or placeholder */}
+                  {selectedProfile?.name || (selectedAssignee ? "Unknown User" : "Select user")} 
                 </SelectValue>
               </SelectTrigger>
               <SelectContent>
                 {profiles.map(profile => (
                   <SelectItem key={profile.id} value={profile.id}>
-                    {profile.name || profile.email}
+                    {profile.name || profile.email} {/* Display name or email */}
                   </SelectItem>
                 ))}
               </SelectContent>

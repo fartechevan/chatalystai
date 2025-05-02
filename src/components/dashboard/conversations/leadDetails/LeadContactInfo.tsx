@@ -11,13 +11,17 @@ import { Customer, Lead } from "../types";
 interface LeadContactInfoProps {
   customer: Customer | null;
   lead: Lead | null;
+  isLoadingCustomer: boolean; // Add loading prop
 }
 
-export function LeadContactInfo({ customer, lead }: LeadContactInfoProps) {
+export function LeadContactInfo({ customer, lead, isLoadingCustomer }: LeadContactInfoProps) { // Add to destructuring
+  // console.log("[Render LeadContactInfo] Props:", { customer, lead, isLoadingCustomer }); // Remove log
   const { toast } = useToast();
   const [isEditing, setIsEditing] = useState(false);
-  const [companyName, setCompanyName] = useState("");
-  const [companyAddress, setCompanyAddress] = useState("");
+  // Remove internal state for companyName and companyAddress
+  // We will use the customer prop directly and manage edits temporarily
+  const [editedCompanyName, setEditedCompanyName] = useState<string | null>(null);
+  const [editedCompanyAddress, setEditedCompanyAddress] = useState<string | null>(null);
   
   // Get the most appropriate name to display
   const displayName = customer?.name || lead?.name || 'Contact';
@@ -30,78 +34,45 @@ export function LeadContactInfo({ customer, lead }: LeadContactInfoProps) {
     return 'C';
   };
 
-  // Load company data from customer when component mounts or when customer/lead changes
+  // Reset edited state when editing is cancelled or customer changes
   useEffect(() => {
-    if (customer) {
-      setCompanyName(customer.company_name || "");
-      setCompanyAddress(customer.company_address || "");
-    } else if (lead?.customer_id) {
-      // If there's a lead with a customer ID but no customer object yet,
-      // fetch the customer data to get company information
-      const fetchCustomerData = async () => {
-        const { data, error } = await supabase
-          .from('customers')
-          .select('company_name, company_address')
-          .eq('id', lead.customer_id)
-          .single();
-          
-        if (data && !error) {
-          setCompanyName(data.company_name || "");
-          setCompanyAddress(data.company_address || "");
-        }
-      };
-      
-      fetchCustomerData();
+    if (!isEditing) {
+      setEditedCompanyName(null);
+      setEditedCompanyAddress(null);
+    } else {
+      // Initialize edit state when editing starts
+      setEditedCompanyName(customer?.company_name || "");
+      setEditedCompanyAddress(customer?.company_address || "");
     }
-  }, [customer, lead]);
+  }, [isEditing, customer]);
+
 
   const handleSave = async () => {
-    if (!customer?.id && !lead?.id) {
+    // Use edited values for saving
+    const finalCompanyName = editedCompanyName ?? customer?.company_name ?? "";
+    const finalCompanyAddress = editedCompanyAddress ?? customer?.company_address ?? "";
+
+    // Need customer ID to save
+    if (!customer?.id) { 
       toast({ 
         title: "Error", 
-        description: "No customer or lead found to update", 
+        description: "Customer ID not found, cannot update company info", 
         variant: "destructive" 
       });
       return;
     }
 
     try {
-      // Create an array to store all update operations
-      const updateOperations = [];
+      // Update the customer record directly using customer.id
+      const { error } = await supabase
+        .from('customers')
+        .update({
+          company_name: finalCompanyName,
+          company_address: finalCompanyAddress
+        })
+        .eq('id', customer.id);
 
-      if (customer?.id) {
-        // Add customer update operation - these fields exist in the customers table
-        updateOperations.push(
-          supabase
-            .from('customers')
-            .update({
-              company_name: companyName,
-              company_address: companyAddress
-            })
-            .eq('id', customer.id)
-        );
-      } else if (lead?.customer_id) {
-        // If we have a lead with a customer ID but no customer object,
-        // update the customer record directly
-        updateOperations.push(
-          supabase
-            .from('customers')
-            .update({
-              company_name: companyName,
-              company_address: companyAddress
-            })
-            .eq('id', lead.customer_id)
-        );
-      }
-
-      // Execute all update operations concurrently
-      const results = await Promise.all(updateOperations);
-
-      // Check for errors in any of the operations
-      const errors = results.filter(result => result.error);
-      if (errors.length > 0) {
-        throw errors[0].error;
-      }
+      if (error) throw error;
 
       toast({
         title: "Success",
@@ -122,7 +93,7 @@ export function LeadContactInfo({ customer, lead }: LeadContactInfoProps) {
     <div className="border-t border-b py-4 space-y-3">
       <div className="flex items-center gap-3">
         <Avatar className="h-12 w-12">
-          <AvatarImage src="https://images.unsplash.com/photo-1560250097-0b93528c311a?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=774&q=80" />
+          {/* Removed hardcoded AvatarImage */}
           <AvatarFallback>{getInitial()}</AvatarFallback>
         </Avatar>
         <div className="space-y-1">
@@ -157,8 +128,8 @@ export function LeadContactInfo({ customer, lead }: LeadContactInfoProps) {
               <Label htmlFor="company-name">Company Name</Label>
               <Input 
                 id="company-name"
-                value={companyName}
-                onChange={(e) => setCompanyName(e.target.value)}
+                value={editedCompanyName ?? ""} // Use edited state
+                onChange={(e) => setEditedCompanyName(e.target.value)}
                 placeholder="Enter company name"
               />
             </div>
@@ -167,8 +138,8 @@ export function LeadContactInfo({ customer, lead }: LeadContactInfoProps) {
               <Label htmlFor="company-address">Company Address</Label>
               <Input 
                 id="company-address"
-                value={companyAddress}
-                onChange={(e) => setCompanyAddress(e.target.value)}
+                value={editedCompanyAddress ?? ""} // Use edited state
+                onChange={(e) => setEditedCompanyAddress(e.target.value)}
                 placeholder="Enter company address"
               />
             </div>
@@ -192,25 +163,45 @@ export function LeadContactInfo({ customer, lead }: LeadContactInfoProps) {
           </div>
         ) : (
           <div className="space-y-3">
+            {/* Company Name Display */}
             <div className="space-y-1">
               <span className="text-sm text-muted-foreground">Company:</span>
-              <p className="text-sm">{companyName || "Not specified"}</p>
+              {isLoadingCustomer ? (
+                <div className="h-4 w-32 bg-muted animate-pulse rounded mt-1"></div>
+              ) : customer ? ( // Check if customer exists *after* loading
+                <p className="text-sm">{customer.company_name || "Not specified"}</p> 
+              ) : (
+                 <p className="text-sm italic text-muted-foreground">No customer data</p> // Explicitly handle null customer
+              )}
             </div>
             
-            {companyAddress && (
+            {/* Company Address Display */}
+            {isLoadingCustomer ? (
+              // Show pulse only if address might exist (or we don't know yet)
+              customer?.company_address !== undefined && <div className="h-4 w-40 bg-muted animate-pulse rounded mt-1"></div>
+            ) : customer && customer.company_address ? ( // Check customer exists *and* has address
               <div className="space-y-1">
                 <span className="text-sm text-muted-foreground">Address:</span>
-                <p className="text-sm">{companyAddress}</p>
+                <p className="text-sm">{customer.company_address}</p>
               </div>
-            )}
+            ) : null} 
             
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={() => setIsEditing(true)}
-            >
-              Edit Company Info
-            </Button>
+            {/* Edit Button Logic */}
+            {isLoadingCustomer ? (
+              <div className="h-8 w-24 bg-muted animate-pulse rounded mt-1"></div> // Placeholder for button
+            ) : customer ? (
+              // Only allow editing if customer object exists and not loading
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => setIsEditing(true)}
+              >
+                Edit Company Info
+              </Button>
+            ) : (
+              // Show message if customer is null after loading
+              !isEditing && <p className="text-xs text-muted-foreground mt-1 italic">Customer data not available to edit.</p>
+            )}
           </div>
         )}
       </div>

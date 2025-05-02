@@ -1,21 +1,18 @@
 
 import { useState, useCallback, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
-import { Profile, Lead } from "../../types";
+import { Profile, Lead, Customer } from "../../types"; // Import Customer
 import { useToast } from "@/hooks/use-toast";
 
-export function useAssignee(profiles: Profile[], lead: Lead | null) {
+export function useAssignee(profiles: Profile[], lead: Lead | null, customer?: Customer | null) { // Add optional customer param
   const [selectedAssignee, setSelectedAssignee] = useState<string | null>(null);
   const { toast } = useToast();
 
-  // Initialize the selected assignee based on the lead
+  // Initialize the selected assignee based on the lead's user_id
   useEffect(() => {
-    if (lead?.user_id) {
-      setSelectedAssignee(lead.user_id);
-    } else if (profiles.length > 0) {
-      setSelectedAssignee(profiles[0].id);
-    }
-  }, [lead?.user_id, profiles]);
+    // Set assignee based on lead's user_id, otherwise null
+    setSelectedAssignee(lead?.user_id || null); 
+  }, [lead?.user_id]); // Only depend on lead.user_id for initialization
 
   const handleAssigneeChange = async (userId: string) => {
     setSelectedAssignee(userId);

@@ -1,5 +1,6 @@
 
 import React, { useCallback, useState } from "react"; // Import useState
+import { useQueryClient } from "@tanstack/react-query"; // Import useQueryClient
 import { LeadsHeader } from "./LeadsHeader";
 import { usePipelineData } from "./hooks/usePipelineData";
 import type { Lead } from "@/components/dashboard/conversations/types"; // Import Lead type
@@ -15,6 +16,7 @@ interface LeadsContentProps {
 
 export function LeadsContent({ pipelineId }: LeadsContentProps) {
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null); // State for selected lead
+  const queryClient = useQueryClient(); // Get queryClient instance
   const { stages, stageLeads, loading, loadStages } = usePipelineData(pipelineId);
   
   // Memoize the callback to prevent unnecessary re-renders
@@ -58,8 +60,10 @@ export function LeadsContent({ pipelineId }: LeadsContentProps) {
         <div className="w-96 border-l bg-background flex-shrink-0 h-full overflow-hidden"> {/* Use overflow-hidden here */}
           {/* Replace placeholder with the actual component */}
           <LeadPipelineDetailsPanel 
+            key={selectedLead.id} // Add key prop here
             lead={selectedLead} 
             onClose={() => setSelectedLead(null)} 
+            queryClient={queryClient} // Pass queryClient
           />
         </div>
       )}
