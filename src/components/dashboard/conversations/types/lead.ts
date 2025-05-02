@@ -7,6 +7,8 @@ export interface Lead {
   value: number;
   pipeline_stage_id: string;
   user_id: string;
+  assignee_id?: string | null; 
+  tags?: { id: string; name: string }[] | null; // Add tags field
   
   // Virtual properties derived from customer data
   company_name?: string;
