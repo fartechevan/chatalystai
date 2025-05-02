@@ -1,19 +1,35 @@
 
-import { useQuery, useQueryClient } from "@tanstack/react-query"; // Import useQueryClient
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
-import { AddContactDialog } from "./components/AddContactDialog"; // Import the dialog
+import { AddContactDialog } from "./components/AddContactDialog";
 import { Button } from "@/components/ui/button";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table"; // Import Table components
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
-import { MoreHorizontal, Plus, Trash2 } from "lucide-react"; // Added Trash2
-import { useState, useMemo } from "react"; // Added useState and useMemo
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from '@/components/ui/dialog'; // Added Dialog components
-import { useToast } from "@/hooks/use-toast"; // Added useToast
-import { Database } from "@/integrations/supabase/types"; // Import generated types
+import { ArrowUpDown, MoreHorizontal, Plus, Trash2 } from "lucide-react";
+import { useState, useMemo } from "react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogClose } from '@/components/ui/dialog';
+import { useToast } from "@/hooks/use-toast";
+import { useDebounce } from "@/hooks/use-debounce"; // Import useDebounce
+import { Database } from "@/integrations/supabase/types";
 
-type Customer = Database['public']['Tables']['customers']['Row']; // Define Customer type
+type Customer = Database['public']['Tables']['customers']['Row'];
+type SortableColumns = 'name' | 'company' | 'phone_number' | 'email'; // Define sortable columns type
+type SortDirection = 'asc' | 'desc';
+
+interface SortConfig {
+  key: SortableColumns;
+  direction: SortDirection;
+}
 
 interface ContactListProps {
   onSelectContact: (contactId: string) => void;
@@ -21,23 +37,43 @@ interface ContactListProps {
 
 export function ContactList({ onSelectContact }: ContactListProps) {
   const queryClient = useQueryClient(); // Get query client instance
-  const { toast } = useToast(); // Initialize toast
-  const [contactToDelete, setContactToDelete] = useState<Customer | null>(null); // State for single delete confirmation
-  const [selectedContactIds, setSelectedContactIds] = useState<Set<string>>(new Set()); // State for bulk selection
-  const [isBulkDeleteConfirmOpen, setIsBulkDeleteConfirmOpen] = useState(false); // State for bulk delete confirmation dialog
+  const { toast } = useToast();
+  const [contactToDelete, setContactToDelete] = useState<Customer | null>(null);
+  const [selectedContactIds, setSelectedContactIds] = useState<Set<string>>(new Set());
+  const [isBulkDeleteConfirmOpen, setIsBulkDeleteConfirmOpen] = useState(false);
+  const [sortConfig, setSortConfig] = useState<SortConfig>({ key: 'name', direction: 'asc' });
+  const [searchTerm, setSearchTerm] = useState(''); // State for search term
+  const debouncedSearchTerm = useDebounce(searchTerm, 300); // Debounce search term
 
-  const { data: contacts, isLoading } = useQuery<Customer[]>({ // Specify type for useQuery data
-    queryKey: ['customers'],
+  const { data: contacts, isLoading } = useQuery<Customer[]>({
+    queryKey: ['customers', sortConfig, debouncedSearchTerm],
     queryFn: async () => {
-      const { data, error } = await supabase
+      let query = supabase
         .from('customers')
         .select('*')
-        .order('name');
-      
+        .order(sortConfig.key, { ascending: sortConfig.direction === 'asc' });
+
+      if (debouncedSearchTerm) {
+        const searchTermPattern = `%${debouncedSearchTerm}%`;
+        query = query.or(
+          `name.ilike.${searchTermPattern},email.ilike.${searchTermPattern},phone_number.ilike.${searchTermPattern}`
+        );
+      }
+
+      const { data, error } = await query;
+
       if (error) throw error;
-      return data || []; // Return empty array if data is null/undefined
+      return data || [];
      },
    });
+
+   // Function to handle sorting
+   const handleSort = (key: SortableColumns) => {
+     setSortConfig(prevConfig => ({
+       key,
+       direction: prevConfig.key === key && prevConfig.direction === 'asc' ? 'desc' : 'asc',
+     }));
+   };
 
    // Derived state to check if all contacts are selected
    const allContactsSelected = useMemo(() => {
@@ -140,12 +176,12 @@ export function ContactList({ onSelectContact }: ContactListProps) {
       <div className="p-4 border-b flex items-center justify-between">
         <div className="flex items-center gap-2">
           <h2 className="text-lg font-semibold">CONTACTS</h2>
-          <Button variant="outline" size="sm" className="h-7 px-2 text-xs">
-            Full list
-          </Button>
-          <Input 
-            placeholder="Search and filter" 
-            className="w-[200px] h-7 text-sm" 
+          {/* Removed "Full list" button */}
+          <Input
+            placeholder="Search name, email, phone..." // Updated placeholder
+            value={searchTerm} // Bind value to state
+            onChange={(e) => setSearchTerm(e.target.value)} // Update state on change
+            className="w-[200px] h-7 text-sm"
           />
           <span className="text-sm text-muted-foreground">
             {contacts?.length || 0} contacts
@@ -192,65 +228,100 @@ export function ContactList({ onSelectContact }: ContactListProps) {
            </Dialog>
          </div>
        </div>
- 
-       <div className="flex-1 min-h-0">
-        <ScrollArea className="h-full">
-          <table className="w-full">
-            <thead className="sticky top-0 bg-background border-b">
-              <tr>
-                <th className="w-12 p-3">
+
+       <div className="flex-1 min-h-0 relative"> {/* Added relative positioning */}
+        <ScrollArea className="h-full absolute inset-0"> {/* Use absolute positioning for scroll area */}
+          <Table className="w-full">
+            <TableHeader className="sticky top-0 bg-background z-10"> {/* Make header sticky */}
+              <TableRow>
+                <TableHead className="w-12 px-3"> {/* Adjusted padding */}
                   <Checkbox
                     checked={allContactsSelected}
                     onCheckedChange={handleSelectAll}
                     aria-label="Select all contacts"
-                    disabled={!contacts || contacts.length === 0} // Disable if no contacts
+                    disabled={!contacts || contacts.length === 0}
                   />
-                </th>
-                <th className="text-left p-3 text-sm font-medium text-muted-foreground">
-                  NAME
-                </th>
-                <th className="text-left p-3 text-sm font-medium text-muted-foreground">
-                  COMPANY
-                </th>
-                <th className="text-left p-3 text-sm font-medium text-muted-foreground">
-                  PHONE
-                </th>
-                 <th className="text-left p-3 text-sm font-medium text-muted-foreground">
-                   EMAIL
-                 </th>
-                 <th className="text-right p-3 text-sm font-medium text-muted-foreground">
+                </TableHead>
+                <TableHead className="px-3">
+                  <Button
+                    variant="ghost"
+                    onClick={() => handleSort('name')}
+                    className="px-0 hover:bg-transparent"
+                  >
+                    NAME
+                    <ArrowUpDown className="ml-2 h-4 w-4" />
+                  </Button>
+                </TableHead>
+                <TableHead className="px-3">
+                   <Button
+                     variant="ghost"
+                     onClick={() => handleSort('company')} // Assuming 'company' is a valid column in your DB
+                     className="px-0 hover:bg-transparent"
+                   >
+                     COMPANY
+                     <ArrowUpDown className="ml-2 h-4 w-4" />
+                   </Button>
+                 </TableHead>
+                <TableHead className="px-3">
+                  <Button
+                    variant="ghost"
+                    onClick={() => handleSort('phone_number')}
+                    className="px-0 hover:bg-transparent"
+                  >
+                    PHONE
+                    <ArrowUpDown className="ml-2 h-4 w-4" />
+                  </Button>
+                </TableHead>
+                 <TableHead className="px-3">
+                   <Button
+                     variant="ghost"
+                     onClick={() => handleSort('email')}
+                     className="px-0 hover:bg-transparent"
+                   >
+                     EMAIL
+                     <ArrowUpDown className="ml-2 h-4 w-4" />
+                   </Button>
+                 </TableHead>
+                 <TableHead className="text-right px-3">
                    ACTIONS
-                 </th>
-               </tr>
-             </thead>
-             <tbody>
-              {contacts?.map((contact) => (
-                <tr 
+                 </TableHead>
+               </TableRow>
+             </TableHeader>
+             <TableBody>
+              {isLoading && ( // Simplified loading state within tbody
+                <TableRow>
+                  <TableCell colSpan={6} className="h-24 text-center">
+                    Loading contacts...
+                  </TableCell>
+                </TableRow>
+              )}
+              {!isLoading && contacts?.length === 0 && ( // Empty state
+                <TableRow>
+                  <TableCell colSpan={6} className="h-24 text-center">
+                    No contacts found. Add your first contact!
+                  </TableCell>
+                </TableRow>
+              )}
+              {!isLoading && contacts?.map((contact) => (
+                <TableRow
                   key={contact.id}
                   onClick={() => onSelectContact(contact.id)}
                   className="hover:bg-muted/50 cursor-pointer"
+                  data-state={selectedContactIds.has(contact.id) ? 'selected' : undefined} // Add selected state
                 >
-                  <td className="w-12 p-3">
+                  <TableCell className="px-3"> {/* Adjusted padding */}
                     <Checkbox
                       checked={selectedContactIds.has(contact.id)}
                       onCheckedChange={(checked) => handleSelectContact(contact.id, !!checked)}
                       onClick={(e) => e.stopPropagation()} // Prevent row click when clicking checkbox
                       aria-label={`Select contact ${contact.name}`}
                     />
-                  </td>
-                  <td className="p-3">
-                    {contact.name}
-                  </td>
-                  <td className="p-3">
-                    <span className="text-muted-foreground">•</span>
-                  </td>
-                  <td className="p-3">
-                    {contact.phone_number}
-                  </td>
-                   <td className="p-3">
-                     {contact.email}
-                   </td>
-                   <td className="p-3 text-right">
+                  </TableCell>
+                  <TableCell className="font-medium px-3">{contact.name}</TableCell> {/* Adjusted padding */}
+                  <TableCell className="text-muted-foreground px-3">{/* Removed dot */}</TableCell> {/* Adjusted padding */}
+                  <TableCell className="px-3">{contact.phone_number}</TableCell> {/* Adjusted padding */}
+                   <TableCell className="px-3">{contact.email}</TableCell> {/* Adjusted padding */}
+                   <TableCell className="text-right px-3"> {/* Adjusted padding */}
                      <Dialog open={contactToDelete?.id === contact.id} onOpenChange={(isOpen) => !isOpen && setContactToDelete(null)}>
                        <DialogTrigger asChild>
                          <Button 
@@ -276,11 +347,11 @@ export function ContactList({ onSelectContact }: ContactListProps) {
                          </DialogFooter>
                        </DialogContent>
                      </Dialog>
-                   </td>
-                 </tr>
+                   </TableCell>
+                 </TableRow>
                ))}
-             </tbody>
-          </table>
+             </TableBody>
+          </Table>
         </ScrollArea>
       </div>
     </div>
