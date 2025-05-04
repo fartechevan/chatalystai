@@ -94,7 +94,8 @@ export function DashboardSidebar() {
       >
         <Menu className="h-5 w-5" />
       </Button>
-      <Sidebar collapsible="icon" className="bg-white md:bg-[#1C2434]"> {/* Changed background */}
+      {/* Apply primary background and secondary text for base sidebar style */}
+      <Sidebar collapsible="icon" className="bg-primary text-secondary"> 
         <SidebarContent>
           <div className="px-2 py-2">
             {menuItems.map((item) => (
@@ -102,15 +103,15 @@ export function DashboardSidebar() {
                 key={item.title}
                 asChild
                 isActive={location.pathname === item.path}
-                 tooltip={item.title}
-                 className={cn(
-                   "relative w-full",
-                   location.pathname === item.path 
-                     ? "bg-gray-100 text-gray-900 md:bg-white/10 md:text-white" // Active styles
-                     : "text-gray-600 hover:bg-gray-100 hover:text-gray-900 md:text-gray-400 md:hover:text-white md:hover:bg-white/5" // Inactive styles
-                 )}
-               >
-                 <Link 
+                  tooltip={item.title}
+                  className={cn(
+                    "relative w-full",
+                    location.pathname === item.path 
+                      ? "bg-secondary text-secondary-foreground" // Active: Light teal bg, dark teal text
+                      : "text-secondary hover:bg-primary hover:text-primary-foreground" // Inactive: Light teal text, hover white text
+                  )}
+                >
+                  <Link 
                   to={item.path} 
                   className="flex items-center gap-3"
                   onClick={handleLinkClick} // Add onClick handler
@@ -128,17 +129,17 @@ export function DashboardSidebar() {
           </div>
 
           <div className="mt-auto px-2 pb-4">
-            <SidebarMenuButton
-              asChild
-               tooltip="Profile"
-                 className={cn(
-                   "w-full",
-                   location.pathname === "/dashboard/profile" 
-                     ? "bg-gray-100 text-gray-900 md:bg-white/10 md:text-white" // Active styles
-                     : "text-gray-600 hover:bg-gray-100 hover:text-gray-900 md:text-gray-400 md:hover:text-white md:hover:bg-white/5" // Inactive styles
-                 )}
-               >
-                 <Link 
+             <SidebarMenuButton
+               asChild
+                tooltip="Profile"
+                  className={cn(
+                    "w-full",
+                    location.pathname === "/dashboard/profile" 
+                      ? "bg-secondary text-secondary-foreground" // Active: Light teal bg, dark teal text
+                      : "text-secondary hover:bg-primary hover:text-primary-foreground" // Inactive: Light teal text, hover white text
+                  )}
+                >
+                  <Link 
                   to="/dashboard/profile" 
                   className="flex items-center gap-3"
                   onClick={handleLinkClick} // Add onClick handler
@@ -148,13 +149,14 @@ export function DashboardSidebar() {
               </Link>
             </SidebarMenuButton>
             
-             <SidebarMenuButton
-               tooltip="Logout"
-               onClick={handleLogout}
-               className="w-full text-gray-600 hover:bg-gray-100 hover:text-gray-900 md:text-gray-400 md:hover:text-white md:hover:bg-white/5 mt-2" // Responsive styles
-             >
-               <div className="flex items-center gap-3">
-                 <LogOut className="h-5 w-5" />
+              <SidebarMenuButton
+                tooltip="Logout"
+                onClick={handleLogout}
+                 // Apply inactive styling logic
+                className="w-full text-secondary hover:bg-primary hover:text-primary-foreground mt-2"
+              >
+                <div className="flex items-center gap-3">
+                  <LogOut className="h-5 w-5" />
                 <span className="text-sm">Logout</span>
               </div>
             </SidebarMenuButton>
