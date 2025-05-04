@@ -319,8 +319,8 @@ const AgentDetailsPanel: React.FC<AgentDetailsPanelProps> = ({ selectedAgentId, 
     } else if (selectedAgentId && selectedAgent) {
        // --- Update Agent ---
        // Basic validation (can be enhanced with zod/react-hook-form)
-       const currentName = (document.getElementById('agent-name') as HTMLInputElement)?.value || selectedAgent.name; // Get current value if uncontrolled
-       if (!currentName.trim()) {
+       // Use agentName state variable for validation
+       if (!agentName.trim()) {
          toast({ variant: "destructive", title: "Validation Error", description: "Agent name is required." });
          return;
        }
@@ -330,7 +330,7 @@ const AgentDetailsPanel: React.FC<AgentDetailsPanelProps> = ({ selectedAgentId, 
        }
 
        const updates: UpdateAIAgent = {
-         name: currentName, // Assuming name might be uncontrolled for edit for now
+         name: agentName.trim(), // Use the agentName state variable
          prompt: promptText,
          knowledge_document_ids: selectedDocumentIds.length > 0 ? selectedDocumentIds : null,
          keyword_trigger: keywordTrigger?.trim() || null,
@@ -462,7 +462,13 @@ const AgentDetailsPanel: React.FC<AgentDetailsPanelProps> = ({ selectedAgentId, 
       {/* Agent Name */}
       <div className="space-y-2">
         <Label htmlFor="agent-name">Agent Name</Label>
-        <Input id="agent-name" defaultValue={selectedAgent?.name} placeholder="e.g., Customer Support Bot" disabled={isCreating || updateMutation.isPending || isLoadingAgent} />
+        <Input
+          id="agent-name"
+          value={agentName} // Use value for controlled component
+          onChange={(e) => setAgentName(e.target.value)} // Update state on change
+          placeholder="e.g., Customer Support Bot"
+          disabled={isCreating || updateMutation.isPending || isLoadingAgent}
+        />
       </div>
       <div className="space-y-2">
         <div className="flex justify-between items-center">
