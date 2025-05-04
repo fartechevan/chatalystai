@@ -4,27 +4,27 @@
  
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 240 10% 3.9%;
-    --card: 0 0% 100%;
-    --card-foreground: 240 10% 3.9%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 240 10% 3.9%;
-    --primary: 240 5.9% 10%;
-    --primary-foreground: 0 0% 98%;
-    --secondary: 240 4.8% 95.9%;
-    --secondary-foreground: 240 5.9% 10%;
-    --muted: 240 4.8% 95.9%;
-    --muted-foreground: 240 3.8% 46.1%;
-    --accent: 240 4.8% 95.9%;
-    --accent-foreground: 240 5.9% 10%;
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 0 0% 98%;
-    --border: 240 5.9% 90%;
-    --input: 240 5.9% 90%;
-    --ring: 240 5.9% 10%;
+    --background: 0 0% 100%; /* White Background */
+    --foreground: 240 10% 3.9%; /* Dark Gray Text */
+    --card: 0 0% 100%; /* White Card Background */
+    --card-foreground: 240 10% 3.9%; /* Dark Gray Card Text */
+    --popover: 0 0% 100%; /* White Popover Background */
+    --popover-foreground: 240 10% 3.9%; /* Dark Gray Popover Text */
+    --primary: 174 100% 27%; /* Dark Teal Buttons/Interactive */
+    --primary-foreground: 0 0% 98%; /* White Text on Primary */
+    --secondary: 174 33% 80%; /* Lighter Teal Secondary Elements */
+    --secondary-foreground: 174 100% 27%; /* Dark Teal Text on Secondary */
+    --muted: 174 33% 80%; /* Lighter Teal Muted Elements */
+    --muted-foreground: 174 100% 27%; /* Dark Teal Text on Muted */
+    --accent: 174 33% 80%; /* Lighter Teal Accent Elements */
+    --accent-foreground: 174 100% 27%; /* Dark Teal Text on Accent */
+    --destructive: 0 84.2% 60.2%; /* Keep original */
+    --destructive-foreground: 0 0% 98%; /* Keep original */
+    --border: 240 5.9% 90%; /* Light Gray Border */
+    --input: 240 5.9% 90%; /* Light Gray Input Background */
+    --ring: 174 100% 27%; /* Dark Teal Focus Ring */
     --radius: 0.75rem;
-    --success: 142 76% 36%;
+    --success: 142 76% 36%; /* Keep original */
     --success-foreground: 0 0% 98%;
     --warning: 38 92% 50%;
     --warning-foreground: 0 0% 98%;
