@@ -361,16 +361,11 @@ export function useIntegrationConnectionState(
         const currentSelectedInstance = validInstances.find(inst => inst.name === currentSelectedInstanceName);
         const fetchedStatus = currentSelectedInstance?.connectionStatus;
 
-        // *** MODIFICATION START ***
-        // Only update localConnectionState if the current state is NOT 'qrcode'
-        // Let the polling logic handle the transition out of 'qrcode' state
-        if (localConnectionState !== 'qrcode') {
-            setLocalConnectionState(isValidConnectionState(fetchedStatus) ? fetchedStatus : 'unknown');
-            console.log(`[fetchInstancesAndSetState] Updated localConnectionState to: ${fetchedStatus || 'unknown'} (current state was not 'qrcode')`);
-        } else {
-            console.log(`[fetchInstancesAndSetState] Current state is 'qrcode'. Skipping state update from fetchInstancesAndSetState.`);
-        }
-        // *** MODIFICATION END ***
+        // *** FINAL MODIFICATION START ***
+        // DO NOT set localConnectionState based on initial fetch.
+        // Let the state remain 'unknown' until user interaction via handleConnect/handleCreateAndConnect.
+        console.log(`[fetchInstancesAndSetState] Fetched status is '${fetchedStatus}'. NOT setting localConnectionState based on initial fetch.`);
+        // *** FINAL MODIFICATION END ***
 
 
         // Update user_reference_id for the first instance (consider if this should be for the selected one)
@@ -386,11 +381,14 @@ export function useIntegrationConnectionState(
 
       } else {
         setSelectedInstanceName("");
-        // Also ensure state is not 'qrcode' if no instances exist
+        // Also ensure state is not 'qrcode' if no instances exist - This part might be okay, or could also be removed if handleConnect handles reset properly. Let's keep it for now.
         if (localConnectionState === 'qrcode') {
-            setLocalConnectionState('unknown');
+             console.log("[fetchInstancesAndSetState] No valid instances found, resetting 'qrcode' state to 'unknown'.");
+             setLocalConnectionState('unknown');
         } else {
-           setLocalConnectionState('unknown'); // No instances, state is unknown
+            // If state wasn't qrcode and no instances, ensure it's unknown (might be redundant if initial state is unknown)
+            // setLocalConnectionState('unknown'); // Let's comment this out, initial state should be unknown anyway.
+             console.log("[fetchInstancesAndSetState] No valid instances found, state remains:", localConnectionState);
         }
       }
     } catch (err) {
@@ -426,20 +424,6 @@ export function useIntegrationConnectionState(
       setQrPollingInterval(null);
     }
   }, [open, selectedIntegration?.id, fetchInstancesAndSetState, qrPollingInterval]);
-
-
-  // Update local state derived from fetched instances
-  // This effect might be redundant now due to the logic inside fetchInstancesAndSetState
-  // Consider removing or refining it if fetchInstancesAndSetState handles all necessary state updates.
-  // For now, keep it but be aware it might conflict if not careful.
-  useEffect(() => {
-    const instance = fetchedInstances.find(inst => inst.name === selectedInstanceName);
-    const status = instance?.connectionStatus;
-    // Prevent this effect from overwriting 'qrcode' state as well
-    if (localConnectionState !== 'qrcode') {
-        setLocalConnectionState(isValidConnectionState(status) ? status : 'unknown');
-    }
-  }, [fetchedInstances, selectedInstanceName, localConnectionState]); // Added localConnectionState
 
 
   // --- Polling Logic ---
@@ -616,10 +600,15 @@ export function useIntegrationConnectionState(
          }
        } else {
          const instanceStatus = connectResponse.instance?.status as ConnectionState | undefined;
-         if (instanceStatus === 'open') {
-           setLocalConnectionState('open');
-           toast({ title: "Already Connected", description: "The WhatsApp instance is already connected." });
-         } else {
+
+         // --- MODIFICATION START ---
+         // ALWAYS proceed to QR/Pairing code check, even if status is initially 'open'
+         // Let polling handle the final transition to 'open' after successful scan/pairing
+         // if (instanceStatus === 'open') { // REMOVED Condition
+         //   setLocalConnectionState('open'); // REMOVED
+         //   toast({ title: "Already Connected", description: "The WhatsApp instance is already connected." }); // REMOVED
+         // } else { // Now this block always runs if instance object exists
+
            let useBase64: string | null = null;
            let usePairingCode: string | null = null;
            const nestedBase64 = connectResponse.qrcode?.base64;
@@ -648,7 +637,8 @@ export function useIntegrationConnectionState(
              toast({ variant: "destructive", title: "Connection Error", description: `Failed to retrieve QR/Pairing code. Status: ${instanceStatus || 'Unknown'}.` });
              setLocalConnectionState('close');
            }
-         }
+         // } // End of original else block
+         // --- MODIFICATION END ---
        }
     } catch (error) {
       console.error("[handleConnect] Error during connection process:", error);
