@@ -144,28 +144,35 @@ export default function Profile() {
       <h1 className="text-2xl font-bold mb-6">My Profile</h1>
       
       <Card>
-        <CardHeader>
-          <div className="flex items-center gap-4">
-            <Avatar className="h-16 w-16">
-              <AvatarImage src={profile?.avatar_url} />
-              <AvatarFallback>{profile ? getInitials(profile.name) : "U"}</AvatarFallback>
-            </Avatar>
-            <div>
-              <CardTitle>{profile?.name || "User"}</CardTitle>
-              <CardDescription>{profile?.email || user?.email}</CardDescription>
-              {profile?.role && (
-                <span className="inline-block mt-1 text-xs px-2 py-1 bg-primary/10 text-primary rounded">
-                  {profile.role}
-                </span>
-              )}
-            </div>
+        <div className="flex flex-col md:flex-row">
+          {/* Left Column */}
+          <div className="md:w-1/3 p-6 border-b md:border-b-0 md:border-r">
+            <CardHeader className="p-0 mb-4">
+              <div className="flex flex-col items-center text-center md:items-start md:text-left gap-4">
+                <Avatar className="h-24 w-24">
+                  <AvatarImage src={profile?.avatar_url} />
+                  <AvatarFallback>{profile ? getInitials(profile.name) : "U"}</AvatarFallback>
+                </Avatar>
+                <div>
+                  <CardTitle>{profile?.name || "User"}</CardTitle>
+                  <CardDescription>{profile?.email || user?.email}</CardDescription>
+                  {profile?.role && (
+                    <span className="inline-block mt-2 text-xs px-2 py-1 bg-primary/10 text-primary rounded">
+                      {profile.role}
+                    </span>
+                  )}
+                </div>
+              </div>
+            </CardHeader>
+            {/* You can add more static info here if needed */}
           </div>
-        </CardHeader>
-        
-        <CardContent className="space-y-4">
-          {isEditing ? (
-            <>
-              <div className="space-y-2">
+
+          {/* Right Column */}
+          <div className="md:w-2/3 p-6">
+            <CardContent className="p-0 space-y-4">
+              {isEditing ? (
+                <>
+                  <div className="space-y-2">
                 <Label htmlFor="name">Full Name</Label>
                 <Input 
                   id="name"
@@ -204,12 +211,12 @@ export default function Profile() {
               </div>
             </div>
           )}
-        </CardContent>
-        
-        <CardFooter className="flex justify-end space-x-2">
-          {isEditing ? (
-            <>
-              <Button 
+            </CardContent> {/* Close CardContent here */}
+            
+            <CardFooter className="p-0 pt-6 flex justify-end space-x-2"> {/* Adjust padding and add pt-6 */}
+              {isEditing ? (
+                <>
+                  <Button 
                 variant="outline" 
                 onClick={() => {
                   setIsEditing(false);
@@ -230,9 +237,11 @@ export default function Profile() {
           ) : (
             <Button onClick={() => setIsEditing(true)}>
               Edit Profile
-            </Button>
-          )}
-        </CardFooter>
+                </Button>
+              )}
+            </CardFooter>
+          </div> {/* Close Right Column div */}
+        </div> {/* Close flex container div */}
       </Card>
     </div>
   );
