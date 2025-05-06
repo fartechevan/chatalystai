@@ -1,10 +1,13 @@
 
 import { Info } from "lucide-react";
+// Removed duplicate Info import
 import { Button } from "@/components/ui/button";
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { createLead } from "@/components/leads/services/leadService";
 import { useToast } from "@/components/ui/use-toast";
+import type { Database } from "@/types/supabase"; // Import Database type
+type PipelineStage = Database['public']['Tables']['pipeline_stages']['Row']; // Define PipelineStage type locally
 
 interface EmptyLeadStateProps {
   conversationId: string;
@@ -12,10 +15,10 @@ interface EmptyLeadStateProps {
 }
 
 export function EmptyLeadState({ conversationId, onLeadCreated }: EmptyLeadStateProps) {
-  const [defaultPipelineStageId, setDefaultPipelineStageId] = useState<string | null>(null);
-  const [defaultPipelineId, setDefaultPipelineId] = useState<string | null>(null);
+  const [targetPipelineStageId, setTargetPipelineStageId] = useState<string | null>(null); // Renamed state
+  const [targetPipelineId, setTargetPipelineId] = useState<string | null>(null); // Renamed state
   const [userId, setUserId] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true); // Start loading true
   const [customerInfo, setCustomerInfo] = useState<{
     id: string | null;
     name: string;
@@ -25,113 +28,147 @@ export function EmptyLeadState({ conversationId, onLeadCreated }: EmptyLeadState
 
   useEffect(() => {
     const fetchData = async () => {
-      // Fetch customer information from the conversation's member participant
-      if (conversationId) {
-        const { data: participantData, error: participantError } = await supabase
+      setIsLoading(true); // Ensure loading state is true at the start
+      let fetchedPipelineId: string | null = null;
+      let fetchedStageId: string | null = null;
+
+      // Fetch customer information and conversation details in parallel
+      if (!conversationId) {
+        setIsLoading(false);
+        return;
+      }
+
+      const [participantResult, conversationResult, sessionResult] = await Promise.all([
+        supabase
           .from('conversation_participants')
-          .select(`
-            id, 
-            role,
-            customer_id,
-            external_user_identifier
-          `)
+          .select('id, role, customer_id, external_user_identifier')
           .eq('conversation_id', conversationId)
           .eq('role', 'member')
+          .maybeSingle(),
+        supabase
+          .from('conversations')
+          .select('integrations_id') // Corrected column name
+          .eq('conversation_id', conversationId)
+          .single(),
+        supabase.auth.getSession()
+      ]);
+
+      // Process participant/customer data
+      const { data: participantData, error: participantError } = participantResult;
+      if (participantError) {
+        console.error("Error fetching conversation participant:", participantError);
+      } else if (participantData) {
+        if (participantData.customer_id) {
+          const { data: customerData, error: customerError } = await supabase
+            .from('customers')
+            .select('*')
+            .eq('id', participantData.customer_id)
+            .single();
+          if (customerError) console.error("Error fetching customer data:", customerError);
+          else if (customerData) setCustomerInfo({ id: customerData.id, name: customerData.name, phone_number: customerData.phone_number });
+        } else if (participantData.external_user_identifier) {
+          setCustomerInfo({ id: null, name: participantData.external_user_identifier || "Unknown", phone_number: participantData.external_user_identifier || "" });
+        }
+      }
+
+      // Process user session
+      setUserId(sessionResult?.data?.session?.user?.id || null);
+
+      // Process conversation and integration config to find target pipeline
+      const { data: conversationData, error: conversationError } = conversationResult;
+      if (conversationError) {
+        console.error("Error fetching conversation data:", conversationError);
+      } else if (conversationData?.integrations_id) { // Corrected property access
+        const { data: integrationConfig, error: configError } = await supabase
+          .from('integrations_config')
+          .select('pipeline_id')
+          .eq('integration_id', conversationData.integrations_id) // Corrected property access
           .maybeSingle();
 
-        if (participantError) {
-          console.error("Error fetching conversation participant:", participantError);
-        } else if (participantData) {
-          // If the participant has a customer_id, fetch the customer data
-          if (participantData.customer_id) {
-            const { data: customerData, error: customerError } = await supabase
-              .from('customers')
-              .select('*')
-              .eq('id', participantData.customer_id)
-              .single();
+        if (configError) {
+          console.error("Error fetching integration config:", configError);
+        } else if (integrationConfig && 'pipeline_id' in integrationConfig && integrationConfig.pipeline_id) {
+          // Type guard: Check integrationConfig exists, has pipeline_id property, and it's truthy
+          const pipelineIdToFetch = integrationConfig.pipeline_id; // Safely access the ID
 
-            if (customerError) {
-              console.error("Error fetching customer data:", customerError);
-            } else if (customerData) {
-              setCustomerInfo({
-                id: customerData.id,
-                name: customerData.name,
-                phone_number: customerData.phone_number
-              });
+          // Found pipeline_id in config, fetch this specific pipeline
+          const { data: specificPipeline, error: specificPipelineError } = await supabase
+            .from('pipelines')
+            .select('id, stages:pipeline_stages(id, position)')
+            .eq('id', pipelineIdToFetch as string) // Explicitly cast to string
+            .limit(1)
+            .single();
+
+          if (specificPipelineError) {
+            console.error("Error fetching integration-specific pipeline:", specificPipelineError);
+            // Fallback handled below
+          } else if (specificPipeline) {
+            fetchedPipelineId = specificPipeline.id;
+            if (specificPipeline.stages && specificPipeline.stages.length > 0) {
+              const sortedStages = [...(specificPipeline.stages as PipelineStage[])].sort((a, b) => a.position - b.position);
+              fetchedStageId = sortedStages[0].id;
             }
-          } else if (participantData.external_user_identifier) {
-            // We have a phone number but no customer yet
-            setCustomerInfo({
-              id: null,
-              name: participantData.external_user_identifier || "Unknown",
-              phone_number: participantData.external_user_identifier || ""
-            });
           }
         }
       }
 
-      // Fetch default pipeline
-      const { data: defaultPipeline, error: pipelineError } = await supabase
-        .from('pipelines')
-        .select('id, stages:pipeline_stages(id, position)')
-        .eq('is_default', true)
-        .limit(1)
-        .single();
-
-      if (pipelineError) {
-        console.error("Error fetching default pipeline:", pipelineError);
-
-        // If no default pipeline found, get any pipeline
-        const { data: anyPipeline, error: anyPipelineError } = await supabase
+      // Fallback: If no integration-specific pipeline was found, fetch default/first pipeline
+      if (!fetchedPipelineId || !fetchedStageId) {
+        // Fetch default pipeline first
+        const { data: defaultPipeline, error: pipelineError } = await supabase
           .from('pipelines')
           .select('id, stages:pipeline_stages(id, position)')
+          .eq('is_default', true)
           .limit(1)
           .single();
 
-        if (anyPipelineError) {
-          console.error("Error fetching any pipeline:", anyPipelineError);
-          toast({
-            title: "Error",
-            description: "Failed to fetch pipeline information.",
-            variant: "destructive",
-          });
-          return;
+        if (pipelineError && pipelineError.code !== 'PGRST116') { // PGRST116 = no rows found, which is okay here
+          console.error("Error fetching default pipeline:", pipelineError);
         }
 
-        if (anyPipeline) {
-          setDefaultPipelineId(anyPipeline.id);
+        if (defaultPipeline) {
+           fetchedPipelineId = defaultPipeline.id;
+           if (defaultPipeline.stages && defaultPipeline.stages.length > 0) {
+             const sortedStages = [...(defaultPipeline.stages as PipelineStage[])].sort((a, b) => a.position - b.position);
+             fetchedStageId = sortedStages[0].id;
+           }
+        } else {
+           // If no default pipeline found (or error fetching it), get any pipeline
+           const { data: anyPipeline, error: anyPipelineError } = await supabase
+             .from('pipelines')
+             .select('id, stages:pipeline_stages(id, position)')
+             .limit(1)
+             .single();
 
-          // Find the first stage in the pipeline
-          if (anyPipeline.stages && anyPipeline.stages.length > 0) {
-            // Sort stages by position
-            const sortedStages = [...anyPipeline.stages].sort((a, b) => a.position - b.position);
-            setDefaultPipelineStageId(sortedStages[0].id);
-          }
+           if (anyPipelineError) {
+             console.error("Error fetching any pipeline:", anyPipelineError);
+             toast({ title: "Error", description: "Failed to fetch any pipeline information.", variant: "destructive" });
+           } else if (anyPipeline) {
+             fetchedPipelineId = anyPipeline.id;
+             if (anyPipeline.stages && anyPipeline.stages.length > 0) {
+               const sortedStages = [...(anyPipeline.stages as PipelineStage[])].sort((a, b) => a.position - b.position);
+               fetchedStageId = sortedStages[0].id;
+             }
+           }
         }
-      } else if (defaultPipeline) {
-        setDefaultPipelineId(defaultPipeline.id);
+      } // Closes outer else if (conversationData?.integrations_id)
 
-        // Find the first stage in the default pipeline
-        if (defaultPipeline.stages && defaultPipeline.stages.length > 0) {
-          // Sort stages by position
-          const sortedStages = [...defaultPipeline.stages].sort((a, b) => a.position - b.position);
-          setDefaultPipelineStageId(sortedStages[0].id);
-        }
-      }
-
-      // Fetch current user
-      const { data: session } = await supabase.auth.getSession();
-      setUserId(session?.session?.user?.id || null);
+      // Set the final target pipeline and stage
+      setTargetPipelineId(fetchedPipelineId);
+      setTargetPipelineStageId(fetchedStageId);
+      setIsLoading(false); // Done loading
     };
 
     fetchData();
   }, [conversationId, toast]);
 
   const handleCreateLead = async () => {
-    if (!defaultPipelineStageId || !userId) {
+    const stageToUse = targetPipelineStageId; // Use the determined stage ID
+
+    if (!stageToUse || !userId) {
       toast({
         title: "Error",
-        description: "Missing pipeline information or user information.",
+        description: "Missing target pipeline stage or user information.",
         variant: "destructive",
       });
       return;
@@ -146,7 +183,7 @@ export function EmptyLeadState({ conversationId, onLeadCreated }: EmptyLeadState
       return;
     }
 
-    setIsLoading(true);
+    setIsLoading(true); // Set loading for the creation process
 
     try {
       // If we already have a customer id, use it directly
@@ -154,12 +191,12 @@ export function EmptyLeadState({ conversationId, onLeadCreated }: EmptyLeadState
         const result = await createLead({
           name: customerInfo.name || "",
           value: 0,
-          pipelineStageId: defaultPipelineStageId,
+          pipelineStageId: stageToUse, // Use determined stage
           userId: userId,
           customerId: customerInfo.id
         });
 
-        if (result.success) {
+        if (result.success && result.leadId) {
           // Connect the lead to the conversation
           const { error: updateError } = await supabase
             .from('conversations')
@@ -170,7 +207,7 @@ export function EmptyLeadState({ conversationId, onLeadCreated }: EmptyLeadState
             console.error("Error connecting lead to conversation:", updateError);
             toast({
               title: "Warning",
-              description: "Lead created but not connected to conversation.",
+              description: "Lead created but failed to connect to conversation.",
               variant: "destructive",
             });
           } else {
@@ -179,12 +216,11 @@ export function EmptyLeadState({ conversationId, onLeadCreated }: EmptyLeadState
               description: "Lead created and connected to conversation!",
             });
           }
-
-          onLeadCreated(result.leadId);
+          onLeadCreated(result.leadId); // Call callback even if connection fails slightly
         } else {
           toast({
             title: "Error",
-            description: `Failed to create lead: ${result.error}`,
+            description: `Failed to create lead: ${result.error || 'Unknown error'}`,
             variant: "destructive",
           });
         }
@@ -193,7 +229,7 @@ export function EmptyLeadState({ conversationId, onLeadCreated }: EmptyLeadState
         const result = await createLead({
           name: customerInfo.name || "",
           value: 0,
-          pipelineStageId: defaultPipelineStageId,
+          pipelineStageId: stageToUse, // Use determined stage
           userId: userId,
           customerInfo: {
             name: customerInfo.name || "",
@@ -201,7 +237,7 @@ export function EmptyLeadState({ conversationId, onLeadCreated }: EmptyLeadState
           },
         });
 
-        if (result.success) {
+        if (result.success && result.leadId) {
           // Now connect the lead to the conversation
           const { error: updateError } = await supabase
             .from('conversations')
@@ -212,7 +248,7 @@ export function EmptyLeadState({ conversationId, onLeadCreated }: EmptyLeadState
             console.error("Error connecting lead to conversation:", updateError);
             toast({
               title: "Warning",
-              description: "Lead created but not connected to conversation.",
+              description: "Lead created but failed to connect to conversation.",
               variant: "destructive",
             });
           } else {
@@ -226,6 +262,7 @@ export function EmptyLeadState({ conversationId, onLeadCreated }: EmptyLeadState
 
               if (participantError) {
                 console.error("Error updating participant with customer ID:", participantError);
+                // Non-critical, don't block success toast
               }
             }
 
@@ -234,12 +271,11 @@ export function EmptyLeadState({ conversationId, onLeadCreated }: EmptyLeadState
               description: "Lead created and connected to conversation!",
             });
           }
-
-          onLeadCreated(result.leadId);
+          onLeadCreated(result.leadId); // Call callback even if connection fails slightly
         } else {
           toast({
             title: "Error",
-            description: `Failed to create lead: ${result.error}`,
+            description: `Failed to create lead: ${result.error || 'Unknown error'}`,
             variant: "destructive",
           });
         }
@@ -248,13 +284,17 @@ export function EmptyLeadState({ conversationId, onLeadCreated }: EmptyLeadState
       console.error("Error creating lead:", error);
       toast({
         title: "Error",
-        description: "Failed to create lead.",
+        description: "An unexpected error occurred while creating the lead.",
         variant: "destructive",
       });
     } finally {
-      setIsLoading(false);
+      setIsLoading(false); // Done with creation attempt
     }
   };
+
+  // Determine button state and text based on loading and data availability
+  const isButtonDisabled = isLoading || !targetPipelineStageId || !customerInfo || !userId;
+  const buttonText = isLoading ? "Loading..." : "Create new lead";
 
   return (
     <div className="flex flex-col items-center justify-center p-8 h-full space-y-4 text-center">
@@ -269,19 +309,20 @@ export function EmptyLeadState({ conversationId, onLeadCreated }: EmptyLeadState
         variant="default"
         size="sm"
         onClick={handleCreateLead}
-        disabled={isLoading || !defaultPipelineStageId || !customerInfo}
+        disabled={isButtonDisabled}
         className="w-full max-w-[220px]"
       >
-        {isLoading ? "Creating..." : "Create new lead"}
+        {buttonText}
       </Button>
 
-      {!defaultPipelineStageId && (
+      {/* Show specific messages if data is missing after initial load */}
+      {!isLoading && !targetPipelineStageId && (
         <p className="text-xs text-muted-foreground">
-          No pipeline available. Please create a pipeline first.
+          Could not determine target pipeline. Please check integration settings or create a default pipeline.
         </p>
       )}
 
-      {!customerInfo && (
+      {!isLoading && !customerInfo && (
         <p className="text-xs text-muted-foreground">
           No customer information found for this conversation.
         </p>

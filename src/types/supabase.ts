@@ -121,6 +121,39 @@ export type Database = {
           },
         ]
       }
+      ai_agent_knowledge_documents: {
+        Row: {
+          agent_id: string
+          created_at: string
+          document_id: string
+        }
+        Insert: {
+          agent_id: string
+          created_at?: string
+          document_id: string
+        }
+        Update: {
+          agent_id?: string
+          created_at?: string
+          document_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_agent_knowledge_documents_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "ai_agents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_agent_knowledge_documents_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "knowledge_documents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ai_agent_sessions: {
         Row: {
           agent_id: string | null
@@ -479,8 +512,8 @@ export type Database = {
           name: string
           status: Database["public"]["Enums"]["integration_status"]
           updated_at: string | null
-          webhook_events: Json | null // Add webhook_events
-          webhook_url: string | null // Add webhook_url
+          webhook_events: Json | null
+          webhook_url: string | null
         }
         Insert: {
           api_key?: string | null
@@ -493,8 +526,8 @@ export type Database = {
           name: string
           status?: Database["public"]["Enums"]["integration_status"]
           updated_at?: string | null
-          webhook_events?: Json | null // Add webhook_events
-          webhook_url?: string | null // Add webhook_url
+          webhook_events?: Json | null
+          webhook_url?: string | null
         }
         Update: {
           api_key?: string | null
@@ -507,8 +540,8 @@ export type Database = {
           name?: string
           status?: Database["public"]["Enums"]["integration_status"]
           updated_at?: string | null
-          webhook_events?: Json | null // Add webhook_events
-          webhook_url?: string | null // Add webhook_url
+          webhook_events?: Json | null
+          webhook_url?: string | null
         }
         Relationships: []
       }
@@ -520,6 +553,7 @@ export type Database = {
           instance_id: string | null
           integration_id: string
           owner_id: string | null
+          pipeline_id: string | null
           status: string | null
           token: string | null
           updated_at: string
@@ -532,6 +566,7 @@ export type Database = {
           instance_id?: string | null
           integration_id: string
           owner_id?: string | null
+          pipeline_id?: string | null
           status?: string | null
           token?: string | null
           updated_at?: string
@@ -544,6 +579,7 @@ export type Database = {
           instance_id?: string | null
           integration_id?: string
           owner_id?: string | null
+          pipeline_id?: string | null
           status?: string | null
           token?: string | null
           updated_at?: string
@@ -555,6 +591,13 @@ export type Database = {
             columns: ["integration_id"]
             isOneToOne: true
             referencedRelation: "integrations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "integrations_config_pipeline_id_fkey"
+            columns: ["pipeline_id"]
+            isOneToOne: false
+            referencedRelation: "pipelines"
             referencedColumns: ["id"]
           },
         ]
@@ -1257,11 +1300,18 @@ export type Database = {
         Returns: string
       }
       match_chunks: {
-        Args: {
-          query_embedding: string
-          match_threshold: number
-          match_count: number
-        }
+        Args:
+          | {
+              query_embedding: string
+              match_threshold: number
+              match_count: number
+            }
+          | {
+              query_embedding: string
+              match_threshold: number
+              match_count: number
+              filter_document_ids?: string[]
+            }
         Returns: {
           id: string
           document_id: string

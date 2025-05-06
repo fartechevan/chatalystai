@@ -1,7 +1,3 @@
--- Add keyword_trigger column to ai_agents table
-ALTER TABLE public.ai_agents
-ADD COLUMN keyword_trigger TEXT;
-
 -- Create ai_agent_integrations join table
 CREATE TABLE public.ai_agent_integrations (
     agent_id UUID NOT NULL,
@@ -39,5 +35,10 @@ BEFORE UPDATE ON public.ai_agent_integrations
 FOR EACH ROW
 EXECUTE FUNCTION public.handle_updated_at();
 
-COMMENT ON COLUMN public.ai_agents.keyword_trigger IS 'Keyword or phrase that triggers this agent in a connected channel.';
 COMMENT ON TABLE public.ai_agent_integrations IS 'Join table linking AI agents to specific integrations (channels).';
+
+-- Add keyword_trigger column to ai_agents table (Moved to the end)
+ALTER TABLE public.ai_agents
+ADD COLUMN keyword_trigger TEXT;
+
+COMMENT ON COLUMN public.ai_agents.keyword_trigger IS 'Keyword or phrase that triggers this agent in a connected channel.';

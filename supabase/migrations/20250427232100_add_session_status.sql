@@ -1,11 +1,5 @@
--- Create ENUM type for session status
-CREATE TYPE public.ai_session_status AS ENUM (
-    'active',
-    'closed',
-    'error'
-);
-
 -- Add status column to ai_agent_sessions table
+-- The 'ai_session_status' type should already exist from a previous migration
 ALTER TABLE public.ai_agent_sessions
 ADD COLUMN status public.ai_session_status DEFAULT 'active' NOT NULL;
 

@@ -3,6 +3,9 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { useState } from "react";
 import type { Integration } from "../../types";
 import { WhatsAppCloudApiContent } from "./WhatsAppCloudApiContent";
+import { usePipelinesList } from "@/hooks/usePipelinesList"; // Import pipeline hook
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"; // Import Select components
+import { Label } from "@/components/ui/label"; // Import Label
 import { WhatsAppAuthorizationContent } from "./WhatsAppAuthorizationContent";
 // import { WhatsAppBusinessSettings } from "./WhatsAppBusinessSettings"; // Remove unused import
 import { WhatsAppBusinessAuthorization } from "./WhatsAppBusinessAuthorization";
@@ -37,6 +40,9 @@ export function IntegrationTabs({
   const { toast } = useToast();
   // const [isLogoutLoading, setIsLogoutLoading] = useState<string | null>(null); // Remove logout state
   const [isDeleteLoading, setIsDeleteLoading] = useState<string | null>(null); // Instance name being deleted
+  const [selectedPipelineId, setSelectedPipelineId] = useState<string | undefined>(undefined); // State for pipeline ID
+  // Fetch all pipelines - selection is handled during save/connect
+  const { pipelines, isLoading: isLoadingPipelines, error: pipelineError } = usePipelinesList(); 
 
   // --- Call the hook here ---
   const {
@@ -328,10 +334,42 @@ export function IntegrationTabs({
                        className="w-full"
                        disabled={isLoading}
                      />
+                     {/* Pipeline Selection Dropdown - Added Here for first instance */}
+                     <div className="space-y-2 pt-4">
+                       <Label htmlFor="pipeline-select-evo-first">Assign to Pipeline (Optional)</Label>
+                       <Select
+                         value={selectedPipelineId}
+                         onValueChange={setSelectedPipelineId}
+                         disabled={isLoadingPipelines} // Disable while loading pipelines
+                       >
+                         <SelectTrigger id="pipeline-select-evo-first" className="w-full">
+                           <SelectValue placeholder="Select a pipeline..." />
+                         </SelectTrigger>
+                         <SelectContent>
+                           {isLoadingPipelines ? (
+                             <SelectItem value="loading" disabled>Loading pipelines...</SelectItem>
+                           ) : pipelineError ? (
+                             <SelectItem value="error" disabled>Error loading pipelines</SelectItem>
+                           ) : pipelines.length === 0 ? (
+                             <SelectItem value="no-pipelines" disabled>No pipelines found</SelectItem> // Simplified placeholder
+                           ) : (
+                             pipelines.map((pipeline) => (
+                               <SelectItem key={pipeline.id} value={pipeline.id.toString()}>
+                                 {pipeline.name}
+                               </SelectItem>
+                             ))
+                           )}
+                         </SelectContent>
+                       </Select>
+                       <p className="text-sm text-muted-foreground">
+                         Select a pipeline to automatically assign new leads from this WhatsApp instance.
+                       </p>
+                     </div>
+                     {/* Create Button */}
                      <Button
                        variant="default"
                        size="lg"
-                       onClick={handleCreateAndConnect}
+                       onClick={() => handleCreateAndConnect(selectedPipelineId)} // Wrap in arrow function and pass ID
                        className="mt-2 w-full"
                        disabled={!newInstanceName.trim() || isLoading}
                      >
@@ -368,10 +406,12 @@ export function IntegrationTabs({
                               <Button
                                 variant="outline"
                                 size="sm"
-                                onClick={() => {
-                                  console.log(`[IntegrationTabs] Connect button clicked for instance: ${instance.name}. Disabled state: ${!instance.name || instance.connectionStatus === 'open' || isLoading || isDeleteLoading === instance.name}`);
+                                // Wrap the call in an arrow function
+                                onClick={() => { 
+                                  console.log(`[IntegrationTabs] Connect button clicked for instance: ${instance.name}. Pipeline: ${selectedPipelineId}`);
                                   if (instance.name) {
-                                    handleConnect(instance.name);
+                                    // Pass selectedPipelineId to handleConnect
+                                    handleConnect(instance.name, selectedPipelineId); 
                                   } else {
                                     console.warn("[IntegrationTabs] Connect button clicked but instance name is missing.");
                                   }
@@ -416,15 +456,49 @@ export function IntegrationTabs({
                         className="flex-grow"
                         disabled={isLoading}
                       />
-                      <Button
-                        variant="default"
-                        onClick={handleCreateAndConnect}
-                        disabled={!newInstanceName.trim() || isLoading}
-                      >
-                        {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Plus className="mr-2 h-4 w-4" />}
-                         Create & Connect
-                      </Button>
-                    </div>
+                     </div>
+                     {/* Pipeline Selection Dropdown - Moved Here */}
+                     <div className="space-y-2 pt-4">
+                       <Label htmlFor="pipeline-select-evo">Assign to Pipeline (Optional)</Label>
+                       <Select
+                         value={selectedPipelineId}
+                         onValueChange={setSelectedPipelineId}
+                         disabled={isLoadingPipelines} // Disable while loading pipelines
+                       >
+                         <SelectTrigger id="pipeline-select-evo" className="w-full">
+                           <SelectValue placeholder="Select a pipeline..." />
+                         </SelectTrigger>
+                         <SelectContent>
+                           {isLoadingPipelines ? (
+                             <SelectItem value="loading" disabled>Loading pipelines...</SelectItem>
+                           ) : pipelineError ? (
+                             <SelectItem value="error" disabled>Error loading pipelines</SelectItem>
+                           ) : pipelines.length === 0 ? (
+                             <SelectItem value="no-pipelines" disabled>No pipelines found for this integration</SelectItem> // Updated placeholder
+                           ) : (
+                             pipelines.map((pipeline) => (
+                               <SelectItem key={pipeline.id} value={pipeline.id.toString()}>
+                                 {pipeline.name}
+                               </SelectItem>
+                             ))
+                           )}
+                         </SelectContent>
+                       </Select>
+                       <p className="text-sm text-muted-foreground">
+                         Select a pipeline to automatically assign new leads from this WhatsApp instance.
+                       </p>
+                     </div>
+                     {/* Create Button - Now below pipeline selection */}
+                     <Button
+                       variant="default"
+                       // Wrap the call in an arrow function
+                       onClick={() => handleCreateAndConnect(selectedPipelineId)}
+                       disabled={!newInstanceName.trim() || isLoading}
+                       className="w-full mt-4" // Added margin top
+                     >
+                       {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Plus className="mr-2 h-4 w-4" />}
+                       Create & Connect
+                     </Button>
                   </div>
                 </div>
               );

@@ -15,10 +15,12 @@ interface LeadsContentProps {
 }
 
 export function LeadsContent({ pipelineId }: LeadsContentProps) {
-  const [selectedLead, setSelectedLead] = useState<Lead | null>(null); // State for selected lead
-  const queryClient = useQueryClient(); // Get queryClient instance
-  const { stages, stageLeads, loading, loadStages } = usePipelineData(pipelineId);
-  
+  const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
+  const [selectedTagIds, setSelectedTagIds] = useState<string[] | null>(null); // State for selected tags
+  const queryClient = useQueryClient();
+  // Pass selectedTagIds to the hook
+  const { stages, stageLeads, loading, loadStages } = usePipelineData(pipelineId, selectedTagIds); 
+
   // Memoize the callback to prevent unnecessary re-renders
   const handleDataChange = useCallback(() => {
     loadStages();
@@ -44,10 +46,15 @@ export function LeadsContent({ pipelineId }: LeadsContentProps) {
     // Change main container to horizontal flex
     <div className="flex h-full"> 
       {/* Wrap Header and Board in a flex-1 container */}
-      <div className="flex-1 flex flex-col h-full overflow-hidden"> 
-        <LeadsHeader selectedPipelineId={pipelineId} />
+      <div className="flex-1 flex flex-col h-full overflow-hidden">
+        {/* Pass tag state and setter to Header */}
+        <LeadsHeader 
+          selectedPipelineId={pipelineId} 
+          selectedTagIds={selectedTagIds}
+          onSelectedTagIdsChange={setSelectedTagIds} 
+        />
         {/* PipelineBoard needs flex-1 to take remaining vertical space */}
-        <PipelineBoard 
+        <PipelineBoard
           stages={stages} 
           stageLeads={stageLeads} 
           onLeadMoved={handleDataChange} 

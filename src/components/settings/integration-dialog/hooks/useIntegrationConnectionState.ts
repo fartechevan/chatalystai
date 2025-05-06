@@ -71,6 +71,7 @@ export function useIntegrationConnectionState(
   const [isFetchingInstances, setIsFetchingInstances] = useState(false);
   const [selectedInstanceName, setSelectedInstanceName] = useState<string>(""); // Keep track of the instance being connected/managed
   const [newInstanceName, setNewInstanceName] = useState<string>("");
+  const [currentPipelineId, setCurrentPipelineId] = useState<string | undefined>(undefined); // Add state to hold pipeline ID during connection
 
   const [showWebhookSetup, setShowWebhookSetup] = useState(false);
   const [pendingWebhookIntegrationId, setPendingWebhookIntegrationId] = useState<string | null>(null);
@@ -253,6 +254,7 @@ export function useIntegrationConnectionState(
                   instance_display_name: instanceDisplayName,
                   owner_id: ownerId, // Store original JID if available
                   user_reference_id: userReferenceId, // Store sanitized ID if available
+                  pipeline_id: currentPipelineId || null, // Include pipeline_id, default to null if undefined
                   // Add other default/required fields if necessary
                  },
                  {
@@ -325,6 +327,7 @@ export function useIntegrationConnectionState(
                   instance_display_name: instanceDisplayName,
                   owner_id: ownerId, // Store original JID if available
                   user_reference_id: userReferenceId, // Store sanitized ID if available
+                  pipeline_id: currentPipelineId || null, // Include pipeline_id, default to null if undefined
                   // Add other default/required fields if necessary
                  },
                  {
@@ -526,11 +529,13 @@ export function useIntegrationConnectionState(
       if (onConnectionEstablished) {
         onConnectionEstablished();
       }
-      if (selectedIntegration?.id) {
-        // Setup webhook and update details
-         const setupWebhook = async () => {
-           try {
-             const { data: integrationData, error: integrationError } = await supabase.from('integrations').select('webhook_url, webhook_events').eq('id', selectedIntegration.id).single();
+       if (selectedIntegration?.id) {
+         // Define an async function inside the effect to use await
+         const handleOpenState = async () => {
+           // Setup webhook and update details
+           const setupWebhook = async () => {
+             try {
+               const { data: integrationData, error: integrationError } = await supabase.from('integrations').select('webhook_url, webhook_events').eq('id', selectedIntegration.id).single();
              if (integrationError || !integrationData) throw new Error(`Failed to fetch integration details: ${integrationError?.message || 'No data'}`);
              const { data: configData, error: configError } = await supabase.from('integrations_config').select('instance_display_name').eq('integration_id', selectedIntegration.id).maybeSingle();
              if (configError) console.error(`Error fetching config for webhook: ${configError.message}`);
@@ -542,18 +547,52 @@ export function useIntegrationConnectionState(
              await setEvolutionWebhook(selectedIntegration.id, instanceDisplayName, integrationData.webhook_url, integrationData.webhook_events as string[]);
              toast({ title: "Webhook Configured", description: "Webhook settings applied." });
            } catch (error) { console.error("[Webhook Setup] Error:", error); toast({ title: "Webhook Setup Error", description: (error as Error).message, variant: "destructive" }); }
-         };
-         setupWebhook();
-         fetchAndUpdateDetails(selectedIntegration.id); // Call function defined above
-      }
-    }
-  }, [localConnectionState, selectedIntegration, onConnectionEstablished, selectedInstanceName, fetchAndUpdateDetails]); // Added fetchAndUpdateDetails
+          };
+           
+           // Run webhook setup and detail fetching in parallel (or sequentially if needed)
+           await Promise.all([
+             setupWebhook(),
+             fetchAndUpdateDetails(selectedIntegration.id) // Call function defined above
+           ]);
+
+          // --- Add logic to update pipeline_id ---
+          if (currentPipelineId) {
+            console.log(`[Open State Effect] Updating pipeline_id to ${currentPipelineId} for integration ${selectedIntegration.id}`);
+            const { error: pipelineUpdateError } = await supabase
+              .from('integrations_config')
+              .update({ pipeline_id: currentPipelineId })
+              .eq('integration_id', selectedIntegration.id);
+ 
+             if (pipelineUpdateError) {
+               console.error(`[Open State Effect] Error updating pipeline_id:`, pipelineUpdateError);
+               toast({
+                title: "Error Saving Pipeline",
+                description: `Failed to save selected pipeline: ${pipelineUpdateError.message}`,
+                variant: "destructive",
+              });
+            } else {
+              console.log(`[Open State Effect] Successfully updated pipeline_id for integration ${selectedIntegration.id}`);
+              // Optionally clear currentPipelineId state after successful update
+              // setCurrentPipelineId(undefined);
+             }
+           } else {
+              console.log(`[Open State Effect] No currentPipelineId set, skipping pipeline update for integration ${selectedIntegration.id}`);
+           }
+           // --- End pipeline_id update logic ---
+         }; // End of handleOpenState async function
+
+         // Call the async function
+         handleOpenState();
+       }
+     }
+   }, [localConnectionState, selectedIntegration, onConnectionEstablished, selectedInstanceName, fetchAndUpdateDetails, currentPipelineId]); // Added currentPipelineId and fetchAndUpdateDetails
 
 
   // --- Connection/Creation Handlers ---
-  const handleConnect = useCallback(async (instanceNameToConnect: string | null | undefined = null) => {
+  const handleConnect = useCallback(async (instanceNameToConnect: string | null | undefined = null, pipelineId?: string | undefined) => {
     const targetInstanceName = instanceNameToConnect || selectedInstanceName;
-    console.log("[handleConnect] Function called for instance:", targetInstanceName);
+    console.log("[handleConnect] Function called for instance:", targetInstanceName, "Pipeline ID:", pipelineId);
+    setCurrentPipelineId(pipelineId); // Store pipeline ID for potential upsert later
 
     if (!targetInstanceName) {
       toast({ title: "Error", description: "No instance name provided or selected.", variant: "destructive" });
@@ -651,14 +690,17 @@ export function useIntegrationConnectionState(
   }, [selectedIntegration?.id, selectedInstanceName]);
 
 
-  const handleCreateAndConnect = useCallback(async () => {
+  const handleCreateAndConnect = useCallback(async (pipelineId?: string | undefined) => {
     if (!newInstanceName || !selectedIntegration?.id) return;
+    console.log("[handleCreateAndConnect] Function called for new instance:", newInstanceName, "Pipeline ID:", pipelineId);
+    setCurrentPipelineId(pipelineId); // Store pipeline ID for potential upsert later
     setIsLoading(true);
     const { success, error, instanceData } = await createEvolutionInstance(newInstanceName, selectedIntegration.id);
     if (success && instanceData) {
+      // Important: Pass the pipelineId to the subsequent handleConnect call
       await refetchInstances(); // Use the refetch function defined above
       setSelectedInstanceName(newInstanceName);
-      await handleConnect(newInstanceName);
+      await handleConnect(newInstanceName, pipelineId); // Pass pipelineId here
     } else {
       toast({ variant: "destructive", title: "Instance Creation Failed", description: error || "Failed to create instance." });
       setIsLoading(false);
