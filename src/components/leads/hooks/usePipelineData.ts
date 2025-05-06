@@ -11,25 +11,30 @@ type SupabaseLeadWithRelations = {
   updated_at: string;
   user_id: string;
   assignee_id?: string | null;
-  value: number;
-  customer_id: string;
-  // Make customers optional as it's not fetched by the simplified query
-  customers?: { 
+  value: number | null; // Allow null
+  customer_id: string | null; // Allow null
+  // Fetch related customer data
+  customers: { 
     company_name?: string | null;
     name?: string | null;
-    // Add other customer fields if needed
-  } | null;
-  // Make lead_tags optional as it's not fetched by the simplified query
-  lead_tags?: { 
-    tags: { 
+    // Add other customer fields if needed (e.g., email, phone)
+    email?: string | null;
+    phone_number?: string | null;
+    company_address?: string | null;
+  } | null; // Customer can be null if customer_id is null or relation doesn't exist
+  // Fetch related tags
+  lead_tags: {
+    tags: {
       id: string;
       name: string;
-    } | null;
-  }[] | null;
-  // Add any other fields selected by '*' from the leads table
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  [key: string]: any; // Allow other properties from '*'
+    } | null; // The tag itself might be null in rare cases? Better safe.
+  }[] | null; // lead_tags array can be null if no tags
+  // Ensure pipeline_stage_id is included if needed from leads table directly
+  pipeline_stage_id: string | null; // Allow null
+  // No need for [key: string]: any; if we explicitly list fields
 };
+
+
 
 
 export interface StageLeads {
@@ -42,7 +47,8 @@ export interface PipelineStage {
   position: number;
 }
 
-export function usePipelineData(pipelineId: string | null) {
+// Add selectedTagIds parameter
+export function usePipelineData(pipelineId: string | null, selectedTagIds: string[] | null) {
   const { toast } = useToast();
   const [stages, setStages] = useState<PipelineStage[]>([]);
   const [stageLeads, setStageLeads] = useState<StageLeads>({});
@@ -73,15 +79,20 @@ export function usePipelineData(pipelineId: string | null) {
        setStages(data);
        
        const leadsData: StageLeads = {};
-      for (const stage of data) {
-        const { data: stageLeadsData, error: leadsError } = await supabase
-          .from('lead_pipeline')
-          .select(`
-            position, 
-            leads (*) 
-          `) // Removed comment
-          .eq('stage_id', stage.id)
-          .order('position');
+       for (const stage of data) {
+         // Fetch leads with customer and tag details
+         const { data: stageLeadsData, error: leadsError } = await supabase
+           .from('lead_pipeline')
+           .select(`
+             position,
+             leads (
+               *,
+               customers (name, company_name, email, phone_number, company_address),
+               lead_tags (tags (id, name))
+             )
+           `)
+           .eq('stage_id', stage.id)
+           .order('position');
 
         if (leadsError) {
           console.error('Error fetching leads for stage', stage.id, leadsError);
@@ -93,20 +104,30 @@ export function usePipelineData(pipelineId: string | null) {
             .map(item => {
               if (item.leads) { // Check item.leads
                 // Cast to the specific intermediate type instead of any
-                const lead = item.leads as SupabaseLeadWithRelations; // Use item.leads
-                const typedLead: Lead = {
-                  id: lead.id,
-                  created_at: lead.created_at,
-                  updated_at: lead.updated_at || lead.created_at,
-                  user_id: lead.user_id,
-                  assignee_id: lead.assignee_id || null, // Ensure null if undefined/missing
-                  value: lead.value || 0,
-                  customer_id: lead.customer_id || '',
-                  pipeline_stage_id: stage.id
-                  // Removed tags mapping
-                  // Removed virtual properties mapping (will be handled in details panel)
-                };
-                return typedLead;
+                 const lead = item.leads as SupabaseLeadWithRelations;
+                 // Map tags correctly
+                 const tags = lead.lead_tags
+                   ?.map(lt => lt.tags)
+                   .filter((tag): tag is { id: string; name: string } => tag !== null) || null; // Handle null tags array or null individual tags
+
+                 const typedLead: Lead = {
+                   id: lead.id,
+                   created_at: lead.created_at,
+                   updated_at: lead.updated_at || lead.created_at,
+                   user_id: lead.user_id,
+                   assignee_id: lead.assignee_id || null,
+                   value: lead.value ?? null, // Use nullish coalescing for value
+                   customer_id: lead.customer_id ?? null, // Use nullish coalescing
+                   pipeline_stage_id: stage.id, // Stage ID comes from the outer loop
+                   tags: tags, // Assign mapped tags
+                   // Map customer data
+                   name: lead.customers?.name ?? undefined, // Use undefined if customer or name is null
+                   company_name: lead.customers?.company_name ?? undefined,
+                   contact_email: lead.customers?.email ?? undefined,
+                   contact_phone: lead.customers?.phone_number ?? undefined,
+                   company_address: lead.customers?.company_address ?? undefined,
+                 };
+                 return typedLead;
               }
               return null;
             })
@@ -116,17 +137,31 @@ export function usePipelineData(pipelineId: string | null) {
          }
        }
        
-       console.log("Final leads data structure:", JSON.stringify(leadsData, null, 2)); // Add detailed log
-       setStageLeads(leadsData);
+       // Filter leads based on selected tags *after* fetching
+       const filteredLeadsData: StageLeads = {};
+       for (const stageId in leadsData) {
+         if (selectedTagIds && selectedTagIds.length > 0) {
+           filteredLeadsData[stageId] = leadsData[stageId].filter(lead =>
+             lead.tags?.some(tag => selectedTagIds.includes(tag.id))
+           );
+         } else {
+           // If no tags are selected, include all leads for the stage
+           filteredLeadsData[stageId] = leadsData[stageId];
+         }
+       }
+
+       console.log("Final filtered leads data structure:", JSON.stringify(filteredLeadsData, null, 2)); // Log filtered data
+       setStageLeads(filteredLeadsData); // Set the filtered leads
      }
-     
+
     setLoading(false);
   };
 
   useEffect(() => {
     setLoading(true);
     loadStages();
-  }, [pipelineId]);
+  // Add selectedTagIds to dependency array
+  }, [pipelineId, selectedTagIds]); 
 
   return {
     stages,

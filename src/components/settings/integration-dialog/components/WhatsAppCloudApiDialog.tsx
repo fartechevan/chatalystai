@@ -5,26 +5,35 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ArrowLeft, Clock } from "lucide-react";
 import { useState } from "react";
 import type { Integration } from "../../types";
+import { usePipelinesList } from "@/hooks/usePipelinesList"; // Import the correct hook
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"; // Import Select components
+import { Label } from "@/components/ui/label"; // Import Label
 
 interface WhatsAppCloudApiDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   selectedIntegration: Integration | null;
+  onConnectClick: (pipelineId: string | undefined) => void; // Add prop to pass pipeline ID back
 }
 
 export function WhatsAppCloudApiDialog({
   open,
   onOpenChange,
   selectedIntegration,
+  onConnectClick, // Destructure the new prop
 }: WhatsAppCloudApiDialogProps) {
   const [activeTab, setActiveTab] = useState<"settings" | "authorization">("settings");
-  
+  // Fetch all pipelines - selection is handled during save/connect
+  const { pipelines, isLoading: isLoadingPipelines, error: pipelineError } = usePipelinesList(); 
+  const [selectedPipelineId, setSelectedPipelineId] = useState<string | undefined>(undefined); // State for selected pipeline
+
   // Function to handle Facebook SDK integration
   const handleConnectWithFacebook = () => {
     // In a real implementation, this would initialize the Facebook SDK and trigger the login flow
-    // For this demo, we'll just log the action
-    console.log("Connecting with Facebook SDK...");
-    window.open("https://business.facebook.com/wa/manage/", "_blank");
+    // For this demo, we'll just log the action and call the callback
+    console.log("Connecting with Facebook SDK with pipeline:", selectedPipelineId);
+    onConnectClick(selectedPipelineId); // Call the callback with the selected ID
+    // window.open("https://business.facebook.com/wa/manage/", "_blank"); // Keep or modify based on actual flow
   };
   
   return (
@@ -83,10 +92,39 @@ export function WhatsAppCloudApiDialog({
                     <li>Select or create a WhatsApp Business account to connect your number.</li>
                   </ul>
                 </div>
+
+                {/* Pipeline Selection Dropdown */}
+                <div className="space-y-2 mb-6">
+                  <Label htmlFor="pipeline-select">Assign to Pipeline (Optional)</Label>
+                  <Select
+                    value={selectedPipelineId}
+                    onValueChange={setSelectedPipelineId}
+                    disabled={isLoadingPipelines}
+                  >
+                    <SelectTrigger id="pipeline-select" className="w-full">
+                      <SelectValue placeholder="Select a pipeline..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {isLoadingPipelines ? (
+                        <SelectItem value="loading" disabled>Loading pipelines...</SelectItem>
+                      ) : (
+                        pipelines.map((pipeline) => (
+                          <SelectItem key={pipeline.id} value={pipeline.id.toString()}>
+                            {pipeline.name}
+                          </SelectItem>
+                        ))
+                      )}
+                    </SelectContent>
+                  </Select>
+                   <p className="text-sm text-muted-foreground">
+                    Select a pipeline to automatically assign new leads from this WhatsApp number.
+                  </p>
+                </div>
                 
                 <Button 
                   className="w-full sm:w-auto flex items-center justify-center gap-2 bg-[#1877F2] hover:bg-[#0e69de]"
                   onClick={handleConnectWithFacebook}
+                  // TODO: Ensure selectedPipelineId is passed along when connection is finalized
                 >
                   <svg viewBox="0 0 36 36" className="h-5 w-5 fill-current" xmlns="http://www.w3.org/2000/svg">
                     <path d="M34 16h-6v-5.2c0-.8.7-1.8 1.5-1.8h4.5V2h-6.2c-5.3 0-8.8 4-8.8 9v5h-5v7h5v16h7V23h4.8l1.2-7z"></path>
