@@ -1,9 +1,13 @@
 
+import React, { useState, useCallback } from 'react'; // Added useState, useCallback
 import { DataTable } from "./DataTable";
 import { columns } from "./columns";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useMediaQuery } from "@/hooks/use-media-query"; // Import useMediaQuery
+import { Button } from "@/components/ui/button"; // Added Button
+import { Loader2, DatabaseZap } from 'lucide-react'; // Added Loader2, DatabaseZap
+import { toast } from '@/hooks/use-toast'; // Added toast
 import { BillingStats } from "./BillingStats";
 import { IntegrationsView } from "./IntegrationsView";
 import { ProfileAccessManagement } from "./integration-access/ProfileAccessManagement";
@@ -16,6 +20,9 @@ interface SettingsContentProps {
 
 export function SettingsContent({ section }: SettingsContentProps) {
   const isMobile = useMediaQuery("(max-width: 768px)"); // Check for mobile screen size
+  const [isVectorizing, setIsVectorizing] = useState(false); // State for schema vectorization
+  const [vectorizeStatus, setVectorizeStatus] = useState<string | null>(null); // Status message for vectorization
+
   const { data: users = [], isLoading } = useQuery({
     queryKey: ['users'],
     queryFn: async () => {
@@ -33,6 +40,32 @@ export function SettingsContent({ section }: SettingsContentProps) {
       return data;
     },
   });
+
+  // Function to trigger schema vectorization - Moved from ConversationStatsView
+  const handleVectorizeSchema = useCallback(async () => {
+    setIsVectorizing(true);
+    setVectorizeStatus("Vectorizing schema...");
+    try {
+      const { data, error } = await supabase.functions.invoke('vectorize-schema');
+
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+
+      setVectorizeStatus(data?.message || "Schema vectorization completed successfully.");
+       toast({ title: "Schema Vectorization Success", description: data?.message });
+
+    } catch (error) { // Explicitly type error as unknown or Error
+      console.error("Error vectorizing schema:", error);
+      const errorMessage = error instanceof Error ? error.message : "An unknown error occurred";
+      setVectorizeStatus(`Error: ${errorMessage}`);
+      toast({ title: "Schema Vectorization Failed", description: errorMessage, variant: "destructive" });
+    } finally {
+      setIsVectorizing(false);
+      // Optionally clear status message after a delay
+      setTimeout(() => setVectorizeStatus(null), 5000);
+    }
+  }, []);
+
 
   if (section === 'billing') {
     return (
@@ -88,6 +121,30 @@ export function SettingsContent({ section }: SettingsContentProps) {
     );
   }
 
+  if (section === 'database') {
+    return (
+      <div className="p-6 space-y-4">
+        <h2 className="text-lg font-semibold">Database Management</h2>
+        <p className="text-muted-foreground">Perform database-related operations.</p>
+
+        {/* Vectorize Schema Button and Status */}
+        <div className="pt-4 border-t">
+          <h3 className="text-md font-medium mb-2">Schema Vectorization</h3>
+          <p className="text-sm text-muted-foreground mb-3">
+            Update the vector embeddings for your database schema. This is used by AI features to understand your data structure.
+          </p>
+          <Button onClick={handleVectorizeSchema} disabled={isVectorizing} variant="outline" size="sm">
+            {isVectorizing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <DatabaseZap className="mr-2 h-4 w-4" />}
+            Vectorize Schema
+          </Button>
+          {/* Display vectorize status */}
+          {vectorizeStatus && <p className={`text-sm ${vectorizeStatus.startsWith('Error') ? 'text-red-500' : 'text-green-600'} mt-2`}>{vectorizeStatus}</p>}
+        </div>
+      </div>
+    );
+  }
+
+  // Default fallback for any other section
   return (
     <div className="p-6"> {/* Removed max-w-5xl mx-auto */}
       <h2 className="text-lg font-semibold">{section.charAt(0).toUpperCase() + section.slice(1)}</h2>

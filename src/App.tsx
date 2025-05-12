@@ -24,6 +24,7 @@ import Profile from "./pages/Profile";
 import BroadcastsPage from "./pages/Broadcasts"; // Import the actual Broadcasts page
 import BroadcastDetailsView from "./components/broadcasts/BroadcastDetailsView"; // Import the details view
 import AIAgentsPage from "./pages/AIAgents"; // Import the new AI Agents page
+// Removed import for BatchSentimentAnalysisLayout as it will be rendered within ConversationStatsView
 
 const App = () => {
   const queryClient = new QueryClient({
@@ -70,6 +71,7 @@ const App = () => {
                     <Route path="mail" element={<ComingSoon />} />
                     <Route path="knowledge" element={<KnowledgeBase />} />
                     <Route path="ai-agents" element={<AIAgentsPage />} /> {/* Add AI Agents route */}
+                    {/* Removed Batch Sentiment Analysis route */}
                     <Route path="profile" element={<Profile />} />
                   </Route>
                 </Routes>

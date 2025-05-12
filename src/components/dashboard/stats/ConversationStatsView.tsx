@@ -2,7 +2,7 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query'; // Added useQueryClient import
 import { supabase } from '@/integrations/supabase/client';
 // Import LineChart components from recharts
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
@@ -30,6 +30,16 @@ import { SelectedConversationsList } from './SelectedConversationsList'; // Impo
 import { ChatWidget } from './ChatWidget'; // Import ChatWidget
 import { ChatPopup } from './ChatPopup'; // Import ChatPopup
 import { toast } from '@/hooks/use-toast'; // Import toast
+// Removed import for BatchSentimentAnalysisLayout
+import BatchSentimentHistoryList from '../analytics/BatchSentimentHistoryList'; // Import the history list directly
+import { BatchDateRangeDialog } from './BatchDateRangeDialog'; // Import the new dialog
+
+// Define type for batch details fetch
+type BatchDetails = {
+  conversation_ids: string[] | null;
+  start_date: string | null;
+  end_date: string | null;
+};
 
 // Define types - Exported Message
 export type Message = {
@@ -180,18 +190,19 @@ const DivergentStackedBarChartComponent = ({ data, onBarClick }: DivergentStacke
     unknown: sentimentCounts.unknown || 0,
   }];
 
-  const hasAnalyzedData = data.some(d => d.sentimentResult !== null);
+  const hasAnalyzedData = data.some(d => d.sentimentResult !== null && d.sentimentResult.sentiment !== 'unknown'); // Adjusted to check for actual sentiment
   const totalSentiments = chartData[0].good + chartData[0].moderate + chartData[0].bad + chartData[0].unknown;
 
-  if (!hasAnalyzedData && data.length > 0) {
-      return <div className="text-center text-muted-foreground p-4">Click "Analyze Sentiments" to process conversations.</div>;
+  if (data.length > 0 && !hasAnalyzedData && data.every(d => d.sentimentResult === null || d.sentimentResult.sentiment === 'unknown')) {
+      return <div className="text-center text-muted-foreground p-4">Conversations loaded. Sentiment details for this batch are not available or all are 'unknown'.</div>;
   }
   if (totalSentiments === 0 && data.length === 0) {
-       return <div className="text-center text-muted-foreground p-4">No conversation data available.</div>;
+       return <div className="text-center text-muted-foreground p-4">No conversation data available for the selected batch.</div>;
   }
-   if (totalSentiments === 0 && hasAnalyzedData) {
+   if (totalSentiments === 0 && hasAnalyzedData) { // This case might be rare now
        return <div className="text-center text-muted-foreground p-4">Analysis complete, but no sentiments detected (all unknown/failed).</div>;
    }
+
 
   return (
     <ResponsiveContainer width="100%" height={300}>
@@ -206,41 +217,6 @@ const DivergentStackedBarChartComponent = ({ data, onBarClick }: DivergentStacke
         <Bar dataKey="moderate" stackId="a" fill="#facc15" name="Moderate" onClick={() => onBarClick?.('moderate')} style={{ cursor: onBarClick ? 'pointer' : 'default' }} />
         <Bar dataKey="bad" stackId="a" fill="#ef4444" name="Bad" onClick={() => onBarClick?.('bad')} style={{ cursor: onBarClick ? 'pointer' : 'default' }} />
         <Bar dataKey="unknown" stackId="a" fill="#a1a1aa" name="Unknown/Not Analyzed" onClick={() => onBarClick?.('unknown')} style={{ cursor: onBarClick ? 'pointer' : 'default' }} />
-      </BarChart>
-    </ResponsiveContainer>
-  );
-};
-
-// --- Heat Map Component (as Grouped Bar Chart) ---
-const HeatMapChartComponent = ({ data }: { data: AnalyzedConversation[] }) => {
-  const sentimentsByDate = data.reduce((acc, curr) => {
-    if (!curr.sentimentResult) return acc;
-    const date = format(startOfDay(parseISO(curr.created_at)), 'yyyy-MM-dd');
-    if (!acc[date]) {
-      acc[date] = { date, good: 0, moderate: 0, bad: 0, unknown: 0 };
-    }
-    acc[date][curr.sentimentResult.sentiment]++;
-    return acc;
-  }, {} as Record<string, { date: string; good: number; moderate: number; bad: number; unknown: number }>);
-
-  const chartData = Object.values(sentimentsByDate).sort((a, b) => a.date.localeCompare(b.date));
-
-  if (chartData.length === 0) {
-    return <div className="text-center text-muted-foreground p-4">Not enough analyzed data to show heatmap.</div>;
-  }
-
-  return (
-    <ResponsiveContainer width="100%" height={300}>
-      <BarChart data={chartData} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
-        <CartesianGrid strokeDasharray="3 3" />
-        <XAxis dataKey="date" />
-        <YAxis allowDecimals={false} />
-        <Tooltip />
-        <Legend />
-        <Bar dataKey="good" fill="#22c55e" name="Good" />
-        <Bar dataKey="moderate" fill="#facc15" name="Moderate" />
-        <Bar dataKey="bad" fill="#ef4444" name="Bad" />
-        <Bar dataKey="unknown" fill="#a1a1aa" name="Unknown" />
       </BarChart>
     </ResponsiveContainer>
   );
@@ -278,37 +254,128 @@ const WordCloudComponent = ({ data }: { data: AnalyzedConversation[] }) => {
 // --- Main View Component ---
 export function ConversationStatsView() {
   const [analyzedConversations, setAnalyzedConversations] = useState<AnalyzedConversation[]>([]);
-  const [isAnalyzing, setIsAnalyzing] = useState(false); // For sentiment analysis
-  const [analysisError, setAnalysisError] = useState<string | null>(null); // For sentiment analysis
   const [isChatOpen, setIsChatOpen] = useState(false);
-  const [isVectorizing, setIsVectorizing] = useState(false); // State for schema vectorization
-  const [vectorizeStatus, setVectorizeStatus] = useState<string | null>(null); // Status message for vectorization
-  const [dateRange, setDateRange] = useState<DateRange | undefined>({
-    from: subDays(new Date(), 29), // Default to last 30 days
-    to: new Date(),
-  });
-  // State for selected sentiment and filtered conversations
   const [selectedSentiment, setSelectedSentiment] = useState<'good' | 'moderate' | 'bad' | 'unknown' | null>(null);
   const [filteredSentimentConversations, setFilteredSentimentConversations] = useState<AnalyzedConversation[]>([]);
+  const [selectedBatchAnalysisId, setSelectedBatchAnalysisId] = useState<string | null>(null);
+  const [selectedBatchConversationIds, setSelectedBatchConversationIds] = useState<string[] | null>(null);
+  const [isCreatingBatch, setIsCreatingBatch] = useState(false); 
+  const [batchCreationError, setBatchCreationError] = useState<string | null>(null);
+  const [selectedBatchDateRange, setSelectedBatchDateRange] = useState<DateRange | undefined>(undefined); 
+  const [isLoadingBatchDetails, setIsLoadingBatchDetails] = useState(false); 
+  const [isDateRangeDialogOpen, setIsDateRangeDialogOpen] = useState(false); 
 
+  const handleSelectBatchAnalysis = async (id: string | null) => {
+    setSelectedBatchAnalysisId(id);
+    setSelectedSentiment(null);
+    setFilteredSentimentConversations([]);
+    setSelectedBatchDateRange(undefined); 
+
+    if (id) {
+      setIsLoadingBatchDetails(true);
+      try {
+        // Fetch batch details including conversation_ids and date range
+        // Re-add 'as any' temporarily to fix TS error
+        const { data: batchData, error: batchError } = await supabase
+          .from('batch_sentiment_analysis' as any) // Re-add 'as any'
+          .select('conversation_ids, start_date, end_date')
+          .eq('id', id)
+          .single<BatchDetails>(); // Keep BatchDetails type for structure hint
+
+        if (batchError) throw batchError;
+
+        if (batchData) {
+          setSelectedBatchConversationIds(batchData.conversation_ids || []);
+          if (batchData.start_date && batchData.end_date) {
+            setSelectedBatchDateRange({
+              from: parseISO(batchData.start_date),
+              to: parseISO(batchData.end_date),
+            });
+          } else {
+             setSelectedBatchDateRange(undefined);
+          }
+        } else {
+          setSelectedBatchConversationIds([]);
+          setSelectedBatchDateRange(undefined);
+        }
+
+      } catch (error) {
+        console.error("Error fetching batch details:", error);
+        toast({ title: "Error fetching batch details", variant: "destructive" });
+        setSelectedBatchConversationIds(null);
+        setSelectedBatchDateRange(undefined);
+      } finally {
+        setIsLoadingBatchDetails(false);
+      }
+    } else {
+      setSelectedBatchConversationIds(null); 
+      setSelectedBatchDateRange(undefined); 
+    }
+  };
+
+  const queryClient = useQueryClient(); 
+
+  const handleCreateNewBatchAnalysis = async (batchStartDate?: Date, batchEndDate?: Date) => { 
+    if (!batchStartDate || !batchEndDate) {
+      toast({ title: "Date range is required for batch analysis.", variant: "destructive" });
+      return;
+    }
+
+    setIsCreatingBatch(true);
+    setBatchCreationError(null);
+    try {
+      const { data, error } = await supabase.functions.invoke('analyze-sentiment-batch', {
+        body: { 
+          startDate: format(batchStartDate, 'yyyy-MM-dd'),
+          endDate: format(batchEndDate, 'yyyy-MM-dd')
+        },
+      });
+
+      if (error) throw error;
+
+      toast({ title: "Batch sentiment analysis started.", description: `Batch ID: ${data?.batch_analysis_id}` });
+      queryClient.invalidateQueries({ queryKey: ['batchAnalyses'] }); 
+      setIsDateRangeDialogOpen(false); 
+
+    } catch (error: unknown) { 
+      console.error("Error creating new batch analysis:", error);
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      setBatchCreationError(errorMessage || "Failed to start batch analysis.");
+      toast({ title: "Batch Analysis Failed", description: errorMessage, variant: "destructive" }); 
+    } finally {
+      setIsCreatingBatch(false);
+    }
+  };
 
   const { data: initialConversationsData, isLoading: isLoadingConversations, error: fetchConversationsError } = useQuery<Conversation[]>({
-    // Include dateRange in queryKey to refetch when it changes
-    queryKey: ['conversationsWithMessages', dateRange?.from, dateRange?.to],
-    queryFn: () => fetchConversationsWithMessages(dateRange?.from, dateRange?.to),
-    enabled: !!dateRange?.from && !!dateRange?.to, // Only run query if dates are set
+    queryKey: ['conversationsForBatch', selectedBatchAnalysisId, selectedBatchDateRange], 
+    queryFn: () => {
+      if (selectedBatchAnalysisId && selectedBatchDateRange?.from && selectedBatchDateRange?.to) {
+         return fetchConversationsWithMessages(selectedBatchDateRange.from, selectedBatchDateRange.to);
+      }
+      return Promise.resolve([]); 
+    },
+    enabled: !!selectedBatchAnalysisId && !!selectedBatchDateRange?.from && !!selectedBatchDateRange?.to,
   });
 
   useEffect(() => {
-    if (initialConversationsData) {
-      setAnalyzedConversations(initialConversationsData.map(conv => ({ ...conv, sentimentResult: null })));
+    if (selectedBatchAnalysisId && initialConversationsData && selectedBatchConversationIds) {
+      const batchConvIdsSet = new Set(selectedBatchConversationIds);
+      const conversationsFromBatch = initialConversationsData.filter(conv =>
+        batchConvIdsSet.has(conv.conversation_id)
+      );
+      // Since detailed sentiment for past batches isn't stored, set sentimentResult to null
+      setAnalyzedConversations(conversationsFromBatch.map(conv => ({ ...conv, sentimentResult: null } as AnalyzedConversation)));
+    } else if (!selectedBatchAnalysisId) {
+      setAnalyzedConversations([]);
     }
-    // Reset selection when data reloads
     setSelectedSentiment(null);
     setFilteredSentimentConversations([]);
-  }, [initialConversationsData]);
+  }, [initialConversationsData, selectedBatchAnalysisId, selectedBatchConversationIds]); 
 
-  // Handler for clicking a bar segment
+  // Removed the useEffect that tried to fetch from 'batch_sentiment_analysis_details'
+  // as this table does not exist and individual results are not stored per batch.
+
   const handleSentimentClick = useCallback((sentiment: 'good' | 'moderate' | 'bad' | 'unknown') => {
     setSelectedSentiment(sentiment);
     const filtered = analyzedConversations.filter(
@@ -317,68 +384,8 @@ export function ConversationStatsView() {
     setFilteredSentimentConversations(filtered);
   }, [analyzedConversations]);
 
-  const handleAnalyzeSentiments = useCallback(async () => {
-    // Reset selection before analysis
-    setSelectedSentiment(null);
-    setFilteredSentimentConversations([]);
 
-    const conversationsToAnalyze = analyzedConversations.filter(c => !c.sentimentResult);
-    if (!conversationsToAnalyze || conversationsToAnalyze.length === 0) {
-      setAnalysisError("No conversations need analysis or data hasn't loaded.");
-      return;
-    }
-
-    setIsAnalyzing(true);
-    setAnalysisError(null);
-    const analysisPromises: Promise<SentimentResult>[] = conversationsToAnalyze.map(conv =>
-      analyzeSentimentForConversation(conv.conversation_id)
-    );
-
-    try {
-      const results = await Promise.all(analysisPromises);
-      setAnalyzedConversations(prevConversations => {
-        const resultsMap = new Map(results.map(r => [r.conversation_id, r]));
-        return prevConversations.map(conv => ({
-          ...conv,
-          sentimentResult: resultsMap.get(conv.conversation_id) || conv.sentimentResult,
-        }));
-      });
-      toast({ title: "Sentiment analysis complete." }); // Add success toast
-    } catch (error) {
-       console.error("Error during batch sentiment analysis:", error);
-       setAnalysisError("An error occurred during the analysis process. Check console for details.");
-       toast({ title: "Sentiment analysis failed.", variant: "destructive" }); // Add error toast
-    } finally {
-      setIsAnalyzing(false);
-    }
-  }, [analyzedConversations]);
-
-  // Function to trigger schema vectorization
-  const handleVectorizeSchema = useCallback(async () => {
-    setIsVectorizing(true);
-    setVectorizeStatus("Vectorizing schema...");
-    try {
-      const { data, error } = await supabase.functions.invoke('vectorize-schema');
-
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
-
-      setVectorizeStatus(data?.message || "Schema vectorization completed successfully.");
-       toast({ title: "Schema Vectorization Success", description: data?.message });
-
-    } catch (error) { // Explicitly type error as unknown or Error
-      console.error("Error vectorizing schema:", error);
-      const errorMessage = error instanceof Error ? error.message : "An unknown error occurred";
-      setVectorizeStatus(`Error: ${errorMessage}`);
-      toast({ title: "Schema Vectorization Failed", description: errorMessage, variant: "destructive" });
-    } finally {
-      setIsVectorizing(false);
-      // Optionally clear status message after a delay
-      setTimeout(() => setVectorizeStatus(null), 5000); 
-    }
-  }, []);
-
-  if (isLoadingConversations) {
+  if (isLoadingConversations && selectedBatchAnalysisId) { 
     return (
       <div className="p-4 md:p-6 space-y-4">
         <h1 className="text-2xl font-semibold">Conversation Analysis</h1>
@@ -395,81 +402,51 @@ export function ConversationStatsView() {
     return <div className="p-4 text-red-500">Error loading conversations: {fetchConversationsError.message}</div>;
   }
 
-  // Calculate hasAnalysisRun *before* the return statement
-  const hasAnalysisRun = analyzedConversations.some(c => c.sentimentResult !== null);
+  const hasAnalysisRun = analyzedConversations.some(c => c.sentimentResult !== null && c.sentimentResult.sentiment !== 'unknown');
 
   return (
-    // Use React.Fragment to return multiple top-level elements
     <>
-      {/* Adjust main layout to grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 p-4 md:p-6">
-        {/* Left Column: Filters and Charts */}
-        <div className="lg:col-span-2 space-y-4">
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-4">
-             <h1 className="text-2xl font-semibold">Conversation Analysis</h1>
-             <div className="flex items-center space-x-2 flex-wrap"> {/* Group buttons */}
-             {/* Add Vectorize Schema Button */}
-             <Button onClick={handleVectorizeSchema} disabled={isVectorizing} variant="outline" size="sm">
-               {isVectorizing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <DatabaseZap className="mr-2 h-4 w-4" />}
-               Vectorize Schema
-             </Button>
-             {/* Updated button label calculation */}
-             <Button onClick={handleAnalyzeSentiments} disabled={isAnalyzing || analyzedConversations.filter(c => !c.sentimentResult).length === 0}>
-               {isAnalyzing ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-               Analyze Sentiments ({analyzedConversations.filter(c => !c.sentimentResult).length} needing analysis)
-             </Button>
-           </div>
+      {/* Main grid container - NO PADDING HERE */}
+      <div className="grid grid-cols-1 lg:grid-cols-4 h-full">
+
+        {/* Left panel column - applies border and background. NO PADDING HERE. */}
+        <div className="lg:col-span-1 h-full border-r bg-muted/10">
+          {/* BatchSentimentHistoryList will manage its own internal padding */}
+          <BatchSentimentHistoryList
+            selectedAnalysisId={selectedBatchAnalysisId}
+            onSelectAnalysis={handleSelectBatchAnalysis}
+              onCreateNewBatch={async () => setIsDateRangeDialogOpen(true)}
+              isCreatingBatch={isCreatingBatch}
+            />
         </div>
-         {/* Display vectorize status */}
-         {vectorizeStatus && <p className={`text-sm ${vectorizeStatus.startsWith('Error') ? 'text-red-500' : 'text-green-600'} mt-1`}>{vectorizeStatus}</p>}
-         {analysisError && <p className="text-sm text-red-500 mt-2">{analysisError}</p>}
 
-           {/* Add Calendar Date Range Picker */}
-           <div className={cn("grid gap-2")}> {/* Removed mb-4 */}
-             <Popover>
-               <PopoverTrigger asChild>
-               <Button
-                 id="date"
-                 variant={"outline"}
-                 className={cn(
-                   "w-[300px] justify-start text-left font-normal",
-                   !dateRange && "text-muted-foreground"
-                 )}
-               >
-                 <CalendarIcon className="mr-2 h-4 w-4" />
-                 {dateRange?.from ? (
-                   dateRange.to ? (
-                     <>
-                       {format(dateRange.from, "LLL dd, y")} -{" "}
-                       {format(dateRange.to, "LLL dd, y")}
-                     </>
-                   ) : (
-                     format(dateRange.from, "LLL dd, y")
-                   )
-                 ) : (
-                   <span>Pick a date range</span>
-                 )}
-               </Button>
-             </PopoverTrigger>
-             <PopoverContent className="w-auto p-0" align="start">
-               <Calendar
-                 initialFocus
-                 mode="range"
-                 defaultMonth={dateRange?.from}
-                 selected={dateRange}
-                 onSelect={setDateRange}
-                 numberOfMonths={2}
-               />
-             </PopoverContent>
-           </Popover>
-         </div>
+        {/* BatchDateRangeDialog - position might need review based on its modal nature */}
+        <BatchDateRangeDialog
+            isOpen={isDateRangeDialogOpen}
+            onOpenChange={setIsDateRangeDialogOpen}
+            onSubmit={handleCreateNewBatchAnalysis}
+            isCreatingBatch={isCreatingBatch}
+        />
 
-        <Tabs defaultValue="divergent-stacked-bar">
-           {/* Adjusted grid columns back after removing tab */}
-           <TabsList className="grid w-full grid-cols-2 md:grid-cols-3 gap-2 mb-4">
-             <TabsTrigger value="divergent-stacked-bar">Sentiment Distribution</TabsTrigger> {/* Renamed for clarity */}
-             <TabsTrigger value="heat-map" disabled={!hasAnalysisRun}>Heat Map</TabsTrigger>
-             <TabsTrigger value="word-cloud" disabled={!hasAnalysisRun}>Word Cloud</TabsTrigger>
+        {/* Main content area (center and right panels) - applies its own padding */}
+        <div className="lg:col-span-3 h-full overflow-y-auto p-4 md:p-6">
+          {/* Center Panel Content */}
+          <div className="space-y-4">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-4">
+              <h1 className="text-2xl font-semibold">Conversation Analysis</h1>
+              {selectedBatchAnalysisId && selectedBatchDateRange?.from && selectedBatchDateRange?.to && (
+               <p className="text-sm text-muted-foreground">
+                 Batch Analysis Date Range: {format(selectedBatchDateRange.from, "LLL dd, y")} -{" "}
+                 {format(selectedBatchDateRange.to, "LLL dd, y")}
+               </p>
+             )}
+             <div className="flex items-center space-x-2 flex-wrap">
+             </div>
+          </div>
+          <Tabs defaultValue="divergent-stacked-bar">
+           <TabsList className="grid w-full grid-cols-2 gap-2 mb-4">
+             <TabsTrigger value="divergent-stacked-bar">Sentiment Distribution</TabsTrigger> 
+             <TabsTrigger value="word-cloud">Word Cloud</TabsTrigger> {/* Enabled by default, will show message if no data */}
            </TabsList>
 
           <Card className="mt-4">
@@ -478,32 +455,25 @@ export function ConversationStatsView() {
             </CardHeader>
             <CardContent>
               <TabsContent value="divergent-stacked-bar">
-                {/* Updated description */}
-                <p className="text-sm text-muted-foreground mb-4">Shows the sentiment distribution for conversations within the selected date range. Click a bar segment to see corresponding conversations.</p>
-                {/* Pass click handler */}
+                <p className="text-sm text-muted-foreground mb-4">
+                  Shows sentiment distribution for the selected batch. 
+                  Currently, detailed per-conversation sentiment for past batches is not stored.
+                </p>
                 <DivergentStackedBarChartComponent data={analyzedConversations} onBarClick={handleSentimentClick} />
               </TabsContent>
-              {/* Removed Filtered Sentiment Bar Tab Content */}
-              {/* Removed Trend Chart TabsContent */}
-              <TabsContent value="heat-map">
-                <p className="text-sm text-muted-foreground mb-4">Best Use Case: Sentiment intensity by category/timeframe. Advantages: Quick identification of hotspots.</p>
-                <HeatMapChartComponent data={analyzedConversations} />
-              </TabsContent>
-              {/* Removed Sankey Diagram TabsContent */}
               <TabsContent value="word-cloud">
-                <p className="text-sm text-muted-foreground mb-4">Best Use Case: Frequent terms in feedback. Advantages: Simple and visually appealing.</p>
+                <p className="text-sm text-muted-foreground mb-4">Frequent terms in conversations from the selected batch.</p>
                 <WordCloudComponent data={analyzedConversations} />
               </TabsContent>
-              {/* Removed Sparkline and Likert Scale TabsContent */}
             </CardContent>
           </Card>
         </Tabs>
 
-        {/* --- Summary Section --- */}
-        {hasAnalysisRun && (
+        {/* Summary Section - This will show 0 for good/moderate/bad if details aren't stored */}
+        {selectedBatchAnalysisId && ( // Show summary if a batch is selected
            <Card className="mt-6">
              <CardHeader>
-               <CardTitle>Sentiment Summary (Selected Range)</CardTitle>
+               <CardTitle>Sentiment Summary (Selected Batch)</CardTitle>
              </CardHeader>
              <CardContent>
                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
@@ -520,39 +490,35 @@ export function ConversationStatsView() {
                    <p className="text-sm text-muted-foreground">Bad</p>
                  </div>
                  <div>
-                   <p className="text-2xl font-bold text-gray-500">{analyzedConversations.filter(c => c.sentimentResult?.sentiment === 'unknown').length}</p>
-                   <p className="text-sm text-muted-foreground">Unknown</p>
+                   <p className="text-2xl font-bold text-gray-500">
+                     {analyzedConversations.filter(c => c.sentimentResult === null || c.sentimentResult.sentiment === 'unknown').length}
+                   </p>
+                   <p className="text-sm text-muted-foreground">Unknown/Not Available</p>
                  </div>
                </div>
              </CardContent>
            </Card>
-        )}
-        {/* --- End Summary Section --- */}
+          )}
+          </div> {/* End of Center Panel Content */}
 
-       </div> {/* End Left Column */}
-
-        {/* Right Column: Selected Conversations List */}
-        <div className="lg:col-span-1">
-          {/* Placeholder for the conversation list - to be implemented next */}
-          {selectedSentiment && (
-            <Card>
-              <CardHeader>
+          {/* Right Panel Content */}
+          <div className="mt-4 lg:mt-0"> {/* Removed lg:col-span-1, let content flow or use flex/grid if needed */}
+            {selectedSentiment && (
+              <Card>
+                <CardHeader>
                 <CardTitle className="capitalize flex justify-between items-center">
                   {selectedSentiment} Conversations ({filteredSentimentConversations.length})
                   <Button variant="ghost" size="sm" onClick={() => setSelectedSentiment(null)}>X</Button>
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                {/* Replace placeholder with the actual list component */}
-                <SelectedConversationsList conversations={filteredSentimentConversations} />
-              </CardContent>
-            </Card>
-          )}
-        </div> {/* End Right Column */}
-      </div> {/* End Main Grid */}
-
-
-      {/* Add Chat Widget and Popup (Keep outside the main grid) */}
+                  <SelectedConversationsList conversations={filteredSentimentConversations} />
+                </CardContent>
+              </Card>
+            )}
+          </div> {/* End of original right column content */}
+        </div> {/* End of new main content container */}
+      </div> {/* End of main grid */}
       <ChatWidget onClick={() => setIsChatOpen(true)} />
       <ChatPopup isOpen={isChatOpen} onOpenChange={setIsChatOpen} />
     </>
