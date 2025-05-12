@@ -7,9 +7,10 @@ import {
   Settings, 
   ShoppingBag, 
   Users, 
-  Webhook, 
+  Webhook,
   MessageCircle,
   Shield,
+  Database, // Added Database icon
   PanelLeftClose, // Added
   PanelLeftOpen   // Added
 } from "lucide-react";
@@ -33,6 +34,7 @@ export function SettingsSidebar({
     { id: "users", label: "Users", icon: Users },
     { id: "access", label: "Access Control", icon: Shield },
     { id: "integrations", label: "Integrations", icon: MessageCircle },
+    { id: "database", label: "Database", icon: Database }, // Added Database section
   ];
 
   return (

@@ -12,7 +12,8 @@ export default function Dashboard() {
     <SidebarProvider defaultOpen={true}>
       <div className="flex h-screen w-full bg-background">
         <DashboardSidebar />
-        <main className="flex-1 pt-8 px-8 overflow-auto relative">
+        {/* Removed pt-8 px-8 */}
+        <main className="flex-1 overflow-auto relative">
           {/* Removed logout button container */}
           <div>
             <Outlet />
