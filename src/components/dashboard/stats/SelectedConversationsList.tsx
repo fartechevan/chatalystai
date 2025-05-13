@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils"; // Import cn
 
 interface SelectedConversationsListProps {
   conversations: AnalyzedConversation[];
+  selectedSentiment: 'good' | 'moderate' | 'bad' | 'unknown' | null; // Add the new prop
 }
 
 // Helper function to get sentiment color
@@ -32,7 +33,7 @@ const formatMessageTime = (timestamp: string) => {
 };
 
 
-export function SelectedConversationsList({ conversations }: SelectedConversationsListProps) {
+export function SelectedConversationsList({ conversations, selectedSentiment }: SelectedConversationsListProps) {
   const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
 
   const handleConversationClick = (id: string) => {
@@ -44,11 +45,23 @@ export function SelectedConversationsList({ conversations }: SelectedConversatio
     return <p className="text-sm text-muted-foreground p-4 text-center">No conversations match the selected sentiment.</p>;
   }
 
+  // Capitalize first letter helper
+  const capitalize = (s: string | null | undefined) => s ? s.charAt(0).toUpperCase() + s.slice(1) : '';
+
   return (
-    <ScrollArea className="h-[600px] w-full"> {/* Removed border/padding, handled by inner cards */}
-      <div className="space-y-3 p-1"> {/* Add spacing between cards */}
-        {conversations.map((conv) => (
-          <Card
+    <div className="flex flex-col h-full">
+      {selectedSentiment && (
+        <h3 className="text-lg font-semibold p-4 pb-2">
+          Conversations from Batch (Clicked: <span className="capitalize">{capitalize(selectedSentiment)}</span>)
+        </h3>
+      )}
+      <ScrollArea className="flex-grow w-full"> {/* Removed fixed height, let it grow */}
+        <div className="space-y-3 p-4 pt-2"> {/* Adjusted padding */}
+          {conversations.length === 0 && (
+             <p className="text-sm text-muted-foreground text-center pt-10">No conversations found for this batch.</p>
+           )}
+          {conversations.map((conv) => (
+            <Card
             key={conv.conversation_id}
             className="cursor-pointer hover:shadow-md transition-shadow"
             onClick={() => handleConversationClick(conv.conversation_id)}
@@ -114,8 +127,9 @@ export function SelectedConversationsList({ conversations }: SelectedConversatio
               </CardContent>
             )}
           </Card>
-        ))}
-      </div>
-    </ScrollArea>
+          ))}
+        </div>
+      </ScrollArea>
+    </div>
   );
 }
