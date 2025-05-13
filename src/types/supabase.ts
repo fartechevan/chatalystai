@@ -244,6 +244,87 @@ export type Database = {
         }
         Relationships: []
       }
+      batch_sentiment_analysis: {
+        Row: {
+          conversation_ids: string[] | null
+          created_at: string | null
+          end_date: string
+          id: string
+          negative_count: number | null
+          neutral_count: number | null
+          overall_sentiment: string | null
+          positive_count: number | null
+          start_date: string
+          summary: string | null
+        }
+        Insert: {
+          conversation_ids?: string[] | null
+          created_at?: string | null
+          end_date: string
+          id?: string
+          negative_count?: number | null
+          neutral_count?: number | null
+          overall_sentiment?: string | null
+          positive_count?: number | null
+          start_date: string
+          summary?: string | null
+        }
+        Update: {
+          conversation_ids?: string[] | null
+          created_at?: string | null
+          end_date?: string
+          id?: string
+          negative_count?: number | null
+          neutral_count?: number | null
+          overall_sentiment?: string | null
+          positive_count?: number | null
+          start_date?: string
+          summary?: string | null
+        }
+        Relationships: []
+      }
+      batch_sentiment_analysis_details: {
+        Row: {
+          batch_analysis_id: string
+          conversation_id: string
+          created_at: string
+          description: string | null
+          id: number
+          sentiment: Database["public"]["Enums"]["sentiment_enum"]
+        }
+        Insert: {
+          batch_analysis_id: string
+          conversation_id: string
+          created_at?: string
+          description?: string | null
+          id?: never
+          sentiment: Database["public"]["Enums"]["sentiment_enum"]
+        }
+        Update: {
+          batch_analysis_id?: string
+          conversation_id?: string
+          created_at?: string
+          description?: string | null
+          id?: never
+          sentiment?: Database["public"]["Enums"]["sentiment_enum"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "batch_sentiment_analysis_details_batch_analysis_id_fkey"
+            columns: ["batch_analysis_id"]
+            isOneToOne: false
+            referencedRelation: "batch_sentiment_analysis"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "batch_sentiment_analysis_details_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["conversation_id"]
+          },
+        ]
+      }
       broadcast_recipients: {
         Row: {
           broadcast_id: string
@@ -1363,6 +1444,17 @@ export type Database = {
         Args: { "": unknown[] }
         Returns: number
       }
+      update_pipeline_name: {
+        Args: { pipeline_id: string; new_name: string }
+        Returns: {
+          created_at: string
+          id: string
+          is_default: boolean | null
+          name: string
+          updated_at: string
+          user_id: string
+        }[]
+      }
       vector_avg: {
         Args: { "": number[] }
         Returns: string
@@ -1395,6 +1487,7 @@ export type Database = {
       new_app_role: "user" | "admin"
       role_enum: "admin" | "member"
       sender_type: "user" | "ai"
+      sentiment_enum: "good" | "moderate" | "bad" | "unknown"
       sentiment_level: "bad" | "moderate" | "good"
       sentiment_type: "bad" | "moderate" | "good"
       sync_status: "pending" | "completed" | "failed"
@@ -1520,6 +1613,7 @@ export const Constants = {
       new_app_role: ["user", "admin"],
       role_enum: ["admin", "member"],
       sender_type: ["user", "ai"],
+      sentiment_enum: ["good", "moderate", "bad", "unknown"],
       sentiment_level: ["bad", "moderate", "good"],
       sentiment_type: ["bad", "moderate", "good"],
       sync_status: ["pending", "completed", "failed"],

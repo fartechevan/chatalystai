@@ -33,12 +33,17 @@ import { toast } from '@/hooks/use-toast'; // Import toast
 // Removed import for BatchSentimentAnalysisLayout
 import BatchSentimentHistoryList from '../analytics/BatchSentimentHistoryList'; // Import the history list directly
 import { BatchDateRangeDialog } from './BatchDateRangeDialog'; // Import the new dialog
+import { Database } from '@/types/supabase'; // Import the Database type
 
-// Define type for batch details fetch
+// Define type for batch details fetch - reflect potential production column names
 type BatchDetails = {
   conversation_ids: string[] | null;
   start_date: string | null;
   end_date: string | null;
+  positive_count?: number; // Use likely production names
+  negative_count?: number;
+  neutral_count?: number;
+  unknown_count?: number; // Keep querying this just in case
 };
 
 // Define types - Exported Message
@@ -66,6 +71,28 @@ type SentimentResult = {
 export type AnalyzedConversation = Conversation & {
   sentimentResult: SentimentResult | null;
 };
+
+// Type for fetched sentiment details
+type BatchSentimentDetail = {
+  conversation_id: string;
+  sentiment: 'good' | 'moderate' | 'bad' | 'unknown';
+  description: string | null;
+};
+
+// Function to fetch individual sentiment details for a batch
+const fetchBatchSentimentDetails = async (batchAnalysisId: string): Promise<BatchSentimentDetail[]> => {
+  const { data, error } = await supabase
+    .from('batch_sentiment_analysis_details')
+    .select('conversation_id, sentiment, description')
+    .eq('batch_analysis_id', batchAnalysisId);
+
+  if (error) {
+    console.error("Error fetching batch sentiment details:", error);
+    throw new Error(error.message);
+  }
+  return data || [];
+};
+
 
 // Fetch function for conversations and their messages with date filtering and participant role check
 const fetchConversationsWithMessages = async (startDate?: Date, endDate?: Date): Promise<Conversation[]> => {
@@ -171,37 +198,32 @@ const analyzeSentimentForConversation = async (conversationId: string): Promise<
 
 // --- Divergent Stacked Bar Chart Component ---
 interface DivergentStackedBarChartProps {
-  data: AnalyzedConversation[];
-  onBarClick?: (sentiment: 'good' | 'moderate' | 'bad' | 'unknown') => void; // Add click handler prop
+  // Accept counts directly
+  sentimentCounts: { good: number; moderate: number; bad: number; unknown: number } | null;
+  onBarClick?: (sentiment: 'good' | 'moderate' | 'bad' | 'unknown') => void; // Keep click handler prop
 }
 
-const DivergentStackedBarChartComponent = ({ data, onBarClick }: DivergentStackedBarChartProps) => {
-  const sentimentCounts = data.reduce((acc, curr) => {
-    const sentiment = curr.sentimentResult?.sentiment || 'unknown';
-    acc[sentiment] = (acc[sentiment] || 0) + 1;
-    return acc;
-  }, {} as Record<string, number>);
+const DivergentStackedBarChartComponent = ({ sentimentCounts, onBarClick }: DivergentStackedBarChartProps) => {
+  // Use provided counts or default to zero if null
+  const counts = sentimentCounts || { good: 0, moderate: 0, bad: 0, unknown: 0 };
 
   const chartData = [{
     name: 'Overall Sentiment',
-    good: sentimentCounts.good || 0,
-    moderate: sentimentCounts.moderate || 0,
-    bad: sentimentCounts.bad || 0,
-    unknown: sentimentCounts.unknown || 0,
+    good: counts.good,
+    moderate: counts.moderate,
+    bad: counts.bad,
+    unknown: counts.unknown,
   }];
 
-  const hasAnalyzedData = data.some(d => d.sentimentResult !== null && d.sentimentResult.sentiment !== 'unknown'); // Adjusted to check for actual sentiment
-  const totalSentiments = chartData[0].good + chartData[0].moderate + chartData[0].bad + chartData[0].unknown;
+  const totalSentiments = counts.good + counts.moderate + counts.bad + counts.unknown;
 
-  if (data.length > 0 && !hasAnalyzedData && data.every(d => d.sentimentResult === null || d.sentimentResult.sentiment === 'unknown')) {
-      return <div className="text-center text-muted-foreground p-4">Conversations loaded. Sentiment details for this batch are not available or all are 'unknown'.</div>;
+  // Updated checks based on counts
+  if (!sentimentCounts) {
+      return <div className="text-center text-muted-foreground p-4">Select a batch analysis to view sentiment distribution.</div>;
   }
-  if (totalSentiments === 0 && data.length === 0) {
-       return <div className="text-center text-muted-foreground p-4">No conversation data available for the selected batch.</div>;
+  if (totalSentiments === 0) {
+       return <div className="text-center text-muted-foreground p-4">No sentiment data available for this batch (all counts are zero).</div>;
   }
-   if (totalSentiments === 0 && hasAnalyzedData) { // This case might be rare now
-       return <div className="text-center text-muted-foreground p-4">Analysis complete, but no sentiments detected (all unknown/failed).</div>;
-   }
 
 
   return (
@@ -255,32 +277,37 @@ const WordCloudComponent = ({ data }: { data: AnalyzedConversation[] }) => {
 export function ConversationStatsView() {
   const [analyzedConversations, setAnalyzedConversations] = useState<AnalyzedConversation[]>([]);
   const [isChatOpen, setIsChatOpen] = useState(false);
-  const [selectedSentiment, setSelectedSentiment] = useState<'good' | 'moderate' | 'bad' | 'unknown' | null>(null);
-  const [filteredSentimentConversations, setFilteredSentimentConversations] = useState<AnalyzedConversation[]>([]);
-  const [selectedBatchAnalysisId, setSelectedBatchAnalysisId] = useState<string | null>(null);
-  const [selectedBatchConversationIds, setSelectedBatchConversationIds] = useState<string[] | null>(null);
-  const [isCreatingBatch, setIsCreatingBatch] = useState(false); 
+   const [selectedBatchAnalysisId, setSelectedBatchAnalysisId] = useState<string | null>(null);
+   const [selectedBatchConversationIds, setSelectedBatchConversationIds] = useState<string[] | null>(null);
+   const [isCreatingBatch, setIsCreatingBatch] = useState(false);
   const [batchCreationError, setBatchCreationError] = useState<string | null>(null);
-  const [selectedBatchDateRange, setSelectedBatchDateRange] = useState<DateRange | undefined>(undefined); 
-  const [isLoadingBatchDetails, setIsLoadingBatchDetails] = useState(false); 
-  const [isDateRangeDialogOpen, setIsDateRangeDialogOpen] = useState(false); 
+  const [selectedBatchDateRange, setSelectedBatchDateRange] = useState<DateRange | undefined>(undefined);
+  const [isLoadingBatchDetails, setIsLoadingBatchDetails] = useState(false);
+  const [isDateRangeDialogOpen, setIsDateRangeDialogOpen] = useState(false);
+  // Add state for sentiment counts
+  const [batchSentimentCounts, setBatchSentimentCounts] = useState<{ good: number; moderate: number; bad: number; unknown: number } | null>(null);
+  // Add state for selected sentiment
+  const [selectedSentiment, setSelectedSentiment] = useState<'good' | 'moderate' | 'bad' | 'unknown' | null>(null);
+  const [filteredSentimentConversations, setFilteredSentimentConversations] = useState<AnalyzedConversation[]>([]); // Re-add filtered state
+
 
   const handleSelectBatchAnalysis = async (id: string | null) => {
-    setSelectedBatchAnalysisId(id);
-    setSelectedSentiment(null);
-    setFilteredSentimentConversations([]);
-    setSelectedBatchDateRange(undefined); 
+     setSelectedBatchAnalysisId(id);
+     setSelectedSentiment(null); // Reset sentiment selection when batch changes
+     setSelectedBatchDateRange(undefined);
 
-    if (id) {
+     if (id) {
       setIsLoadingBatchDetails(true);
       try {
         // Fetch batch details including conversation_ids and date range
-        // Re-add 'as any' temporarily to fix TS error
+        // Fetch counts along with other details
+        // Cast table name to expected type to satisfy TS/ESLint
+        // Select likely production column names (excluding unknown_count as it doesn't exist)
         const { data: batchData, error: batchError } = await supabase
-          .from('batch_sentiment_analysis' as any) // Re-add 'as any'
-          .select('conversation_ids, start_date, end_date')
+          .from('batch_sentiment_analysis' as keyof Database['public']['Tables']) // Cast to keyof Tables
+          .select('conversation_ids, start_date, end_date, positive_count, negative_count, neutral_count')
           .eq('id', id)
-          .single<BatchDetails>(); // Keep BatchDetails type for structure hint
+          .single<BatchDetails>(); // Use BatchDetails reflecting potential production names
 
         if (batchError) throw batchError;
 
@@ -294,26 +321,61 @@ export function ConversationStatsView() {
           } else {
              setSelectedBatchDateRange(undefined);
           }
+          // Map fetched counts (using likely production names) to state keys
+          setBatchSentimentCounts({
+            good: batchData.positive_count ?? 0, // Map positive to good
+            moderate: batchData.neutral_count ?? 0, // Map neutral to moderate
+            bad: batchData.negative_count ?? 0, // Map negative to bad
+            unknown: batchData.unknown_count ?? 0, // Use unknown directly if present
+          });
         } else {
           setSelectedBatchConversationIds([]);
           setSelectedBatchDateRange(undefined);
+          setBatchSentimentCounts(null); // Reset counts if no data
         }
 
-      } catch (error) {
-        console.error("Error fetching batch details:", error);
-        toast({ title: "Error fetching batch details", variant: "destructive" });
+      } catch (error: unknown) { // Use 'unknown' for better type safety
+        console.error("Error fetching batch details (raw object):", error);
+        // Attempt to stringify for more details, handling circular references
+        try {
+          // Check if error is an object before trying to stringify its properties
+          if (typeof error === 'object' && error !== null) {
+            console.error("Error fetching batch details (stringified):", JSON.stringify(error, Object.getOwnPropertyNames(error)));
+          } else {
+            console.error("Error fetching batch details (not an object or null):", error);
+          }
+        } catch (e) {
+          console.error("Could not stringify the error object:", e);
+        }
+
+        let errorMessage = "An unknown error occurred while fetching batch details. Check console for more details.";
+        if (typeof error === 'object' && error !== null) {
+          if ('message' in error && typeof (error as { message: unknown }).message === 'string') {
+            errorMessage = (error as { message: string }).message;
+          }
+          // Log more details if available from Supabase error structure
+          if ('details' in error && typeof (error as { details: unknown }).details === 'string') console.error("Error details:", (error as { details: string }).details);
+          if ('hint' in error && typeof (error as { hint: unknown }).hint === 'string') console.error("Error hint:", (error as { hint: string }).hint);
+          if ('code' in error && typeof (error as { code: unknown }).code === 'string') console.error("Error code:", (error as { code: string }).code);
+        } else if (typeof error === 'string') {
+          errorMessage = error;
+        }
+
+        toast({ title: "Error Fetching Batch", description: errorMessage, variant: "destructive" });
         setSelectedBatchConversationIds(null);
         setSelectedBatchDateRange(undefined);
+        setBatchSentimentCounts(null); // Reset counts on error
       } finally {
         setIsLoadingBatchDetails(false);
       }
     } else {
-      setSelectedBatchConversationIds(null); 
-      setSelectedBatchDateRange(undefined); 
-    }
-  };
+       setSelectedBatchConversationIds(null);
+       setSelectedBatchDateRange(undefined);
+       setBatchSentimentCounts(null); // Reset counts when deselecting
+     }
+   };
 
-  const queryClient = useQueryClient(); 
+   const queryClient = useQueryClient();
 
   const handleCreateNewBatchAnalysis = async (batchStartDate?: Date, batchEndDate?: Date) => { 
     if (!batchStartDate || !batchEndDate) {
@@ -355,37 +417,72 @@ export function ConversationStatsView() {
       }
       return Promise.resolve([]); 
     },
-    enabled: !!selectedBatchAnalysisId && !!selectedBatchDateRange?.from && !!selectedBatchDateRange?.to,
-  });
+     enabled: !!selectedBatchAnalysisId && !!selectedBatchDateRange?.from && !!selectedBatchDateRange?.to,
+    });
 
-  useEffect(() => {
-    if (selectedBatchAnalysisId && initialConversationsData && selectedBatchConversationIds) {
-      const batchConvIdsSet = new Set(selectedBatchConversationIds);
-      const conversationsFromBatch = initialConversationsData.filter(conv =>
-        batchConvIdsSet.has(conv.conversation_id)
-      );
-      // Since detailed sentiment for past batches isn't stored, set sentimentResult to null
-      setAnalyzedConversations(conversationsFromBatch.map(conv => ({ ...conv, sentimentResult: null } as AnalyzedConversation)));
-    } else if (!selectedBatchAnalysisId) {
-      setAnalyzedConversations([]);
-    }
-    setSelectedSentiment(null);
-    setFilteredSentimentConversations([]);
-  }, [initialConversationsData, selectedBatchAnalysisId, selectedBatchConversationIds]); 
-
-  // Removed the useEffect that tried to fetch from 'batch_sentiment_analysis_details'
-  // as this table does not exist and individual results are not stored per batch.
-
-  const handleSentimentClick = useCallback((sentiment: 'good' | 'moderate' | 'bad' | 'unknown') => {
-    setSelectedSentiment(sentiment);
-    const filtered = analyzedConversations.filter(
-      conv => conv.sentimentResult?.sentiment === sentiment
-    );
-    setFilteredSentimentConversations(filtered);
-  }, [analyzedConversations]);
+   // Query hook to fetch individual sentiment details for the selected batch
+   const { data: batchDetailsData, isLoading: isLoadingBatchDetailsData, error: fetchDetailsError } = useQuery<BatchSentimentDetail[], Error>({ // Specify Error type
+     queryKey: ['batchSentimentDetails', selectedBatchAnalysisId],
+     queryFn: () => {
+       if (!selectedBatchAnalysisId) return Promise.resolve([]);
+       console.log(`Fetching details for batch: ${selectedBatchAnalysisId}`); // Debug log
+       return fetchBatchSentimentDetails(selectedBatchAnalysisId);
+     },
+     enabled: !!selectedBatchAnalysisId, // Fetch whenever a batch ID is selected
+   });
 
 
-  if (isLoadingConversations && selectedBatchAnalysisId) { 
+   useEffect(() => {
+     // Wait for both conversations and details to load before merging
+     if (selectedBatchAnalysisId && initialConversationsData && selectedBatchConversationIds && batchDetailsData) {
+       console.log("Merging conversation data with details...");
+       const batchConvIdsSet = new Set(selectedBatchConversationIds);
+       const sentimentDetailsMap = new Map(batchDetailsData.map(d => [d.conversation_id, d]));
+       console.log(`Details map size: ${sentimentDetailsMap.size}`);
+
+       const mergedConversations = initialConversationsData
+         .filter(conv => batchConvIdsSet.has(conv.conversation_id))
+         .map(conv => {
+           const detail = sentimentDetailsMap.get(conv.conversation_id);
+           return {
+             ...conv,
+             // Merge sentiment details if found, otherwise keep sentimentResult null
+             sentimentResult: detail ? {
+               conversation_id: conv.conversation_id,
+               sentiment: detail.sentiment,
+               description: detail.description ?? undefined,
+             } : null,
+           } as AnalyzedConversation;
+         });
+
+       console.log(`Merged conversations count: ${mergedConversations.length}`);
+       setAnalyzedConversations(mergedConversations);
+       // Reset selections when batch data changes
+       setSelectedSentiment(null);
+       setFilteredSentimentConversations([]);
+
+     } else if (!selectedBatchAnalysisId) {
+       // Clear data if no batch is selected
+       setAnalyzedConversations([]);
+       setSelectedSentiment(null);
+       setFilteredSentimentConversations([]);
+     }
+   }, [initialConversationsData, selectedBatchAnalysisId, selectedBatchConversationIds, batchDetailsData]); // Dependencies for merging
+
+
+   // Click handler for sentiment bars - Filters the merged conversations
+   const handleSentimentClick = (sentiment: 'good' | 'moderate' | 'bad' | 'unknown') => {
+     setSelectedSentiment(sentiment);
+     console.log(`Filtering for sentiment: ${sentiment}`);
+     // Filter the already merged analyzedConversations state
+     const filtered = analyzedConversations.filter(conv => conv.sentimentResult?.sentiment === sentiment);
+     console.log(`Filtered count: ${filtered.length}`);
+     setFilteredSentimentConversations(filtered);
+   };
+
+
+    // Show loading skeleton if either conversations or details are loading for the selected batch
+    if ((isLoadingConversations || isLoadingBatchDetailsData) && selectedBatchAnalysisId) {
     return (
       <div className="p-4 md:p-6 space-y-4">
         <h1 className="text-2xl font-semibold">Conversation Analysis</h1>
@@ -396,21 +493,24 @@ export function ConversationStatsView() {
         </Card>
       </div>
     );
-  }
+     }
 
-  if (fetchConversationsError) {
-    return <div className="p-4 text-red-500">Error loading conversations: {fetchConversationsError.message}</div>;
-  }
+     // Handle errors for both queries
+     if (fetchConversationsError || fetchDetailsError) {
+       const errorMsg = fetchConversationsError?.message || fetchDetailsError?.message || "An unknown error occurred";
+       return <div className="p-4 text-red-500">Error loading data: {errorMsg}</div>;
+     }
 
-  const hasAnalysisRun = analyzedConversations.some(c => c.sentimentResult !== null && c.sentimentResult.sentiment !== 'unknown');
+     // This check might need adjustment depending on whether sentimentResult can be null even after merging
+     const hasAnalysisRun = analyzedConversations.some(c => c.sentimentResult !== null);
 
   return (
     <>
-      {/* Main grid container - NO PADDING HERE */}
-      <div className="grid grid-cols-1 lg:grid-cols-4 h-full">
+      {/* Main grid container - Changed to 6 columns */}
+      <div className="grid grid-cols-1 lg:grid-cols-6 h-full">
 
         {/* Left panel column - applies border and background. NO PADDING HERE. */}
-        <div className="lg:col-span-1 h-full border-r bg-muted/10">
+        <div className="lg:col-span-1 h-full border-r bg-muted/10 overflow-y-auto"> {/* Added overflow-y-auto */}
           {/* BatchSentimentHistoryList will manage its own internal padding */}
           <BatchSentimentHistoryList
             selectedAnalysisId={selectedBatchAnalysisId}
@@ -428,10 +528,10 @@ export function ConversationStatsView() {
             isCreatingBatch={isCreatingBatch}
         />
 
-        {/* Main content area (center and right panels) - applies its own padding */}
-        <div className="lg:col-span-3 h-full overflow-y-auto p-4 md:p-6">
+        {/* Center content area - Changed to span 3, added border */}
+        <div className="lg:col-span-3 h-full overflow-y-auto p-4 md:p-6 border-r">
           {/* Center Panel Content */}
-          <div className="space-y-4">
+          {/* Removed redundant inner div */}
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-4">
               <h1 className="text-2xl font-semibold">Conversation Analysis</h1>
               {selectedBatchAnalysisId && selectedBatchDateRange?.from && selectedBatchDateRange?.to && (
@@ -455,14 +555,17 @@ export function ConversationStatsView() {
             </CardHeader>
             <CardContent>
               <TabsContent value="divergent-stacked-bar">
-                <p className="text-sm text-muted-foreground mb-4">
-                  Shows sentiment distribution for the selected batch. 
-                  Currently, detailed per-conversation sentiment for past batches is not stored.
-                </p>
-                <DivergentStackedBarChartComponent data={analyzedConversations} onBarClick={handleSentimentClick} />
-              </TabsContent>
-              <TabsContent value="word-cloud">
-                <p className="text-sm text-muted-foreground mb-4">Frequent terms in conversations from the selected batch.</p>
+                 <p className="text-sm text-muted-foreground mb-4">
+                   Shows the aggregated sentiment distribution for the selected batch analysis run. Click a bar to see related conversations.
+                  </p>
+                  {/* Pass the batchSentimentCounts state and click handler to the chart */}
+                  <DivergentStackedBarChartComponent
+                    sentimentCounts={batchSentimentCounts}
+                    onBarClick={handleSentimentClick} // Pass the handler
+                  />
+                </TabsContent>
+                <TabsContent value="word-cloud">
+                  <p className="text-sm text-muted-foreground mb-4">Frequent terms in conversations from the selected batch.</p>
                 <WordCloudComponent data={analyzedConversations} />
               </TabsContent>
             </CardContent>
@@ -473,51 +576,52 @@ export function ConversationStatsView() {
         {selectedBatchAnalysisId && ( // Show summary if a batch is selected
            <Card className="mt-6">
              <CardHeader>
-               <CardTitle>Sentiment Summary (Selected Batch)</CardTitle>
-             </CardHeader>
-             <CardContent>
-               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
-                 <div>
-                   <p className="text-2xl font-bold text-green-500">{analyzedConversations.filter(c => c.sentimentResult?.sentiment === 'good').length}</p>
-                   <p className="text-sm text-muted-foreground">Good</p>
+                <CardTitle>Sentiment Summary (Selected Batch)</CardTitle>
+              </CardHeader>
+              <CardContent>
+                {/* Use batchSentimentCounts for the summary - Removed Moderate */}
+                <div className="grid grid-cols-3 gap-4 text-center"> {/* Adjusted grid columns */}
+                  <div>
+                    <p className="text-2xl font-bold text-green-500">{batchSentimentCounts?.good ?? 0}</p>
+                    <p className="text-sm text-muted-foreground">Good</p>
+                  </div>
+                  {/* Removed Moderate div */}
+                  <div>
+                    <p className="text-2xl font-bold text-red-500">{batchSentimentCounts?.bad ?? 0}</p>
+                    <p className="text-sm text-muted-foreground">Bad</p>
                  </div>
                  <div>
-                   <p className="text-2xl font-bold text-yellow-500">{analyzedConversations.filter(c => c.sentimentResult?.sentiment === 'moderate').length}</p>
-                   <p className="text-sm text-muted-foreground">Moderate</p>
-                 </div>
-                 <div>
-                   <p className="text-2xl font-bold text-red-500">{analyzedConversations.filter(c => c.sentimentResult?.sentiment === 'bad').length}</p>
-                   <p className="text-sm text-muted-foreground">Bad</p>
-                 </div>
-                 <div>
-                   <p className="text-2xl font-bold text-gray-500">
-                     {analyzedConversations.filter(c => c.sentimentResult === null || c.sentimentResult.sentiment === 'unknown').length}
-                   </p>
-                   <p className="text-sm text-muted-foreground">Unknown/Not Available</p>
+                   <p className="text-2xl font-bold text-gray-500">{batchSentimentCounts?.unknown ?? 0}</p>
+                   <p className="text-sm text-muted-foreground">Unknown/Not Analyzed</p>
                  </div>
                </div>
              </CardContent>
-           </Card>
-          )}
-          </div> {/* End of Center Panel Content */}
-
-          {/* Right Panel Content */}
-          <div className="mt-4 lg:mt-0"> {/* Removed lg:col-span-1, let content flow or use flex/grid if needed */}
-            {selectedSentiment && (
-              <Card>
-                <CardHeader>
-                <CardTitle className="capitalize flex justify-between items-center">
-                  {selectedSentiment} Conversations ({filteredSentimentConversations.length})
-                  <Button variant="ghost" size="sm" onClick={() => setSelectedSentiment(null)}>X</Button>
-                </CardTitle>
-              </CardHeader>
-              <CardContent>
-                  <SelectedConversationsList conversations={filteredSentimentConversations} />
-                </CardContent>
-              </Card>
+            </Card>
             )}
-          </div> {/* End of original right column content */}
-        </div> {/* End of new main content container */}
+          {/* Removed redundant closing div */}
+
+        </div> {/* End of Center content area */}
+
+        {/* Right panel for conversation list - New Column */}
+        <div className="lg:col-span-2 h-full overflow-y-auto p-4 md:p-6 bg-muted/10">
+          {selectedSentiment && (
+            <SelectedConversationsList
+              conversations={filteredSentimentConversations} // Pass the FILTERED list
+              selectedSentiment={selectedSentiment}
+            />
+          )}
+          {!selectedSentiment && selectedBatchAnalysisId && (
+             <div className="flex items-center justify-center h-full text-muted-foreground">
+               <p>Click a sentiment bar in the chart to view conversations.</p>
+             </div>
+           )}
+           {!selectedBatchAnalysisId && (
+             <div className="flex items-center justify-center h-full text-muted-foreground">
+               <p>Select a batch analysis from the left panel first.</p>
+             </div>
+           )}
+        </div> {/* End of Right panel */}
+
       </div> {/* End of main grid */}
       <ChatWidget onClick={() => setIsChatOpen(true)} />
       <ChatPopup isOpen={isChatOpen} onOpenChange={setIsChatOpen} />
