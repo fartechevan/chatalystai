@@ -12,8 +12,8 @@ interface SchemaItem {
   schema_name: string;
   table_name: string;
   column_name: string | null; // Null for table-level items
+  data_type: string | null; // Added for columns, null for tables
   description: string; // Fetched or generated description
-  // Add other details if needed, e.g., data_type for columns
 }
 
 // Interface for the data to be inserted into schema_embeddings
@@ -21,6 +21,7 @@ interface EmbeddingInsertData {
   schema_name: string;
   table_name: string;
   column_name: string | null;
+  data_type: string | null; // Added
   description: string;
   embedding: number[]; // The actual embedding vector
 }
@@ -70,6 +71,7 @@ export async function introspectSchema(dbPoolClient: PoolClient): Promise<Schema
         schema_name: 'public',
         table_name: tableName,
         column_name: null,
+        data_type: null, // For table-level items
         description: tableDescription,
       });
       console.log(`  Processing table: ${tableName} (Description: ${tableDescription.substring(0, 50)}...)`);
@@ -109,9 +111,10 @@ export async function introspectSchema(dbPoolClient: PoolClient): Promise<Schema
           schema_name: 'public',
           table_name: tableName,
           column_name: columnName,
+          data_type: columnType, // Assign fetched data_type
           description: columnDescription,
         });
-         console.log(`      Column: ${columnName} (Description: ${columnDescription.substring(0, 50)}...)`);
+         console.log(`      Column: ${columnName} (Type: ${columnType}, Description: ${columnDescription.substring(0, 50)}...)`);
       }
     }
     console.log("Schema introspection complete.");
@@ -145,10 +148,11 @@ export async function generateSchemaEmbeddings(
         schema_name: item.schema_name,
         table_name: item.table_name,
         column_name: item.column_name,
+        data_type: item.data_type, // Pass data_type
         description: item.description,
         embedding: embedding,
       });
-       console.log(`  Generated embedding for: ${item.table_name}${item.column_name ? '.' + item.column_name : ''}`);
+       console.log(`  Generated embedding for: ${item.table_name}${item.column_name ? '.' + item.column_name : ''} (Type: ${item.data_type})`);
     } else {
        console.warn(`  Failed to generate embedding for: ${item.table_name}${item.column_name ? '.' + item.column_name : ''}`);
     }
@@ -193,7 +197,11 @@ export async function storeEmbeddingsDb(
     // 2. Insert new embeddings
     // Need to cast embedding array to string format expected by pgvector
     const insertData = embeddings.map(e => ({
-        ...e,
+        schema_name: e.schema_name,
+        table_name: e.table_name,
+        column_name: e.column_name,
+        data_type: e.data_type, // Include data_type
+        description: e.description,
         embedding: JSON.stringify(e.embedding) // Cast to string '[1,2,3]'
     }));
 

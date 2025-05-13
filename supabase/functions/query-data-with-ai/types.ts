@@ -21,6 +21,7 @@ export interface RelevantSchemaPart {
   schema_name: string;
   table_name: string;
   column_name: string | null; // Column name can be null for table-level descriptions
+  data_type: string; // Added to include column data type
   description: string;
   similarity: number;
 }

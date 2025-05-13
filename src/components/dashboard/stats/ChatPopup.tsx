@@ -78,7 +78,33 @@ export function ChatPopup({ isOpen, onOpenChange }: ChatPopupProps) {
       let botText = "Sorry, I couldn't process that request."; // Default error message
       if (error) {
         console.error("Error invoking query-data-with-ai function:", error);
-        botText = `Error: ${error.message}`;
+        let detailedError = error.message; // Default to the generic message
+        // Check if error.context exists (this should be the Fetch Response object)
+        if (error.context) {
+          try {
+            // First, let's log the raw text of the response to see what we're getting
+            const rawResponseText = await error.context.text();
+            console.error("Raw error response from function:", rawResponseText);
+
+            // Attempt to parse the JSON body from the error response
+            // We need to re-parse it as .text() consumes the body
+            const errorJson = JSON.parse(rawResponseText); 
+            if (errorJson && errorJson.error) {
+              detailedError = errorJson.error; // Use the error message from the function's JSON response
+            } else {
+              // If JSON is valid but no 'error' field, use the raw text (or part of it)
+              detailedError = rawResponseText.substring(0, 200); // Show first 200 chars
+            }
+          } catch (e) {
+            // Log if parsing fails, and use the generic error message or potentially the raw text if available
+            console.error("Failed to parse error JSON from function response, or other error:", e);
+            // If error.context.text() was successful earlier, rawResponseText would be defined
+            // but it might not be if .text() itself failed.
+            // Fallback to the generic error.message if raw text isn't helpful or available.
+            // detailedError = rawResponseText ? rawResponseText.substring(0, 200) : error.message;
+          }
+        }
+        botText = `Error: ${detailedError}`;
       } else if (data?.error) {
         // Handle errors returned *within* the function's response
         console.error("Function returned error:", data.error);
@@ -125,7 +151,7 @@ export function ChatPopup({ isOpen, onOpenChange }: ChatPopupProps) {
 
   return (
     <Sheet open={isOpen} onOpenChange={onOpenChange}>
-      <SheetContent className="w-[400px] sm:w-[540px] flex flex-col">
+      <SheetContent className="w-11/12 md:w-1/2 lg:w-1/3 flex flex-col">
         <SheetHeader>
           <SheetTitle>Analyze Conversation Data</SheetTitle>
           <SheetDescription>
