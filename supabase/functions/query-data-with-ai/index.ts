@@ -48,8 +48,22 @@ serve(async (req) => {
       );
     }
 
-    // 6. Generate SQL Query via OpenAI
-    const generatedSql = await generateSqlQuery(openai, query, history || [], relevantSchemaParts);
+    // 6. Generate SQL Query or Clarification Question via OpenAI
+    const sqlOrClarification = await generateSqlQuery(openai, query, history || [], relevantSchemaParts);
+
+    // Check if OpenAI returned a clarification question instead of SQL
+    if (!sqlOrClarification.toUpperCase().startsWith("SELECT")) {
+      // It's a clarification question (or potentially an unhandled case from generateSqlQuery if it didn't throw)
+      console.log("Returning clarification question to user:", sqlOrClarification);
+      return new Response(
+        JSON.stringify({ response: sqlOrClarification }), // Send the clarification as the main response
+        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 }
+      );
+    }
+
+    // It's an SQL query, proceed with execution
+    const generatedSql = sqlOrClarification;
+    console.log("Proceeding with SQL execution:", generatedSql);
 
     // 7. Execute Generated SQL via RPC
     const queryResult = await executeGeneratedSql(supabaseClient, generatedSql);
@@ -70,7 +84,7 @@ serve(async (req) => {
 
   } catch (error) {
     // Log the full error object for better debugging
-    console.error("Caught error in query-data-with-ai handler:", error);
+    console.error("Caught error in query-data-with-ai handler:", error); // Keep this top-level log
     let status = 500;
     // Set specific statuses based on error messages from utils
     if (error.message === "Method Not Allowed") status = 405;
@@ -79,14 +93,23 @@ serve(async (req) => {
     if (error.message === "OpenAI client is not initialized (API key likely missing).") status = 503; // Service Unavailable
     if (error.message === "Failed to generate embedding for the query.") status = 502; // Bad Gateway (issue with OpenAI)
     if (error.message.startsWith("Failed to query schema embeddings via RPC")) status = 500; // Internal DB/RPC issue
-    if (error.message === "SQL generation failed or deemed unsafe/impossible.") {
+    
+    // Log the exact error message being checked
+    console.log(`Checking error.message for SQL generation failure. Message content: "${error.message}"`);
+
+    // Check if the error message indicates an SQL generation failure from OpenAI
+    if (error.message && error.message.includes("SQL generation failed or deemed unsafe/impossible.")) { 
+        console.log("SQL generation failure condition MET. Returning 200 OK with user-friendly message.");
         // Return a user-friendly message instead of just the error
         // Ensure this error response also follows the { response: string } structure
         return new Response(
             JSON.stringify({ response: "Sorry, I couldn't construct a valid query to answer that based on the available data." }),
             { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 200 } // Return 200 OK with explanation
         );
+    } else {
+        console.log("SQL generation failure condition NOT MET. Proceeding with other error checks.");
     }
+
     if (error.message.startsWith("OpenAI API error during SQL generation")) status = 502;
     if (error.message.startsWith("Failed to execute the data query via RPC")) status = 500; // Internal DB/RPC issue
     // Note: summarizeResults now returns an object, so errors during summarization are handled internally

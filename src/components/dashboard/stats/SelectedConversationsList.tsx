@@ -5,6 +5,11 @@ import { Separator } from "@/components/ui/separator";
 import { format, parseISO } from 'date-fns';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"; // Added CardHeader, CardTitle
 import { Badge } from "@/components/ui/badge"; // Import Badge
+import { Button } from "@/components/ui/button"; // Import Button
+import { supabase } from "@/integrations/supabase/client"; // Import supabase client
+import { useAuthUser } from "@/hooks/useAuthUser"; // Import useAuthUser hook
+import { toast } from "@/hooks/use-toast"; // Import toast
+import { CreateSegmentDialog } from "./CreateSegmentDialog"; // Import the dialog
 import { cn } from "@/lib/utils"; // Import cn
 
 interface SelectedConversationsListProps {
@@ -35,10 +40,76 @@ const formatMessageTime = (timestamp: string) => {
 
 export function SelectedConversationsList({ conversations, selectedSentiment }: SelectedConversationsListProps) {
   const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
+  const [isCreateSegmentDialogOpen, setIsCreateSegmentDialogOpen] = useState(false);
+  const [isCreatingSegment, setIsCreatingSegment] = useState(false);
+  const { userData: user, isLoading: isLoadingUser } = useAuthUser(); // Correctly destructure and get user
 
   const handleConversationClick = (id: string) => {
     setSelectedConversationId(prevId => (prevId === id ? null : id)); // Toggle selection
   };
+
+  const getUniqueCustomerIds = (): string[] => {
+    const customerIds = new Set<string>();
+    conversations.forEach(conv => {
+      conv.messages.forEach(msg => {
+        if (msg.is_user && msg.customer_id) { // Check for customer_id
+          customerIds.add(msg.customer_id);
+        }
+      });
+    });
+    return Array.from(customerIds);
+  };
+
+  const handleCreateSegmentSubmit = async (segmentName: string) => {
+    if (!user) { // user is from useAuthUser()
+      toast({ title: "Authentication Error", description: "You must be logged in to create a segment.", variant: "destructive" });
+      return;
+    }
+
+    const customerIds = getUniqueCustomerIds();
+    if (customerIds.length === 0) {
+      toast({ title: "No Participants", description: "No customer participants found in the current list to create a segment from.", variant: "default" }); // Changed variant
+      return;
+    }
+
+    setIsCreatingSegment(true);
+    try {
+      // The segment-handler expects POST to /segments/from-contacts
+      // or direct POST to /segment-handler with specific body for 'from-contacts'
+      // We will use the direct POST to base path approach as identified in segment-handler
+      const { data, error } = await supabase.functions.invoke('segment-handler', {
+        body: {
+          segmentName: segmentName,
+          customerIds: customerIds,
+          userId: user.id, // Pass the authenticated user's ID
+        },
+        // method: 'POST', // Not strictly needed if the function handles POST on base path for this action
+      });
+
+      if (error) throw error;
+
+      toast({ title: "Segment Created", description: `Segment "${segmentName}" created successfully with ${customerIds.length} participants. Segment ID: ${data?.id}` });
+      setIsCreateSegmentDialogOpen(false);
+    } catch (error) { // More general error typing, can be refined if specific error types are known
+      console.error("Error creating segment:", error);
+      const errorMessage = error instanceof Error ? error.message : "An unknown error occurred.";
+      toast({ title: "Segment Creation Failed", description: errorMessage, variant: "destructive" });
+    } finally {
+      setIsCreatingSegment(false);
+    }
+  };
+
+  const uniqueCustomerIdsCount = getUniqueCustomerIds().length;
+
+  // Debugging logs
+  console.log("[SelectedConversationsList] Rendering. Props:", { conversationsLength: conversations.length, selectedSentiment });
+  console.log("[SelectedConversationsList] State:", { uniqueCustomerIdsCount, isLoadingUser, isCreatingSegment });
+  console.log("[SelectedConversationsList] Button visibility conditions:", {
+    cond1_selectedSentiment: !!selectedSentiment,
+    cond2_conversationsLength: conversations.length > 0,
+    cond3_uniqueCustomerIdsCount: uniqueCustomerIdsCount > 0,
+    cond4_notIsLoadingUser: !isLoadingUser,
+  });
 
 
   if (!conversations || conversations.length === 0) {
@@ -49,19 +120,31 @@ export function SelectedConversationsList({ conversations, selectedSentiment }: 
   const capitalize = (s: string | null | undefined) => s ? s.charAt(0).toUpperCase() + s.slice(1) : '';
 
   return (
-    <div className="flex flex-col h-full">
-      {selectedSentiment && (
-        <h3 className="text-lg font-semibold p-4 pb-2">
-          Conversations from Batch (Clicked: <span className="capitalize">{capitalize(selectedSentiment)}</span>)
-        </h3>
-      )}
-      <ScrollArea className="flex-grow w-full"> {/* Removed fixed height, let it grow */}
-        <div className="space-y-3 p-4 pt-2"> {/* Adjusted padding */}
-          {conversations.length === 0 && (
-             <p className="text-sm text-muted-foreground text-center pt-10">No conversations found for this batch.</p>
-           )}
-          {conversations.map((conv) => (
-            <Card
+    <>
+      <div className="flex flex-col h-full">
+        <div className="p-4 pb-2 flex justify-between items-center">
+          {selectedSentiment && (
+            <h3 className="text-lg font-semibold capitalize">
+              {capitalize(selectedSentiment)} Sentiment Conversations
+            </h3>
+          )}
+          {conversations.length > 0 && uniqueCustomerIdsCount > 0 && !isLoadingUser && (
+            <Button 
+              size="sm" 
+              onClick={() => setIsCreateSegmentDialogOpen(true)} 
+              disabled={isCreatingSegment || isLoadingUser}
+            >
+              {isCreatingSegment ? "Creating..." : `Create Segment (${uniqueCustomerIdsCount} Participants)`}
+            </Button>
+          )}
+        </div>
+        <ScrollArea className="flex-grow w-full"> {/* Removed fixed height, let it grow */}
+          <div className="space-y-3 p-4 pt-2"> {/* Adjusted padding */}
+            {conversations.length === 0 && ( // This condition might be redundant due to the check above
+               <p className="text-sm text-muted-foreground text-center pt-10">No conversations found for this batch.</p>
+             )}
+            {conversations.map((conv) => (
+              <Card
             key={conv.conversation_id}
             className="cursor-pointer hover:shadow-md transition-shadow"
             onClick={() => handleConversationClick(conv.conversation_id)}
@@ -128,8 +211,16 @@ export function SelectedConversationsList({ conversations, selectedSentiment }: 
             )}
           </Card>
           ))}
-        </div>
-      </ScrollArea>
-    </div>
+          {/* Removed extra closing bracket and parenthesis below */}
+          </div>
+        </ScrollArea>
+      </div>
+      <CreateSegmentDialog
+        isOpen={isCreateSegmentDialogOpen}
+        onOpenChange={setIsCreateSegmentDialogOpen}
+        onSubmit={handleCreateSegmentSubmit}
+        isLoading={isCreatingSegment}
+      />
+    </>
   );
 }

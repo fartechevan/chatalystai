@@ -52,6 +52,7 @@ export type Message = {
   created_at: string;
   sender_participant_id: string | null;
   is_user?: boolean; // Flag to indicate if sender is a customer
+  customer_id?: string | null; // Add customer_id here
 };
 
 type Conversation = {
@@ -160,7 +161,7 @@ const fetchConversationsWithMessages = async (startDate?: Date, endDate?: Date):
         const participant = msg.sender_participant_id ? participantMap.get(msg.sender_participant_id) : undefined;
         // Determine if the sender is a user (customer)
         const is_user = !!participant?.customer_id;
-        return { ...msg, is_user };
+        return { ...msg, is_user, customer_id: participant?.customer_id || null }; // Add customer_id to the message object
     }) ?? [];
 
     return {
