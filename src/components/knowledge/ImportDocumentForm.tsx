@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 
 import { useState, useRef } from "react";
 import { useForm } from "react-hook-form";
@@ -17,9 +18,10 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Upload, FileText, ChevronRight } from "lucide-react";
+import { Loader2, Upload, FileText, ChevronRight, ExternalLink } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { apiServiceInstance } from "@/services/api/apiService";
 import { 
   ChunkingMethod, 
   ChunkingOptions, 
@@ -51,6 +53,8 @@ export function ImportDocumentForm({ onCancel, onSuccess }: ImportDocumentFormPr
   const [isProcessingPdf, setIsProcessingPdf] = useState(false);
   const [pdfPreviewUrl, setPdfPreviewUrl] = useState<string | null>(null);
   const [isProcessingChunks, setIsProcessingChunks] = useState(false);
+  const [isUploadingToEndpoint, setIsUploadingToEndpoint] = useState(false);
+  const [uploadResponse, setUploadResponse] = useState<{success: boolean; message?: string; fileUrl?: string} | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
   const form = useForm<FormValues>({
@@ -90,7 +94,59 @@ export function ImportDocumentForm({ onCancel, onSuccess }: ImportDocumentFormPr
     const previewUrl = URL.createObjectURL(file);
     setPdfPreviewUrl(previewUrl);
 
-    // Process PDF
+    // Upload to the specified endpoint
+    try {
+      setIsUploadingToEndpoint(true);
+      const uploadEndpoint = "https://chunk-feature-chatalyst-dot-fartech-yvqj.et.r.appspot.com/upload";
+      const response = await apiServiceInstance.uploadPdfFile(file, uploadEndpoint);
+      
+      setUploadResponse(response);
+      
+      if (response.success) {
+        toast({
+          title: "PDF uploaded successfully",
+          description: response.message || "File was uploaded to the external service.",
+        });
+        
+        // Check if the response contains extracted text content and use it
+        if (response.text_content) {
+          setPdfText(response.text_content);
+          form.setValue("content", response.text_content);
+          
+          // Switch to the 'Paste Text' tab to show the extracted content
+          const pasteTextTab = document.querySelector('[data-value="paste"]') as HTMLElement;
+          if (pasteTextTab) {
+            pasteTextTab.click();
+          }
+          
+          toast({
+            title: "Text extracted successfully",
+            description: `Extracted ${response.text_content.length} characters from the PDF.`,
+          });
+          
+          // Skip local PDF processing since we already have the text
+          setIsProcessingPdf(false);
+          return;
+        }
+      } else {
+        toast({
+          variant: "destructive",
+          title: "Upload failed",
+          description: response.error || "Failed to upload PDF to the external service.",
+        });
+      }
+    } catch (error) {
+      console.error("Error uploading PDF to endpoint:", error);
+      toast({
+        variant: "destructive",
+        title: "Upload failed",
+        description: error instanceof Error ? error.message : "Failed to upload PDF to the external service",
+      });
+    } finally {
+      setIsUploadingToEndpoint(false);
+    }
+
+    // Process PDF locally
     try {
       setIsProcessingPdf(true);
       // Import PDF.js dynamically
@@ -133,6 +189,75 @@ export function ImportDocumentForm({ onCancel, onSuccess }: ImportDocumentFormPr
   const handleManualUpload = () => {
     if (fileInputRef.current) {
       fileInputRef.current.click();
+    }
+  };
+
+  const handlePreviewChunks_v2 = async () => {
+    const content = form.getValues("content");
+    
+    if (!content) {
+      toast({
+        variant: "destructive",
+        title: "No content",
+        description: "Please add content or upload a PDF to preview chunks.",
+      });
+      return;
+    }
+    
+    setIsProcessingChunks(true);
+    
+    // Define the expected response type
+    interface ChunkResponse {
+      chunks: string[];
+    }
+    
+    try {
+      // Call the external chunking API endpoint using apiServiceInstance
+      const data = await apiServiceInstance.request<ChunkResponse>('https://chunk-feature-chatalyst-dot-fartech-yvqj.et.r.appspot.com/chunk-text', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ "text": content }),
+        logRequests: true, // Enable logging for this request
+      });
+      
+      if (data.chunks && Array.isArray(data.chunks)) {
+        setChunks(data.chunks);
+        setShowChunks(true);
+      } else {
+        // Fallback to paragraph chunking if API response doesn't contain chunks
+        const options: ChunkingOptions = {
+          method: 'paragraph' as ChunkingMethod,
+        };
+        
+        const generatedChunks = generateChunks(content, options);
+        setChunks(generatedChunks);
+        setShowChunks(true);
+        
+        toast({
+          title: "Using fallback chunking",
+          description: "External chunking service failed. Using paragraph-based chunking instead.",
+        });
+      }
+    } catch (error) {
+      console.error("Error previewing chunks:", error);
+      
+      // Fallback to paragraph chunking if there's an error
+      const options: ChunkingOptions = {
+        method: 'paragraph' as ChunkingMethod,
+      };
+      
+      const generatedChunks = generateChunks(content, options);
+      setChunks(generatedChunks);
+      setShowChunks(true);
+      
+      toast({
+        title: "Using fallback chunking",
+        description: "External chunking service failed. Using paragraph-based chunking instead.",
+      });
+    } finally {
+      setIsProcessingChunks(false);
     }
   };
 
@@ -398,10 +523,10 @@ export function ImportDocumentForm({ onCancel, onSuccess }: ImportDocumentFormPr
                 </div>
               </div>
               
-              {isProcessingPdf && (
+              {(isProcessingPdf || isUploadingToEndpoint) && (
                 <div className="flex items-center justify-center p-4">
                   <Loader2 className="h-6 w-6 animate-spin mr-2" />
-                  <span>Processing PDF...</span>
+                  <span>{isUploadingToEndpoint ? "Uploading PDF to external service..." : "Processing PDF..."}</span>
                 </div>
               )}
               
@@ -414,6 +539,32 @@ export function ImportDocumentForm({ onCancel, onSuccess }: ImportDocumentFormPr
                       className="w-full h-full"
                       title="PDF Preview"
                     />
+                  </div>
+                </div>
+              )}
+              
+              {uploadResponse && uploadResponse.success && uploadResponse.fileUrl && (
+                <div className="mt-4 p-3 bg-green-50 border border-green-200 rounded-md">
+                  <div className="flex items-center">
+                    <div className="flex-shrink-0">
+                      <svg className="h-5 w-5 text-green-400" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                      </svg>
+                    </div>
+                    <div className="ml-3">
+                      <h3 className="text-sm font-medium text-green-800">Upload Successful</h3>
+                      <div className="mt-2 text-sm text-green-700">
+                        <p>PDF was successfully uploaded to the external service.</p>
+                        <a 
+                          href={uploadResponse.fileUrl} 
+                          target="_blank" 
+                          rel="noopener noreferrer"
+                          className="flex items-center mt-1 text-green-600 hover:text-green-800"
+                        >
+                          View uploaded file <ExternalLink className="ml-1 h-3 w-3" />
+                        </a>
+                      </div>
+                    </div>
                   </div>
                 </div>
               )}
@@ -473,7 +624,7 @@ export function ImportDocumentForm({ onCancel, onSuccess }: ImportDocumentFormPr
                 <Button 
                   type="button" 
                   variant="outline" 
-                  onClick={handlePreviewChunks}
+                  onClick={handlePreviewChunks_v2}
                   disabled={isSubmitting || isProcessingChunks || !form.getValues("content")}
                 >
                   {isProcessingChunks ? (
