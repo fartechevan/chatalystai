@@ -1,3 +1,5 @@
+/* eslint-disable no-constant-binary-expression */
+/* eslint-disable valid-typeof */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 import { useState, useRef } from "react";
@@ -66,200 +68,231 @@ export function ImportDocumentForm({ onCancel, onSuccess }: ImportDocumentFormPr
   });
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  const file = e.target.files?.[0];
+  if (!file) return;
 
-    if (file.type !== "application/pdf") {
-      toast({
-        variant: "destructive",
-        title: "Invalid file type",
-        description: "Please upload a PDF file.",
-      });
-      return;
-    }
+  if (file.type !== "application/pdf") {
+    toast({
+      variant: "destructive",
+      title: "Invalid file type",
+      description: "Please upload a PDF file.",
+    });
+    return;
+  }
 
-    if (file.size > MAX_FILE_SIZE) {
-      toast({
-        variant: "destructive",
-        title: "File too large",
-        description: "Please upload a file smaller than 10MB.",
-      });
-      return;
-    }
+  if (file.size > MAX_FILE_SIZE) {
+    toast({
+      variant: "destructive",
+      title: "File too large",
+      description: "Please upload a file smaller than 10MB.",
+    });
+    return;
+  }
 
-    setPdfFile(file);
-    form.setValue("title", file.name.replace(/\.pdf$/, ""));
+  setPdfFile(file);
+  form.setValue("title", file.name.replace(/\.pdf$/, ""));
+  
+  // Generate preview URL
+  const previewUrl = URL.createObjectURL(file);
+  setPdfPreviewUrl(previewUrl);
+
+  // Upload to the specified endpoint
+  try {
+    setIsUploadingToEndpoint(true);
+    const uploadEndpoint = "https://chunk-feature-chatalyst-dot-fartech-yvqj.et.r.appspot.com/upload";
+    const response = await apiServiceInstance.uploadPdfFile(file, uploadEndpoint);
     
-    // Generate preview URL
-    const previewUrl = URL.createObjectURL(file);
-    setPdfPreviewUrl(previewUrl);
-
-    // Upload to the specified endpoint
-    try {
-      setIsUploadingToEndpoint(true);
-      const uploadEndpoint = "https://chunk-feature-chatalyst-dot-fartech-yvqj.et.r.appspot.com/upload";
-      const response = await apiServiceInstance.uploadPdfFile(file, uploadEndpoint);
+    setUploadResponse(response);
+    
+    if (response?.success) {
+      // Store the session_id in localStorage
+      if (response?.session_id && typeof window !== undefined) {
+        localStorage.setItem("upload_session_id", response.session_id);
+        console.log("Session ID stored in localStorage:", response.session_id);
+      }
       
-      setUploadResponse(response);
+      toast({
+        title: "PDF uploaded successfully",
+        description: response.message || "File was uploaded to the external service.",
+      });
       
-      if (response.success) {
+      // Check if the response contains extracted text content and use it
+      if (response.text_content) {
+        setPdfText(response.text_content);
+        form.setValue("content", response.text_content);
+        
+        // Switch to the 'Paste Text' tab to show the extracted content
+        const pasteTextTab = document.querySelector('[data-value="paste"]') as HTMLElement;
+        if (pasteTextTab) {
+          pasteTextTab.click();
+        }
+        
         toast({
-          title: "PDF uploaded successfully",
-          description: response.message || "File was uploaded to the external service.",
+          title: "Text extracted successfully",
+          description: `Extracted ${response.text_content.length} characters from the PDF.`,
         });
         
-        // Check if the response contains extracted text content and use it
-        if (response.text_content) {
-          setPdfText(response.text_content);
-          form.setValue("content", response.text_content);
-          
-          // Switch to the 'Paste Text' tab to show the extracted content
-          const pasteTextTab = document.querySelector('[data-value="paste"]') as HTMLElement;
-          if (pasteTextTab) {
-            pasteTextTab.click();
-          }
-          
-          toast({
-            title: "Text extracted successfully",
-            description: `Extracted ${response.text_content.length} characters from the PDF.`,
-          });
-          
-          // Skip local PDF processing since we already have the text
-          setIsProcessingPdf(false);
-          return;
-        }
-      } else {
-        toast({
-          variant: "destructive",
-          title: "Upload failed",
-          description: response.error || "Failed to upload PDF to the external service.",
-        });
+        // Skip local PDF processing since we already have the text
+        setIsProcessingPdf(false);
+        return;
       }
-    } catch (error) {
-      console.error("Error uploading PDF to endpoint:", error);
+    } else {
       toast({
         variant: "destructive",
         title: "Upload failed",
-        description: error instanceof Error ? error.message : "Failed to upload PDF to the external service",
-      });
-    } finally {
-      setIsUploadingToEndpoint(false);
-    }
-
-    // Process PDF locally
-    try {
-      setIsProcessingPdf(true);
-      // Import PDF.js dynamically
-      const pdfjsLib = await import('pdfjs-dist');
-      pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
-      
-      // Load PDF document
-      const loadingTask = pdfjsLib.getDocument(previewUrl);
-      const pdf = await loadingTask.promise;
-      
-      let extractedText = '';
-      
-      // Extract text from each page
-      for (let i = 1; i <= pdf.numPages; i++) {
-        const page = await pdf.getPage(i);
-        const textContent = await page.getTextContent();
-        const textItems = textContent.items.map((item: any) => item.str).join(' ');
-        extractedText += textItems + '\n\n';
-      }
-      
-      setPdfText(extractedText);
-      form.setValue("content", extractedText);
-      setIsProcessingPdf(false);
-      
-      toast({
-        title: "PDF processed successfully",
-        description: `Extracted ${extractedText.length} characters from ${pdf.numPages} pages.`,
-      });
-    } catch (error) {
-      console.error("Error processing PDF:", error);
-      setIsProcessingPdf(false);
-      toast({
-        variant: "destructive",
-        title: "Error processing PDF",
-        description: error instanceof Error ? error.message : "Failed to extract text from PDF",
+        description: response.error || "Failed to upload PDF to the external service.",
       });
     }
-  };
+  } catch (error) {
+    console.error("Error uploading PDF to endpoint:", error);
+    toast({
+      variant: "destructive",
+      title: "Upload failed",
+      description: error instanceof Error ? error.message : "Failed to upload PDF to the external service",
+    });
+  } finally {
+    setIsUploadingToEndpoint(false);
+  }
 
+  // Process PDF locally
+  try {
+    setIsProcessingPdf(true);
+    // Import PDF.js dynamically
+    const pdfjsLib = await import('pdfjs-dist');
+    pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
+    
+    // Load PDF document
+    const loadingTask = pdfjsLib.getDocument(previewUrl);
+    const pdf = await loadingTask.promise;
+    
+    let extractedText = '';
+    
+    // Extract text from each page
+    for (let i = 1; i <= pdf.numPages; i++) {
+      const page = await pdf.getPage(i);
+      const textContent = await page.getTextContent();
+      const textItems = textContent.items.map((item: any) => item.str).join(' ');
+      extractedText += textItems + '\n\n';
+    }
+    
+    setPdfText(extractedText);
+    form.setValue("content", extractedText);
+    setIsProcessingPdf(false);
+    
+    toast({
+      title: "PDF processed successfully",
+      description: `Extracted ${extractedText.length} characters from ${pdf.numPages} pages.`,
+    });
+  } catch (error) {
+    console.error("Error processing PDF:", error);
+    setIsProcessingPdf(false);
+    toast({
+      variant: "destructive",
+      title: "Error processing PDF",
+      description: error instanceof Error ? error.message : "Failed to extract text from PDF",
+    });
+  }
+};
   const handleManualUpload = () => {
     if (fileInputRef.current) {
       fileInputRef.current.click();
     }
   };
 
-  const handlePreviewChunks_v2 = async () => {
-    const content = form.getValues("content");
+const handlePreviewChunks_v2 = async () => {
+  const content = form.getValues("content");
     
-    if (!content) {
+  if (!content) {
+    toast({
+      variant: "destructive",
+      title: "No content",
+      description: "Please add content or upload a PDF to preview chunks.",
+    });
+    return;
+  }
+    
+  setIsProcessingChunks(true);
+    
+  // Define the expected response type
+  interface ChunkResponse {
+    chunks: string[];
+  }
+    
+  try {
+    // Get the session_id from localStorage
+    let session_id : any
+    if(typeof window !== undefined){
+      session_id = localStorage.getItem("upload_session_id");
+    }
+
+    
+    if (!session_id) {
       toast({
         variant: "destructive",
-        title: "No content",
-        description: "Please add content or upload a PDF to preview chunks.",
-      });
-      return;
-    }
-    
-    setIsProcessingChunks(true);
-    
-    // Define the expected response type
-    interface ChunkResponse {
-      chunks: string[];
-    }
-    
-    try {
-      // Call the external chunking API endpoint using apiServiceInstance
-      const data = await apiServiceInstance.request<ChunkResponse>('https://chunk-feature-chatalyst-dot-fartech-yvqj.et.r.appspot.com/chunk-text', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ "text": content }),
-        logRequests: true, // Enable logging for this request
+        title: "No session ID found",
+        description: "Please upload a PDF first to generate a session ID.",
       });
       
-      if (data.chunks && Array.isArray(data.chunks)) {
-        setChunks(data.chunks);
-        setShowChunks(true);
-      } else {
-        // Fallback to paragraph chunking if API response doesn't contain chunks
-        const options: ChunkingOptions = {
-          method: 'paragraph' as ChunkingMethod,
-        };
-        
-        const generatedChunks = generateChunks(content, options);
-        setChunks(generatedChunks);
-        setShowChunks(true);
-        
-        toast({
-          title: "Using fallback chunking",
-          description: "External chunking service failed. Using paragraph-based chunking instead.",
-        });
-      }
-    } catch (error) {
-      console.error("Error previewing chunks:", error);
-      
-      // Fallback to paragraph chunking if there's an error
+      // Fallback to paragraph chunking if no session_id is available
       const options: ChunkingOptions = {
         method: 'paragraph' as ChunkingMethod,
       };
-      
+        
       const generatedChunks = generateChunks(content, options);
       setChunks(generatedChunks);
       setShowChunks(true);
-      
+      setIsProcessingChunks(false);
+      return;
+    }
+    
+    // Call the external chunking API endpoint using apiServiceInstance with session_id
+    const data = await apiServiceInstance.request<ChunkResponse>('https://chunk-feature-chatalyst-dot-fartech-yvqj.et.r.appspot.com/chunk-text', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ "session_id": session_id }),
+      logRequests: true, // Enable logging for this request
+    });
+        
+    if (data.chunks && Array.isArray(data.chunks)) {
+      setChunks(data.chunks);
+      setShowChunks(true);
+    } else {
+      // Fallback to paragraph chunking if API response doesn't contain chunks
+      const options: ChunkingOptions = {
+        method: 'paragraph' as ChunkingMethod,
+      };
+            
+      const generatedChunks = generateChunks(content, options);
+      setChunks(generatedChunks);
+      setShowChunks(true);
+            
       toast({
         title: "Using fallback chunking",
         description: "External chunking service failed. Using paragraph-based chunking instead.",
       });
-    } finally {
-      setIsProcessingChunks(false);
     }
-  };
+  } catch (error) {
+    console.error("Error previewing chunks:", error);
+        
+    // Fallback to paragraph chunking if there's an error
+    const options: ChunkingOptions = {
+      method: 'paragraph' as ChunkingMethod,
+    };
+        
+    const generatedChunks = generateChunks(content, options);
+    setChunks(generatedChunks);
+    setShowChunks(true);
+        
+    toast({
+      title: "Using fallback chunking",
+      description: "External chunking service failed. Using paragraph-based chunking instead.",
+    });
+  } finally {
+    setIsProcessingChunks(false);
+  }
+};
 
   const handlePreviewChunks = async () => {
     const content = form.getValues("content");
