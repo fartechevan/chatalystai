@@ -137,7 +137,7 @@ const AgentDetailsPanel: React.FC<AgentDetailsPanelProps> = ({ selectedAgentId, 
       // For now, let's assume it might be missing and default
       // TODO: Adjust this based on where activation_mode is actually stored/fetched from
       // Fetching activation_mode requires joining ai_agent_integrations. For now, keep default.
-      // setActivationMode((selectedAgent as any)?.activation_mode || 'keyword'); // Default to 'keyword'
+      setActivationMode(selectedAgent.activation_mode || 'keyword'); // Default to 'keyword'
       // Keep default setting logic for now until data fetching is updated
        if (!selectedAgentId) { // Only reset if creating
          setActivationMode('keyword');
@@ -309,9 +309,7 @@ const AgentDetailsPanel: React.FC<AgentDetailsPanelProps> = ({ selectedAgentId, 
         keyword_trigger: keywordTrigger?.trim() || null,
          integration_ids: selectedIntegrationIds.length > 0 ? selectedIntegrationIds : [],
          is_enabled: isEnabled,
-         // TODO: activation_mode needs to be saved to ai_agent_integrations, not ai_agents.
-         // The createAIAgent service needs modification or a separate call.
-         // activation_mode: activationMode,
+         activation_mode: activationMode,
        };
        console.log("Creating agent with data:", newAgentData);
        createMutation.mutate(newAgentData);
@@ -336,9 +334,7 @@ const AgentDetailsPanel: React.FC<AgentDetailsPanelProps> = ({ selectedAgentId, 
          keyword_trigger: keywordTrigger?.trim() || null,
          integration_ids: selectedIntegrationIds.length > 0 ? selectedIntegrationIds : [],
          is_enabled: isEnabled,
-          // TODO: activation_mode needs to be saved to ai_agent_integrations, not ai_agents.
-          // The updateAIAgent service needs modification or a separate call.
-         // activation_mode: activationMode,
+         activation_mode: activationMode,
        };
 
        // Only send update if something actually changed (optional optimization)
