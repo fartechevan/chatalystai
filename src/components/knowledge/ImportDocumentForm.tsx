@@ -30,7 +30,7 @@ import {
   generateChunks 
 } from "./utils/chunkingUtils";
 
-const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
+const MAX_FILE_SIZE = 16 * 1024 * 1024; // 16MB
 
 const formSchema = z.object({
   title: z.string().min(1, "Title is required"),
@@ -68,131 +68,138 @@ export function ImportDocumentForm({ onCancel, onSuccess }: ImportDocumentFormPr
   });
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-  const file = e.target.files?.[0];
-  if (!file) return;
+  const files = Array.from(e.target.files || []);
+  if (files.length === 0) return;
 
-  if (file.type !== "application/pdf") {
-    toast({
-      variant: "destructive",
-      title: "Invalid file type",
-      description: "Please upload a PDF file.",
-    });
-    return;
-  }
-
-  if (file.size > MAX_FILE_SIZE) {
-    toast({
-      variant: "destructive",
-      title: "File too large",
-      description: "Please upload a file smaller than 10MB.",
-    });
-    return;
-  }
-
-  setPdfFile(file);
-  form.setValue("title", file.name.replace(/\.pdf$/, ""));
+  // Track successful uploads
+  let successCount = 0;
+  let failCount = 0;
   
-  // Generate preview URL
-  const previewUrl = URL.createObjectURL(file);
-  setPdfPreviewUrl(previewUrl);
+  // Set upload state
+  setIsUploadingToEndpoint(true);
+  
+  // Create a function to process a single file
+  const uploadFile = async (file: File) => {
+    // Validate file type
+    if (file.type !== "application/pdf") {
+      toast({
+        variant: "destructive",
+        title: "Invalid file type",
+        description: `${file.name} is not a PDF file.`,
+      });
+      failCount++;
+      return;
+    }
 
-  // Upload to the specified endpoint
-  try {
-    setIsUploadingToEndpoint(true);
-    const uploadEndpoint = "https://chunk-feature-chatalyst-dot-fartech-yvqj.et.r.appspot.com/upload";
-    const response = await apiServiceInstance.uploadPdfFile(file, uploadEndpoint);
-    
-    setUploadResponse(response);
-    
-    if (response?.success) {
-      // Store the session_id in localStorage
-      if (response?.session_id && typeof window !== undefined) {
-        localStorage.setItem("upload_session_id", response.session_id);
-        console.log("Session ID stored in localStorage:", response.session_id);
+    // Validate file size
+    if (file.size > MAX_FILE_SIZE) {
+      toast({
+        variant: "destructive",
+        title: "File too large",
+        description: `${file.name} exceeds 16MB limit.`,
+      });
+      failCount++;
+      return;
+    }
+
+    // For the first file, update title and preview
+    if (successCount === 0) {
+      setPdfFile(file);
+      form.setValue("title", file.name.replace(/\.pdf$/, ""));
+      
+      // Generate preview URL for the first file
+      const previewUrl = URL.createObjectURL(file);
+      setPdfPreviewUrl(previewUrl);
+    }
+
+    // Upload to the specified endpoint
+    try {
+      const uploadEndpoint = "http://127.0.0.1:5000/upload";
+      const response = await apiServiceInstance.uploadPdfFile(file, uploadEndpoint);
+      
+      if (successCount === 0) {
+        setUploadResponse(response);
       }
       
-      toast({
-        title: "PDF uploaded successfully",
-        description: response.message || "File was uploaded to the external service.",
-      });
-      
-      // Check if the response contains extracted text content and use it
-      if (response.text_content) {
-        setPdfText(response.text_content);
-        form.setValue("content", response.text_content);
+      if (response?.success) {
+        successCount++;
         
-        // Switch to the 'Paste Text' tab to show the extracted content
-        const pasteTextTab = document.querySelector('[data-value="paste"]') as HTMLElement;
-        if (pasteTextTab) {
-          pasteTextTab.click();
+        // Store the session_id in localStorage (for the first successful file)
+        if (successCount === 1 && response?.session_id && typeof window !== undefined) {
+          localStorage.setItem("upload_session_id", response.session_id);
+          console.log("Session ID stored in localStorage:", response.session_id);
         }
         
+        // Check if the response contains extracted text content and use it
+        if (response.text_content) {
+          // For first file, set the content directly
+          if (successCount === 1) {
+            setPdfText(response.text_content);
+            form.setValue("content", response.text_content);
+          } else {
+            // For subsequent files, append with a separator
+            const currentText = form.getValues("content");
+            const newText = currentText + "\n\n--- New Document ---\n\n" + response.text_content;
+            setPdfText(newText);
+            form.setValue("content", newText);
+          }
+          
+          // If this is the first successful file, switch to the 'Paste Text' tab
+          if (successCount === 1) {
+            const pasteTextTab = document.querySelector('[data-value="paste"]') as HTMLElement;
+            if (pasteTextTab) {
+              pasteTextTab.click();
+            }
+          }
+        } else {
+          // No text content in response
+          toast({
+            variant: "destructive",
+            title: "No text extracted",
+            description: `File ${file.name} was uploaded but no text content was returned.`,
+          });
+        }
+      } else {
+        failCount++;
         toast({
-          title: "Text extracted successfully",
-          description: `Extracted ${response.text_content.length} characters from the PDF.`,
+          variant: "destructive",
+          title: "Upload failed",
+          description: `Failed to upload ${file.name}: ${response.error || "Unknown error"}`,
         });
-        
-        // Skip local PDF processing since we already have the text
-        setIsProcessingPdf(false);
-        return;
       }
-    } else {
+    } catch (error) {
+      failCount++;
+      console.error(`Error uploading ${file.name}:`, error);
       toast({
         variant: "destructive",
         title: "Upload failed",
-        description: response.error || "Failed to upload PDF to the external service.",
+        description: `Failed to upload ${file.name}: ${error instanceof Error ? error.message : "Unknown error"}`,
       });
     }
-  } catch (error) {
-    console.error("Error uploading PDF to endpoint:", error);
-    toast({
-      variant: "destructive",
-      title: "Upload failed",
-      description: error instanceof Error ? error.message : "Failed to upload PDF to the external service",
-    });
-  } finally {
-    setIsUploadingToEndpoint(false);
-  }
+  };
 
-  // Process PDF locally
-  try {
-    setIsProcessingPdf(true);
-    // Import PDF.js dynamically
-    const pdfjsLib = await import('pdfjs-dist');
-    pdfjsLib.GlobalWorkerOptions.workerSrc = `//cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
-    
-    // Load PDF document
-    const loadingTask = pdfjsLib.getDocument(previewUrl);
-    const pdf = await loadingTask.promise;
-    
-    let extractedText = '';
-    
-    // Extract text from each page
-    for (let i = 1; i <= pdf.numPages; i++) {
-      const page = await pdf.getPage(i);
-      const textContent = await page.getTextContent();
-      const textItems = textContent.items.map((item: any) => item.str).join(' ');
-      extractedText += textItems + '\n\n';
-    }
-    
-    setPdfText(extractedText);
-    form.setValue("content", extractedText);
-    setIsProcessingPdf(false);
-    
+  // Upload all files sequentially
+  for (const file of files) {
+    await uploadFile(file);
+  }
+  
+  setIsUploadingToEndpoint(false);
+  
+  // Show summary toast
+  if (successCount > 0) {
     toast({
-      title: "PDF processed successfully",
-      description: `Extracted ${extractedText.length} characters from ${pdf.numPages} pages.`,
+      title: "PDF upload complete",
+      description: `Successfully uploaded ${successCount} file${successCount !== 1 ? 's' : ''}${failCount > 0 ? `, ${failCount} failed` : ''}.`,
     });
-  } catch (error) {
-    console.error("Error processing PDF:", error);
-    setIsProcessingPdf(false);
+  } else if (failCount > 0) {
     toast({
       variant: "destructive",
-      title: "Error processing PDF",
-      description: error instanceof Error ? error.message : "Failed to extract text from PDF",
+      title: "PDF upload failed",
+      description: `Failed to upload all ${failCount} file${failCount !== 1 ? 's' : ''}.`,
     });
   }
-};
+  };
+
   const handleManualUpload = () => {
     if (fileInputRef.current) {
       fileInputRef.current.click();
@@ -246,7 +253,7 @@ const handlePreviewChunks_v2 = async () => {
     }
     
     // Call the external chunking API endpoint using apiServiceInstance with session_id
-    const data = await apiServiceInstance.request<ChunkResponse>('https://chunk-feature-chatalyst-dot-fartech-yvqj.et.r.appspot.com/chunk-text', {
+    const data = await apiServiceInstance.request<ChunkResponse>('http://127.0.0.1:5000/chunk-text', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -544,6 +551,7 @@ const handlePreviewChunks_v2 = async () => {
                   type="file"
                   ref={fileInputRef}
                   onChange={handleFileChange}
+                  multiple
                   className="hidden"
                   accept=".pdf"
                 />
@@ -551,7 +559,7 @@ const handlePreviewChunks_v2 = async () => {
                   <Upload className="h-10 w-10 text-muted-foreground" />
                   <h3 className="font-medium">Upload PDF Document</h3>
                   <p className="text-sm text-muted-foreground">
-                    Drag and drop or click to browse (max 10MB)
+                    Drag and drop or click to browse (max 16MB)
                   </p>
                 </div>
               </div>
