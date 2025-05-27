@@ -1,0 +1,23 @@
+# nixpacks.toml
+# Explicitly tell Nixpacks to use Node.js providers and specific commands
+# to avoid Deno being incorrectly used for the frontend build.
+
+providers = ["node"]
+
+[phases.setup]
+# Specify Node.js version and include bun
+# You can adjust the Node.js version if needed (e.g., "nodejs_18", "nodejs_20")
+nixPkgs = ["nodejs_20", "bun"]
+
+[phases.install]
+# Use bun install, as a bun.lockb file is present
+cmds = ["bun install --frozen-lockfile"]
+
+[phases.build]
+# Use the build script from package.json (which is vite build)
+cmds = ["bun run build"]
+
+[start]
+# For a static Vite build, Coolify will serve files from the 'publishDirectory' (dist).
+# This start command is mostly a placeholder for static sites.
+cmd = "echo 'Static site build. Coolify will serve from the publish directory.'"
