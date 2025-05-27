@@ -11,7 +11,9 @@ nixPkgs = ["nodejs_20", "bun"]
 
 [phases.install]
 # Use bun install, as a bun.lockb file is present
-cmds = ["bun install --frozen-lockfile"]
+# Removed --frozen-lockfile to allow lockfile updates during build if necessary.
+# It's recommended to run `bun install` locally and commit bun.lockb for consistency.
+cmds = ["bun install"]
 
 [phases.build]
 # Use the build script from package.json (which is vite build)
