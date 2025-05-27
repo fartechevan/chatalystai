@@ -20,6 +20,6 @@ cmds = ["bun install"]
 cmds = ["bun run build"]
 
 [start]
-# For a static Vite build, Coolify will serve files from the 'publishDirectory' (dist).
-# This start command is mostly a placeholder for static sites.
-cmd = "echo 'Static site build. Coolify will serve from the publish directory.'"
+# Explicitly run Caddy to serve the static site.
+# Nixpacks prepares the Caddyfile at /assets/Caddyfile.
+cmd = "caddy run --config /assets/Caddyfile --adapter caddyfile"
