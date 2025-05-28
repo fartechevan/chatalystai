@@ -37,6 +37,14 @@ export const sendTextService = async (params: SendTextParams): Promise<SendTextR
 
   console.log(`sendTextService: Invoking Edge Function 'evolution-api-handler' for integration ${integrationId}`);
 
+  // Explicitly check for an active session before invoking the function
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) {
+    console.error('sendTextService: No active session found. Aborting Edge Function call.');
+    throw new Error('No active session. Please log in again.');
+  }
+  console.log('sendTextService: Active session confirmed.');
+
   // Construct the payload for the Edge Function
   const functionPayload = {
     action: 'send-text',
@@ -54,9 +62,43 @@ export const sendTextService = async (params: SendTextParams): Promise<SendTextR
     body: functionPayload,
   });
 
-  if (error) {
-    console.error('Error invoking evolution-api-handler Edge Function:', error);
-    throw new Error(`Edge Function invocation failed: ${error.message}`);
+  if (error) { // error is FunctionsHttpError
+    let detailedErrorMessage = `Edge Function invocation failed: ${error.message}`;
+    let functionResponseBody = '(Could not determine Edge Function response body)';
+    const responseStatus = error.context?.status || 'N/A'; // Changed to const
+
+    if (error.context && typeof error.context.text === 'function') { // error.context is a Response object
+      try {
+        const bodyText = await error.context.text(); // Asynchronously read the response body as text
+        functionResponseBody = bodyText;
+        // Try to parse as JSON to get a more specific error message if available
+        try {
+          const jsonParsed = JSON.parse(bodyText);
+          if (jsonParsed && jsonParsed.error) {
+            functionResponseBody = `Error from function: ${jsonParsed.error}`;
+          } else if (jsonParsed && jsonParsed.message) {
+            functionResponseBody = `Message from function: ${jsonParsed.message}`;
+          } else {
+            // If not a structured error, use the full text.
+            functionResponseBody = `Raw body: ${bodyText}`;
+          }
+        } catch (e) {
+          // Not JSON, or malformed. Use the raw text.
+          functionResponseBody = `Raw body (not JSON): ${bodyText}`;
+        }
+      } catch (readError) {
+        functionResponseBody = `(Failed to read Edge Function response body: ${readError.message})`;
+      }
+    }
+    
+    detailedErrorMessage += ` | Status: ${responseStatus} | Response: ${functionResponseBody}`;
+    // Log the original error object, the status, and the processed response body
+    console.error(
+      'Error invoking evolution-api-handler Edge Function. Original error object:', error, 
+      `Response Status: ${responseStatus}`, 
+      `Processed Response Body: ${functionResponseBody}`
+    );
+    throw new Error(detailedErrorMessage);
   }
 
   // Check the response structure from the Edge Function
