@@ -9,6 +9,53 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      agent_availability_settings: {
+        Row: {
+          agent_id: string
+          appointment_duration_minutes: number | null
+          buffer_time_minutes: number | null
+          created_at: string | null
+          day_of_week: Database["public"]["Enums"]["day_of_week"]
+          end_time: string | null
+          id: string
+          is_available: boolean | null
+          start_time: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          agent_id: string
+          appointment_duration_minutes?: number | null
+          buffer_time_minutes?: number | null
+          created_at?: string | null
+          day_of_week: Database["public"]["Enums"]["day_of_week"]
+          end_time?: string | null
+          id?: string
+          is_available?: boolean | null
+          start_time?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          agent_id?: string
+          appointment_duration_minutes?: number | null
+          buffer_time_minutes?: number | null
+          created_at?: string | null
+          day_of_week?: Database["public"]["Enums"]["day_of_week"]
+          end_time?: string | null
+          id?: string
+          is_available?: boolean | null
+          start_time?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_availability_settings_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "ai_agents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       agent_conversations: {
         Row: {
           added_to_knowledge_base: boolean | null
@@ -69,6 +116,47 @@ export type Database = {
             columns: ["session_id"]
             isOneToOne: false
             referencedRelation: "ai_agent_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      agent_google_calendar_settings: {
+        Row: {
+          access_token: string | null
+          agent_id: string
+          calendar_id: string | null
+          created_at: string | null
+          id: string
+          refresh_token: string | null
+          token_expiry_timestamp: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          access_token?: string | null
+          agent_id: string
+          calendar_id?: string | null
+          created_at?: string | null
+          id?: string
+          refresh_token?: string | null
+          token_expiry_timestamp?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          access_token?: string | null
+          agent_id?: string
+          calendar_id?: string | null
+          created_at?: string | null
+          id?: string
+          refresh_token?: string | null
+          token_expiry_timestamp?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_google_calendar_settings_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "ai_agents"
             referencedColumns: ["id"]
           },
         ]
@@ -210,6 +298,9 @@ export type Database = {
       }
       ai_agents: {
         Row: {
+          activation_mode:
+            | Database["public"]["Enums"]["agent_activation_mode"]
+            | null
           created_at: string
           id: string
           is_enabled: boolean | null
@@ -221,6 +312,9 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          activation_mode?:
+            | Database["public"]["Enums"]["agent_activation_mode"]
+            | null
           created_at?: string
           id?: string
           is_enabled?: boolean | null
@@ -232,6 +326,9 @@ export type Database = {
           user_id: string
         }
         Update: {
+          activation_mode?:
+            | Database["public"]["Enums"]["agent_activation_mode"]
+            | null
           created_at?: string
           id?: string
           is_enabled?: boolean | null
@@ -592,6 +689,8 @@ export type Database = {
           is_connected: boolean | null
           name: string
           status: Database["public"]["Enums"]["integration_status"]
+          team_id: string | null
+          team_visibility: boolean | null
           updated_at: string | null
           webhook_events: Json | null
           webhook_url: string | null
@@ -606,6 +705,8 @@ export type Database = {
           is_connected?: boolean | null
           name: string
           status?: Database["public"]["Enums"]["integration_status"]
+          team_id?: string | null
+          team_visibility?: boolean | null
           updated_at?: string | null
           webhook_events?: Json | null
           webhook_url?: string | null
@@ -620,11 +721,21 @@ export type Database = {
           is_connected?: boolean | null
           name?: string
           status?: Database["public"]["Enums"]["integration_status"]
+          team_id?: string | null
+          team_visibility?: boolean | null
           updated_at?: string | null
           webhook_events?: Json | null
           webhook_url?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "integrations_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       integrations_config: {
         Row: {
@@ -860,6 +971,7 @@ export type Database = {
           customer_id: string | null
           id: string
           pipeline_stage_id: string | null
+          team_id: string | null
           updated_at: string
           user_id: string
           value: number | null
@@ -869,6 +981,7 @@ export type Database = {
           customer_id?: string | null
           id?: string
           pipeline_stage_id?: string | null
+          team_id?: string | null
           updated_at?: string
           user_id: string
           value?: number | null
@@ -878,6 +991,7 @@ export type Database = {
           customer_id?: string | null
           id?: string
           pipeline_stage_id?: string | null
+          team_id?: string | null
           updated_at?: string
           user_id?: string
           value?: number | null
@@ -895,6 +1009,13 @@ export type Database = {
             columns: ["pipeline_stage_id"]
             isOneToOne: false
             referencedRelation: "pipeline_stages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "leads_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
             referencedColumns: ["id"]
           },
         ]
@@ -985,6 +1106,7 @@ export type Database = {
           id: string
           is_default: boolean | null
           name: string
+          team_id: string | null
           updated_at: string
           user_id: string
         }
@@ -993,6 +1115,7 @@ export type Database = {
           id?: string
           is_default?: boolean | null
           name: string
+          team_id?: string | null
           updated_at?: string
           user_id: string
         }
@@ -1001,10 +1124,19 @@ export type Database = {
           id?: string
           is_default?: boolean | null
           name?: string
+          team_id?: string | null
           updated_at?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "pipelines_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       profile_integration_access: {
         Row: {
@@ -1229,6 +1361,59 @@ export type Database = {
           },
         ]
       }
+      team_users: {
+        Row: {
+          created_at: string | null
+          id: string
+          role: Database["public"]["Enums"]["team_role"]
+          team_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          role?: Database["public"]["Enums"]["team_role"]
+          team_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          role?: Database["public"]["Enums"]["team_role"]
+          team_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "team_users_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      teams: {
+        Row: {
+          created_at: string | null
+          id: string
+          name: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          name: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          name?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       token_allocations: {
         Row: {
           created_at: string | null
@@ -1306,6 +1491,15 @@ export type Database = {
         Args: { "": string } | { "": unknown }
         Returns: unknown
       }
+      create_new_team: {
+        Args: { p_name: string }
+        Returns: {
+          created_at: string | null
+          id: string
+          name: string
+          updated_at: string | null
+        }[]
+      }
       execute_dynamic_sql: {
         Args: { sql_query: string }
         Returns: Json
@@ -1359,6 +1553,14 @@ export type Database = {
       hnswhandler: {
         Args: { "": unknown }
         Returns: unknown
+      }
+      is_user_team_admin_or_owner: {
+        Args: { p_user_id: string; p_team_id: string }
+        Returns: boolean
+      }
+      is_user_team_member: {
+        Args: { p_user_id: string; p_team_id: string }
+        Returns: boolean
       }
       ivfflat_bit_support: {
         Args: { "": unknown }
@@ -1451,6 +1653,7 @@ export type Database = {
           id: string
           is_default: boolean | null
           name: string
+          team_id: string | null
           updated_at: string
           user_id: string
         }[]
@@ -1481,8 +1684,17 @@ export type Database = {
       }
     }
     Enums: {
+      agent_activation_mode: "keyword" | "always_on"
       ai_session_status: "active" | "closed" | "error"
       app_role: "admin" | "user" | "customer"
+      day_of_week:
+        | "monday"
+        | "tuesday"
+        | "wednesday"
+        | "thursday"
+        | "friday"
+        | "saturday"
+        | "sunday"
       integration_status: "available" | "coming_soon"
       new_app_role: "user" | "admin"
       role_enum: "admin" | "member"
@@ -1492,6 +1704,7 @@ export type Database = {
       sentiment_type: "bad" | "moderate" | "good"
       sync_status: "pending" | "completed" | "failed"
       task_status: "follow-up" | "meeting"
+      team_role: "owner" | "admin" | "member"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1607,8 +1820,18 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      agent_activation_mode: ["keyword", "always_on"],
       ai_session_status: ["active", "closed", "error"],
       app_role: ["admin", "user", "customer"],
+      day_of_week: [
+        "monday",
+        "tuesday",
+        "wednesday",
+        "thursday",
+        "friday",
+        "saturday",
+        "sunday",
+      ],
       integration_status: ["available", "coming_soon"],
       new_app_role: ["user", "admin"],
       role_enum: ["admin", "member"],
@@ -1618,6 +1841,7 @@ export const Constants = {
       sentiment_type: ["bad", "moderate", "good"],
       sync_status: ["pending", "completed", "failed"],
       task_status: ["follow-up", "meeting"],
+      team_role: ["owner", "admin", "member"],
     },
   },
 } as const

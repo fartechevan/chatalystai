@@ -9,6 +9,7 @@ import { LoginForm } from "./components/auth/LoginForm";
 import Main from "./pages/Main";
 import Settings from "./pages/Settings";
 import { AuthProvider } from "./components/auth/AuthProvider";
+import { TeamProvider } from "./context/TeamContext"; // Import TeamProvider
 import { ProtectedRoute } from "./components/auth/ProtectedRoute";
 import { SidebarProvider } from "./components/ui/sidebar";
 import { ConversationView } from "./components/dashboard/conversations/ConversationView";
@@ -24,6 +25,7 @@ import Profile from "./pages/Profile";
 import BroadcastsPage from "./pages/Broadcasts"; // Import the actual Broadcasts page
 import BroadcastDetailsView from "./components/broadcasts/BroadcastDetailsView"; // Import the details view
 import AIAgentsPage from "./pages/AIAgents"; // Import the new AI Agents page
+import TeamsPage from "./pages/Teams"; // Import Teams page
 // Removed import for BatchSentimentAnalysisLayout as it will be rendered within ConversationStatsView
 
 const App = () => {
@@ -39,10 +41,11 @@ const App = () => {
   return (
     <QueryClientProvider client={queryClient}>
       <AuthProvider>
-        <TooltipProvider>
-          <SidebarProvider>
-            <div className="min-h-screen bg-background">
-              <Toaster />
+        <TeamProvider>
+          <TooltipProvider>
+            <SidebarProvider>
+              <div className="min-h-screen bg-background">
+                <Toaster />
               <Sonner />
               <BrowserRouter>
                 <Routes>
@@ -71,14 +74,16 @@ const App = () => {
                     <Route path="mail" element={<ComingSoon />} />
                     <Route path="knowledge" element={<KnowledgeBase />} />
                     <Route path="ai-agents" element={<AIAgentsPage />} /> {/* Add AI Agents route */}
+                    <Route path="teams" element={<TeamsPage />} /> {/* Add Teams route */}
                     {/* Removed Batch Sentiment Analysis route */}
                     <Route path="profile" element={<Profile />} />
                   </Route>
                 </Routes>
               </BrowserRouter>
-            </div>
-          </SidebarProvider>
-        </TooltipProvider>
+              </div>
+            </SidebarProvider>
+          </TooltipProvider>
+        </TeamProvider>
       </AuthProvider>
     </QueryClientProvider>
   );
