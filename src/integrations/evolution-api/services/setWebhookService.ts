@@ -52,7 +52,6 @@ export async function setEvolutionWebhook(
      };
 
      // --- Added Log ---
-     console.log(`[setEvolutionWebhook] Attempting to set webhook for instance ${instanceName}. URL: ${setWebhookUrl}, Payload:`, JSON.stringify(payload, null, 2));
      // --- End Added Log ---
 
      // 4. Make request using ApiService
@@ -67,7 +66,6 @@ export async function setEvolutionWebhook(
       body: JSON.stringify(payload),
     });
 
-    console.log(`Successfully set webhook for instance ${instanceName}`);
     return true;
 
   } catch (error) {

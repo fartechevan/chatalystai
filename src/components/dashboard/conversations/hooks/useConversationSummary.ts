@@ -23,7 +23,6 @@ export function useConversationSummary(
         conversation: selectedConversation
       }));
 
-      console.log('Calling summarize-conversation function...');
       const { data, error } = await supabase.functions.invoke('summarize-conversation', {
         body: { messages: messagesWithConversation }
       });
@@ -32,7 +31,6 @@ export function useConversationSummary(
 
       // Store the summary in the database
       if (data.summary) {
-        console.log('Saving summary to database...');
         const { data: summaryData, error: summaryError } = await supabase
           .from('conversation_summaries')
           .upsert({
@@ -62,8 +60,6 @@ export function useConversationSummary(
           throw tokenError;
         }
 
-        console.log('Summary saved successfully:', summaryData);
-        console.log('Token usage logged successfully');
         return summaryData;
       }
 

@@ -53,7 +53,6 @@ export function SegmentsView() {
       fetchSegments();
     } else if (!isAuthLoading && !userData) {
       // Handle case where user is definitely not logged in (optional)
-      console.log("SegmentsView: User not authenticated, skipping fetch.");
       setIsLoading(false); // Ensure loading state is turned off
       setSegments([]); // Clear any stale data
     }
@@ -129,7 +128,6 @@ export function SegmentsView() {
       // --- Step 2: Add Contacts (Conditional) ---
       let contactAddError: Error | null = null;
       if (populationMethod === 'existing' && selectedCustomerIdsForNewSegment.length > 0) {
-        console.log(`Bulk adding ${selectedCustomerIdsForNewSegment.length} existing customers to segment ${newSegment.id}`);
         try {
           // Call the new bulk endpoint
           const { error: bulkAddError } = await supabase.functions.invoke(`segment-handler/segments/${newSegment.id}/contacts/bulk`, {
@@ -144,7 +142,6 @@ export function SegmentsView() {
         }
 
       } else if (populationMethod === 'csv' && selectedCsvFileForNewSegment) {
-        console.log(`Importing CSV ${selectedCsvFileForNewSegment.name} to new segment ${newSegment.id}`);
         try {
           const fileContent = await selectedCsvFileForNewSegment.text();
           // Use the existing import endpoint, passing the NEW segment ID
@@ -220,7 +217,6 @@ export function SegmentsView() {
     setViewingSegment(segment);
     setIsLoadingContacts(true);
     setSegmentContacts([]); // Clear previous contacts
-    console.log(`Fetching contacts for segment: ${segment.name} (ID: ${segment.id})`);
     try {
       // Call the endpoint to list contacts for the specific segment
       const { data, error } = await supabase.functions.invoke(`segment-handler/segments/${segment.id}/contacts`, {
@@ -265,8 +261,6 @@ export function SegmentsView() {
        toast({ title: 'Invalid file type. Please upload a CSV file.', variant: 'destructive' });
        return;
     }
-
-    console.log(`Importing ${selectedFile.name} to segment ${segmentToImportTo.name} (ID: ${segmentToImportTo.id}) with mode: ${importMode}`);
 
     try {
       // Read file content as text

@@ -59,10 +59,8 @@ const AgentListPanel: React.FC<AgentListPanelProps> = ({ selectedAgentId, onSele
   const handleCreateNew = () => {
     // TODO: Implement logic to show the creation form in the details panel
     // onSelectAgent(null); // Deselect any current agent to show create form - Handled by onInitiateCreate now
-    console.log("Create New Agent clicked");
     // Remove handleCreateNew function as it's now directly in onClick
     // onSelectAgent(null); // This logic is moved to the layout
-    console.log("Create New Agent clicked");
   }
 
   return (

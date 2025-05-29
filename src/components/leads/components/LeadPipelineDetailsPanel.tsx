@@ -63,13 +63,10 @@ export function LeadPipelineDetailsPanel({ lead: initialLead, onClose, queryClie
 
   // --- Data Fetching (Profiles & Customer) ---
   useEffect(() => {
-    // console.log("[Effect Profiles] Running for lead:", initialLead?.id); 
     const getProfiles = async () => {
-      // console.log("[Effect Profiles] Fetching profiles..."); 
       setIsLoadingProfiles(true); // Set loading true before fetch
       try {
         const profilesData = await fetchProfiles();
-        // console.log("[Effect Profiles] Fetched profiles data:", profilesData); 
         setProfiles(profilesData as Profile[]); 
       } catch (error) {
         console.error("Error fetching profiles:", error); // Keep error log

@@ -19,7 +19,6 @@ export function PipelineBoard({ stages, stageLeads, onLeadMoved, onLeadClick }: 
  
    const handleDragEnd = async (result: DropResult) => {
      if (!result.destination) return;
-     // console.log("Drag end:", result); // Removed log
  
      const sourceStageId = result.source.droppableId;
      const destinationStageId = result.destination.droppableId;
@@ -74,7 +73,6 @@ export function PipelineBoard({ stages, stageLeads, onLeadMoved, onLeadClick }: 
           <div className="flex gap-6 min-w-max h-full"> {/* Ensure inner flex container also takes height */}
             {stages.map((stage, index) => {
               const leadsForStage = stageLeads[stage.id] || [];
-              console.log(`Leads passed to stage "${stage.name}" (ID: ${stage.id}):`, JSON.stringify(leadsForStage, null, 2)); // Add log here
               return (
                 <LeadsStage
                   key={stage.id}

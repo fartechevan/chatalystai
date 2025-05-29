@@ -40,7 +40,6 @@ export function useCustomerData(setLead: React.Dispatch<React.SetStateAction<Lea
            name: customerData.name
          };
          
-         // console.log("Handling lead data:", leadData); // Removed log
          setLead(leadData);
          
          return { lead: leadData, customer: customerData };

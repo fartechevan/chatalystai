@@ -99,13 +99,6 @@ export function useConversationData(selectedConversation?: Conversation | null) 
             throw new Error("Could not find recipient's phone number");
           }
 
-          console.log("Sending WhatsApp message with:", {
-            instanceId,
-            customerPhoneNumber,
-            content,
-            integrationId: selectedConversation.integrations_id // Renamed property for clarity
-          });
-
           // Send the message via WhatsApp
           const whatsappResult = await sendWhatsAppMessage(
             instanceId,
@@ -113,8 +106,6 @@ export function useConversationData(selectedConversation?: Conversation | null) 
             content,
             selectedConversation.integrations_id
           );
-
-          console.log("WhatsApp result:", whatsappResult);
 
           // If WhatsApp message fails, show error and don't save to database
           if (!whatsappResult.success) {

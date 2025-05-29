@@ -4,7 +4,6 @@ import { supabase } from "@/integrations/supabase/client";
  * Fetches Evolution API config (key and URL) from a secure Supabase function.
  */
 export async function getEvolutionConfig(): Promise<{ apiKey: string; apiUrl: string } | null> {
-  console.log("Fetching Evolution API config via Supabase function...");
   try {
     const { data, error } = await supabase.functions.invoke('get-evolution-config');
 
@@ -17,7 +16,6 @@ export async function getEvolutionConfig(): Promise<{ apiKey: string; apiUrl: st
        console.error('Incomplete config received from get-evolution-config:', data);
        throw new Error('Incomplete configuration received from server.');
     }
-    console.log("Successfully fetched Evolution API config.");
     return data as { apiKey: string; apiUrl: string };
   } catch (err) {
     console.error('Error in getEvolutionConfig:', err);

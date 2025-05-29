@@ -9,14 +9,12 @@ import { WHATSAPP_INSTANCE } from "./config"; // Correct path now
 export function getSavedInstanceData() {
   try {
     const savedInstanceStr = localStorage.getItem(WHATSAPP_INSTANCE); // Use renamed constant
-    // console.log('Raw saved instance from localStorage:', savedInstanceStr); // Removed log
     
     if (!savedInstanceStr) {
       return null;
     }
     
     const savedInstance = JSON.parse(savedInstanceStr);
-    // console.log('Parsed saved instance:', savedInstance); // Removed log
     
     // Return the full parsed object
     return savedInstance; 

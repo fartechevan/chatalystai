@@ -62,6 +62,5 @@ export const sendTextMessage = async (
 
     // 4. Return the successful response (error handling done by ApiService)
     // Logging handled by ApiService if enabled.
-    // console.log(`sendTextMessage: Send text successful for instance ${instanceId}.`); // Removed log
     return result;
 };

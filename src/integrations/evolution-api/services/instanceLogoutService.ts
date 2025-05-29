@@ -34,6 +34,5 @@ export const logoutInstance = async (
 
     // 4. If the request succeeded (didn't throw), logout was successful.
     // Logging handled by ApiService if enabled.
-    // console.log(`logoutInstance: Logout successful for instance ${instanceId}`); // Removed log
     return { success: true };
 };

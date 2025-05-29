@@ -35,15 +35,12 @@ export const sendTextService = async (params: SendTextParams): Promise<SendTextR
   // Destructure params - instance is now the DB integration ID
   const { integrationId, number, text } = params; // Removed instance, added integrationId
 
-  console.log(`sendTextService: Invoking Edge Function 'evolution-api-handler' for integration ${integrationId}`);
-
   // Explicitly check for an active session before invoking the function
   const { data: { session } } = await supabase.auth.getSession();
   if (!session) {
     console.error('sendTextService: No active session found. Aborting Edge Function call.');
     throw new Error('No active session. Please log in again.');
   }
-  console.log('sendTextService: Active session confirmed.');
 
   // Construct the payload for the Edge Function
   const functionPayload = {
@@ -54,8 +51,6 @@ export const sendTextService = async (params: SendTextParams): Promise<SendTextR
     // Pass optional data if the Edge Function is designed to handle it
     // ...optionalData
   };
-
-  console.log("sendTextService: Invoking Edge Function with payload:", JSON.stringify(functionPayload, null, 2));
 
   // Invoke the Supabase Edge Function
   const { data, error } = await supabase.functions.invoke<SendTextResponse>('evolution-api-handler', {
@@ -118,8 +113,6 @@ export const sendTextService = async (params: SendTextParams): Promise<SendTextR
      console.warn('Edge Function indicated failure:', data.message || 'No specific message provided.');
      throw new Error(data.message || 'Edge Function execution failed without specific error.');
   }
-
-  console.log(`sendTextService: Edge Function call successful for ${number}. Response data:`, data.data);
 
   // Return the data part of the Edge Function's response
   // Adjust based on the actual structure returned by your Edge Function on success
