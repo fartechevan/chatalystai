@@ -1,4 +1,5 @@
 -- supabase/migrations/20250512233200_create_batch_sentiment_details_table.sql
+-- Renamed to 20250529131555_create_batch_sentiment_details_table.sql to fix dependency order
 
 CREATE TABLE public.batch_sentiment_analysis_details (
     id bigint PRIMARY KEY GENERATED ALWAYS AS IDENTITY,
