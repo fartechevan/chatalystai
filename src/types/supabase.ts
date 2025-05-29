@@ -1138,6 +1138,57 @@ export type Database = {
           },
         ]
       }
+      plans: {
+        Row: {
+          created_at: string
+          features: Json | null
+          id: string
+          messages_per_month: number | null
+          name: string
+          owner_id: string | null
+          price: number
+          team_id: string | null
+          token_allocation: number | null
+        }
+        Insert: {
+          created_at?: string
+          features?: Json | null
+          id?: string
+          messages_per_month?: number | null
+          name: string
+          owner_id?: string | null
+          price: number
+          team_id?: string | null
+          token_allocation?: number | null
+        }
+        Update: {
+          created_at?: string
+          features?: Json | null
+          id?: string
+          messages_per_month?: number | null
+          name?: string
+          owner_id?: string | null
+          price?: number
+          team_id?: string | null
+          token_allocation?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "plans_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "plans_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profile_integration_access: {
         Row: {
           created_at: string
@@ -1291,6 +1342,76 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      subscriptions: {
+        Row: {
+          cancel_at_period_end: boolean | null
+          canceled_at: string | null
+          created_at: string
+          current_period_end: string
+          current_period_start: string
+          ended_at: string | null
+          id: string
+          plan_id: string
+          profile_id: string
+          status: Database["public"]["Enums"]["subscription_status"]
+          subscribed_at: string
+          team_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          cancel_at_period_end?: boolean | null
+          canceled_at?: string | null
+          created_at?: string
+          current_period_end: string
+          current_period_start: string
+          ended_at?: string | null
+          id?: string
+          plan_id: string
+          profile_id: string
+          status: Database["public"]["Enums"]["subscription_status"]
+          subscribed_at?: string
+          team_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          cancel_at_period_end?: boolean | null
+          canceled_at?: string | null
+          created_at?: string
+          current_period_end?: string
+          current_period_start?: string
+          ended_at?: string | null
+          id?: string
+          plan_id?: string
+          profile_id?: string
+          status?: Database["public"]["Enums"]["subscription_status"]
+          subscribed_at?: string
+          team_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "subscriptions_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "plans"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "subscriptions_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "subscriptions_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       tags: {
         Row: {
@@ -1702,6 +1823,14 @@ export type Database = {
       sentiment_enum: "good" | "moderate" | "bad" | "unknown"
       sentiment_level: "bad" | "moderate" | "good"
       sentiment_type: "bad" | "moderate" | "good"
+      subscription_status:
+        | "active"
+        | "trialing"
+        | "past_due"
+        | "canceled"
+        | "incomplete"
+        | "incomplete_expired"
+        | "unpaid"
       sync_status: "pending" | "completed" | "failed"
       task_status: "follow-up" | "meeting"
       team_role: "owner" | "admin" | "member"
@@ -1839,6 +1968,15 @@ export const Constants = {
       sentiment_enum: ["good", "moderate", "bad", "unknown"],
       sentiment_level: ["bad", "moderate", "good"],
       sentiment_type: ["bad", "moderate", "good"],
+      subscription_status: [
+        "active",
+        "trialing",
+        "past_due",
+        "canceled",
+        "incomplete",
+        "incomplete_expired",
+        "unpaid",
+      ],
       sync_status: ["pending", "completed", "failed"],
       task_status: ["follow-up", "meeting"],
       team_role: ["owner", "admin", "member"],
