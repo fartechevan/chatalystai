@@ -68,8 +68,6 @@ export async function createEvolutionInstance(
   instanceName: string,
   integrationId: string
 ): Promise<{success: boolean, instanceData?: CreateInstanceApiResponse, error?: string}> {
-  console.log(`[createEvolutionInstance] Attempting to create instance: ${instanceName} for integration: ${integrationId}`);
-
   try {
     const { apiKey, baseUrl } = await getEvolutionCredentials(integrationId);
     if (!apiKey || !baseUrl) {
@@ -77,7 +75,6 @@ export async function createEvolutionInstance(
     }
 
     const apiUrl = `${baseUrl}/instance/create`;
-    console.log(`[createEvolutionInstance] Calling API: ${apiUrl}`);
 
     // Construct body based on Postman collection v2.2.2
     const requestBody = {
@@ -86,7 +83,6 @@ export async function createEvolutionInstance(
       integration: "WHATSAPP-BAILEYS" // Optional, but explicitly setting default
       // Removed description and settings fields
     };
-    console.log("[createEvolutionInstance] Request Body:", JSON.stringify(requestBody));
 
 
     const response = await fetch(apiUrl, {
@@ -98,12 +94,10 @@ export async function createEvolutionInstance(
       body: JSON.stringify(requestBody),
     });
 
-    console.log(`[createEvolutionInstance] API Response Status: ${response.status}`);
     // Try to parse JSON regardless of status, as error details might be in the body
     let responseData: unknown; // Use unknown instead of any
     try {
         responseData = await response.json();
-        console.log("[createEvolutionInstance] API Response Data:", responseData);
     } catch (jsonError) {
         console.warn("[createEvolutionInstance] Failed to parse API response as JSON.", jsonError);
         // If JSON parsing fails, try to get text, but don't error out here yet
@@ -155,7 +149,6 @@ export async function createEvolutionInstance(
         // Decide if this should be treated as an error or just a warning
         // For now, let's proceed but log a warning. The connection step might fail later.
     } else {
-        console.log(`[createEvolutionInstance] Updating integrations_config with instanceId: ${instanceId}, token: ${token ? 'present' : 'missing'}`);
         const { error: updateError } = await supabase
             .from('integrations_config')
             .update({
@@ -171,8 +164,6 @@ export async function createEvolutionInstance(
             // Consider if this should throw an error or just be logged
             // Throwing might be better to indicate the full process wasn't successful
             throw new Error(`Failed to update configuration after instance creation: ${updateError.message}`);
-        } else {
-            console.log("[createEvolutionInstance] Successfully updated integrations_config.");
         }
     }
     // --- END: Update integrations_config ---

@@ -14,7 +14,6 @@ export async function checkInstanceStatus(
 ): Promise<ConnectionState> {
   // Removed optional token/baseUrl parameters as credentials should always be fetched via integrationId
   try {
-    console.log(`Checking status for instance: ${instanceName} (Integration: ${integrationId})`);
 
     if (!integrationId) {
         console.error("[checkInstanceStatus] Integration ID is required.");
@@ -30,7 +29,6 @@ export async function checkInstanceStatus(
 
     // Use instanceName in the endpoint URL
     const endpoint = `${baseUrl}/instance/connectionState/${instanceName}`;
-    console.log(`[checkInstanceStatus] Requesting URL: ${endpoint}`);
 
     const response = await fetch(endpoint, {
       method: 'GET',
@@ -48,8 +46,6 @@ export async function checkInstanceStatus(
 
     // Attempt to parse the response *only if response.ok*
     const data = await response.json();
-
-    console.log('[checkInstanceStatus] Success: Status', response.status, response.statusText, 'Headers:', Object.fromEntries(response.headers.entries()), 'Body:', data);
 
     // Map the response to a connection state
     let state: string | undefined = undefined;

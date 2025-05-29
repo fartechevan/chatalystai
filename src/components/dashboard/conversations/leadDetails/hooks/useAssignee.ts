@@ -33,7 +33,6 @@ export function useAssignee(profiles: Profile[], lead: Lead | null, customer?: C
           variant: "destructive"
         });
       } else {
-        console.log(`Updated lead ${lead.id} assignee to ${userId}`);
         
         const profileName = profiles.find(p => p.id === userId)?.name || "Selected user";
         toast({

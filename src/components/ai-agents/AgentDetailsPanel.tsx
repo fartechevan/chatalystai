@@ -311,7 +311,6 @@ const AgentDetailsPanel: React.FC<AgentDetailsPanelProps> = ({ selectedAgentId, 
          is_enabled: isEnabled,
          activation_mode: activationMode,
        };
-       console.log("Creating agent with data:", newAgentData);
        createMutation.mutate(newAgentData);
 
     } else if (selectedAgentId && selectedAgent) {
@@ -355,7 +354,6 @@ const AgentDetailsPanel: React.FC<AgentDetailsPanelProps> = ({ selectedAgentId, 
 
   const handleDelete = () => {
     if (selectedAgentId) {
-      console.log("Delete clicked for:", selectedAgentId);
       // TODO: Implement delete mutation
       // Call deleteAIAgent mutation here
       // On success, invalidate queries and call onAgentUpdate()

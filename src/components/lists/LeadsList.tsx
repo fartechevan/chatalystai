@@ -217,8 +217,7 @@ export function LeadsList() {
   };
 
   const handleViewDetails = (lead: Lead) => {
-    // Placeholder: Log details or implement navigation/panel opening
-    console.log("View Details:", lead);
+    // Placeholder for actual navigation or modal display
     toast({ title: "View Details", description: `Details for ${lead.name || lead.company_name} logged to console.` });
   };
 

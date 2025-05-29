@@ -15,7 +15,6 @@ interface LeadContactInfoProps {
 }
 
 export function LeadContactInfo({ customer, lead, isLoadingCustomer }: LeadContactInfoProps) { // Add to destructuring
-  // console.log("[Render LeadContactInfo] Props:", { customer, lead, isLoadingCustomer }); // Remove log
   const { toast } = useToast();
   const [isEditing, setIsEditing] = useState(false);
   // Remove internal state for companyName and companyAddress

@@ -426,7 +426,6 @@ export function ConversationStatsView() {
      queryKey: ['batchSentimentDetails', selectedBatchAnalysisId],
      queryFn: () => {
        if (!selectedBatchAnalysisId) return Promise.resolve([]);
-       console.log(`Fetching details for batch: ${selectedBatchAnalysisId}`); // Debug log
        return fetchBatchSentimentDetails(selectedBatchAnalysisId);
      },
      enabled: !!selectedBatchAnalysisId, // Fetch whenever a batch ID is selected
@@ -436,10 +435,8 @@ export function ConversationStatsView() {
    useEffect(() => {
      // Wait for both conversations and details to load before merging
      if (selectedBatchAnalysisId && initialConversationsData && selectedBatchConversationIds && batchDetailsData) {
-       console.log("Merging conversation data with details...");
        const batchConvIdsSet = new Set(selectedBatchConversationIds);
        const sentimentDetailsMap = new Map(batchDetailsData.map(d => [d.conversation_id, d]));
-       console.log(`Details map size: ${sentimentDetailsMap.size}`);
 
        const mergedConversations = initialConversationsData
          .filter(conv => batchConvIdsSet.has(conv.conversation_id))
@@ -456,7 +453,6 @@ export function ConversationStatsView() {
            } as AnalyzedConversation;
          });
 
-       console.log(`Merged conversations count: ${mergedConversations.length}`);
        setAnalyzedConversations(mergedConversations);
        // Reset selections when batch data changes
        setSelectedSentiment(null);
@@ -474,10 +470,8 @@ export function ConversationStatsView() {
    // Click handler for sentiment bars - Filters the merged conversations
    const handleSentimentClick = (sentiment: 'good' | 'moderate' | 'bad' | 'unknown') => {
      setSelectedSentiment(sentiment);
-     console.log(`Filtering for sentiment: ${sentiment}`);
      // Filter the already merged analyzedConversations state
      const filtered = analyzedConversations.filter(conv => conv.sentimentResult?.sentiment === sentiment);
-     console.log(`Filtered count: ${filtered.length}`);
      setFilteredSentimentConversations(filtered);
    };
 

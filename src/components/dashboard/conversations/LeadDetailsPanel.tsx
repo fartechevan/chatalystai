@@ -243,7 +243,6 @@ export function LeadDetailsPanel({
              <EmptyLeadState 
                conversationId={selectedConversation?.conversation_id || ''}
                onLeadCreated={async (leadId) => {
-                 // console.log("Lead created:", leadId); // Removed log
                  // Invalidate the conversations query to refetch conversations
                  await queryClient.invalidateQueries({ queryKey: ['conversations'] });
 

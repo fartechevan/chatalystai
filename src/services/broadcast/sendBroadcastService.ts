@@ -55,14 +55,12 @@ export const sendBroadcastService = async (params: SendBroadcastParams): Promise
     targetMode === 'segment' ? `segment ${segmentId}` :
     targetMode === 'csv' ? `${phoneNumbers?.length || 0} numbers from CSV` :
     `${customerIds?.length || 0} selected customers`;
-  console.log(`sendBroadcastService: Starting broadcast for ${targetDescription}, integration ${integrationId}, instance ${instanceId}`);
 
   // Credentials handled by sendTextService
 
   // --- 2. Setup Broadcast Tracking in DB ---
   let broadcastId: string;
   let validRecipients: RecipientInfo[] = [];
-  console.log("sendBroadcastService: Setting up broadcast tracking...");
   try {
     // Create Broadcast Record - Store the actual instanceId (UUID)
     const { data: broadcastData, error: broadcastInsertError } = await supabase
@@ -72,13 +70,11 @@ export const sendBroadcastService = async (params: SendBroadcastParams): Promise
       .single();
     if (broadcastInsertError) throw broadcastInsertError;
     broadcastId = broadcastData.id;
-    console.log(`sendBroadcastService: Created broadcast record ID: ${broadcastId}`);
 
     // Fetch target customers based on mode
     let validCustomers: CustomerInfo[] = [];
 
     if (targetMode === 'segment' && segmentId) {
-      console.log(`sendBroadcastService: Fetching contacts for segment ${segmentId}...`);
       const { data: segmentContactsData, error: segmentContactsError } = await supabase
         .from('segment_contacts')
         .select(`customers ( id, phone_number )`)
@@ -88,10 +84,8 @@ export const sendBroadcastService = async (params: SendBroadcastParams): Promise
       validCustomers = (segmentContactsData || [])
         .map(sc => sc.customers)
         .filter((c): c is CustomerInfo => c !== null && typeof c.phone_number === 'string' && c.phone_number.trim() !== '');
-      console.log(`sendBroadcastService: Found ${validCustomers.length} valid contacts in segment.`);
 
     } else if (targetMode === 'customers' && customerIds && customerIds.length > 0) {
-      console.log(`sendBroadcastService: Fetching details for ${customerIds.length} provided customer IDs...`);
       const { data: customersData, error: customerError } = await supabase
         .from("customers")
         .select("id, phone_number")
@@ -101,7 +95,6 @@ export const sendBroadcastService = async (params: SendBroadcastParams): Promise
       validCustomers = (customersData || []).filter(
         (c): c is CustomerInfo => typeof c.phone_number === 'string' && c.phone_number.trim() !== ''
       );
-      console.log(`sendBroadcastService: Found ${validCustomers.length} valid customers from provided IDs.`);
 
     }
     // NOTE: CSV mode handles recipient creation differently below
@@ -131,7 +124,6 @@ export const sendBroadcastService = async (params: SendBroadcastParams): Promise
             phone_number: r.phone_number,
             recipient_id: r.id // broadcast_recipients.id
         }));
-        console.log(`sendBroadcastService: Created ${validRecipients.length} recipient records for ${targetMode} mode.`);
     }
     // For CSV mode, recipient records are not created upfront as customer_id might be missing
 
@@ -141,7 +133,6 @@ export const sendBroadcastService = async (params: SendBroadcastParams): Promise
   }
 
   // --- 3. Send Messages using sendTextService & Update Status ---
-  console.log("sendBroadcastService: Starting message sending loop...");
   let successfulSends = 0;
   let failedSends = 0;
   let totalAttempted = 0;
@@ -158,7 +149,6 @@ export const sendBroadcastService = async (params: SendBroadcastParams): Promise
     let updatePayload: { status: string; error_message?: string | null; sent_at?: string | null } = { status: 'failed', error_message: null, sent_at: null };
 
     try {
-      console.log(`sendBroadcastService: Calling sendTextService for ${number}...`);
       await sendTextService({
           integrationId: integrationId,
           instance: instanceId,
@@ -167,7 +157,6 @@ export const sendBroadcastService = async (params: SendBroadcastParams): Promise
       });
       successfulSends++;
       updatePayload = { status: 'sent', sent_at: new Date().toISOString(), error_message: null };
-      console.log(`sendBroadcastService: Successfully sent to ${number}.`);
     } catch (error: unknown) {
       failedSends++;
       const errorMessage = error instanceof Error ? error.message : String(error);
@@ -194,7 +183,6 @@ export const sendBroadcastService = async (params: SendBroadcastParams): Promise
   }
 
   // --- 4. Finalize and Return Summary ---
-  console.log(`sendBroadcastService: Broadcast complete. Total Attempted: ${totalAttempted}, Success: ${successfulSends}, Failed: ${failedSends}`);
   // Optionally update the main broadcast record status
 
   return {

@@ -20,9 +20,7 @@ export function LeadDetailsInfo({
   lead, 
   isLoading // Represents isLoadingProfiles from parent
 }: LeadDetailsInfoProps) {
-  // console.log("[Render LeadDetailsInfo] Props:", { profiles, selectedAssignee, customer, lead, isLoading }); // Remove log
   const selectedProfile = profiles.find(profile => profile.id === selectedAssignee);
-  // console.log("[Render LeadDetailsInfo] Found selectedProfile:", selectedProfile); // Remove log
 
   return (
     <div className="p-4 space-y-6">

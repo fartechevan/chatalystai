@@ -27,8 +27,6 @@ export async function logoutWhatsAppInstance(
       return false;
   }
 
-  // console.log(`Attempting to log out instance ${instanceId} (Integration: ${integrationId})...`); // Removed log
-
   try {
     // 1. Fetch credentials
     const { apiKey, baseUrl } = await getEvolutionCredentials(integrationId);
@@ -47,7 +45,6 @@ export async function logoutWhatsAppInstance(
 
     // 4. Logout successful - API call succeeded (didn't throw)
     // Logging handled by ApiService if enabled.
-    // console.log(`logoutWhatsAppInstance: API call successful for instance ${instanceId}.`); // Removed log
 
     // 5. Clean up the integrations_config table (Keep this logic)
     const { error: dbError } = await supabase

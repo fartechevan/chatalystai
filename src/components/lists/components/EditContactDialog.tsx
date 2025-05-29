@@ -79,7 +79,6 @@ export function EditContactDialog({ contact, onContactUpdated, children }: EditC
 
       if (error) throw error;
 
-      console.log('Contact updated:', data);
       toast({
         title: "Contact Updated",
         description: `${name} has been updated successfully.`,
