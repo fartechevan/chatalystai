@@ -1,7 +1,7 @@
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { useState } from "react";
-import type { Integration } from "../../types";
+import type { Integration, PlanDetails } from "../../types"; // Import PlanDetails
 // import { WhatsAppCloudApiContent } from "./WhatsAppCloudApiContent"; // Removed
 import { usePipelinesList } from "@/hooks/usePipelinesList"; // Import pipeline hook
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"; // Import Select components
@@ -26,6 +26,8 @@ interface IntegrationTabsProps {
   onClose: () => void; // Keep for closing dialog
   open: boolean; // Add open state for the hook
   onOpenChange: (open: boolean) => void; // Add onOpenChange for the hook
+  currentPlan?: PlanDetails | null; // Add currentPlan prop
+  tenantId?: string | null; // Add tenantId prop
 }
 
 export function IntegrationTabs({
@@ -34,6 +36,8 @@ export function IntegrationTabs({
   onClose,
   open,
   onOpenChange,
+  currentPlan, // Destructure currentPlan
+  tenantId, // Destructure tenantId
 }: IntegrationTabsProps) {
   const [activeTab, setActiveTab] = useState<"settings" | "authorization">("settings");
   const [isClearing, setIsClearing] = useState(false);
@@ -70,7 +74,7 @@ export function IntegrationTabs({
     handleWebhookSetupComplete,
     // Need refetch function from the hook to update list after delete/logout
     refetch: refetchInstances, // Assuming the hook exposes a refetch function for instances
-  } = useIntegrationConnectionState(selectedIntegration, open); // Pass open state
+  } = useIntegrationConnectionState(selectedIntegration, open, tenantId); // Pass tenantId to the hook
 
   // --- End hook call ---
 

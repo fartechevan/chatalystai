@@ -13,9 +13,9 @@ declare global {
 
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import React, { useState } from "react";
-import type { Integration } from "../types";
+import type { Integration, PlanDetails } from "../types"; // Import PlanDetails
 import { useFacebookSDK } from "./hooks/useFacebookSDK";
-import { QRCodeScreen } from "./components/QRCodeScreen";
+// import { QRCodeScreen } from "./components/QRCodeScreen"; // File does not exist
 import { DeviceSelect } from "./components/DeviceSelect";
 import { IntegrationTabs } from "./components/IntegrationTabs";
 import { DialogMain } from "./components/DialogMain";
@@ -24,16 +24,21 @@ import { Button } from "@/components/ui/button";
 import { WebhookSetupForm } from "./components/WebhookSetupForm";
 // import { EvolutionInstance, ConnectionState } from "@/integrations/evolution-api/types"; // Remove type imports if not needed here
 
+// Assuming PlanDetails might be needed by the dialog or its children for validation/display
 interface IntegrationDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void; // Changed signature back
   selectedIntegration: Integration | null;
+  currentPlan?: PlanDetails | null; // Add currentPlan prop
+  tenantId?: string | null; // Add tenantId prop
 }
 
 export function IntegrationDialog({
   open,
   onOpenChange,
   selectedIntegration,
+  currentPlan, // Destructure currentPlan
+  tenantId, // Destructure tenantId
 }: IntegrationDialogProps) {
   const { handleConnectWithFacebook } = useFacebookSDK();
 
@@ -68,6 +73,8 @@ export function IntegrationDialog({
             // liveConnectionState={connectionState as ConnectionState}
             open={open} // Pass open state if needed by the hook inside IntegrationTabs
             onOpenChange={onOpenChange} // Pass onOpenChange if needed by the hook inside IntegrationTabs
+            currentPlan={currentPlan} // Pass currentPlan to IntegrationTabs
+            tenantId={tenantId} // Pass tenantId to IntegrationTabs
           />
         </div>
 
