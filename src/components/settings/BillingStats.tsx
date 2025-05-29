@@ -33,6 +33,7 @@ interface Plan {
   price: number;
   messages_per_month: number | null;
   token_allocation: number | null;
+  integrations_allowed: number | null; // Added this line
   features: Json | null; 
   owner_id: string | null;
   team_id: string | null;
@@ -335,6 +336,9 @@ export function BillingStats() {
                   <ul className="space-y-1 text-sm text-muted-foreground">
                     {plan.messages_per_month && <li>Up to {plan.messages_per_month.toLocaleString()} messages/month</li>}
                     {plan.token_allocation && <li>{plan.token_allocation.toLocaleString()} tokens/month</li>}
+                    {plan.name === 'Trial' && <li>1 Integration</li>}
+                    {plan.name === 'Starter' && <li>3 Integrations</li>}
+                    {plan.name === 'Professional' && <li>10 Integrations</li>}
                     {plan.features && Array.isArray(plan.features) && plan.features.map((feature, index) => (
                       <li key={index} className="flex items-center">
                         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-2 text-green-500"><polyline points="20 6 9 17 4 12"></polyline></svg>
