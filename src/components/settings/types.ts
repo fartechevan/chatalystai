@@ -23,3 +23,15 @@ export interface Integration {
 
 // Define the connection state type to include 'unknown', 'qrcode', and 'pairingCode'
 export type ConnectionState = 'idle' | 'connecting' | 'open' | 'close' | 'unknown' | 'qrcode' | 'pairingCode';
+
+// Define a type for plan details, including integration limits
+// This might require Json type from '@/types/supabase' if integration_limits is truly dynamic Json
+// For now, using Record for more specific structure.
+export interface PlanDetails {
+  id: string;
+  name: string;
+  integrations_allowed?: number | null; // Total number of integration instances allowed by the plan
+  max_integrations?: number | null; // Potentially for distinct integration *types* - needs clarification if different from integrations_allowed
+  integration_limits?: Record<string, number | null> | null; // Specific limits for instances of a certain integration type, e.g., { "WhatsApp": 2, "Telegram": 1 }
+  // Add other plan fields as necessary
+}
