@@ -2,11 +2,11 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { useState } from "react";
 import type { Integration } from "../../types";
-import { WhatsAppCloudApiContent } from "./WhatsAppCloudApiContent";
+// import { WhatsAppCloudApiContent } from "./WhatsAppCloudApiContent"; // Removed
 import { usePipelinesList } from "@/hooks/usePipelinesList"; // Import pipeline hook
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"; // Import Select components
 import { Label } from "@/components/ui/label"; // Import Label
-import { WhatsAppAuthorizationContent } from "./WhatsAppAuthorizationContent";
+// import { WhatsAppAuthorizationContent } from "./WhatsAppAuthorizationContent"; // Removed
 // import { WhatsAppBusinessSettings } from "./WhatsAppBusinessSettings"; // Remove unused import
 import { WhatsAppBusinessAuthorization } from "./WhatsAppBusinessAuthorization";
 import { useToast } from "@/hooks/use-toast";
@@ -234,23 +234,11 @@ export function IntegrationTabs({
         <TabsTrigger value="authorization" className="flex-1">Authorization</TabsTrigger>
       </TabsList>
 
-      {/* Render the content based on selected integration */}
-      {selectedIntegration?.name === "WhatsApp Cloud API" ? (
-        <>
-          <TabsContent value="settings" className="space-y-6 h-96">
-            <WhatsAppCloudApiContent handleConnectWithFacebook={handleConnectWithFacebook} />
-          </TabsContent>
-
-          <TabsContent value="authorization">
-            <WhatsAppAuthorizationContent />
-          </TabsContent>
-        </>
-      ) : (
-        // --- Render content for other WhatsApp types (Evolution API) ---
-        <>
-          <TabsContent value="settings" className="space-y-6 h-96 overflow-y-auto"> {/* Added overflow */}
-            {/* --- Conditional Rendering Logic (Moved from WhatsAppBusinessSettings) --- */}
-            {(() => {
+      {/* --- Render content for WhatsApp types (Evolution API) --- */}
+      <>
+        <TabsContent value="settings" className="space-y-6 h-96 overflow-y-auto"> {/* Added overflow */}
+          {/* --- Conditional Rendering Logic (Moved from WhatsAppBusinessSettings) --- */}
+          {(() => {
               // Loading State
               if (isLoading || isFetchingInstances) {
                 return (
@@ -511,7 +499,7 @@ export function IntegrationTabs({
             <WhatsAppBusinessAuthorization selectedIntegration={selectedIntegration} />
           </TabsContent>
         </>
-      )}
+      {/* Removed the closing parenthesis of the ternary operator that is no longer needed */}
 
       <div className="mt-6 flex justify-end gap-2">
         <AlertDialog>
