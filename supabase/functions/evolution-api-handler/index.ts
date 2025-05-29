@@ -183,10 +183,29 @@ serve(async (req: Request) => { // Add Request type
         .single();
 
       // Extract nested data and check for existence
-      const configData = instanceData?.integrations_config as { instance_display_name: string } | null; // Type assertion
-      const instanceNameForApi = configData?.instance_display_name;
+      const rawIntegrationsConfig = instanceData?.integrations_config;
+      let configFirstElement: { instance_display_name: string } | undefined = undefined;
+
+      if (rawIntegrationsConfig) {
+        if (Array.isArray(rawIntegrationsConfig) && rawIntegrationsConfig.length > 0) {
+          configFirstElement = rawIntegrationsConfig[0] as { instance_display_name: string };
+        } else if (typeof rawIntegrationsConfig === 'object' && !Array.isArray(rawIntegrationsConfig) && rawIntegrationsConfig !== null) {
+          // If it's an object and not an array (and not null), treat it as the element.
+          configFirstElement = rawIntegrationsConfig as { instance_display_name: string };
+        }
+      }
+      const instanceNameForApi = configFirstElement?.instance_display_name;
       const apiKey = instanceData?.api_key;
       const baseUrl = instanceData?.base_url;
+
+      // ---- START DEBUG LOGS (adjusted) ----
+      console.log(`Action: send-text - DEBUG: Raw instanceData for ID ${instanceId}:`, JSON.stringify(instanceData, null, 2));
+      console.log(`Action: send-text - DEBUG: Extracted apiKey: "${apiKey}" (Type: ${typeof apiKey})`);
+      console.log(`Action: send-text - DEBUG: Extracted baseUrl: "${baseUrl}" (Type: ${typeof baseUrl})`);
+      console.log(`Action: send-text - DEBUG: Raw value of instanceData.integrations_config:`, JSON.stringify(rawIntegrationsConfig, null, 2));
+      console.log(`Action: send-text - DEBUG: Processed configFirstElement:`, JSON.stringify(configFirstElement, null, 2));
+      console.log(`Action: send-text - DEBUG: Extracted instanceNameForApi: "${instanceNameForApi}" (Type: ${typeof instanceNameForApi})`);
+      // ---- END DEBUG LOGS ----
 
       if (instanceError || !instanceData || !apiKey || !baseUrl || !instanceNameForApi) {
          const errorMsg = instanceError?.message || "Instance not found or missing required fields (instance_display_name from config, api_key, base_url).";
