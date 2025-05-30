@@ -1,8 +1,8 @@
-
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Tag, Loader2 } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Tag, Loader2, X as XIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 interface LeadTagsProps {
@@ -51,22 +51,22 @@ export function LeadTags({ tags, setTags, onAddTag, onRemoveTag, isLoading = fal
 
   return (
     <div className="space-y-2">
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap gap-2 items-center">
         {tags.length > 0 ? (
           tags.map((tag, index) => (
-            <div key={index} className="flex items-center gap-1 bg-muted rounded-md px-2 py-1 text-xs">
-              <span>{tag}</span>
+            <Badge key={index} variant="secondary" className="text-xs font-normal">
+              {tag}
               <button 
                 onClick={() => handleRemoveTag(tag)}
-                className="text-muted-foreground hover:text-foreground"
+                className="ml-1.5 -mr-0.5 p-0.5 rounded-full hover:bg-destructive/20 text-destructive opacity-70 hover:opacity-100"
                 aria-label={`Remove ${tag} tag`}
               >
-                &times;
+                <XIcon className="h-3 w-3" />
               </button>
-            </div>
+            </Badge>
           ))
         ) : (
-          <div className="text-xs text-muted-foreground">No tags yet</div>
+          <p className="text-xs text-muted-foreground italic">No tags yet</p>
         )}
       </div>
       

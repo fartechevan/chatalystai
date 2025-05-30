@@ -11,7 +11,7 @@ import { useMediaQuery } from "@/hooks/use-media-query";
 
 export function LeadsLayout() {
   const [selectedPipelineId, setSelectedPipelineId] = useState<string | null>(null);
-  const [isCollapsed, setIsCollapsed] = useState(false);
+  // const [isCollapsed, setIsCollapsed] = useState(false); // Removed isCollapsed state
   const [isMobileDrawerOpen, setIsMobileDrawerOpen] = useState(false);
   const isDesktop = useMediaQuery("(min-width: 768px)"); // md breakpoint
 
@@ -22,16 +22,16 @@ export function LeadsLayout() {
     }
   };
 
-  const handleCollapseToggle = () => {
-    setIsCollapsed(!isCollapsed);
-  };
+  // const handleCollapseToggle = () => { // Removed handleCollapseToggle
+  //   setIsCollapsed(!isCollapsed);
+  // };
 
   const sidebarContent = (
     <LeadsSidebar
       selectedPipelineId={selectedPipelineId}
       onPipelineSelect={handlePipelineSelect}
-      isCollapsed={isDesktop ? isCollapsed : false} // Sidebar is never collapsed in mobile drawer view
-      onCollapse={handleCollapseToggle}
+      // isCollapsed prop removed
+      // onCollapse prop removed
     />
   );
 
@@ -56,16 +56,16 @@ export function LeadsLayout() {
 
       {/* Desktop Sidebar */}
       <div className={cn(
-        "hidden md:flex", // Show only on md and up
-        isCollapsed ? "w-16" : "w-48", // Width controlled by collapse state
-        "transition-all duration-300"
+        "hidden md:flex w-48", // Show only on md and up, fixed width
+        // isCollapsed ? "w-16" : "w-48", // Width controlled by collapse state - REMOVED
+        "transition-all duration-300" // Transition might not be needed if width is fixed
       )}>
         {sidebarContent}
       </div>
 
       {/* Main Content Area */}
       {/* Removed overflow-hidden to let child components manage scrolling */}
-      <div className="flex-1 flex flex-col"> 
+      <div className="flex-1 flex flex-col">
         <LeadsContent pipelineId={selectedPipelineId} />
       </div>
     </div>
