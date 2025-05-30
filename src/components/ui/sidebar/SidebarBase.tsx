@@ -27,7 +27,7 @@ export const SidebarBase = React.forwardRef<HTMLDivElement, SidebarBaseProps>(
       return (
         <div
           className={cn(
-            "flex h-full w-[--sidebar-width] flex-col bg-sidebar text-sidebar-foreground",
+            "flex h-full w-[--sidebar-width] flex-col bg-background text-foreground border-r", // Reverted to light bg, dark text, added border
             className
           )}
           ref={ref}
@@ -44,10 +44,10 @@ export const SidebarBase = React.forwardRef<HTMLDivElement, SidebarBaseProps>(
           <SheetContent
              data-sidebar="sidebar"
              data-mobile="true"
-             className="w-[--sidebar-width] bg-white p-0 text-gray-900 [&>button]:hidden" // Changed bg-sidebar to bg-white and text color
+             className="w-[--sidebar-width] bg-background p-0 text-foreground [&>button]:hidden" // Reverted to light bg, dark text for mobile
              style={
                {
-                "--sidebar-width": "20rem", // Increased width for mobile
+                "--sidebar-width": "16rem", // Adjusted mobile width
               } as React.CSSProperties
             }
             side={side}
@@ -61,15 +61,15 @@ export const SidebarBase = React.forwardRef<HTMLDivElement, SidebarBaseProps>(
     return (
       <div
         ref={ref}
-        className="group peer hidden md:block text-sidebar-foreground"
+        className="group peer hidden md:block text-foreground" // Changed text-sidebar-foreground to text-foreground
         data-state={state}
         data-collapsible={state === "collapsed" ? collapsible : ""}
         data-variant={variant}
         data-side={side}
         style={
           {
-            "--sidebar-width": "9rem",
-            "--sidebar-width-icon": "11rem",
+            "--sidebar-width": "16rem", // Adjusted expanded width
+            "--sidebar-width-icon": "4.5rem", // Adjusted collapsed width
           } as React.CSSProperties
         }
       >
@@ -98,7 +98,7 @@ export const SidebarBase = React.forwardRef<HTMLDivElement, SidebarBaseProps>(
         >
           <div
             data-sidebar="sidebar"
-            className="flex h-full w-full flex-col bg-sidebar group-data-[variant=floating]:rounded-lg group-data-[variant=floating]:border group-data-[variant=floating]:border-sidebar-border group-data-[variant=floating]:shadow bg-[#333333]" // Updated background color
+            className="flex h-full w-full flex-col bg-background text-foreground group-data-[variant=floating]:rounded-lg group-data-[variant=floating]:border group-data-[variant=floating]:border-border group-data-[variant=floating]:shadow rounded-r-lg" // Re-added rounded-r-lg for card-like feel on docked sidebar
           >
             {children}
           </div>

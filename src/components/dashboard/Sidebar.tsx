@@ -24,20 +24,20 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Button } from "@/components/ui/button";
+// Button import removed as it's no longer used for the hamburger menu here
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { useAuth } from "@/components/auth/AuthProvider";
 
-type MenuItem = {
+export type MenuItem = {
   title: string;
   icon: React.ElementType;
   path: string;
   badge?: number;
 };
 
-const menuItems: MenuItem[] = [
+export const menuItems: MenuItem[] = [
   { title: "Dashboard", icon: Home, path: "/dashboard" },
   { title: "Leads", icon: Target, path: "/dashboard/leads" },
   { title: "Chat", icon: MessageSquare, path: "/dashboard/conversations" },
@@ -55,7 +55,7 @@ const menuItems: MenuItem[] = [
 export function DashboardSidebar() {
   const location = useLocation();
   const navigate = useNavigate();
-  const { toggleSidebar, setOpenMobile, isMobile } = useSidebar(); // Get setOpenMobile and isMobile
+  const { toggleSidebar, setOpenMobile, isMobile, state } = useSidebar(); // Get setOpenMobile, isMobile, and state
   const { user } = useAuth();
 
   const handleLinkClick = () => {
@@ -88,18 +88,12 @@ export function DashboardSidebar() {
 
   return (
     <>
-      <Button
-        variant="ghost"
-        size="icon"
-        className="fixed top-4 left-4 z-50 md:hidden" // Reverted z-index to z-50
-        onClick={toggleSidebar}
-      >
-        <Menu className="h-5 w-5" />
-      </Button>
+      {/* Hamburger menu button removed, now handled in DashboardLayout.tsx */}
       {/* Apply primary background and secondary text for base sidebar style */}
-      <Sidebar collapsible="icon" className="bg-primary text-secondary"> 
-        <SidebarContent>
-          <div className="px-2 py-2">
+      <Sidebar collapsible="icon" variant="floating"> {/* Set variant to floating */}
+        <SidebarContent className="ml-2"> {/* Added ml-2 for left indent */}
+          {/* Restored p-2 to this div, as it represents a content group inside the card */}
+          <div className="p-2"> 
             {menuItems.map((item) => (
               <SidebarMenuButton
                 key={item.title}
@@ -107,15 +101,15 @@ export function DashboardSidebar() {
                 isActive={location.pathname === item.path}
                   tooltip={item.title}
                   className={cn(
-                    "relative w-full",
+                    "relative w-full", // Removed pl-3, relying on default p-2 from SidebarMenuButton variant
                     location.pathname === item.path 
-                      ? "bg-secondary text-secondary-foreground" // Active: Light teal bg, dark teal text
-                      : "text-secondary hover:bg-primary hover:text-primary-foreground" // Inactive: Light teal text, hover white text
+                      ? "bg-muted text-accent-foreground" // Active: Muted bg, Accent text
+                      : "text-foreground hover:bg-accent/10" // Inactive: Default text, subtle accent hover
                   )}
                 >
                   <Link 
                   to={item.path} 
-                  className="flex items-center gap-3"
+                  className="flex items-center gap-2" // Changed gap-3 to gap-2
                   onClick={handleLinkClick} // Add onClick handler
                 >
                   <item.icon className="h-5 w-5" />
@@ -130,20 +124,22 @@ export function DashboardSidebar() {
             ))}
           </div>
 
-          <div className="mt-auto px-2 pb-4">
+          {/* Restored p-2 to this div */}
+          <div className="mt-auto p-2"> 
+            {/* Desktop collapse/expand button removed, now handled in DashboardLayout.tsx */}
              <SidebarMenuButton
                asChild
                 tooltip="Profile"
                   className={cn(
-                    "w-full",
+                    "w-full", // Removed pl-3
                     location.pathname === "/dashboard/profile" 
-                      ? "bg-secondary text-secondary-foreground" // Active: Light teal bg, dark teal text
-                      : "text-secondary hover:bg-primary hover:text-primary-foreground" // Inactive: Light teal text, hover white text
+                      ? "bg-muted text-accent-foreground" // Active: Muted bg, Accent text
+                      : "text-foreground hover:bg-accent/10" // Inactive: Default text, subtle accent hover
                   )}
                 >
                   <Link 
                   to="/dashboard/profile" 
-                  className="flex items-center gap-3"
+                  className="flex items-center gap-2" // Changed gap-3 to gap-2
                   onClick={handleLinkClick} // Add onClick handler
                 >
                   <UserRound className="h-5 w-5" />
@@ -155,9 +151,9 @@ export function DashboardSidebar() {
                 tooltip="Logout"
                 onClick={handleLogout}
                  // Apply inactive styling logic
-                className="w-full text-secondary hover:bg-primary hover:text-primary-foreground mt-2"
+                className="w-full text-foreground hover:bg-accent/10 mt-2" // Removed pl-3
               >
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2"> {/* Changed gap-3 to gap-2 */}
                   <LogOut className="h-5 w-5" />
                 <span className="text-sm">Logout</span>
               </div>

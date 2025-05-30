@@ -1,8 +1,8 @@
 
 import { useState, useEffect } from "react";
-import { Loader2 } from "lucide-react"; // Removed User icon, kept Loader2 for summary
-import { UseMutationResult } from "@tanstack/react-query"; // Removed useMutation, useQueryClient
-// Removed toast, supabase, Button imports
+import { Loader2, MessagesSquare } from "lucide-react"; // Added MessagesSquare
+import { UseMutationResult } from "@tanstack/react-query";
+import { Button } from "@/components/ui/button"; // Added Button import
 
 import type { Conversation, Message as MessageType } from "./types";
 import { ConversationHeader } from "./ConversationHeader";
@@ -20,6 +20,9 @@ interface ConversationMainAreaProps {
   summarizeMutation: UseMutationResult<unknown, Error, unknown, unknown>; // Changed any to unknown
   summary: string | undefined;
   summaryTimestamp: string | undefined;
+  isDesktop?: boolean; // Added isDesktop prop
+  partnerName?: string; // Added partnerName prop
+  onOpenLeadDetails?: () => void; // Added prop to trigger lead details drawer
 }
 
 export function ConversationMainArea({
@@ -33,6 +36,9 @@ export function ConversationMainArea({
   summarizeMutation,
   summary,
   summaryTimestamp,
+  isDesktop, // Destructured isDesktop
+  partnerName, // Destructured partnerName
+  onOpenLeadDetails, // Destructured prop
 }: ConversationMainAreaProps) {
   // Removed derivedCustomerId state, queryClient, useEffect for customer ID,
   // createLeadMutation, and handleCreateLead function.
@@ -51,7 +57,11 @@ export function ConversationMainArea({
     >
       {selectedConversation ? (
         <>
-          <ConversationHeader conversation={selectedConversation} />
+          <ConversationHeader 
+            conversation={selectedConversation} 
+            partnerName={partnerName} 
+            onOpenLeadDetails={onOpenLeadDetails} // Pass prop to header
+          />
           
           <MessageList 
             messages={messages} 
@@ -79,9 +89,20 @@ export function ConversationMainArea({
           )}
         </>
       ) : (
-        <div className="text-center p-6">
-          <h2 className="text-xl font-semibold mb-2">Select a conversation</h2>
-          <p className="text-muted-foreground">Choose a conversation from the list to start chatting</p>
+        <div className="flex-1 flex flex-col items-center justify-center text-center p-6">
+          <div className="border-border flex size-16 items-center justify-center rounded-full border-2 mb-4">
+            <MessagesSquare className="size-8 text-muted-foreground" />
+          </div >
+          <h1 className="text-xl font-semibold mb-1">Your messages</h1>
+          <p className="text-muted-foreground text-sm mb-4">Send a message to start a chat.</p>
+          {/* The button below might trigger opening the conversation list on mobile, or be a general CTA */}
+          {/* For now, it's a visual placeholder based on the reference */}
+          <Button 
+            onClick={() => { /* TODO: Define action, e.g., open convo list on mobile */ }}
+            className="bg-blue-500 hover:bg-blue-600 text-white"
+          >
+            Send message
+          </Button>
         </div>
       )}
     </div>
