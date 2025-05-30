@@ -14,7 +14,12 @@ export const HeaderSecondaryActionSlot: React.FC = () => {
   // Show if node exists AND (it's segments page OR it's contacts page)
   // Or, if you want it to show on any page that sets a secondaryActionNode, remove page checks:
   // if (!secondaryActionNode) { return null; }
-  if (!secondaryActionNode || !(isSegmentsPage || isContactsPage)) {
+  // if (!secondaryActionNode || !(isSegmentsPage || isContactsPage)) { // Original condition
+  //   return null;
+  // }
+
+  // Show on any page if secondaryActionNode is set
+  if (!secondaryActionNode) {
     return null;
   }
 

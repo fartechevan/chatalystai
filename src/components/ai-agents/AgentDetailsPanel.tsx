@@ -779,7 +779,7 @@ const AgentDetailsPanel: React.FC<AgentDetailsPanelProps> = ({ selectedAgentId, 
         <Button variant="outline" size="icon" onClick={onNavigateBack} aria-label="Back to list">
           <ArrowLeft className="h-4 w-4" />
         </Button>
-        <CardTitle className="flex-grow">{isCreating ? 'Create New Agent' : (isLoadingAgent ? 'Loading...' : `Agent: ${selectedAgent?.name ?? ''}`)}</CardTitle>
+        <CardTitle className="flex-grow">{isCreating ? 'Create New Agent' : (isLoadingAgent ? 'Loading...' : `${selectedAgent?.name ?? ''}`)}</CardTitle>
       </CardHeader>
 
       {/* Main Content Area */}
