@@ -1,39 +1,37 @@
-
 import { useState } from "react";
+import { useOutletContext } from "react-router-dom";
 import { GetStartedView } from "@/components/dashboard/getting-started/GetStartedView";
-import { MainDashboardSidebar } from "@/components/dashboard/MainDashboardSidebar";
 import { DashboardAnalytics } from "@/components/dashboard/DashboardAnalytics";
 import { useAuthUser } from "@/hooks/useAuthUser";
+import { PageHeaderContextType, TabValue } from "@/components/dashboard/DashboardLayout"; // Import context type and TabValue
 
 export default function Main() {
   const [timeFilter, setTimeFilter] = useState<'today' | 'yesterday' | 'week' | 'month'>('month');
   const [userFilter, setUserFilter] = useState<string>('all');
-  const [selectedPanel, setSelectedPanel] = useState<'getting-started' | 'analytics'>('getting-started');
   const { userData } = useAuthUser();
+  
+  // Consume activeTab from context
+  const { activeTab } = useOutletContext<PageHeaderContextType>();
+
+  // Tab bar is now removed from here and managed in DashboardLayout
 
   return (
-    <div className="flex flex-1 h-full">
-      <div className="w-64 min-w-[200px] border-r bg-muted/30">
-        <MainDashboardSidebar
-          selectedPanel={selectedPanel}
-          onSelect={setSelectedPanel}
+    // Removed the outer div that contained the tab bar
+    // The main content area will now fill the space provided by DashboardLayout's <main>
+    <div className="flex-1 bg-transparent h-full overflow-auto"> {/* Ensure this div takes up available space */}
+      {activeTab === "overview" && (
+        <div className="h-full">
+          <GetStartedView userData={userData} />
+        </div>
+      )}
+      {activeTab === "analytics" && (
+        <DashboardAnalytics
+          timeFilter={timeFilter}
+          userFilter={userFilter}
+          onTimeChange={setTimeFilter}
+          onUserChange={setUserFilter}
         />
-      </div>
-      <div className="flex-1 bg-transparent h-full overflow-auto">
-        {selectedPanel === "getting-started" && (
-          <div className="h-full">
-            <GetStartedView userData={userData} />
-          </div>
-        )}
-        {selectedPanel === "analytics" && (
-          <DashboardAnalytics
-            timeFilter={timeFilter}
-            userFilter={userFilter}
-            onTimeChange={setTimeFilter}
-            onUserChange={setUserFilter}
-          />
-        )}
-      </div>
+      )}
     </div>
   );
 }

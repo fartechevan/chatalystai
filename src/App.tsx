@@ -26,6 +26,7 @@ import Profile from "./pages/Profile";
 import BroadcastsPage from "./pages/Broadcasts"; // Import the actual Broadcasts page
 import BroadcastDetailsView from "./components/broadcasts/BroadcastDetailsView"; // Import the details view
 import AIAgentsPage from "./pages/AIAgents"; // Import the new AI Agents page
+import MultiAIAgents from "./pages/MultiAIAgents"; // Import the new Multi AI Agents page
 import TeamsPage from "./pages/Teams"; // Import Teams page
 import ContactsPage from "@/pages/ContactsPage"; // Import Contacts page using @ alias
 import SegmentsPage from "./pages/SegmentsPage"; // Import Segments page
@@ -85,6 +86,7 @@ const App = () => {
                     <Route path="mail" element={<ComingSoon />} />
                     <Route path="knowledge" element={<KnowledgeBase />} />
                     <Route path="ai-agents" element={<AIAgentsPage />} /> {/* Add AI Agents route */}
+                    <Route path="multi-ai-agents" element={<MultiAIAgents />} /> {/* Add Multi AI Agents route */}
                     <Route path="teams" element={<TeamsPage />} /> {/* Add Teams route */}
                     <Route path="contacts" element={<ContactsPage />} /> {/* Add Contacts route */}
                     <Route path="segments" element={<SegmentsPage />} /> {/* Add Segments route */}

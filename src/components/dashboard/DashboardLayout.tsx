@@ -27,8 +27,12 @@ import { useQueryClient } from "@tanstack/react-query";
 // import { DashboardAnalytics } from "./DashboardAnalytics";
 import React, { useState, useEffect } from "react"; // Import React for useState
 
+export type TabValue = "overview" | "analytics";
+
 export interface PageHeaderContextType {
   setHeaderActions: React.Dispatch<React.SetStateAction<React.ReactNode | null>>;
+  activeTab: TabValue;
+  setActiveTab: React.Dispatch<React.SetStateAction<TabValue>>;
 }
 
 // Define a new internal component for the header content
@@ -41,6 +45,9 @@ const DashboardHeaderContent: React.FC<{
   onShowCreateDialog: () => void;
   toggleSidebar: () => void; // Added toggleSidebar
   sidebarState: string; // Added sidebarState
+  activeTab: TabValue; // Added activeTab
+  setActiveTab: React.Dispatch<React.SetStateAction<TabValue>>; // Added setActiveTab
+  isDashboardPage: boolean; // To conditionally show tabs
 }> = ({
   pageTitle,
   isKnowledgeBasePage,
@@ -50,8 +57,15 @@ const DashboardHeaderContent: React.FC<{
   onShowCreateDialog,
   toggleSidebar, // Added toggleSidebar
   sidebarState, // Added sidebarState
+  activeTab, // Added activeTab
+  setActiveTab, // Added setActiveTab
+  isDashboardPage, // To conditionally show tabs
 }) => {
   const { headerNavNode, setIsBatchDateRangeDialogOpen } = usePageActionContext(); // Now called within a child of PageActionProvider
+
+  const tabCommonClass = "inline-flex h-[calc(100%-1px)] flex-1 items-center justify-center gap-1.5 rounded-md border border-transparent px-2 py-1 text-sm font-medium whitespace-nowrap transition-[color,box-shadow] focus-visible:ring-[3px] focus-visible:outline-1 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:shadow-sm [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4";
+  const activeTabClass = "data-[state=active]:bg-background dark:data-[state=active]:text-foreground focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:outline-ring dark:data-[state=active]:border-input dark:data-[state=active]:bg-input/30 text-foreground";
+  const inactiveTabClass = "text-foreground dark:text-muted-foreground";
 
   return (
     <header className="flex h-14 items-center gap-4 border-b bg-background px-4 lg:h-[60px] lg:px-6">
@@ -75,13 +89,47 @@ const DashboardHeaderContent: React.FC<{
         <PanelLeft className={cn("h-5 w-5", sidebarState === "collapsed" && "rotate-180")} />
         <span className="sr-only">Toggle sidebar</span>
       </Button>
-      <HeaderBreadcrumbSlot />
-      <ConditionalPageTitle pageTitle={pageTitle} />
-      {headerNavNode && <div className="flex items-center gap-2 ml-4">{headerNavNode}</div>}
-      
-      <div className="ml-auto flex items-center gap-4 md:gap-2 lg:gap-4">
+  <HeaderBreadcrumbSlot />
+  <ConditionalPageTitle pageTitle={pageTitle} />
+  {headerNavNode && <div className="flex items-center gap-2 ml-4">{headerNavNode}</div>}
+
+  {/* Tab Bar - Conditionally rendered for /dashboard path */}
+  {isDashboardPage && (
+    <div className="flex items-center ml-4"> {/* Added flex items-center and margin */}
+      <div
+        role="tablist"
+        aria-orientation="horizontal"
+        className="bg-muted text-muted-foreground inline-flex h-9 w-fit items-center justify-center rounded-lg p-[3px]"
+        tabIndex={0}
+        style={{ outline: "none" }}
+      >
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeTab === "overview"}
+          data-state={activeTab === "overview" ? "active" : "inactive"}
+          onClick={() => setActiveTab("overview")}
+          className={cn(tabCommonClass, activeTab === "overview" ? activeTabClass : inactiveTabClass)}
+        >
+          Overview
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={activeTab === "analytics"}
+          data-state={activeTab === "analytics" ? "active" : "inactive"}
+          onClick={() => setActiveTab("analytics")}
+          className={cn(tabCommonClass, activeTab === "analytics" ? activeTabClass : inactiveTabClass)}
+        >
+          Analytics
+        </button>
+      </div>
+    </div>
+  )}
+  
+  <div className="ml-auto flex items-center gap-4 md:gap-2 lg:gap-4">
         <HeaderSettingsSearchInput />
-        {isStatsPage && (
+        {isStatsPage && !isDashboardPage && ( // Ensure this button doesn't show if tabs are already handling analytics
           <Button onClick={() => setIsBatchDateRangeDialogOpen(true)} size="sm">
             <PlusCircle className="mr-2 h-4 w-4" />
             New Batch Analysis
@@ -124,6 +172,7 @@ export function DashboardLayout() {
   const [headerActions, setHeaderActions] = useState<React.ReactNode | null>(null);
   const [showImportForm, setShowImportForm] = useState(false);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [activeTab, setActiveTab] = useState<TabValue>("overview"); // Moved tab state here
 
   // headerNavNode is now consumed by DashboardHeaderContent
 
@@ -154,7 +203,8 @@ export function DashboardLayout() {
   };
 
   const isKnowledgeBasePage = location.pathname.startsWith("/dashboard/knowledge");
-  const isStatsPage = location.pathname === "/dashboard/stats"; // Check if it's the stats page
+  const isStatsPage = location.pathname === "/dashboard/stats"; 
+  const isDashboardPage = location.pathname === "/dashboard" || location.pathname === "/dashboard/"; // Check if it's the main dashboard page
 
   const getCurrentTitle = () => {
     const { pathname } = location;
@@ -209,10 +259,19 @@ export function DashboardLayout() {
   };
 
   const pageTitle = getCurrentTitle();
-  // const [activeTab, setActiveTab] = React.useState("overview"); // activeTab state is no longer needed
   // Dummy state for DashboardAnalytics props - replace with actual state management if needed
   // const [timeFilter, setTimeFilter] = React.useState<'today' | 'yesterday' | 'week' | 'month'>('month'); // timeFilter state is no longer needed
   // const [userFilter, setUserFilter] = React.useState('all'); // userFilter state is no longer needed
+
+  // Effect to switch tab if navigating directly to /dashboard/stats
+  useEffect(() => {
+    if (location.pathname === "/dashboard/stats") {
+      setActiveTab("analytics");
+    } else if (location.pathname === "/dashboard" || location.pathname === "/dashboard/") {
+      setActiveTab("overview");
+    }
+  }, [location.pathname]);
+
 
   return (
     <PageActionProvider>
@@ -222,15 +281,18 @@ export function DashboardLayout() {
           <DashboardHeaderContent
             pageTitle={pageTitle}
             isKnowledgeBasePage={isKnowledgeBasePage}
-            isStatsPage={isStatsPage} // Pass isStatsPage
+            isStatsPage={isStatsPage && !isDashboardPage} // Pass isStatsPage, but not if dashboard page is showing tabs
             headerActions={headerActions}
             onShowImportForm={handleShowImportForm}
             onShowCreateDialog={() => setShowCreateDialog(true)}
             toggleSidebar={toggleSidebar} // Pass toggleSidebar
             sidebarState={state} // Pass sidebar state
+            activeTab={activeTab} // Pass activeTab
+            setActiveTab={setActiveTab} // Pass setActiveTab
+            isDashboardPage={isDashboardPage} // Pass isDashboardPage
           />
           <main className="flex flex-1 flex-col overflow-auto py-4 pr-4 pl-2 lg:py-6 lg:pr-6 lg:pl-3">
-            <Outlet context={{ setHeaderActions } satisfies PageHeaderContextType} />
+            <Outlet context={{ setHeaderActions, activeTab, setActiveTab } satisfies PageHeaderContextType} />
           </main>
         </div>
         {showImportForm && (

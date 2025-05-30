@@ -1,9 +1,9 @@
 import React, { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Skeleton } from '@/components/ui/skeleton';
-import { MessageSquare, Loader2, PowerOff, BookPlus } from 'lucide-react'; // Added BookPlus
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'; // Keep for other alerts if needed
+// Skeleton might not be needed directly if ConditionalRenderer handles its own default
+import { MessageSquare, Loader2, PowerOff, BookPlus, Info, Terminal } from 'lucide-react'; // Added Info, Terminal for ConditionalRenderer defaults
 import { supabase } from '@/integrations/supabase/client';
 // Correct the import path for the Database type to match the client's type source
 import type { Database } from '@/integrations/supabase/types';
@@ -11,7 +11,7 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import {
-  Dialog,
+  Dialog as ShadDialog, // Alias Dialog
   DialogContent,
   DialogHeader,
   DialogTitle,
@@ -22,9 +22,10 @@ import {
 } from "@/components/ui/dialog";
 import DocumentSelector from '@/components/knowledge/DocumentSelector'; // Changed to default import
 import { saveChunkWithEmbedding } from '@/lib/knowledgebase'; // Added saveChunkWithEmbedding
-import { Label } from '@/components/ui/label'; // Added Label
-import { Textarea } from '@/components/ui/textarea'; // Added Textarea import
-import { listKnowledgeDocuments, KnowledgeDocument } from '@/services/knowledge/documentService'; // Added import for fetching documents
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { listKnowledgeDocuments, KnowledgeDocument } from '@/services/knowledge/documentService';
+import ConditionalRenderer from '@/components/shared/ConditionalRenderer'; // Import ConditionalRenderer
 
 // Define type alias for the table row from generated types - Use agent_conversations
 type AgentConversationRow = Database['public']['Tables']['agent_conversations']['Row'];
@@ -149,7 +150,7 @@ const AgentConversationLogs: React.FC<AgentConversationLogsProps> = ({ sessionId
   });
 
   // Access data safely, let TS infer type from useQuery
-  const logs = data?.logs ?? [];
+  const logsToDisplay = data?.logs ?? []; // Renamed for clarity when passing to ConditionalRenderer
   const totalCount = data?.count ?? 0;
   const totalPages = Math.ceil(totalCount / LOGS_PAGE_SIZE);
 
@@ -164,11 +165,11 @@ const AgentConversationLogs: React.FC<AgentConversationLogsProps> = ({ sessionId
   // --- Mutation to end the session ---
   const endSessionMutation = useMutation({
     mutationFn: async (sessionIdToEnd: string) => {
-      const { error } = await supabase.functions.invoke('end-agent-session', {
+      const { error: functionError } = await supabase.functions.invoke('end-agent-session', { // Renamed error to functionError
         body: { session_id: sessionIdToEnd },
       });
-      if (error) {
-        throw new Error(error.message || 'Failed to end session.');
+      if (functionError) { // Check functionError
+        throw new Error(functionError.message || 'Failed to end session.');
       }
     },
     onSuccess: () => {
@@ -183,9 +184,9 @@ const AgentConversationLogs: React.FC<AgentConversationLogsProps> = ({ sessionId
       // Consider calling a prop function here if the parent needs to react (e.g., clear selection)
       // onSessionEnded?.();
     },
-    onError: (error) => {
-      toast({ variant: "destructive", title: "Error", description: `Failed to end session: ${error.message}` });
-    }, // <-- Added missing closing brace
+    onError: (mutationError: Error) => { // Explicitly type mutationError
+      toast({ variant: "destructive", title: "Error", description: `Failed to end session: ${mutationError.message}` });
+    },
   });
 
   const handleEndSession = () => {
@@ -222,12 +223,12 @@ const AgentConversationLogs: React.FC<AgentConversationLogsProps> = ({ sessionId
       setAnswerText('');   // Reset A state
       setSelectedDocumentId(null);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    } catch (error: any) { // Reverted back to 'any' as required by TS, disabled ESLint warning
-      console.error("Error saving chunk:", error);
+    } catch (saveError: any) { // Explicitly type saveError
+      console.error("Error saving chunk:", saveError);
       toast({
         variant: "destructive",
         title: "Error Saving Chunk",
-        description: error.message || "Failed to save message as chunk.",
+        description: saveError.message || "Failed to save message as chunk.",
       });
     } finally {
       setIsSavingChunk(false);
@@ -248,10 +249,11 @@ const AgentConversationLogs: React.FC<AgentConversationLogsProps> = ({ sessionId
   };
 
   return (
-    <Dialog open={isChunkDialogOpen} onOpenChange={setIsChunkDialogOpen}>
-      <Card className="w-full h-full flex flex-col">
-        <CardHeader className="flex flex-row items-center justify-between space-x-4">
-          <CardTitle className="flex-grow">
+    <>
+      <ShadDialog open={isChunkDialogOpen} onOpenChange={setIsChunkDialogOpen}>
+        <Card className="w-full h-full flex flex-col">
+          <CardHeader className="flex flex-row items-center justify-between space-x-4">
+            <CardTitle className="flex-grow">
             {/* Display the full session ID */}
             {sessionId ? `Conversation Logs (Session: ${sessionId})` : 'Select a Session'}
           </CardTitle>
@@ -280,27 +282,13 @@ const AgentConversationLogs: React.FC<AgentConversationLogsProps> = ({ sessionId
                <p className="text-lg font-semibold">Select a Session</p>
               <p className="text-sm">Please select an agent session to view its conversation logs.</p>
             </div>
-          ) : isLoading ? (
-            <div className="space-y-4 p-4">
-              <Skeleton className="h-20 w-full" />
-              <Skeleton className="h-20 w-full" />
-              <Skeleton className="h-20 w-full" />
-            </div>
-          ) : isError ? (
-            <Alert variant="destructive" className="m-4">
-              <MessageSquare className="h-4 w-4" />
-              <AlertTitle>Error Loading Logs</AlertTitle>
-              <AlertDescription>{(error as Error)?.message || 'Failed to fetch conversation logs.'}</AlertDescription>
-            </Alert>
-          ) : logs.length === 0 ? (
-            <div className="flex flex-col items-center justify-center h-full text-center text-muted-foreground p-4">
-              <MessageSquare className="h-12 w-12 mb-4" />
-              <p className="text-lg font-semibold">No Conversation Logs Found</p>
-              <p className="text-sm">No interactions recorded for this session yet.</p>
-            </div>
           ) : (
-            <div className="space-y-3 flex flex-col">
-              {logs.map((log) => (
+            <ConditionalRenderer<AgentConversationWithDetails, Error>
+              isLoading={isLoading && !data} // Show loading only on initial fetch or if data is undefined
+              isError={isError}
+              error={error}
+              data={logsToDisplay}
+              renderItem={(log: AgentConversationWithDetails) => (
                 <div
                   key={log.id}
                   className={cn(
@@ -308,6 +296,11 @@ const AgentConversationLogs: React.FC<AgentConversationLogsProps> = ({ sessionId
                     log.sender_type === 'user' ? 'justify-end' : 'justify-start'
                   )}
                 >
+                  {/* Simplified DialogTrigger for diagnostics - This was the temporary change */}
+                  {/* <DialogTrigger asChild onClick={() => handleOpenChunkDialog(log.message_content)}> */}
+                  {/*  <Button variant="outline" size="sm" className="m-1">Log: {log.id.substring(0, 8)}</Button> */}
+                  {/* </DialogTrigger> */}
+                  {/* Restoring original complex div structure */}
                   <DialogTrigger asChild onClick={() => handleOpenChunkDialog(log.message_content)}>
                     <div
                       className={cn(
@@ -320,7 +313,6 @@ const AgentConversationLogs: React.FC<AgentConversationLogsProps> = ({ sessionId
                       <BookPlus className="absolute top-1 right-1 h-3 w-3 text-muted-foreground opacity-0 group-hover:opacity-100 transition-opacity" />
                       <div className="flex justify-between items-center mb-1 text-xs opacity-70">
                         <span>
-                          {/* Restore original logic using joined data */}
                           {log.sender_type === 'user' ? (log.ai_agent_sessions?.contact_identifier || 'User') : (log.ai_agent_sessions?.ai_agents?.name || 'AI')}
                         </span>
                         <span>
@@ -336,11 +328,18 @@ const AgentConversationLogs: React.FC<AgentConversationLogsProps> = ({ sessionId
                     </div>
                   </DialogTrigger>
                 </div>
-              ))}
-            </div>
+              )}
+              layout="list" // Explicitly list layout
+              className="space-y-3 flex flex-col" // Apply original container classes
+              loadingItemCount={5} // Number of skeletons for logs
+              emptyTitle="No Conversation Logs Found"
+              emptyMessage="No interactions recorded for this session yet."
+              errorTitle="Error Loading Logs"
+              // errorMessage will use default from error object
+            />
           )}
         </CardContent>
-        {sessionId && totalPages > 1 && (
+        {sessionId && totalCount > 0 && totalPages > 1 && ( // Also check totalCount > 0 before showing pagination
           <div className="flex items-center justify-between p-4 border-t">
             <Button
               variant="outline"
@@ -404,7 +403,7 @@ const AgentConversationLogs: React.FC<AgentConversationLogsProps> = ({ sessionId
                availableDocuments={documentsData || []}
                isLoading={isLoadingDocuments}
                isError={isErrorDocuments}
-               error={errorDocuments}
+               error={errorDocuments} // Pass the error object for documents
                placeholder="Select a document..."
              />
            </div>
@@ -423,7 +422,8 @@ const AgentConversationLogs: React.FC<AgentConversationLogsProps> = ({ sessionId
           </Button>
         </DialogFooter>
       </DialogContent>
-    </Dialog> // Closing Dialog tag
+    </ShadDialog> 
+    </>
   );
 };
 
