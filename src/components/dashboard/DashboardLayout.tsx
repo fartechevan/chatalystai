@@ -9,11 +9,16 @@ import { cn } from "@/lib/utils";
 // GetStartedView and DashboardAnalytics are also removed as content is now driven by Outlet
 // import { GetStartedView } from "./getting-started/GetStartedView";
 // import { DashboardAnalytics } from "./DashboardAnalytics";
-import React from "react"; // Import React for useState
+import React, { useState } from "react"; // Import React for useState
+
+export interface PageHeaderContextType {
+  setHeaderActions: React.Dispatch<React.SetStateAction<React.ReactNode | null>>;
+}
 
 export function DashboardLayout() {
   const { toggleSidebar, state, isMobile } = useSidebar();
   const location = useLocation();
+  const [headerActions, setHeaderActions] = useState<React.ReactNode | null>(null);
 
   const getCurrentTitle = () => {
     // Handle the base /dashboard route explicitly
@@ -67,16 +72,15 @@ export function DashboardLayout() {
             <span className="sr-only">Toggle sidebar</span>
           </Button>
           <h1 className="text-xl font-semibold hidden sm:inline-flex">{pageTitle}</h1>
-          {/* TabsList is removed as Outlet will handle content */}
+          
           <div className="ml-auto flex items-center gap-4 md:gap-2 lg:gap-4">
-            {/* Example: <SearchInput /> <UserNav /> */}
+            {headerActions}
           </div>
         </header>
         <main className="flex flex-1 flex-col overflow-auto p-4 lg:p-6">
-          {/* Outlet is added here to render child routes */}
-          <Outlet />
+          {/* Outlet is added here to render child routes, passing context */}
+          <Outlet context={{ setHeaderActions } satisfies PageHeaderContextType} />
         </main>
-        {/* Tabs component is removed */}
       </div>
     </div>
   );
