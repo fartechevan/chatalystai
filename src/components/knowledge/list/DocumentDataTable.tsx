@@ -3,18 +3,16 @@
 import * as React from "react";
 import {
   ColumnDef,
-  // ColumnFiltersState, // No longer managed here
-  // SortingState, // No longer managed here
-  // VisibilityState, // No longer managed here
   flexRender,
-  // getCoreRowModel, // No longer managed here
-  // getFacetedRowModel, // No longer managed here
-  // getFacetedUniqueValues, // No longer managed here
-  // getFilteredRowModel, // No longer managed here
-  // getPaginationRowModel, // No longer managed here
-  // getSortedRowModel, // No longer managed here
-  // useReactTable, // No longer used here
-  type Table as TanstackTable, // Renamed to avoid conflict with HTML Table
+  getCoreRowModel,
+  getPaginationRowModel,
+  getSortedRowModel,
+  getFilteredRowModel,
+  useReactTable,
+  SortingState,
+  ColumnFiltersState,
+  VisibilityState,
+  RowSelectionState,
 } from "@tanstack/react-table";
 
 import {
@@ -25,28 +23,45 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-
-import { DataTablePagination } from "@/components/ui/data-table-pagination"; // Assuming this exists or will be created
-// import { BroadcastTableToolbar } from "./BroadcastTableToolbar"; // Corrected path - No longer imported here
+import { DataTablePagination } from "@/components/ui/data-table-pagination"; // Assuming this is a shared component
 
 interface DataTableProps<TData, TValue> {
-  table: TanstackTable<TData>; // Accept table instance as a prop
-  columns: ColumnDef<TData, TValue>[]; // Still need columns for colSpan in empty state
-  // data is now part of the table instance
-  // pageCount, pageIndex, pageSize, onPageChange, onPageSizeChange are handled by the passed table instance
-  totalItems?: number; // Total number of items for display in pagination
+  columns: ColumnDef<TData, TValue>[];
+  data: TData[];
+  onRowClick?: (row: TData) => void; // Optional: if rows should be clickable
 }
 
-export function BroadcastDataTable<TData, TValue>({
-  table,
-  columns, // Keep columns prop for determining colSpan
-  totalItems,
+export function DocumentDataTable<TData, TValue>({
+  columns,
+  data,
+  onRowClick,
 }: DataTableProps<TData, TValue>) {
-  // All table state and logic (useReactTable, state hooks) are now in BroadcastListView.tsx
+  const [sorting, setSorting] = React.useState<SortingState>([]);
+  const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]);
+  const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({});
+  const [rowSelection, setRowSelection] = React.useState<RowSelectionState>({});
+
+  const table = useReactTable({
+    data,
+    columns,
+    getCoreRowModel: getCoreRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
+    onSortingChange: setSorting,
+    getSortedRowModel: getSortedRowModel(),
+    onColumnFiltersChange: setColumnFilters,
+    getFilteredRowModel: getFilteredRowModel(),
+    onColumnVisibilityChange: setColumnVisibility,
+    onRowSelectionChange: setRowSelection,
+    state: {
+      sorting,
+      columnFilters,
+      columnVisibility,
+      rowSelection,
+    },
+  });
 
   return (
     <div className="space-y-4">
-      {/* Toolbar is now rendered in the parent component (BroadcastListView) */}
       <div className="rounded-md border">
         <Table>
           <TableHeader>
@@ -54,7 +69,7 @@ export function BroadcastDataTable<TData, TValue>({
               <TableRow key={headerGroup.id}>
                 {headerGroup.headers.map((header) => {
                   return (
-                    <TableHead key={header.id} colSpan={header.colSpan}>
+                    <TableHead key={header.id}>
                       {header.isPlaceholder
                         ? null
                         : flexRender(
@@ -73,6 +88,8 @@ export function BroadcastDataTable<TData, TValue>({
                 <TableRow
                   key={row.id}
                   data-state={row.getIsSelected() && "selected"}
+                  onClick={() => onRowClick && onRowClick(row.original)}
+                  className={onRowClick ? "cursor-pointer" : ""}
                 >
                   {row.getVisibleCells().map((cell) => (
                     <TableCell key={cell.id}>
@@ -87,7 +104,7 @@ export function BroadcastDataTable<TData, TValue>({
             ) : (
               <TableRow>
                 <TableCell
-                  colSpan={columns.length} // Use columns.length here
+                  colSpan={columns.length}
                   className="h-24 text-center"
                 >
                   No results.
@@ -97,11 +114,7 @@ export function BroadcastDataTable<TData, TValue>({
           </TableBody>
         </Table>
       </div>
-      <DataTablePagination
-        table={table}
-        totalItems={totalItems}
-        pageSizeOptions={[10, 20, 30, 40, 50]}
-      />
+      <DataTablePagination table={table} />
     </div>
   );
 }

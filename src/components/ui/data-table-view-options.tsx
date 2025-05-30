@@ -20,18 +20,13 @@ interface DataTableViewOptionsProps<TData> {
 export function DataTableViewOptions<TData>({
   table,
 }: DataTableViewOptionsProps<TData>) {
+  // The Button and DropdownMenuTrigger are removed.
+  // The DropdownMenu and its content remain, but will not be triggerable without a trigger.
+  // This might be an intermediate step if the user intends to trigger this menu another way,
+  // or if the goal is to effectively disable this UI feature for now.
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button
-          variant="outline"
-          size="sm"
-          className="ml-auto hidden h-8 lg:flex"
-        >
-          <MixerHorizontalIcon className="mr-2 h-4 w-4" />
-          View
-        </Button>
-      </DropdownMenuTrigger>
+      {/* DropdownMenuTrigger and Button removed */}
       <DropdownMenuContent align="end" className="w-[150px]">
         <DropdownMenuLabel>Toggle columns</DropdownMenuLabel>
         <DropdownMenuSeparator />

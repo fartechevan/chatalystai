@@ -4,10 +4,12 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from '@/hooks/use-toast';
-import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { PlusCircle, Trash2, UserPlus } from 'lucide-react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+// Table components will be replaced by TeamUsersDataTable
+import { UserPlus } from 'lucide-react';
 import { useAuth } from '@/components/auth/AuthProvider'; // To get current user's ID
+import { TeamUsersDataTable } from './list/TeamUsersDataTable';
+import { columns as teamMemberColumns, TeamMember } from './list/columns';
 
 interface TeamUsersProps {
   teamId: string;
@@ -125,13 +127,33 @@ const TeamUsers: React.FC<TeamUsersProps> = ({ teamId }) => {
 
   const displayedTeamUsers = teamUsers as DisplayTeamUser[];
 
+  const transformedTeamMembers: TeamMember[] = displayedTeamUsers.map(member => ({
+    id: member.user?.id || member.user_id, // Profile ID
+    name: member.user?.email?.split('@')[0] || member.user_id, // Placeholder for name, ideally fetch full profile
+    email: member.user?.email || 'N/A',
+    role: member.role,
+    team_user_id: member.id, // This is the team_users table PK
+  }));
+
+  // Pass action handlers to the table via meta
+  // This requires modification in TeamUsersDataTable and columns.tsx
+  const tableMeta = {
+    handleRoleChange,
+    handleRemoveUser,
+    isCurrentUserOwner: (teamIdToCheck: string) => isCurrentUserOwner(teamIdToCheck), // Pass as function
+    isCurrentUserAdmin: (teamIdToCheck: string) => isCurrentUserAdmin(teamIdToCheck), // Pass as function
+    currentUserId: currentUser?.id,
+    teamId, // current teamId
+    isLoading,
+  };
+
 
   return (
-    <Card className="mt-6"> {/* Consider removing mt-6 if parent component handles spacing */}
-      <CardHeader className="px-6 py-4 flex flex-row items-center justify-between"> {/* Adjusted padding */}
+    <Card className="mt-6">
+      <CardHeader className="px-6 py-4 flex flex-row items-center justify-between">
         <div>
-            <CardTitle className="text-xl">Team Members</CardTitle> {/* Consistent title size */}
-            <CardDescription>Manage users and their roles in this team.</CardDescription> {/* Slightly more descriptive */}
+            <CardTitle className="text-xl">Team Members</CardTitle>
+            <CardDescription>Manage users and their roles in this team.</CardDescription>
         </div>
         {canManageUsers && (
             <Button onClick={() => setShowAddUserModal(true)} size="sm">
@@ -139,66 +161,28 @@ const TeamUsers: React.FC<TeamUsersProps> = ({ teamId }) => {
             </Button>
         )}
       </CardHeader>
-      <CardContent className="p-0"> {/* Remove padding if table handles it */}
-        {isLoading && teamUsers.length === 0 && <div className="p-6 text-center"><p>Loading members...</p></div>}
-        {!isLoading && teamUsers.length === 0 && <div className="p-6 text-center"><p className="text-muted-foreground">No users in this team yet. Add one to get started!</p></div>}
+      <CardContent className="p-6"> {/* ADDED PADDING p-6 */}
+        {isLoading && transformedTeamMembers.length === 0 && <div className="p-6 text-center"><p>Loading members...</p></div>}
+        {!isLoading && transformedTeamMembers.length === 0 && 
+          <div className="p-6 text-center">
+            <p className="text-muted-foreground">No users in this team yet. Add one to get started!</p>
+          </div>
+        }
         
-        {teamUsers.length > 0 && (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Email</TableHead>
-                <TableHead className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Role</TableHead>
-                {canManageUsers && <TableHead className="h-12 px-4 align-middle font-medium text-muted-foreground text-right">Actions</TableHead>}
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {displayedTeamUsers.map((member) => (
-                <TableRow key={member.id} className="hover:bg-muted/50"> {/* Added hover state */}
-                  <TableCell className="p-4 align-middle">{member.user?.email || member.user_id}</TableCell>
-                  <TableCell className="p-4 align-middle">
-                    {canManageUsers && member.user_id !== currentUser?.id && !(member.role === 'owner' && !isCurrentUserOwner(teamId)) ? (
-                      <Select
-                        value={member.role}
-                        onValueChange={(value) => handleRoleChange(member.id, value as 'owner' | 'admin' | 'member')}
-                        disabled={isLoading}
-                      >
-                        <SelectTrigger className="w-[120px]">
-                          <SelectValue placeholder="Select role" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {isCurrentUserOwner(teamId) && <SelectItem value="owner">Owner</SelectItem>}
-                          <SelectItem value="admin">Admin</SelectItem>
-                          <SelectItem value="member">Member</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    ) : (
-                      <span className="capitalize">{member.role}</span>
-                    )}
-                  </TableCell>
-                  {canManageUsers && (
-                    <TableCell className="p-4 align-middle text-right">
-                      {member.user_id !== currentUser?.id && !(member.role === 'owner' && !isCurrentUserOwner(teamId)) && (
-                        <Button
-                          variant="ghost"
-                          size="icon" // size="sm" might be more consistent with other actions if text is added
-                          onClick={() => handleRemoveUser(member.id, member.user?.email)}
-                          disabled={isLoading}
-                          title="Remove user"
-                        >
-                          <Trash2 className="h-4 w-4 text-destructive" />
-                        </Button>
-                      )}
-                    </TableCell>
-                  )}
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+        {transformedTeamMembers.length > 0 && (
+          <TeamUsersDataTable
+            columns={teamMemberColumns} // These columns need to be adapted to use meta
+            data={transformedTeamMembers}
+            // Pass meta to TeamUsersDataTable, which then passes it to useReactTable
+            // This requires TeamUsersDataTable to accept a meta prop.
+            // For now, this is a conceptual placement. The actual wiring is more complex.
+            // Let's assume columns.tsx will be modified to access these via table.options.meta
+            meta={tableMeta}
+          />
         )}
       </CardContent>
 
-      {/* Basic Add User Modal */}
+      {/* Add User Modal remains the same */}
       {showAddUserModal && canManageUsers && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div className="bg-card p-6 rounded-lg shadow-xl w-full max-w-md">

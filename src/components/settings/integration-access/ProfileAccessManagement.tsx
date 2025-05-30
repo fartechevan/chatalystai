@@ -213,12 +213,7 @@ export function ProfileAccessManagement() {
 
   return (
     <div className="p-4 space-y-8">
-      <div className="flex justify-between items-center">
-        <div>
-          <h2 className="text-2xl font-semibold">Integration Access</h2>
-          <p className="text-muted-foreground">Manage who can access which integrations</p>
-        </div>
-      </div>
+      {/* Title and subtitle removed */}
 
       {/* Loading State */}
       {(isLoading || isCheckingRole) && (

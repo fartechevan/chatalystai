@@ -1,18 +1,32 @@
-import React from 'react';
+import React, { useEffect } from 'react'; // Import useEffect
 import { useTeams } from '@/context/TeamContext';
-import TeamDetails from '@/components/teams/TeamDetails'; // To be created
-import TeamUsers from '@/components/teams/TeamUsers'; // To be created
-import { Button } from '@/components/ui/button'; // For "Create Team" button
+import TeamDetails from '@/components/teams/TeamDetails';
+import TeamUsers from '@/components/teams/TeamUsers';
+import { Button } from '@/components/ui/button';
 import { PlusCircle } from 'lucide-react';
+import { usePageActionContext } from '@/context/PageActionContext'; // Import context
 
 const TeamsPage: React.FC = () => {
   const { teams, currentTeam, setCurrentTeam, createTeam, isLoading } = useTeams();
-
-  // Placeholder for actual UI components
-  // For now, just showing a basic structure
+  const { setPrimaryAction } = usePageActionContext(); // Use the context
 
   const [showCreateModal, setShowCreateModal] = React.useState(false);
   const [newTeamName, setNewTeamName] = React.useState('');
+
+  useEffect(() => {
+    // Set the primary action for the header
+    setPrimaryAction({
+      id: 'create-new-team',
+      label: 'Create New Team',
+      icon: PlusCircle,
+      action: () => setShowCreateModal(true),
+    });
+
+    // Clear the action when the component unmounts
+    return () => {
+      setPrimaryAction(null);
+    };
+  }, [setPrimaryAction, setShowCreateModal]);
 
   const handleCreateTeam = async () => {
     if (newTeamName.trim()) {
@@ -28,13 +42,13 @@ const TeamsPage: React.FC = () => {
   };
 
   return (
-    <div className="container mx-auto p-4 md:p-6 lg:p-8">
-      <div className="flex justify-between items-center mb-6">
+    <> {/* Using a fragment as the new root */}
+      {/* Remove the title and button from here, they are now in DashboardLayout or handled by context */}
+      {/* <div className="flex justify-between items-center mb-6">
         <h1 className="text-2xl font-semibold">Teams Management</h1>
-        <Button onClick={() => setShowCreateModal(true)}>
-          <PlusCircle className="mr-2 h-4 w-4" /> Create New Team
-        </Button>
-      </div>
+      </div> */}
+      {/* The page title "Teams" is now set by DashboardLayout based on route */}
+      {/* The "Create New Team" button is now in the header via PageActionContext */}
 
       {isLoading && <p>Loading teams...</p>}
 
@@ -48,15 +62,15 @@ const TeamsPage: React.FC = () => {
       )}
 
       {!isLoading && teams.length > 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="md:col-span-1">
-            <h2 className="text-xl font-medium mb-3">Your Teams</h2>
-            <ul className="space-y-2">
+        <div className="grid grid-cols-1 md:grid-cols-5 gap-6"> {/* Changed md:grid-cols-4 to md:grid-cols-5 */}
+          <div className="md:col-span-1"> {/* This now means 1/5 width on md+ screens */}
+            {/* <h2 className="text-xl font-medium mb-3">Your Teams</h2> REMOVED TITLE */}
+            <ul className="space-y-2"> {/* REMOVED pt-3 */}
               {teams.map((team) => (
                 <li key={team.id}>
                   <Button
                     variant={currentTeam?.id === team.id ? 'secondary' : 'ghost'}
-                    className="w-full justify-start"
+                    className="w-full justify-start" // Reverted padding change
                     onClick={() => setCurrentTeam(team)}
                   >
                     {team.name}
@@ -65,7 +79,7 @@ const TeamsPage: React.FC = () => {
               ))}
             </ul>
           </div>
-          <div className="md:col-span-2">
+          <div className="md:col-span-4"> {/* Changed md:col-span-3 to md:col-span-4 */}
             {currentTeam ? (
               <div className="space-y-6">
                 <TeamDetails team={currentTeam} />
@@ -99,7 +113,7 @@ const TeamsPage: React.FC = () => {
           </div>
         </div>
       )}
-    </div>
+    </>
   );
 };
 
