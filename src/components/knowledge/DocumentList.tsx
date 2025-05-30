@@ -2,31 +2,28 @@
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Trash2, FileText, File, ExternalLink } from "lucide-react";
+import { Card, CardHeader, CardTitle, CardDescription, CardContent, CardFooter } from "@/components/ui/card"; // Keep Card for loading state
+import { Button } from "@/components/ui/button"; // Keep for potential future use or if actions need it directly
 import { useToast } from "@/hooks/use-toast";
-import { formatDistanceToNow } from "date-fns";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Badge } from "@/components/ui/badge";
+// import { supabase } from "@/integrations/supabase/client"; // Removed duplicate import
 
-interface Document {
-  id: string;
-  title: string;
-  created_at: string;
-  updated_at: string;
-  file_type: string;
-  file_path: string;
-}
+// Imports for the new DataTable structure
+import { DocumentDataTable } from "./list/DocumentDataTable";
+import { DocumentTableToolbar } from "./list/DocumentTableToolbar";
+import { getDocumentColumns, Document } from "./list/columns"; // Document type comes from columns.tsx
 
 interface DocumentListProps {
   onSelectDocument: (id: string | null) => void;
-  selectedDocumentId: string | null;
+  selectedDocumentId: string | null; // Keep this to highlight selected row or for other logic
 }
 
 export function DocumentList({ onSelectDocument, selectedDocumentId }: DocumentListProps) {
   const { toast } = useToast();
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  // selectedDocumentId is passed as a prop, no need to manage it here directly for the table selection state
+  // The table itself will manage its internal row selection state.
+  // We might use selectedDocumentId to externally control or reflect selection if needed.
 
   useEffect(() => {
     const checkAuth = async () => {
@@ -37,7 +34,7 @@ export function DocumentList({ onSelectDocument, selectedDocumentId }: DocumentL
     checkAuth();
   }, []);
 
-  const { data: documents = [], isLoading, refetch } = useQuery({
+  const { data: documents = [], isLoading, refetch } = useQuery<Document[]>({ // Specify Document[] type
     queryKey: ['knowledge-documents'],
     queryFn: async () => {
       if (!isAuthenticated) return [];
@@ -107,10 +104,24 @@ export function DocumentList({ onSelectDocument, selectedDocumentId }: DocumentL
 
   const handleViewOriginalPdf = (document: Document) => {
     if (document.file_path) {
-      const url = supabase.storage.from('documents').getPublicUrl(document.file_path).data.publicUrl;
-      window.open(url, '_blank');
+      const { data } = supabase.storage.from('documents').getPublicUrl(document.file_path);
+      if (data?.publicUrl) {
+        window.open(data.publicUrl, '_blank');
+      } else {
+        toast({
+          variant: "destructive",
+          title: "Error getting public URL",
+          description: "Could not retrieve the public URL for the document.",
+        });
+      }
     }
   };
+
+  const columns = getDocumentColumns({
+    onDelete: handleDeleteDocument,
+    onViewOriginal: handleViewOriginalPdf,
+    onSelectDocument: onSelectDocument, // Pass the onSelectDocument prop for row click
+  });
 
   if (!isAuthenticated) {
     return (
@@ -121,6 +132,8 @@ export function DocumentList({ onSelectDocument, selectedDocumentId }: DocumentL
   }
 
   if (isLoading) {
+    // You can use a more sophisticated skeleton loader for tables if available
+    // For now, using a simple card skeleton
     return (
       <div className="space-y-4">
         {[1, 2, 3].map((i) => (
@@ -137,71 +150,26 @@ export function DocumentList({ onSelectDocument, selectedDocumentId }: DocumentL
       </div>
     );
   }
-
-  if (documents.length === 0) {
-    return (
-      <div className="bg-muted p-4 rounded-lg text-center">
-        <p>No documents found. Import a document to get started.</p>
-      </div>
-    );
-  }
+  
+  // Note: The DocumentDataTable itself handles the "No documents found" case.
+  // We can remove the explicit check here if the DataTable's "No results" message is sufficient.
+  // if (documents.length === 0 && !isLoading) {
+  //   return (
+  //     <div className="bg-muted p-4 rounded-lg text-center">
+  //       <p>No documents found. Import a document to get started.</p>
+  //     </div>
+  //   );
+  // }
 
   return (
-    <div className="space-y-4 max-h-[70vh] overflow-y-auto pr-2">
-      {documents.map((doc) => (
-        <div 
-          key={doc.id}
-          className={`flex items-center justify-between p-4 cursor-pointer transition-colors border rounded-md ${
-            selectedDocumentId === doc.id ? 'border-primary' : 'border-muted'
-          }`}
-          onClick={() => onSelectDocument(doc.id)}
-        >
-          <div className="flex items-start gap-2">
-            {doc.file_type === 'pdf' ? (
-              <FileText className="h-5 w-5 text-muted-foreground mt-0.5 shrink-0" />
-            ) : (
-              <File className="h-5 w-5 text-muted-foreground mt-0.5 shrink-0" />
-            )}
-            <div className="flex-1 min-w-0">
-              <div className="text-base truncate font-medium">{doc.title}</div>
-              <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                <span>Updated {formatDistanceToNow(new Date(doc.updated_at), { addSuffix: true })}</span>
-                {doc.file_type && (
-                  <Badge variant="outline" className="text-xs">
-                    {doc.file_type.toUpperCase()}
-                  </Badge>
-                )}
-              </div>
-            </div>
-          </div>
-          <div className="flex gap-2">
-            {doc.file_type === 'pdf' && doc.file_path && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleViewOriginalPdf(doc);
-                }}
-                title="View original PDF"
-              >
-                <ExternalLink className="h-4 w-4 text-muted-foreground" />
-              </Button>
-            )}
-            <Button 
-              variant="ghost" 
-              size="sm"
-              onClick={(e) => {
-                e.stopPropagation();
-                handleDeleteDocument(doc.id);
-              }}
-              title="Delete document"
-            >
-              <Trash2 className="h-4 w-4 text-destructive" />
-            </Button>
-          </div>
-        </div>
-      ))}
+    <div className="space-y-4">
+      {/* The DocumentTableToolbar can be added here if needed in the future */}
+      {/* <DocumentTableToolbar table={table} /> */}
+      <DocumentDataTable
+        columns={columns}
+        data={documents}
+        onRowClick={(row) => onSelectDocument(row.id)} // This makes the row clickable
+      />
     </div>
   );
 }

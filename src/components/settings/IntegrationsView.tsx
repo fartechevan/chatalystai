@@ -1,6 +1,6 @@
-import { Input } from "@/components/ui/input";
 import { ShieldAlert } from "lucide-react";
 import { useState, useEffect, useMemo } from "react";
+// Input is removed as it will be in the header
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs"; // Import Tabs components
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
@@ -12,6 +12,7 @@ import { useToast } from "@/hooks/use-toast";
 import { checkInstanceStatus } from "@/integrations/evolution-api/services/instanceStatusService";
 import { useTeams } from "@/context/TeamContext"; // Import useTeams
 import { useAuth } from "@/components/auth/AuthProvider"; // Import useAuth
+import { useSettingsSearch } from "@/context/SettingsSearchContext"; // Import the hook
 
 interface IntegrationsViewProps {
   isActive: boolean; // Prop to control loading
@@ -20,7 +21,7 @@ interface IntegrationsViewProps {
 export function IntegrationsView({ isActive }: IntegrationsViewProps) {
   const { currentTeam, isLoading: isLoadingTeamsContext } = useTeams(); // Get current team for plan fetching
   const [activeTab, setActiveTab] = useState("all"); // Default to 'all'
-  const [searchQuery, setSearchQuery] = useState("");
+  const { searchQuery } = useSettingsSearch(); // Use search query from context
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedIntegration, setSelectedIntegration] = useState<Integration | null>(null);
   const { toast } = useToast();
@@ -611,7 +612,7 @@ export function IntegrationsView({ isActive }: IntegrationsViewProps) {
   });
 
   return (
-    <div className="space-y-8"> 
+    <div className="space-y-8">
       <IntegrationDialog
         open={dialogOpen}
         onOpenChange={handleDialogClose}
@@ -620,14 +621,7 @@ export function IntegrationsView({ isActive }: IntegrationsViewProps) {
         tenantId={tenantId} // Pass tenantId to IntegrationDialog
       />
 
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 md:gap-0">
-        <Input
-          placeholder="Search"
-          className="w-full md:max-w-sm"
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-        />
-      </div>
+      {/* Search input is removed from here, will be in the header */}
 
       <Tabs defaultValue="all" value={activeTab} onValueChange={setActiveTab} className="w-full">
         <TabsList className="grid w-full grid-cols-2 mb-8"> 

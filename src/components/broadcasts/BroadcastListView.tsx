@@ -7,9 +7,26 @@ import type { PageHeaderContextType } from '@/components/dashboard/DashboardLayo
 import { supabase } from "@/integrations/supabase/client";
 import type { PostgrestError } from "@supabase/supabase-js"; // Import PostgrestError
 import { BroadcastModal } from "@/components/dashboard/conversations/BroadcastModal";
-import { getBroadcastColumns } from "./list/columns"; // Import columns
+import { getBroadcastColumns, statuses } from "./list/columns"; // Import columns and statuses
 import { BroadcastDataTable } from "./list/BroadcastDataTable"; // Import DataTable
+import { BroadcastTableToolbar } from "./list/BroadcastTableToolbar"; // Import Toolbar
 import { PlusCircle } from 'lucide-react'; // Icon for Create button
+import { DataTableFacetedFilter } from "@/components/ui/data-table-faceted-filter"; // Import Faceted Filter
+import { Cross2Icon } from "@radix-ui/react-icons"; // Import Reset Icon
+import {
+  useReactTable,
+  getCoreRowModel,
+  getFilteredRowModel,
+  getPaginationRowModel,
+  getSortedRowModel,
+  getFacetedRowModel,
+  getFacetedUniqueValues,
+  type ColumnDef, // Import ColumnDef
+  type SortingState,
+  type ColumnFiltersState,
+  type VisibilityState,
+  type Table, // Import Table type
+} from "@tanstack/react-table";
 
 // Define the type for a broadcast record (can be moved to a types file)
 export interface Broadcast {
@@ -62,43 +79,61 @@ const fetchBroadcastsFromAPI = async (page: number, pageSize: number, searchTerm
   // }
 
   // Type the response from Supabase more accurately
-  const { data, error, count } = await query.range((page - 1) * pageSize, page * pageSize - 1);
-
-  if (error) {
-    console.error("Error fetching broadcasts:", error);
-    // Ensure the error object is properly handled if it's a PostgrestError or a generic Error
-    const errorMessage = (error as PostgrestError)?.message || (error as Error)?.message || "Unknown error fetching broadcasts";
-    return { data: [], totalCount: 0 };
-  }
-
-  // The 'data' from Supabase with an explicit select should be closer to our Broadcast type,
-  // but we still map to ensure defaults and structure for all fields in our `Broadcast` interface.
-  
-  // Define a type for the items we expect directly from the DB based on `selectColumns`
-  // This type represents the minimal structure we rely on from the database.
-  type DbBroadcastItem = {
+  // Define the type for items directly from Supabase based *only* on selectColumns
+  type ExactSupabaseDataItem = {
     id: string;
     message_text: string;
     created_at: string;
-    // Allow any other properties that might come from the DB item
-    [key: string]: any; 
+    // No other fields are expected from this specific select query
   };
 
-  // Force a break in TypeScript's inference chain by casting through unknown.
-  const supabaseData = data as unknown as DbBroadcastItem[] | null;
+  // Define an interface for the expected shape of the Supabase query response
+  interface SupabaseQueryResponse<T> {
+    data: T[] | null;
+    error: PostgrestError | null;
+    count: number | null;
+    status: number; 
+    statusText: string; 
+  }
 
-  const formattedData = (supabaseData || []).map((item: DbBroadcastItem): Broadcast => {
+  // Let Supabase infer the types from the query as much as possible.
+  // The .select() method in Supabase client is generic and should provide good inference.
+  // Using @ts-expect-error to suppress persistent "Type instantiation is excessively deep" error from Supabase query.
+  // @ts-expect-error - Supabase query type complexity leads to excessively deep type instantiation.
+  const queryResponse: SupabaseQueryResponse<ExactSupabaseDataItem> = await query.range((page - 1) * pageSize, page * pageSize - 1);
+
+  // Access parts from the explicitly typed queryResponse
+  const supabaseDataResult = queryResponse.data;
+  const responseError = queryResponse.error; // Renamed to avoid conflict with outer scope 'error' state
+  const count = queryResponse.count;
+
+
+  if (responseError) {
+    console.error("Error fetching broadcasts:", responseError);
+    const typedError = responseError as PostgrestError | Error; // Keep this for error handling
+    const errorMessage = typedError.message || "Unknown error fetching broadcasts";
+    return { data: [], totalCount: 0 };
+  }
+
+  // Explicitly cast the data to the expected raw type.
+  // supabaseDataResult is already typed as ExactSupabaseDataItem[] | null
+  const rawItems = supabaseDataResult; 
+
+  const formattedData = (rawItems || []).map((item: ExactSupabaseDataItem): Broadcast => {
     // Construct the full Broadcast object, providing defaults for fields.
     return {
-      id: item.id, 
-      message_text: item.message_text, 
-      created_at: item.created_at, 
-      name: item.name || `Broadcast ${item.id.substring(0, 4)}`,
-      status: item.status || 'draft',
-      recipient_count: typeof item.recipient_count === 'number' ? item.recipient_count : 0,
-      scheduled_at: item.scheduled_at || null,
-      instance_id: item.instance_id || undefined,
-      integration_id: item.integration_id || undefined,
+      id: item.id,
+      message_text: item.message_text,
+      created_at: item.created_at,
+      name: `Broadcast ${item.id.substring(0, 4)}`, // Default name
+      status: 'draft', // Default status
+      recipient_count: 0, // Default recipient_count
+      scheduled_at: null, // Default scheduled_at
+      instance_id: undefined, // Default instance_id
+      integration_id: undefined, // Default integration_id
+      // If 'item' could potentially have more fields from a less strict DB response,
+      // you could spread item here: ...item, and then override with defaults.
+      // However, with a strict select, this is cleaner.
     };
   });
 
@@ -125,6 +160,15 @@ const BroadcastListView = () => {
 
   const [messageToDuplicate, setMessageToDuplicate] = useState<string | null>(null);
 
+  // React Table state lifted from BroadcastDataTable
+  const [rowSelection, setRowSelection] = React.useState({});
+  const [columnVisibility, setColumnVisibility] =
+    React.useState<VisibilityState>({});
+  const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>(
+    []
+  );
+  const [sorting, setSorting] = React.useState<SortingState>([]);
+
   useEffect(() => {
     const loadBroadcasts = async () => {
       setIsLoading(true);
@@ -134,9 +178,18 @@ const BroadcastListView = () => {
         const { data, totalCount: fetchedTotalCount } = await fetchBroadcastsFromAPI(page, pageSize, searchTerm, filters);
         setBroadcasts(data);
         setTotalCount(fetchedTotalCount);
-      } catch (err: unknown) {
+      } catch (err) { // err is unknown by default
         console.error("Error loading broadcasts:", err);
-        const message = err instanceof Error ? err.message : "Failed to load broadcasts.";
+        let message = "Failed to load broadcasts.";
+        if (err instanceof Error) {
+          message = err.message;
+        } else if (typeof err === 'string') {
+          message = err;
+        }
+        // Can add more specific checks for PostgrestError if needed
+        // else if (err && typeof err === 'object' && 'message' in err) {
+        //   message = String((err as { message: unknown }).message);
+        // }
         setError(message);
       } finally {
         setIsLoading(false);
@@ -163,54 +216,111 @@ const BroadcastListView = () => {
   const pageCount = Math.ceil(totalCount / pageSize);
 
   // Memoize columns to prevent re-creation on every render
-  const columns = useMemo(
-    () => getBroadcastColumns({ 
-      onViewDetails: handleViewDetails, 
-      onDuplicate: (msg: string) => handleOpenModal(msg) 
+  const columns: ColumnDef<Broadcast>[] = useMemo( // Added type for columns
+    () => getBroadcastColumns({
+      onViewDetails: handleViewDetails,
+      onDuplicate: (msg: string) => handleOpenModal(msg)
     }),
-    // eslint-disable-next-line react-hooks/exhaustive-deps 
-    [navigate] // Assuming handleViewDetails and handleOpenModal are stable or memoized
-    // If handleOpenModal depends on messageToDuplicate, it might need more complex memoization or be defined inside useEffect
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [navigate]
   );
+
+  const table: Table<Broadcast> = useReactTable({ // Explicitly type the table instance
+    data: broadcasts,
+    columns,
+    state: {
+      sorting,
+      columnVisibility,
+      rowSelection,
+      columnFilters,
+      pagination: {
+        pageIndex: page - 1, // DataTable is 0-indexed
+        pageSize: pageSize,
+      },
+    },
+    pageCount: pageCount,
+    enableRowSelection: true,
+    onRowSelectionChange: setRowSelection,
+    onSortingChange: setSorting,
+    onColumnFiltersChange: setColumnFilters,
+    onColumnVisibilityChange: setColumnVisibility,
+    getCoreRowModel: getCoreRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    getFacetedRowModel: getFacetedRowModel(),
+    getFacetedUniqueValues: getFacetedUniqueValues(),
+    manualPagination: true,
+    manualFiltering: true, // Assuming server-side filtering or controlled filtering
+    manualSorting: true, // Assuming server-side sorting or controlled sorting
+    onPaginationChange: (updater) => {
+      if (typeof updater === 'function') {
+        const newPaginationState = updater({ pageIndex: page - 1, pageSize: pageSize });
+        setPage(newPaginationState.pageIndex + 1);
+        setPageSize(newPaginationState.pageSize);
+      } else {
+        setPage(updater.pageIndex + 1);
+        setPageSize(updater.pageSize);
+      }
+    },
+  });
+
 
   const outletContext = useOutletContext<PageHeaderContextType | undefined>();
 
   useEffect(() => {
-    if (outletContext?.setHeaderActions) {
+    if (outletContext?.setHeaderActions && table) { // Ensure table is initialized
+      const isFiltered = table.getState().columnFilters.length > 0;
       const actions = (
-        <Button onClick={() => handleOpenModal()}>
-          <PlusCircle className="mr-2 h-4 w-4" /> Create Broadcast
-        </Button>
+        <div className="flex items-center space-x-2">
+          {/* BroadcastTableToolbar now only contains search and view options */}
+          <BroadcastTableToolbar table={table as Table<Broadcast>} /> 
+          
+          {/* Moved Status Filter and Reset Button here */}
+          {table.getColumn("status") && (
+            <DataTableFacetedFilter
+              column={table.getColumn("status")}
+              title="Status"
+              options={statuses.map(status => ({ label: status.label, value: status.value }))}
+            />
+          )}
+          {isFiltered && (
+            <Button
+              variant="ghost"
+              onClick={() => table.resetColumnFilters()}
+              className="h-8 px-2 lg:px-3"
+            >
+              Reset
+              <Cross2Icon className="ml-2 h-4 w-4" />
+            </Button>
+          )}
+
+          <Button onClick={() => handleOpenModal()}>
+            <PlusCircle className="mr-2 h-4 w-4" /> Create Broadcast
+          </Button>
+        </div>
       );
       outletContext.setHeaderActions(actions);
     }
-    // Cleanup function to remove actions when component unmounts
     return () => {
       if (outletContext?.setHeaderActions) {
         outletContext.setHeaderActions(null);
       }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [outletContext?.setHeaderActions]); // Rerun if setHeaderActions changes (should be stable)
-  // handleOpenModal should be stable or memoized if included in deps
+  }, [outletContext?.setHeaderActions, table, handleOpenModal, columnFilters, sorting, rowSelection, columnVisibility]); // Removed handleCreateLead from dependencies
 
   return (
     <div className="h-full flex-1 flex-col space-y-8 md:flex"> {/* Removed p-8, parent main has padding */}
-      {/* Header section (title and Create button) is now removed from here and handled by DashboardLayout */}
-      
       {isLoading && <div className="pt-6 text-center"><p>Loading broadcasts...</p></div>}
       {error && <div className="pt-6 text-center"><p className="text-red-500">{error}</p></div>}
       
       {!isLoading && !error && (
         <BroadcastDataTable
-          columns={columns}
-          data={broadcasts}
-          pageCount={pageCount}
-          pageIndex={page - 1} // DataTable is 0-indexed for pageIndex
-          pageSize={pageSize}
-          onPageChange={(newPageIndex) => setPage(newPageIndex + 1)} // Adjust back to 1-indexed for our state
-          onPageSizeChange={setPageSize}
-          totalItems={totalCount}
+          table={table as Table<Broadcast>} // Pass table instance
+          columns={columns} // Pass columns for colSpan
+          // data, pageCount, pageIndex, pageSize, onPageChange, onPageSizeChange are now part of the table instance
+          totalItems={totalCount} // Pass totalItems for pagination display
         />
       )}
       {!isLoading && !error && broadcasts.length === 0 && totalCount === 0 && (

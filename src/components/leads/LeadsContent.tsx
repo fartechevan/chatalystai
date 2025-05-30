@@ -1,7 +1,7 @@
 
 import React, { useCallback, useState } from "react"; // Import useState
 import { useQueryClient } from "@tanstack/react-query"; // Import useQueryClient
-import { LeadsHeader } from "./LeadsHeader";
+// import { LeadsHeader } from "./LeadsHeader"; // LeadsHeader is being removed
 import { usePipelineData } from "./hooks/usePipelineData";
 import type { Lead } from "@/components/dashboard/conversations/types"; // Import Lead type
 import { useLeadsRealtime } from "./hooks/useLeadsRealtime";
@@ -9,16 +9,22 @@ import { EmptyPipelineState } from "./components/EmptyPipelineState";
 import { LoadingState } from "./components/LoadingState";
 import { PipelineBoard } from "./components/PipelineBoard";
 import { LeadPipelineDetailsPanel } from "./components/LeadPipelineDetailsPanel"; // Import the new component
+import type { Dispatch, SetStateAction } from 'react'; // Import Dispatch and SetStateAction
 
 interface LeadsContentProps {
   pipelineId: string | null;
+  selectedTagIds: string[] | null; 
+  onSelectedTagIdsChange: Dispatch<SetStateAction<string[] | null>>;
+  // onAddLeadClick is no longer needed as LeadsHeader is removed
 }
 
-export function LeadsContent({ pipelineId }: LeadsContentProps) {
+export function LeadsContent({ pipelineId, selectedTagIds, onSelectedTagIdsChange }: LeadsContentProps) {
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
-  const [selectedTagIds, setSelectedTagIds] = useState<string[] | null>(null); // State for selected tags
+  // selectedTagIds state is now managed by LeadsLayout and passed as a prop
+  // const [selectedTagIds, setSelectedTagIds] = useState<string[] | null>(null); 
   const queryClient = useQueryClient();
-  // Pass selectedTagIds to the hook
+  
+  // selectedTagIds is now a prop, use it directly in usePipelineData
   const { stages, stageLeads, loading, loadStages } = usePipelineData(pipelineId, selectedTagIds); 
 
   // Memoize the callback to prevent unnecessary re-renders
@@ -47,12 +53,7 @@ export function LeadsContent({ pipelineId }: LeadsContentProps) {
     <div className="flex h-full"> 
       {/* Wrap Header and Board in a flex-1 container */}
       <div className="flex-1 flex flex-col h-full overflow-hidden">
-        {/* Pass tag state and setter to Header */}
-        <LeadsHeader 
-          selectedPipelineId={pipelineId} 
-          selectedTagIds={selectedTagIds}
-          onSelectedTagIdsChange={setSelectedTagIds} 
-        />
+        {/* LeadsHeader component has been removed */}
         {/* PipelineBoard needs flex-1 to take remaining vertical space */}
         <PipelineBoard
           stages={stages} 
