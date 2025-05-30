@@ -31,19 +31,101 @@ export interface PageHeaderContextType {
   setHeaderActions: React.Dispatch<React.SetStateAction<React.ReactNode | null>>;
 }
 
+// Define a new internal component for the header content
+const DashboardHeaderContent: React.FC<{
+  pageTitle: string;
+  isKnowledgeBasePage: boolean;
+  isStatsPage: boolean; // New prop
+  headerActions: React.ReactNode | null;
+  onShowImportForm: () => void;
+  onShowCreateDialog: () => void;
+  toggleSidebar: () => void; // Added toggleSidebar
+  sidebarState: string; // Added sidebarState
+}> = ({
+  pageTitle,
+  isKnowledgeBasePage,
+  isStatsPage, // New prop
+  headerActions,
+  onShowImportForm,
+  onShowCreateDialog,
+  toggleSidebar, // Added toggleSidebar
+  sidebarState, // Added sidebarState
+}) => {
+  const { headerNavNode, setIsBatchDateRangeDialogOpen } = usePageActionContext(); // Now called within a child of PageActionProvider
+
+  return (
+    <header className="flex h-14 items-center gap-4 border-b bg-background px-4 lg:h-[60px] lg:px-6">
+      {/* Mobile Toggle Button */}
+      <Button
+        variant="outline"
+        size="icon"
+        className="shrink-0 sm:hidden" // Only on small screens
+        onClick={toggleSidebar}
+      >
+        <MenuIcon className="h-5 w-5" />
+        <span className="sr-only">Toggle navigation menu</span>
+      </Button>
+      {/* Desktop Toggle Button */}
+      <Button
+        variant="outline"
+        size="icon"
+        className="hidden shrink-0 sm:inline-flex" // Hidden on small, visible on sm+
+        onClick={toggleSidebar}
+      >
+        <PanelLeft className={cn("h-5 w-5", sidebarState === "collapsed" && "rotate-180")} />
+        <span className="sr-only">Toggle sidebar</span>
+      </Button>
+      <HeaderBreadcrumbSlot />
+      <ConditionalPageTitle pageTitle={pageTitle} />
+      {headerNavNode && <div className="flex items-center gap-2 ml-4">{headerNavNode}</div>}
+      
+      <div className="ml-auto flex items-center gap-4 md:gap-2 lg:gap-4">
+        <HeaderSettingsSearchInput />
+        {isStatsPage && (
+          <Button onClick={() => setIsBatchDateRangeDialogOpen(true)} size="sm">
+            <PlusCircle className="mr-2 h-4 w-4" />
+            New Batch Analysis
+          </Button>
+        )}
+        <HeaderSecondaryActionSlot />
+        <HeaderPrimaryActionButton />
+        {isKnowledgeBasePage && (
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button className="flex items-center gap-2">
+                <PlusCircle className="h-4 w-4" />
+                Add Document
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={onShowImportForm} className="cursor-pointer">
+                <Upload className="h-4 w-4 mr-2" />
+                Import Document
+              </DropdownMenuItem>
+              <DropdownMenuItem onClick={onShowCreateDialog} className="cursor-pointer">
+                <FilePlus className="h-4 w-4 mr-2" />
+                Create New Document
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        )}
+        {headerActions}
+      </div>
+    </header>
+  );
+};
+
 export function DashboardLayout() {
   const { toggleSidebar, state, isMobile } = useSidebar();
   const location = useLocation();
-  const navigate = useNavigate();
+  // const navigate = useNavigate(); // navigate is not used
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [headerActions, setHeaderActions] = useState<React.ReactNode | null>(null); // Keep for existing KB actions
+  const [headerActions, setHeaderActions] = useState<React.ReactNode | null>(null);
   const [showImportForm, setShowImportForm] = useState(false);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
 
-  // New context consumer for primary page action
-  // This needs to be inside the PageActionProvider, so we'll call usePageActionContext within the return statement
-  // or wrap a sub-component. For now, let's plan to access it where the button is rendered.
+  // headerNavNode is now consumed by DashboardHeaderContent
 
   const handleImportSuccess = () => {
     setShowImportForm(false);
@@ -72,6 +154,7 @@ export function DashboardLayout() {
   };
 
   const isKnowledgeBasePage = location.pathname.startsWith("/dashboard/knowledge");
+  const isStatsPage = location.pathname === "/dashboard/stats"; // Check if it's the stats page
 
   const getCurrentTitle = () => {
     const { pathname } = location;
@@ -131,71 +214,22 @@ export function DashboardLayout() {
   // const [timeFilter, setTimeFilter] = React.useState<'today' | 'yesterday' | 'week' | 'month'>('month'); // timeFilter state is no longer needed
   // const [userFilter, setUserFilter] = React.useState('all'); // userFilter state is no longer needed
 
-
   return (
-    <PageActionProvider> {/* Wrap the entire layout content */}
-      <div className="flex h-screen bg-background"> {/* Main container */}
+    <PageActionProvider>
+      <div className="flex h-screen bg-background">
         <DashboardSidebar />
-        <div className="flex flex-1 flex-col overflow-hidden"> {/* Content wrapper */}
-          {/* Tabs component is removed as Outlet will handle content */}
-          <header className="flex h-14 items-center gap-4 border-b bg-background px-4 lg:h-[60px] lg:px-6">
-          {/* Mobile Toggle Button */}
-          <Button
-            variant="outline"
-            size="icon"
-            className="shrink-0 sm:hidden" // Only on small screens
-            onClick={toggleSidebar}
-          >
-            <MenuIcon className="h-5 w-5" />
-            <span className="sr-only">Toggle navigation menu</span>
-          </Button>
-          {/* Desktop Toggle Button */}
-          {/* Placed at the start of the content header, appears next to the sidebar */}
-          <Button
-            variant="outline"
-            size="icon"
-            className="hidden shrink-0 sm:inline-flex" // Hidden on small, visible on sm+
-            onClick={toggleSidebar}
-          >
-            <PanelLeft className={cn("h-5 w-5", state === "collapsed" && "rotate-180")} />
-            <span className="sr-only">Toggle sidebar</span>
-          </Button>
-          <HeaderBreadcrumbSlot />
-          {/* Conditionally render h1 if no breadcrumb is present, or let breadcrumb handle title */}
-          {/* This requires HeaderBreadcrumbSlot to not render if breadcrumbNode is null, which it does. */}
-          {/* We also need to access breadcrumbNode here to make the decision. */}
-          <ConditionalPageTitle pageTitle={pageTitle} />
-          
-          <div className="ml-auto flex items-center gap-4 md:gap-2 lg:gap-4">
-            <HeaderSettingsSearchInput /> {/* Add the settings search input here */}
-            <HeaderSecondaryActionSlot /> {/* Render secondary action slot (e.g., filter input) */}
-            <HeaderPrimaryActionButton /> 
-            {isKnowledgeBasePage && (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button className="flex items-center gap-2">
-                    <PlusCircle className="h-4 w-4" />
-                    Add Document
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={handleShowImportForm} className="cursor-pointer">
-                    <Upload className="h-4 w-4 mr-2" />
-                    Import Document
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => setShowCreateDialog(true)} className="cursor-pointer">
-                    <FilePlus className="h-4 w-4 mr-2" />
-                    Create New Document
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            )}
-            {headerActions}
-          </div>
-        </header>
-          <main className="flex flex-1 flex-col overflow-auto py-4 pr-4 pl-2 lg:py-6 lg:pr-6 lg:pl-3"> {/* MODIFIED PADDING */}
-            {/* Outlet is added here to render child routes, passing context */}
-            {/* PageActionProvider is now at a higher level */}
+        <div className="flex flex-1 flex-col overflow-hidden">
+          <DashboardHeaderContent
+            pageTitle={pageTitle}
+            isKnowledgeBasePage={isKnowledgeBasePage}
+            isStatsPage={isStatsPage} // Pass isStatsPage
+            headerActions={headerActions}
+            onShowImportForm={handleShowImportForm}
+            onShowCreateDialog={() => setShowCreateDialog(true)}
+            toggleSidebar={toggleSidebar} // Pass toggleSidebar
+            sidebarState={state} // Pass sidebar state
+          />
+          <main className="flex flex-1 flex-col overflow-auto py-4 pr-4 pl-2 lg:py-6 lg:pr-6 lg:pl-3">
             <Outlet context={{ setHeaderActions } satisfies PageHeaderContextType} />
           </main>
         </div>
