@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input"; // Import Input
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge"; // Import Badge
 import {
   Table,
   TableHeader,
@@ -88,59 +89,62 @@ const BroadcastsPage = () => {
   };
 
   return (
-    <div className="p-4 md:p-6 space-y-6">
-      <div className="flex justify-between items-center">
+    <div className="container mx-auto py-8 px-4 md:px-6 lg:px-8 space-y-8"> {/* Adjusted padding and spacing */}
+      {/* Page Header */}
+      <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-4"> {/* Removed mb-6, space-y-8 on parent handles it */}
         <h1 className="text-2xl font-semibold">Broadcast History</h1>
-        <Button onClick={handleOpenModal}>New Broadcast</Button>
-      </div>
-
-      {/* Search Input */}
-      <div className="mb-4">
-        <Input
-          type="text"
-          placeholder="Search broadcasts by message..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="max-w-sm"
-        />
+        <div className="flex flex-col sm:flex-row gap-2">
+          <Input
+            type="text"
+            placeholder="Search messages..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full sm:w-64" // Adjusted width
+          />
+          <Button onClick={handleOpenModal} className="w-full sm:w-auto">New Broadcast</Button>
+        </div>
       </div>
 
       <Card>
-        <CardHeader>
-          <CardTitle>Past Broadcasts ({filteredBroadcasts.length})</CardTitle> {/* Show count */}
+        <CardHeader className="px-6 py-4"> {/* Adjusted padding */}
+          <div className="flex justify-between items-center">
+            <div className="flex items-center gap-3"> {/* Increased gap */}
+              <CardTitle className="text-xl">Past Broadcasts</CardTitle> {/* Slightly smaller title for card context */}
+            </div>
+          </div>
         </CardHeader>
-        <CardContent>
-          {isLoading && <p>Loading broadcast history...</p>}
-          {error && <p className="text-red-500">{error}</p>}
+        <CardContent className="p-0"> {/* Remove padding if table handles it, or use p-6 if table needs container padding */}
+          {isLoading && <div className="p-6 text-center"><p>Loading broadcast history...</p></div>}
+          {error && <div className="p-6 text-center"><p className="text-red-500">{error}</p></div>}
           {!isLoading && !error && broadcasts.length > 0 && filteredBroadcasts.length === 0 && (
-             <p>No broadcasts match your search term.</p>
+             <div className="p-6 text-center"><p>No broadcasts match your search term.</p></div>
           )}
           {!isLoading && !error && broadcasts.length === 0 && (
-            <p>No broadcast messages sent yet.</p>
+            <div className="p-6 text-center"><p>No broadcast messages sent yet. Create one to get started!</p></div>
           )}
-          {!isLoading && !error && filteredBroadcasts.length > 0 && ( // Use filteredBroadcasts
+          {!isLoading && !error && filteredBroadcasts.length > 0 && (
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Message</TableHead>
-                  <TableHead>Sent Date</TableHead>
-                  <TableHead>Status</TableHead> {/* Placeholder */}
-                  <TableHead className="text-right">Actions</TableHead>
+                  <TableHead className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Message</TableHead>
+                  <TableHead className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Sent Date</TableHead>
+                  <TableHead className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Status</TableHead>
+                  <TableHead className="h-12 px-4 align-middle font-medium text-muted-foreground text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {filteredBroadcasts.map((broadcast) => ( // Use filteredBroadcasts
-                  <TableRow key={broadcast.id}>
-                    <TableCell className="font-medium max-w-xs truncate">
+                {filteredBroadcasts.map((broadcast) => (
+                  <TableRow key={broadcast.id} className="hover:bg-muted/50"> {/* Added hover state */}
+                    <TableCell className="p-4 align-middle font-medium max-w-md truncate">
                       {broadcast.message_text}
                     </TableCell>
-                    <TableCell>
+                    <TableCell className="p-4 align-middle text-muted-foreground"> {/* Standardized text color */}
                       {format(new Date(broadcast.created_at), 'PPpp')}
                     </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      {broadcast.status || 'Sent'} {/* Display status or default */}
+                    <TableCell className="p-4 align-middle text-muted-foreground">
+                      {broadcast.status || 'Sent'}
                     </TableCell>
-                    <TableCell className="text-right space-x-2">
+                    <TableCell className="p-4 align-middle text-right space-x-2">
                       {/* Duplicate Button */}
                       <Button
                         variant="ghost"

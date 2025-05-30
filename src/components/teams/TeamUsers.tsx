@@ -127,11 +127,11 @@ const TeamUsers: React.FC<TeamUsersProps> = ({ teamId }) => {
 
 
   return (
-    <Card className="mt-6">
-      <CardHeader className="flex flex-row items-center justify-between">
+    <Card className="mt-6"> {/* Consider removing mt-6 if parent component handles spacing */}
+      <CardHeader className="px-6 py-4 flex flex-row items-center justify-between"> {/* Adjusted padding */}
         <div>
-            <CardTitle>Team Members</CardTitle>
-            <CardDescription>Manage users in this team.</CardDescription>
+            <CardTitle className="text-xl">Team Members</CardTitle> {/* Consistent title size */}
+            <CardDescription>Manage users and their roles in this team.</CardDescription> {/* Slightly more descriptive */}
         </div>
         {canManageUsers && (
             <Button onClick={() => setShowAddUserModal(true)} size="sm">
@@ -139,24 +139,24 @@ const TeamUsers: React.FC<TeamUsersProps> = ({ teamId }) => {
             </Button>
         )}
       </CardHeader>
-      <CardContent>
-        {isLoading && teamUsers.length === 0 && <p>Loading members...</p>}
-        {!isLoading && teamUsers.length === 0 && <p className="text-muted-foreground">No users in this team yet.</p>}
+      <CardContent className="p-0"> {/* Remove padding if table handles it */}
+        {isLoading && teamUsers.length === 0 && <div className="p-6 text-center"><p>Loading members...</p></div>}
+        {!isLoading && teamUsers.length === 0 && <div className="p-6 text-center"><p className="text-muted-foreground">No users in this team yet. Add one to get started!</p></div>}
         
         {teamUsers.length > 0 && (
           <Table>
             <TableHeader>
               <TableRow>
-                <TableHead>Email</TableHead>
-                <TableHead>Role</TableHead>
-                {canManageUsers && <TableHead className="text-right">Actions</TableHead>}
+                <TableHead className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Email</TableHead>
+                <TableHead className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Role</TableHead>
+                {canManageUsers && <TableHead className="h-12 px-4 align-middle font-medium text-muted-foreground text-right">Actions</TableHead>}
               </TableRow>
             </TableHeader>
             <TableBody>
               {displayedTeamUsers.map((member) => (
-                <TableRow key={member.id}>
-                  <TableCell>{member.user?.email || member.user_id}</TableCell>
-                  <TableCell>
+                <TableRow key={member.id} className="hover:bg-muted/50"> {/* Added hover state */}
+                  <TableCell className="p-4 align-middle">{member.user?.email || member.user_id}</TableCell>
+                  <TableCell className="p-4 align-middle">
                     {canManageUsers && member.user_id !== currentUser?.id && !(member.role === 'owner' && !isCurrentUserOwner(teamId)) ? (
                       <Select
                         value={member.role}
@@ -177,11 +177,11 @@ const TeamUsers: React.FC<TeamUsersProps> = ({ teamId }) => {
                     )}
                   </TableCell>
                   {canManageUsers && (
-                    <TableCell className="text-right">
+                    <TableCell className="p-4 align-middle text-right">
                       {member.user_id !== currentUser?.id && !(member.role === 'owner' && !isCurrentUserOwner(teamId)) && (
                         <Button
                           variant="ghost"
-                          size="icon"
+                          size="icon" // size="sm" might be more consistent with other actions if text is added
                           onClick={() => handleRemoveUser(member.id, member.user?.email)}
                           disabled={isLoading}
                           title="Remove user"

@@ -59,9 +59,11 @@ export function LeadsHeader({
   const selectedTags = availableTags.filter(tag => selectedTagIds?.includes(tag.id));
 
   return (
-    <div className="flex justify-between items-center p-4 border-b gap-4">
-      <div className="flex items-center gap-4">
-        <h2 className="text-lg font-semibold">Pipeline</h2>
+    // Use px-6 for more horizontal padding, consistent with typical dashboard page headers
+    <div className="flex flex-col sm:flex-row justify-between items-center p-4 sm:px-6 border-b gap-3"> 
+      <div className="flex items-center gap-3"> {/* Reduced gap slightly for a tighter look */}
+        {/* Consider making the title larger if this is a main page title */}
+        <h1 className="text-xl font-semibold">Pipeline</h1> 
         
         {/* Tag Filter Popover */}
         <Popover open={openPopover} onOpenChange={setOpenPopover}>
@@ -70,17 +72,17 @@ export function LeadsHeader({
               variant="outline"
               role="combobox"
               aria-expanded={openPopover}
-              className="w-[200px] justify-between"
+              className="w-[220px] justify-between text-sm" // Increased width slightly, ensured text size
             >
               <span className="truncate">
                 {selectedTags.length > 0 
                   ? `${selectedTags.length} tag${selectedTags.length > 1 ? 's' : ''} selected` 
-                  : "Filter by tag..."}
+                  : "Filter by tags..."} 
               </span>
               <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
             </Button>
           </PopoverTrigger>
-          <PopoverContent className="w-[200px] p-0">
+          <PopoverContent className="w-[220px] p-0"> {/* Matched width */}
             <Command>
               <CommandInput placeholder="Search tags..." />
               <CommandList>
@@ -111,17 +113,18 @@ export function LeadsHeader({
           </PopoverContent>
         </Popover>
         {/* Display selected tags as badges */}
-        <div className="flex gap-1 flex-wrap">
+        <div className="flex gap-1.5 flex-wrap"> {/* Slightly increased gap for badges */}
           {selectedTags.map(tag => (
-            <Badge key={tag.id} variant="secondary" className="flex items-center gap-1">
+            <Badge key={tag.id} variant="outline" className="flex items-center gap-1 text-xs"> {/* Changed to outline, adjusted text size */}
               {tag.name}
               <Button 
                 variant="ghost" 
                 size="icon" 
-                className="h-4 w-4 p-0 ml-1" 
+                className="h-3.5 w-3.5 p-0 ml-0.5 hover:bg-destructive/20 rounded-full" // Made X button smaller and rounder on hover
                 onClick={() => handleTagSelect(tag.id)}
+                title={`Remove tag ${tag.name}`}
               >
-                <X className="h-3 w-3" />
+                <X className="h-2.5 w-2.5 text-muted-foreground hover:text-destructive" />
               </Button>
             </Badge>
           ))}
@@ -129,9 +132,10 @@ export function LeadsHeader({
       </div>
 
       {/* Add Lead Button */}
-      <Button disabled={!selectedPipelineId}> {/* Disable if no pipeline selected */}
-        <Plus className="h-4 w-4 mr-2" />
-        ADD LEAD
+      {/* On smaller screens, this button might wrap. Consider responsive layout for the header if many items. */}
+      <Button disabled={!selectedPipelineId} size="sm"> {/* Standardized button size */}
+        <Plus className="h-4 w-4 mr-1.5" /> {/* Adjusted margin */}
+        Add Lead
       </Button>
     </div>
   );

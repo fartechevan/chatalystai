@@ -458,39 +458,39 @@ export function ChunkEditor() {
               <p className="text-sm">Add chunks manually or generate from your document content</p>
             </div>
           ) : (
-            <div>
-              <Table className="border rounded-lg">
+            <div className="border rounded-lg overflow-hidden"> {/* Added overflow-hidden for better border radius handling with table */}
+              <Table> {/* Removed className="border rounded-lg" as parent div handles it */}
                 <TableHeader>
-                  <TableRow className="hover:bg-transparent">
-                    <TableHead className="w-10">
+                  <TableRow className="hover:bg-transparent bg-muted/50"> {/* Added subtle bg to header row */}
+                    <TableHead className="h-12 px-4 text-left align-middle font-medium text-muted-foreground w-10">
                       <div className="flex items-center" onClick={toggleSelectAll}>
                         {selectAll ? 
                           <CheckSquare className="h-5 w-5 cursor-pointer text-primary" /> : 
-                          <Square className="h-5 w-5 cursor-pointer" />
+                          <Square className="h-5 w-5 cursor-pointer text-muted-foreground hover:text-primary" /> // Adjusted non-selected icon style
                         }
                       </div>
                     </TableHead>
-                    <TableHead>Chunk</TableHead>
-                    <TableHead className="w-[180px]">Characters</TableHead>
-                    <TableHead className="w-[180px]">Retrieval count</TableHead>
-                    <TableHead className="w-[120px] text-right">Status</TableHead>
+                    <TableHead className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Chunk</TableHead>
+                    <TableHead className="h-12 px-4 text-left align-middle font-medium text-muted-foreground w-[180px]">Characters</TableHead>
+                    <TableHead className="h-12 px-4 text-left align-middle font-medium text-muted-foreground w-[180px]">Retrieval count</TableHead>
+                    <TableHead className="h-12 px-4 text-right align-middle font-medium text-muted-foreground w-[120px]">Status</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {filteredChunks.map((chunk, index) => (
-                    <TableRow key={chunk.id} className="group">
-                      <TableCell>
+                    <TableRow key={chunk.id} className="group hover:bg-muted/50"> {/* Ensured hover state */}
+                      <TableCell className="p-4 align-middle">
                         <div 
                           className="flex items-center" 
                           onClick={() => toggleSelectChunk(chunk.id)}
                         >
                           {selectedChunks.has(chunk.id) ? 
                             <CheckSquare className="h-5 w-5 cursor-pointer text-primary" /> : 
-                            <Square className="h-5 w-5 cursor-pointer" />
+                            <Square className="h-5 w-5 cursor-pointer text-muted-foreground hover:text-primary" /> // Adjusted non-selected icon style
                           }
                         </div>
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="p-4 align-middle">
                         <div className="space-y-1">
                           <div className="font-medium flex items-center gap-2">
                             <Hash className="h-4 w-4 text-muted-foreground" />
@@ -512,13 +512,13 @@ export function ChunkEditor() {
                           </div>
                         </div>
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="p-4 align-middle text-muted-foreground">
                         {getCharacterCount(chunk.content).toLocaleString()} characters
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="p-4 align-middle text-muted-foreground">
                         {Math.floor(Math.random() * 10)} Retrieval count
                       </TableCell>
-                      <TableCell className="text-right">
+                      <TableCell className="p-4 align-middle text-right">
                         <Badge 
                           className="ml-auto bg-green-100 text-green-800 hover:bg-green-100"
                         >
