@@ -379,20 +379,21 @@ export function IntegrationTabs({
                   <p className="text-sm text-muted-foreground">
                     Select an instance below to connect or manage.
                   </p>
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Instance Name</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead className="text-right">Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {fetchedInstances.map((instance) => (
-                        <TableRow key={instance.id || instance.name}>
-                          <TableCell className="font-medium">{instance.name || 'Unnamed Instance'}</TableCell>
-                          <TableCell>{renderStatus(instance.connectionStatus as ConnectionState)}</TableCell>
-                          <TableCell className="text-right">
+                  <div className="border rounded-lg overflow-hidden"> {/* Added container for consistent styling */}
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="hover:bg-transparent bg-muted/50"> {/* Added subtle bg to header row */}
+                          <TableHead className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Instance Name</TableHead>
+                          <TableHead className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Status</TableHead>
+                          <TableHead className="h-12 px-4 text-right align-middle font-medium text-muted-foreground">Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {fetchedInstances.map((instance) => (
+                          <TableRow key={instance.id || instance.name} className="hover:bg-muted/50"> {/* Added hover state */}
+                            <TableCell className="p-4 align-middle font-medium">{instance.name || 'Unnamed Instance'}</TableCell>
+                            <TableCell className="p-4 align-middle">{renderStatus(instance.connectionStatus as ConnectionState)}</TableCell>
+                            <TableCell className="p-4 align-middle text-right">
                             <div className="flex items-center justify-end space-x-1"> {/* Wrapper div */}
                               {/* Connect Button */}
                               <Button
@@ -437,6 +438,7 @@ export function IntegrationTabs({
                       ))}
                     </TableBody>
                   </Table>
+                  </div> {/* Close container div */}
                   {/* Section to create additional instances */}
                   <div className="pt-4 border-t mt-4">
                     <h4 className="text-md font-semibold mb-2">Create New Instance</h4>

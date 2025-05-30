@@ -61,44 +61,45 @@ export function ContactDetails({ contactId, onCloseDetails }: ContactDetailsProp
   };
 
   return (
-    <div className="p-6 h-full flex flex-col">
-      <Card className="flex-1 overflow-auto">
-        <CardHeader>
-          <div className="flex justify-between items-start">
-            <div>
-              <h2 className="text-2xl font-bold">{contact.name}</h2>
-              <p className="text-muted-foreground">{contact.email || 'No email'}</p>
-            </div>
-            {/* Edit Button and Dialog Trigger */}
-            <EditContactDialog contact={dialogContact} onContactUpdated={handleContactUpdated}>
-              <Button variant="outline" size="icon">
-                <Pencil className="h-4 w-4" />
-                <span className="sr-only">Edit Contact</span>
-              </Button>
-            </EditContactDialog>
+    // The parent in ListsView.tsx handles the main panel styling (border-l, bg-background, shadow-lg)
+    // This component will now just manage its internal content structure and padding.
+    <div className="h-full flex flex-col"> 
+      {/* Header Section */}
+      <div className="flex justify-between items-center p-4 border-b">
+        <div>
+          <h2 className="text-xl font-semibold truncate">{contact.name}</h2>
+          <p className="text-sm text-muted-foreground truncate">{contact.email || 'No email'}</p>
+        </div>
+        <EditContactDialog contact={dialogContact} onContactUpdated={handleContactUpdated}>
+          <Button variant="ghost" size="icon"> {/* Changed to ghost for a less prominent edit button */}
+            <Pencil className="h-4 w-4" />
+            <span className="sr-only">Edit Contact</span>
+          </Button>
+        </EditContactDialog>
+      </div>
+
+      {/* Content Section */}
+      <div className="flex-1 overflow-y-auto p-4"> {/* Added padding to content area */}
+        <div className="space-y-6"> {/* Increased spacing between sections */}
+          <div>
+            <h3 className="text-xs font-medium uppercase text-muted-foreground mb-1">Phone</h3>
+            <p className="text-sm">{contact.phone_number || 'N/A'}</p>
           </div>
-        </CardHeader>
-        <CardContent>
-          <div className="space-y-4">
-            <div>
-              <label className="text-sm font-medium">Phone</label>
-              <p>{contact.phone_number || 'N/A'}</p> {/* Corrected field name */}
-            </div>
-             <div>
-              <label className="text-sm font-medium">Company</label>
-              <p>{contact.company_name || 'N/A'}</p> {/* Corrected field name */}
-            </div>
-            {contact.metadata && typeof contact.metadata === 'object' && Object.keys(contact.metadata).length > 0 && ( // Check if metadata exists and is not empty object
-              <div>
-                <label className="text-sm font-medium">Additional Information</label>
-                <pre className="mt-1 text-sm bg-muted p-2 rounded-md">
-                  {JSON.stringify(contact.metadata, null, 2)}
-                </pre>
-              </div>
-            )}
+          <div>
+            <h3 className="text-xs font-medium uppercase text-muted-foreground mb-1">Company</h3>
+            <p className="text-sm">{contact.company_name || 'N/A'}</p>
           </div>
-        </CardContent>
-      </Card>
+          {contact.metadata && typeof contact.metadata === 'object' && Object.keys(contact.metadata).length > 0 && (
+            <div>
+              <h3 className="text-xs font-medium uppercase text-muted-foreground mb-1">Additional Information</h3>
+              <pre className="mt-1 text-xs bg-muted/50 p-3 rounded-md overflow-x-auto"> {/* Adjusted pre styling */}
+                {JSON.stringify(contact.metadata, null, 2)}
+              </pre>
+            </div>
+          )}
+        </div>
+      </div>
+      {/* Optional: Add a CardFooter here if actions are needed at the bottom of the panel */}
     </div>
   );
 }

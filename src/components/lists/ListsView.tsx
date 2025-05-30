@@ -1,39 +1,37 @@
-
-import { useState, useEffect } from "react"; // Keep only one import
+import { useState, useEffect } from "react";
 import { ContactList } from "./ContactList";
 import { CompanyList } from "./CompanyList";
 import { LeadsList } from "./LeadsList";
-import { SegmentsView } from "./SegmentsView"; // Import SegmentsView
+import { SegmentsView } from "./SegmentsView";
 import { ContactDetails } from "./ContactDetails";
 import { Button } from "@/components/ui/button";
-import { UsersIcon, Building2, Image, Package, Target, PanelLeftClose, PanelLeftOpen, SidebarOpen, ListFilter } from "lucide-react"; // Added icons & ListFilter for segments
+import { UsersIcon, Building2, Image, Package, Target, PanelLeftClose, PanelLeftOpen, SidebarOpen, ListFilter } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"; // Added Sheet
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
-import { useMediaQuery } from "@/hooks/use-media-query"; // Added hook import
+import { useMediaQuery } from "@/hooks/use-media-query";
 
 export function ListsView() {
   const [selectedTab, setSelectedTab] = useState("contacts");
   const [selectedContactId, setSelectedContactId] = useState<string | null>(null);
-  const [isListCollapsed, setIsListCollapsed] = useState(false); // State for desktop collapse
-  const [isMobileListDrawerOpen, setIsMobileListDrawerOpen] = useState(false); // State for mobile drawer
-  const isDesktop = useMediaQuery("(min-width: 768px)"); // md breakpoint
+  const [isListCollapsed, setIsListCollapsed] = useState(false);
+  const [isMobileListDrawerOpen, setIsMobileListDrawerOpen] = useState(false);
+  const isDesktop = useMediaQuery("(min-width: 768px)");
 
   const listItems = [
-    { id: "contacts", label: "Contacts", icon: UsersIcon }, // Restored
-    { id: "companies", label: "Companies", icon: Building2 }, // Restored
+    { id: "contacts", label: "Contacts", icon: UsersIcon },
+    { id: "companies", label: "Companies", icon: Building2 },
     { id: "leads", label: "Leads", icon: Target },
-    { id: "segments", label: "Segments", icon: ListFilter }, // Added Segments tab
-    // { id: "all", label: "All Contacts and Companies", icon: Users2 }, // Removed
+    { id: "segments", label: "Segments", icon: ListFilter },
     { id: "media", label: "Media", icon: Image },
     { id: "products", label: "Products", icon: Package },
   ];
 
   const handleTabSelect = (tabId: string) => {
     setSelectedTab(tabId);
-    setSelectedContactId(null); // Clear selected contact when changing list type
+    setSelectedContactId(null); 
     if (!isDesktop) {
-      setIsMobileListDrawerOpen(false); // Close drawer on selection
+      setIsMobileListDrawerOpen(false);
     }
   };
 
@@ -41,70 +39,49 @@ export function ListsView() {
     setIsListCollapsed(!isListCollapsed);
   };
 
-  // Extracted Left Panel Content
   const listPanelContent = (
     <div className={cn(
-      "border-r bg-muted/30 flex flex-col h-full transition-all duration-300 relative",
-      // Width is controlled by parent container (SheetContent or desktop div)
-      isDesktop && isListCollapsed ? "items-center" : "" // Center icons when collapsed
+      "border-r bg-background flex flex-col h-full transition-all duration-300 relative",
+      isDesktop && isListCollapsed ? "items-center" : "" 
     )}>
-      <div className={cn("p-4 border-b", isDesktop && isListCollapsed ? "px-2" : "")}>
-        <h2 className={cn(
-          "font-semibold text-lg", 
-          isDesktop && isListCollapsed ? "hidden" : "" // Hide title when collapsed
-        )}>
-          Lists
-        </h2>
+      <div className={cn(
+        "flex items-center border-b", 
+        isDesktop && isListCollapsed ? "h-[57px] justify-center px-2" : "px-4 h-[57px] justify-between"
+      )}>
+        {! (isDesktop && isListCollapsed) && <span className="font-semibold text-lg">Lists</span>}
+        {isDesktop && (
+          <Button variant="ghost" size="icon" onClick={handleCollapseToggle} className={cn(isDesktop && isListCollapsed ? "" : "ml-auto")}>
+            {isListCollapsed ? <PanelLeftOpen className="h-5 w-5" /> : <PanelLeftClose className="h-5 w-5" />}
+            <span className="sr-only">{isListCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}</span>
+          </Button>
+        )}
       </div>
       <ScrollArea className="flex-1">
-        <div className={cn("p-3 space-y-1", isDesktop && isListCollapsed ? "px-1.5" : "")}>
+        <nav className={cn("px-3 py-2 space-y-1", isDesktop && isListCollapsed ? "px-1.5" : "")}>
           {listItems.map((item) => (
             <Button
               key={item.id}
               variant={selectedTab === item.id ? "secondary" : "ghost"}
               className={cn(
-                "w-full justify-start gap-2 h-10",
-                selectedTab === item.id && "bg-muted font-medium",
-                isDesktop && isListCollapsed ? "px-2 justify-center" : "" // Adjust padding/alignment when collapsed
+                "w-full justify-start gap-2 text-sm h-9",
+                isDesktop && isListCollapsed ? "px-0 justify-center" : "px-3" 
               )}
               onClick={() => handleTabSelect(item.id)}
-              title={item.label} // Add title for collapsed view
+              title={item.label} 
             >
               <item.icon className="h-4 w-4 flex-shrink-0" />
-              {/* Hide label when collapsed on desktop */}
               <span className={cn(isDesktop && isListCollapsed ? "hidden" : "")}>{item.label}</span>
             </Button>
           ))}
-        </div>
+        </nav>
       </ScrollArea>
-      {/* Desktop Collapse Button */}
-      {isDesktop && (
-         <button
-            onClick={handleCollapseToggle}
-            className={cn(
-              "absolute -right-3 top-3 p-1 rounded-full bg-background border shadow-sm hover:bg-accent",
-              "transition-transform"
-            )}
-            title={isListCollapsed ? 'Expand list types' : 'Collapse list types'}
-          >
-            {isListCollapsed ? (
-              <PanelLeftOpen className="h-4 w-4" /> 
-            ) : (
-              <PanelLeftClose className="h-4 w-4" />
-            )}
-          </button>
-      )}
     </div>
   );
 
-
   return (
-    // Use h-full, remove negative margins
     <div className="h-full w-full flex flex-col relative"> 
-      <div className="flex-1 flex min-h-0"> {/* Ensure flex container takes height */}
-        
-        {/* Mobile Drawer Trigger */}
-        <div className="md:hidden p-2 border-r"> {/* Add border to match desktop */}
+      <div className="flex-1 flex min-h-0">
+        <div className="md:hidden p-2 border-r"> 
           <Sheet open={isMobileListDrawerOpen} onOpenChange={setIsMobileListDrawerOpen}>
             <SheetTrigger asChild>
               <Button variant="outline" size="icon">
@@ -112,73 +89,60 @@ export function ListsView() {
                 <span className="sr-only">Open Lists Menu</span>
               </Button>
             </SheetTrigger>
-            <SheetContent side="left" className="p-0 w-60"> {/* Adjust width */}
+            <SheetContent side="left" className="p-0 w-60">
               {listPanelContent}
             </SheetContent>
           </Sheet>
         </div>
 
-        {/* Desktop Left Panel */}
         <div className={cn(
-          "hidden md:flex", // Show only on md+
-          isListCollapsed ? "w-16" : "w-64", // Control width based on state
+          "hidden md:flex", 
+          isListCollapsed ? "w-16" : "w-64", 
           "transition-all duration-300"
         )}>
           {listPanelContent}
         </div>
 
-        {/* Main Content & Details Panel */}
-        <div className="flex-1 flex min-w-0"> {/* Added min-w-0 */}
-          
-          {/* Conditional Rendering for Mobile vs Desktop */}
-          {isDesktop ? (
-            // --- Desktop View ---
-            <>
-              {/* Middle Panel (List Content) */}
-              <div className="flex-1 flex flex-col overflow-auto"> 
+        <div className="flex-1 flex min-w-0 bg-muted/20"> {/* Added background to content area parent */}
+          <div className="flex-1 flex flex-col overflow-auto p-4 md:p-6"> {/* Added padding to content area */}
+            {isDesktop ? (
+              <>
                 {selectedTab === "contacts" && <ContactList onSelectContact={setSelectedContactId} />}
                 {selectedTab === "companies" && <CompanyList />}
                 {selectedTab === "leads" && <LeadsList />}
-                {selectedTab === "segments" && <SegmentsView />} {/* Render SegmentsView */}
-                {selectedTab === "media" && <div className="p-4">Media Content Placeholder</div>}
-                {selectedTab === "products" && <div className="p-4">Products Content Placeholder</div>}
-              </div>
-
-              {/* Right Details Panel (Only show for contacts tab for now) */}
-              {isDesktop && selectedTab === "contacts" && selectedContactId && ( // Corrected conditional logic
-                <div className="w-96 border-l flex-shrink-0 overflow-auto"> {/* Added overflow-auto */}
-                  <ContactDetails
-                    contactId={selectedContactId}
-                    // No onClose needed for desktop
-                  />
-                </div>
-              )}
-            </>
-          ) : (
-            // --- Mobile View ---
-            <>
-              {selectedContactId ? (
-                // Show Details Panel only
-                <div className="flex-1 flex flex-col overflow-auto">
+                {selectedTab === "segments" && <SegmentsView />}
+                {selectedTab === "media" && <div className="p-4 bg-background rounded-lg shadow">Media Content Placeholder</div>}
+                {selectedTab === "products" && <div className="p-4 bg-background rounded-lg shadow">Products Content Placeholder</div>}
+              </>
+            ) : (
+              <>
+                {selectedContactId && selectedTab === "contacts" ? (
                    <ContactDetails 
                      contactId={selectedContactId} 
-                     onCloseDetails={() => setSelectedContactId(null)} // Pass handler
+                     onCloseDetails={() => setSelectedContactId(null)}
                    />
-                </div>
-              ) : (
-                // Show List Panel only
-                <div className="flex-1 flex flex-col overflow-auto">
-                  {selectedTab === "contacts" && <ContactList onSelectContact={setSelectedContactId} />}
-                  {selectedTab === "companies" && <CompanyList />}
-                  {selectedTab === "leads" && <LeadsList />}
-                  {selectedTab === "segments" && <SegmentsView />} {/* Render SegmentsView */}
-                  {selectedTab === "media" && <div className="p-4">Media Content Placeholder</div>}
-                  {selectedTab === "products" && <div className="p-4">Products Content Placeholder</div>}
-                </div>
-              )}
-            </>
+                ) : (
+                  <>
+                    {selectedTab === "contacts" && <ContactList onSelectContact={setSelectedContactId} />}
+                    {selectedTab === "companies" && <CompanyList />}
+                    {selectedTab === "leads" && <LeadsList />}
+                    {selectedTab === "segments" && <SegmentsView />}
+                    {selectedTab === "media" && <div className="p-4 bg-background rounded-lg shadow">Media Content Placeholder</div>}
+                    {selectedTab === "products" && <div className="p-4 bg-background rounded-lg shadow">Products Content Placeholder</div>}
+                  </>
+                )}
+              </>
+            )}
+          </div>
+
+          {isDesktop && selectedTab === "contacts" && selectedContactId && (
+            <div className="w-96 border-l flex-shrink-0 overflow-auto bg-background shadow-lg"> {/* Added bg and shadow */}
+              <ContactDetails
+                contactId={selectedContactId}
+              />
+            </div>
           )}
-        </div> {/* End Main Content & Details Panel */}
+        </div>
       </div>
     </div>
   );
