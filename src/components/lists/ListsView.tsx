@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { ContactList } from "./ContactList";
-import { CompanyList } from "./CompanyList";
+// import { CompanyList } from "./CompanyList"; // Commenting out as per request
 import { LeadsList } from "./LeadsList";
 import { SegmentsView } from "./SegmentsView";
 import { ContactDetails } from "./ContactDetails";
@@ -20,11 +20,11 @@ export function ListsView() {
 
   const listItems = [
     { id: "contacts", label: "Contacts", icon: UsersIcon },
-    { id: "companies", label: "Companies", icon: Building2 },
+    // { id: "companies", label: "Companies", icon: Building2 }, // Commenting out as per request
     { id: "leads", label: "Leads", icon: Target },
     { id: "segments", label: "Segments", icon: ListFilter },
     { id: "media", label: "Media", icon: Image },
-    { id: "products", label: "Products", icon: Package },
+    // { id: "products", label: "Products", icon: Package }, // Commenting out as per request
   ];
 
   const handleTabSelect = (tabId: string) => {
@@ -108,11 +108,11 @@ export function ListsView() {
             {isDesktop ? (
               <>
                 {selectedTab === "contacts" && <ContactList onSelectContact={setSelectedContactId} />}
-                {selectedTab === "companies" && <CompanyList />}
+                {/* {selectedTab === "companies" && <CompanyList />} */}
                 {selectedTab === "leads" && <LeadsList />}
                 {selectedTab === "segments" && <SegmentsView />}
                 {selectedTab === "media" && <div className="p-4 bg-background rounded-lg shadow">Media Content Placeholder</div>}
-                {selectedTab === "products" && <div className="p-4 bg-background rounded-lg shadow">Products Content Placeholder</div>}
+                {/* {selectedTab === "products" && <div className="p-4 bg-background rounded-lg shadow">Products Content Placeholder</div>} */}
               </>
             ) : (
               <>
@@ -124,11 +124,11 @@ export function ListsView() {
                 ) : (
                   <>
                     {selectedTab === "contacts" && <ContactList onSelectContact={setSelectedContactId} />}
-                    {selectedTab === "companies" && <CompanyList />}
+                    {/* {selectedTab === "companies" && <CompanyList />} */}
                     {selectedTab === "leads" && <LeadsList />}
                     {selectedTab === "segments" && <SegmentsView />}
                     {selectedTab === "media" && <div className="p-4 bg-background rounded-lg shadow">Media Content Placeholder</div>}
-                    {selectedTab === "products" && <div className="p-4 bg-background rounded-lg shadow">Products Content Placeholder</div>}
+                    {/* {selectedTab === "products" && <div className="p-4 bg-background rounded-lg shadow">Products Content Placeholder</div>} */}
                   </>
                 )}
               </>
