@@ -14,6 +14,10 @@ interface PageActionContextType {
   setSecondaryActionNode: (node: React.ReactNode | null) => void;
   breadcrumbNode: React.ReactNode | null; // New: For breadcrumbs
   setBreadcrumbNode: (node: React.ReactNode | null) => void; // New
+  headerNavNode: React.ReactNode | null; // New: For header navigation elements
+  setHeaderNavNode: (node: React.ReactNode | null) => void; // New
+  isBatchDateRangeDialogOpen: boolean;
+  setIsBatchDateRangeDialogOpen: (isOpen: boolean) => void;
 }
 
 const PageActionContext = createContext<PageActionContextType | undefined>(undefined);
@@ -34,6 +38,8 @@ export const PageActionProvider: React.FC<PageActionProviderProps> = ({ children
   const [primaryAction, setPrimaryActionState] = useState<PageAction | null>(null);
   const [secondaryActionNode, setSecondaryActionNodeState] = useState<React.ReactNode | null>(null);
   const [breadcrumbNode, setBreadcrumbNodeState] = useState<React.ReactNode | null>(null); // New
+  const [headerNavNode, setHeaderNavNodeState] = useState<React.ReactNode | null>(null); // New
+  const [isBatchDateRangeDialogOpen, setIsBatchDateRangeDialogOpenState] = useState<boolean>(false);
 
   const setPrimaryAction = useCallback((action: PageAction | null) => {
     setPrimaryActionState(action);
@@ -47,12 +53,22 @@ export const PageActionProvider: React.FC<PageActionProviderProps> = ({ children
     setBreadcrumbNodeState(node);
   }, []);
 
+  const setHeaderNavNode = useCallback((node: React.ReactNode | null) => { // New
+    setHeaderNavNodeState(node);
+  }, []);
+
+  const setIsBatchDateRangeDialogOpen = useCallback((isOpen: boolean) => {
+    setIsBatchDateRangeDialogOpenState(isOpen);
+  }, []);
+
   return (
     <PageActionContext.Provider 
       value={{ 
         primaryAction, setPrimaryAction, 
         secondaryActionNode, setSecondaryActionNode,
-        breadcrumbNode, setBreadcrumbNode // New
+        breadcrumbNode, setBreadcrumbNode, // New
+        headerNavNode, setHeaderNavNode, // New
+        isBatchDateRangeDialogOpen, setIsBatchDateRangeDialogOpen
       }}
     >
       {children}
