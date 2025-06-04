@@ -1,13 +1,11 @@
 
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from "../../../../integrations/supabase/client.ts";
 import type { Conversation } from "../types";
 
 /**
  * Fetches conversations the current user has access to, with their associated leads
  */
 export async function fetchConversationsWithParticipants() {
-  console.log("Fetching conversations with participants for current user...");
-
   // 1. Get current user ID
   const { data: { user }, error: userError } = await supabase.auth.getUser();
   if (userError || !user) {
@@ -16,7 +14,6 @@ export async function fetchConversationsWithParticipants() {
     return { conversations: [], profiles: [], customers: [] }; 
   }
   const userId = user.id;
-  console.log(`Current user ID: ${userId}`);
 
   // 2. Fetch accessible integration_ids for the user
   const { data: accessData, error: accessError } = await supabase
@@ -30,7 +27,6 @@ export async function fetchConversationsWithParticipants() {
   }
   // Use the fetched integration_ids directly
   const accessibleIntegrationIds = accessData?.map(item => item.integration_id) || []; 
-  console.log(`User has access to integration IDs: ${accessibleIntegrationIds.join(', ') || 'None'}`);
 
   // Step 3 (fetching integration_ids from integrations_config) is removed as it's redundant.
 
@@ -39,8 +35,6 @@ export async function fetchConversationsWithParticipants() {
   const integrationFilter = accessibleIntegrationIds.length > 0
     ? `integrations_id.is.null,integrations_id.in.(${accessibleIntegrationIds.map(id => `"${id}"`).join(',')})`
     : 'integrations_id.is.null'; // If user has no access, only show internal chats
-
-  console.log(`Applying conversation filter: ${integrationFilter}`);
 
   // 5. Define the query builder using const
   const query = supabase
@@ -73,8 +67,6 @@ export async function fetchConversationsWithParticipants() {
     console.error("Error fetching conversations:", conversationsError);
     throw conversationsError;
   }
-
-  console.log(`Fetched ${conversations?.length || 0} conversations matching access criteria.`);
 
   // Return early if no conversations are found or accessible
   if (!conversations || conversations.length === 0) {

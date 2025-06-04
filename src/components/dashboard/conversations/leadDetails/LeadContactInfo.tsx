@@ -15,7 +15,6 @@ interface LeadContactInfoProps {
 }
 
 export function LeadContactInfo({ customer, lead, isLoadingCustomer }: LeadContactInfoProps) { // Add to destructuring
-  // console.log("[Render LeadContactInfo] Props:", { customer, lead, isLoadingCustomer }); // Remove log
   const { toast } = useToast();
   const [isEditing, setIsEditing] = useState(false);
   // Remove internal state for companyName and companyAddress
@@ -104,17 +103,17 @@ export function LeadContactInfo({ customer, lead, isLoadingCustomer }: LeadConta
       <div className="pl-12 space-y-3">
         {/* Contact Information */}
         {(displayEmail || displayPhone) && (
-          <div className="space-y-2">
+          <div className="space-y-3"> {/* Increased spacing slightly */}
             {displayPhone && (
-              <div className="space-y-1">
-                <span className="text-sm text-muted-foreground">Phone:</span>
+              <div> {/* Removed space-y-1, using Label's implicit bottom margin or direct margin */}
+                <Label className="text-xs text-muted-foreground">Phone</Label> {/* Use Label, smaller text */}
                 <p className="text-sm">{displayPhone}</p>
               </div>
             )}
             
             {displayEmail && (
-              <div className="space-y-1">
-                <span className="text-sm text-muted-foreground">Email:</span>
+              <div>
+                <Label className="text-xs text-muted-foreground">Email</Label>
                 <p className="text-sm">{displayEmail}</p>
               </div>
             )}
@@ -164,27 +163,28 @@ export function LeadContactInfo({ customer, lead, isLoadingCustomer }: LeadConta
         ) : (
           <div className="space-y-3">
             {/* Company Name Display */}
-            <div className="space-y-1">
-              <span className="text-sm text-muted-foreground">Company:</span>
+            <div>
+              <Label className="text-xs text-muted-foreground">Company</Label>
               {isLoadingCustomer ? (
                 <div className="h-4 w-32 bg-muted animate-pulse rounded mt-1"></div>
-              ) : customer ? ( // Check if customer exists *after* loading
+              ) : customer ? ( 
                 <p className="text-sm">{customer.company_name || "Not specified"}</p> 
               ) : (
-                 <p className="text-sm italic text-muted-foreground">No customer data</p> // Explicitly handle null customer
+                 <p className="text-sm italic text-muted-foreground">No customer data</p> 
               )}
             </div>
             
             {/* Company Address Display */}
-            {isLoadingCustomer ? (
-              // Show pulse only if address might exist (or we don't know yet)
-              customer?.company_address !== undefined && <div className="h-4 w-40 bg-muted animate-pulse rounded mt-1"></div>
-            ) : customer && customer.company_address ? ( // Check customer exists *and* has address
-              <div className="space-y-1">
-                <span className="text-sm text-muted-foreground">Address:</span>
-                <p className="text-sm">{customer.company_address}</p>
+            {(isLoadingCustomer && customer?.company_name !== undefined) || (customer && customer.company_address) ? ( // Show if loading and company might have address, or if customer has address
+              <div>
+                <Label className="text-xs text-muted-foreground">Address</Label>
+                {isLoadingCustomer ? (
+                   <div className="h-4 w-40 bg-muted animate-pulse rounded mt-1"></div>
+                ) : (
+                  <p className="text-sm">{customer?.company_address}</p>
+                )}
               </div>
-            ) : null} 
+            ) : null}
             
             {/* Edit Button Logic */}
             {isLoadingCustomer ? (

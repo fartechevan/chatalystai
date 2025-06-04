@@ -11,7 +11,6 @@ export async function getEvolutionApiCredentials(
   apiKey: string | null;
   baseUrl: string | null;
 }> {
-  console.log(`Getting Evolution API credentials for integration: ${integrationId || 'default'}`);
   
   try {
     // If integrationId is provided, try to get credentials from that specific integration
@@ -45,9 +44,9 @@ export async function getEvolutionApiCredentials(
         console.error("Error fetching integration config:", configError);
       } else if (config) {
         // Handle potential nested object from join query
-        const baseUrl = config.integrations ? 
-          (typeof config.integrations === 'object' ? 
-            (config.integrations as any).base_url : null) 
+        const baseUrl = config.integrations ?
+          (typeof config.integrations === 'object' && config.integrations !== null && 'base_url' in config.integrations ?
+            (config.integrations as { base_url: string | null }).base_url : null)
           : null;
           
         return {

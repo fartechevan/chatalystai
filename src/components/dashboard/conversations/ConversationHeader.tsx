@@ -9,33 +9,34 @@ import {
 import { Input } from "@/components/ui/input";
 import {
   MoreVertical,
-  Search,
-  PhoneCall,
-  Video,
+  // Search, // To be removed
+  // PhoneCall, // To be removed
+  // Video, // To be removed
   Eye,
   Star,
   Flag,
   Clock,
   Tag,
   User,
-  X,
-  // Removed Loader2 as it's no longer needed here
+  PanelRightOpen, // Added for the new trigger button
 } from "lucide-react";
 import { useState, useEffect } from "react";
-// Removed unused imports: useMutation, useQueryClient, toast
+import { useMediaQuery } from "@/hooks/use-media-query"; // Added back for isDesktop check
 import type { Conversation } from "./types";
 import type { Customer } from "./types/customer";
+// import { Input } from "@/components/ui/input"; 
 import { supabase } from "@/integrations/supabase/client";
 
 interface ConversationHeaderProps {
   conversation: Conversation | null;
-  // Add refetchConversations if needed, or rely on queryClient invalidation
+  partnerName?: string;
+  onOpenLeadDetails?: () => void; // Added prop
 }
 
-export function ConversationHeader({ conversation }: ConversationHeaderProps) {
-  const [isSearchExpanded, setIsSearchExpanded] = useState(false);
+export function ConversationHeader({ conversation, partnerName, onOpenLeadDetails }: ConversationHeaderProps) {
+  // const [isSearchExpanded, setIsSearchExpanded] = useState(false); // Search functionality was removed
   const [customerData, setCustomerData] = useState<Customer | null>(null);
-  // Removed derivedCustomerId state and queryClient instance
+  const isDesktop = useMediaQuery("(min-width: 1024px)"); // For showing the button only on desktop
 
   // Fetch customer data when conversation changes (keeping this part)
   useEffect(() => {
@@ -105,11 +106,12 @@ export function ConversationHeader({ conversation }: ConversationHeaderProps) {
   }
 
   // Get contact information from various sources
-  const contactName = getContactName(customerData, conversation);
+  const localContactName = getContactName(customerData, conversation);
+  const displayContactName = (partnerName && partnerName !== "Chat") ? partnerName : localContactName;
   const phoneNumber = getPhoneNumber(customerData, conversation);
 
   // Get the first letter for the avatar
-  const avatarInitial = contactName.charAt(0).toUpperCase();
+  const avatarInitial = displayContactName.charAt(0).toUpperCase();
   // Removed showCreateLeadButton calculation
 
   return (
@@ -125,55 +127,31 @@ export function ConversationHeader({ conversation }: ConversationHeaderProps) {
               <User className="w-6 h-6 text-gray-500" />
             )}
           </div>
-          <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-white"></div>
+          {/* <div className="absolute bottom-0 right-0 w-3 h-3 bg-green-500 rounded-full border-2 border-white"></div> Removed green dot */}
         </div>
         <div className="truncate"> {/* Added truncate */}
-          <h2 className="font-semibold truncate" title={contactName}>{contactName}</h2> {/* Added truncate and title */}
+          <h2 className="font-semibold truncate" title={displayContactName}>{displayContactName}</h2> {/* Added truncate and title */}
           <p className="text-xs text-gray-500 truncate" title={phoneNumber}>{phoneNumber}</p> {/* Added truncate and title */}
         </div>
       </div>
 
       {/* Actions Section */}
       <div className="flex items-center space-x-1 flex-shrink-0">
-        {/* Removed Create Lead Button */}
-
-        {/* Existing Icons */}
-        {isSearchExpanded ? (
-          <div className="flex items-center rounded-md bg-gray-100 px-2">
-            <Search className="h-4 w-4 text-gray-400" />
-            <Input
-              className="h-8 w-40 border-0 bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0"
-              placeholder="Search conversation..."
-              autoFocus
-              onBlur={() => setIsSearchExpanded(false)}
-            />
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8"
-              onClick={() => setIsSearchExpanded(false)}
-            >
-              <X className="h-4 w-4" />
-            </Button>
-          </div>
-        ) : (
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => setIsSearchExpanded(true)}
+        {/* Desktop Trigger for Lead Details Panel */}
+        {isDesktop && onOpenLeadDetails && (
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            onClick={onOpenLeadDetails} 
+            aria-label="Toggle Lead Details" // Updated aria-label
+            title="Toggle Lead Details" // Updated title
           >
-            <Search className="h-5 w-5" />
+            <PanelRightOpen className="h-5 w-5" />
           </Button>
         )}
-        <Button variant="ghost" size="icon">
-          <PhoneCall className="h-5 w-5" />
-        </Button>
-        <Button variant="ghost" size="icon">
-          <Video className="h-5 w-5" />
-        </Button>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon">
+            <Button variant="ghost" size="icon" aria-label="More options">
               <MoreVertical className="h-5 w-5" />
             </Button>
           </DropdownMenuTrigger>

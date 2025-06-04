@@ -27,11 +27,9 @@ export function useEvolutionApiConnection(selectedIntegration: Integration | nul
 
     // Check if we have the necessary config values
     if (instanceNameToCheck && integrationId) { // Check for integrationId instead of token/baseUrl
-      console.log(`Checking status for configured instance: ${instanceNameToCheck} (Integration: ${integrationId})`);
       try {
         // Call checkInstanceStatus with instanceName and integrationId
         const currentState = await checkInstanceStatus(instanceNameToCheck, integrationId);
-        console.log("[LOG] checkCurrentConnectionState: currentState from checkInstanceStatus:", currentState); // Log the returned state
         // Ensure the state is valid before setting (and assert type for setConnectionState)
         if (['open', 'connecting', 'close', 'qrcode', 'pairingCode', 'idle', 'unknown'].includes(currentState)) {
              setConnectionState(currentState as ConnectionState); // Assert type here
@@ -47,7 +45,6 @@ export function useEvolutionApiConnection(selectedIntegration: Integration | nul
       }
     } else {
       // Update log message
-      console.log('Status Check: Necessary details not available (Instance Display Name or Integration ID missing).');
       setConnectionState('unknown'); // Set to unknown if details missing
       return false; // Indicate check couldn't be performed
     }
@@ -65,9 +62,7 @@ export function useEvolutionApiConnection(selectedIntegration: Integration | nul
         return;
     }
 
-     console.log(`Starting connection status polling for instance: ${instanceNameToPoll}`);
      const intervalId = setInterval(async () => {
-       console.log(`Polling status for: ${instanceNameToPoll}`);
 
       try {
         const currentState = await checkInstanceStatus(instanceNameToPoll, integrationId);
@@ -80,7 +75,6 @@ export function useEvolutionApiConnection(selectedIntegration: Integration | nul
 
 
         if (currentState === 'open' || currentState === 'close') { // Stop polling if definitively open or closed
-          console.log(`Polling successful: Instance ${instanceNameToPoll} is ${currentState}. Stopping polling.`);
           clearInterval(intervalId);
           setPollingInterval(null);
         }
@@ -166,13 +160,11 @@ export function useEvolutionApiConnection(selectedIntegration: Integration | nul
  
    useEffect(() => {
      if (config) {
-       // console.log('Initial connection state check with config:', config); // Removed log
        checkCurrentConnectionState();
      }
  
     return () => {
       if (pollingInterval) {
-        console.log('Cleaning up polling interval on unmount/config change.');
         clearInterval(pollingInterval);
         setPollingInterval(null);
       }
@@ -181,7 +173,6 @@ export function useEvolutionApiConnection(selectedIntegration: Integration | nul
 
   useEffect(() => {
     if ((connectionState === 'open' || connectionState === 'close') && pollingInterval) {
-      console.log(`Connection state is ${connectionState}, stopping polling.`);
       clearInterval(pollingInterval);
       setPollingInterval(null);
     }

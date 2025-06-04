@@ -1,20 +1,19 @@
-
-import { Card } from "@/components/ui/card";
+import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/components/ui/card"; // Import Card parts
 import { Button } from "@/components/ui/button";
 import { useState } from "react";
 import { AddLeadDialog } from "./AddLeadDialog";
 import { cn } from "@/lib/utils";
 import { Draggable, Droppable } from "@hello-pangea/dnd";
-// Building, User, DollarSign are now used in LeadCard
 import type { Lead } from "@/components/dashboard/conversations/types";
 import { LeadCard } from "./components/LeadCard"; // Import the new component
+import { Plus } from "lucide-react"; // Import Plus for the button
 
 interface LeadsStageProps {
   name: string;
   id: string;
   index?: number;
   leads: Lead[];
-  onLeadClick: (lead: Lead) => void; // Add prop for click handling
+  onLeadClick: (lead: Lead) => void;
 }
 
 const stageColors = {
@@ -24,78 +23,76 @@ const stageColors = {
   3: "border-orange-200", // Nurturing - light orange
 };
 
-export function LeadsStage({ name, id, index = 0, leads, onLeadClick }: LeadsStageProps) { // Add onLeadClick to destructuring
+export function LeadsStage({ name, id, index = 0, leads, onLeadClick }: LeadsStageProps) {
   const [isAddLeadOpen, setIsAddLeadOpen] = useState(false);
 
   const handleLeadAdded = () => {
-    // This will be handled by the realtime subscription in LeadsContent
     setIsAddLeadOpen(false);
   };
 
-  // formatCurrency function moved to LeadCard
-
   return (
-    // Remove flex-1, rely on min-width and parent flex container
-    <div className="min-w-[250px]"> 
-      <div className={cn(
-        "border-b-2 pb-2 mb-4",
+    <Card className="min-w-[280px] w-[280px] h-full flex flex-col bg-muted/60"> {/* Stage as a Card */}
+      <CardHeader className={cn(
+        "border-b-2 pb-3 pt-4 px-4", // Adjusted padding
         stageColors[index as keyof typeof stageColors] || "border-gray-400"
       )}>
-        <div className="flex flex-col">
-          <h3 className="text-sm font-medium text-muted-foreground uppercase tracking-wider">
-            {name}
-          </h3>
-          <div className="text-sm">
-            {leads.length} leads: {leads.reduce((sum, lead) => sum + (lead.value || 0), 0).toLocaleString()} RM
-          </div>
+        <div className="flex justify-between items-center">
+          <CardTitle className="text-base font-semibold uppercase tracking-wider">{name}</CardTitle>
+          <span className="text-xs font-medium text-muted-foreground">
+            {leads.length} {leads.length === 1 ? "lead" : "leads"} - {leads.reduce((sum, lead) => sum + (lead.value || 0), 0).toLocaleString()} RM
+          </span>
         </div>
-      </div>
+      </CardHeader>
 
-      <Droppable droppableId={id}>
-        {(provided, snapshot) => (
-          <div
-            ref={provided.innerRef}
-            {...provided.droppableProps}
-            className={cn(
-              "space-y-2 min-h-[200px] rounded-lg transition-colors p-2",
-              snapshot.isDraggingOver && "bg-muted/50"
-            )}
-          >
-            {leads.map((lead, leadIndex) => (
-              <Draggable
-                key={lead.id}
-                draggableId={lead.id}
-                index={leadIndex}
-              >
-                {(provided, snapshot) => (
-                  <div
-                    ref={provided.innerRef}
-                    {...provided.draggableProps}
-                    {...provided.dragHandleProps}
-                    className={cn(
-                      "transition-all duration-300 ease-in-out", // Changed to ease-in-out
-                      snapshot.isDragging && "opacity-50"
-                    )}
-                    onClick={() => onLeadClick(lead)} // Keep onClick on the wrapper div
-                  >
-                    {/* Use the LeadCard component */}
-                    <LeadCard lead={lead} /> 
-                  </div>
-                )}
-              </Draggable>
-            ))}
-            {provided.placeholder}
-          </div>
-        )}
-      </Droppable>
+      <CardContent className="flex-1 overflow-y-auto p-3 space-y-3"> {/* Content area scrolls */}
+        <Droppable droppableId={id}>
+          {(provided, snapshot) => (
+            <div
+              ref={provided.innerRef}
+              {...provided.droppableProps}
+              className={cn(
+                "min-h-[150px] rounded-md transition-colors",
+                snapshot.isDraggingOver && "bg-primary/10" 
+              )}
+            >
+              {leads.map((lead, leadIndex) => (
+                <Draggable
+                  key={lead.id}
+                  draggableId={lead.id}
+                  index={leadIndex}
+                >
+                  {(providedDraggable, snapshotDraggable) => (
+                    <div
+                      ref={providedDraggable.innerRef}
+                      {...providedDraggable.draggableProps}
+                      {...providedDraggable.dragHandleProps}
+                      className={cn(
+                        "mb-3", // Add margin bottom to space out cards
+                        snapshotDraggable.isDragging && "opacity-50"
+                      )}
+                      onClick={() => onLeadClick(lead)}
+                    >
+                      <LeadCard lead={lead} /> 
+                    </div>
+                  )}
+                </Draggable>
+              ))}
+              {provided.placeholder}
+            </div>
+          )}
+        </Droppable>
+      </CardContent>
 
-      <Button
-        variant="ghost"
-        className="w-full mt-2 border border-dotted border-black"
-        onClick={() => setIsAddLeadOpen(true)}
-      >
-        Add lead
-      </Button>
+      <CardFooter className="p-3 border-t">
+        <Button
+          variant="outline"
+          className="w-full text-sm"
+          onClick={() => setIsAddLeadOpen(true)}
+        >
+          <Plus className="h-4 w-4 mr-2" />
+          Add lead
+        </Button>
+      </CardFooter>
 
       <AddLeadDialog
         isOpen={isAddLeadOpen}
@@ -103,6 +100,6 @@ export function LeadsStage({ name, id, index = 0, leads, onLeadClick }: LeadsSta
         pipelineStageId={id}
         onLeadAdded={handleLeadAdded}
       />
-    </div>
+    </Card>
   );
 }

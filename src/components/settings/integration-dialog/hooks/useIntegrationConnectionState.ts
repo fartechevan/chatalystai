@@ -14,7 +14,7 @@ import { checkInstanceStatus } from "@/integrations/evolution-api/services/insta
 import { toast } from "@/components/ui/use-toast"; // Import toast for error handling
 
 
-import { WebhookSetupForm } from "../components/WebhookSetupForm";
+// import { WebhookSetupForm } from "../components/WebhookSetupForm"; // Not used directly in this hook
 
 // Helper type guard to check for error structure
 interface ApiErrorWithMessage {
@@ -57,8 +57,12 @@ function hasResponseError(obj: unknown): obj is ApiErrorWithResponse {
 export function useIntegrationConnectionState(
   selectedIntegration: Integration | null,
   open: boolean,
+  tenantId: string | null, // Added tenantId parameter
   onConnectionEstablished?: () => void // Make it optional for safety
 ) {
+  useEffect(() => {
+    console.log(`[DEBUG DUPLICATE CHECK][useIntegrationConnectionState] Hook initialized/props updated. tenantId prop value:`, tenantId);
+  }, [tenantId]);
   const [integrationMainPopup, setIntegrationMainPopup] = useState(true);
   const [showDeviceSelect, setShowDeviceSelect] = useState(false);
   const [isConnected, setIsConnected] = useState(false); // Represents if connection was ever 'open'
@@ -75,6 +79,11 @@ export function useIntegrationConnectionState(
 
   const [showWebhookSetup, setShowWebhookSetup] = useState(false);
   const [pendingWebhookIntegrationId, setPendingWebhookIntegrationId] = useState<string | null>(null);
+
+  // Integration limit states
+  const [currentIntegrationCount, setCurrentIntegrationCount] = useState(0);
+  const [maxIntegrationsAllowed, setMaxIntegrationsAllowed] = useState<number | null>(null);
+  const [canAddMoreIntegrations, setCanAddMoreIntegrations] = useState(true); // Assume true until checked
 
   // Use config hook for base_url, token etc. needed for API calls
   const { config, isLoading: configLoading, refetch: refetchConfig } = useEvolutionApiConfig(selectedIntegration);
@@ -106,10 +115,10 @@ export function useIntegrationConnectionState(
      if (checkError) throw checkError;
 
      if (!existingConfig) {
-       console.log(`[updateIntegrationStatus] No config found for ${integrationId}, inserting default.`);
+       console.log(`[updateIntegrationStatus] No config found for ${integrationId}, inserting default with integration_id and null status.`);
        const { error: insertError } = await supabase
          .from('integrations_config')
-         .insert({ integration_id: integrationId, base_url: 'https://api.evoapicloud.com' }); // Example default
+         .insert({ integration_id: integrationId, status: null }); // Insert only valid columns
        if (insertError) throw insertError;
      }
    } catch (error) {
@@ -235,47 +244,108 @@ export function useIntegrationConnectionState(
        console.log("[refetchInstances] Manual fetch valid instances after filtering", validInstances);
       setFetchedInstances(validInstances);
 
-      // --- BEGIN: Upsert fetched instances into integrations_config ---
+      // --- BEGIN: Insert fetched instances into integrations_config ---
       if (validInstances.length > 0) {
-        console.log("[refetchInstances] Upserting fetched instances into DB...");
-        const upsertPromises = validInstances.map(async (instance) => {
+        console.log("[refetchInstances] Inserting fetched instances into DB...");
+        console.log(`[DEBUG DUPLICATE CHECK][refetchInstances] Preparing to insert/update ${validInstances.length} instances. Current tenantId for these operations:`, tenantId);
+        const insertPromises = validInstances.map(async (instance) => {
           const instanceId = instance.id;
           const instanceDisplayName = instance.name;
           const ownerId = instance.ownerJid; // May be undefined
           const userReferenceId = ownerId ? ownerId.replace(/@s\.whatsapp\.net$/, '') : null;
 
           try {
-            const { error: upsertError } = await supabase
-              .from('integrations_config')
-              .upsert(
-                {
-                  integration_id: integrationId, // integrationId from function scope
-                  instance_id: instanceId,
-                  instance_display_name: instanceDisplayName,
-                  owner_id: ownerId, // Store original JID if available
-                  user_reference_id: userReferenceId, // Store sanitized ID if available
-                  pipeline_id: currentPipelineId || null, // Include pipeline_id, default to null if undefined
-                  // Add other default/required fields if necessary
-                 },
-                 {
-                   onConflict: 'integration_id', // Corrected: Use integration_id as the conflict target
-                   ignoreDuplicates: false, // Ensure updates happen
-                 }
-              );
-            if (upsertError) {
-              console.error(`[refetchInstances] Error upserting instance ${instanceId} for integration ${integrationId}:`, upsertError);
-              // Optionally throw or collect errors
+            const insertPayload = {
+              integration_id: integrationId,
+              instance_id: instanceId,
+              instance_display_name: instanceDisplayName,
+              owner_id: ownerId,
+              user_reference_id: userReferenceId,
+              pipeline_id: currentPipelineId || null,
+              token: instance.token,
+              tenant_id: tenantId,
+            };
+            console.log(`[DEBUG DUPLICATE CHECK][refetchInstances] Attempting to call upsert_integration_config RPC for instance_id: ${instanceId}, tenant_id: ${tenantId}.`);
+            const rpcArgs = {
+              p_integration_id: integrationId,
+              p_instance_id: instanceId,
+              p_tenant_id: tenantId,
+              p_instance_display_name: instanceDisplayName,
+              p_token: instance.token,
+              p_owner_id: ownerId,
+              p_user_reference_id: userReferenceId,
+              p_pipeline_id: currentPipelineId || null,
+              p_status: instance.connectionStatus // Pass connectionStatus as p_status
+            };
+            console.log('[DEBUG DUPLICATE CHECK][refetchInstances] RPC Args:', rpcArgs);
+            const { error: rpcError } = await supabase.rpc('upsert_integration_config', rpcArgs);
+
+            if (rpcError) {
+              console.error(`[DEBUG DUPLICATE CHECK][refetchInstances] ERROR calling upsert_integration_config RPC for instance ${instanceId} (tenant: ${tenantId}):`, rpcError, 'Args were:', rpcArgs);
             } else {
-               console.log(`[refetchInstances] Successfully upserted instance ${instanceId} for integration ${integrationId}`);
+               console.log(`[refetchInstances] Successfully called upsert_integration_config RPC for instance ${instanceId} (tenant: ${tenantId}).`);
             }
           } catch (err) {
-            console.error(`[refetchInstances] Exception during upsert for instance ${instanceId}:`, err);
+            console.error(`[refetchInstances] Exception during insert for instance ${instanceId}:`, err);
           }
         });
-        await Promise.all(upsertPromises);
-        console.log("[refetchInstances] Finished upserting instances.");
+        await Promise.all(insertPromises);
+        console.log("[refetchInstances] Finished upserting instances via RPC.");
+
+        // --- BEGIN: Delete stale instances from DB ---
+        if (validInstances.length > 0) { // Only run deletion if we have a valid list of live instances
+          const liveInstanceIds = validInstances.map(inst => inst.id);
+          console.log(`[refetchInstances] Live instance IDs from API for integration ${integrationId} (tenant: ${tenantId}):`, liveInstanceIds);
+
+          const { data: dbInstances, error: fetchDbError } = await supabase
+            .from('integrations_config')
+            .select('instance_id')
+            .eq('integration_id', integrationId)
+            .eq('tenant_id', tenantId); // Ensure we only check against the current tenant
+
+          if (fetchDbError) {
+            console.error(`[refetchInstances] Error fetching DB instance_ids for deletion check:`, fetchDbError);
+          } else if (dbInstances) {
+            const dbInstanceIds = dbInstances.map(dbInst => dbInst.instance_id).filter(id => id !== null) as string[];
+            console.log(`[refetchInstances] DB instance IDs for integration ${integrationId} (tenant: ${tenantId}):`, dbInstanceIds);
+            
+            const staleInstanceIds = dbInstanceIds.filter(dbId => !liveInstanceIds.includes(dbId));
+
+            if (staleInstanceIds.length > 0) {
+              console.log(`[refetchInstances] Stale instance IDs to delete for integration ${integrationId} (tenant: ${tenantId}):`, staleInstanceIds);
+              const { error: deleteError } = await supabase
+                .from('integrations_config')
+                .delete()
+                .eq('integration_id', integrationId)
+                .eq('tenant_id', tenantId)
+                .in('instance_id', staleInstanceIds);
+
+              if (deleteError) {
+                console.error(`[refetchInstances] Error deleting stale instances for integration ${integrationId} (tenant: ${tenantId}):`, deleteError);
+              } else {
+                console.log(`[refetchInstances] Successfully deleted ${staleInstanceIds.length} stale instances for integration ${integrationId} (tenant: ${tenantId}).`);
+              }
+            } else {
+              console.log(`[refetchInstances] No stale instances to delete for integration ${integrationId} (tenant: ${tenantId}).`);
+            }
+          }
+        } else { // If validInstances is empty, it implies all existing instances for this integration_id/tenant_id might be stale
+            console.log(`[refetchInstances] API returned no live instances for integration ${integrationId} (tenant: ${tenantId}). Deleting all associated DB instances.`);
+            const { error: deleteAllError } = await supabase
+                .from('integrations_config')
+                .delete()
+                .eq('integration_id', integrationId)
+                .eq('tenant_id', tenantId); // Make sure to scope by tenant_id
+
+            if (deleteAllError) {
+                console.error(`[refetchInstances] Error deleting all instances for integration ${integrationId} (tenant: ${tenantId}) when API returned none:`, deleteAllError);
+            } else {
+                console.log(`[refetchInstances] Successfully deleted all instances for integration ${integrationId} (tenant: ${tenantId}) as API returned none.`);
+            }
+        }
+        // --- END: Delete stale instances from DB ---
       }
-      // --- END: Upsert fetched instances ---
+      // --- END: Insert fetched instances ---
 
       if (validInstances.length > 0 && !validInstances.some(inst => inst.name === selectedInstanceName)) {
          setSelectedInstanceName(validInstances[0].name);
@@ -290,7 +360,8 @@ export function useIntegrationConnectionState(
     } finally {
       setIsFetchingInstances(false);
     }
-  }, [selectedIntegration?.id, selectedInstanceName]);
+  }, [selectedIntegration?.id, selectedInstanceName, tenantId, currentPipelineId, config]); // Dependency array is correct
+
 
   // --- Instance Fetching ---
   const fetchInstancesAndSetState = useCallback(async (integrationId: string) => {
@@ -308,47 +379,108 @@ export function useIntegrationConnectionState(
       );
       setFetchedInstances(validInstances);
 
-      // --- BEGIN: Upsert fetched instances into integrations_config ---
+      // --- BEGIN: Insert fetched instances into integrations_config ---
       if (validInstances.length > 0) {
-        console.log("[fetchInstancesAndSetState] Upserting fetched instances into DB...");
-        const upsertPromises = validInstances.map(async (instance) => {
+        console.log("[fetchInstancesAndSetState] Inserting fetched instances into DB...");
+        console.log(`[DEBUG DUPLICATE CHECK][fetchInstancesAndSetState] Preparing to insert/update ${validInstances.length} instances. Current tenantId for these operations:`, tenantId);
+        const insertPromises = validInstances.map(async (instance) => {
           const instanceId = instance.id;
           const instanceDisplayName = instance.name;
           const ownerId = instance.ownerJid; // May be undefined
           const userReferenceId = ownerId ? ownerId.replace(/@s\.whatsapp\.net$/, '') : null;
 
           try {
-            const { error: upsertError } = await supabase
-              .from('integrations_config')
-              .upsert(
-                {
-                  integration_id: integrationId, // integrationId from function scope
-                  instance_id: instanceId,
-                  instance_display_name: instanceDisplayName,
-                  owner_id: ownerId, // Store original JID if available
-                  user_reference_id: userReferenceId, // Store sanitized ID if available
-                  pipeline_id: currentPipelineId || null, // Include pipeline_id, default to null if undefined
-                  // Add other default/required fields if necessary
-                 },
-                 {
-                   onConflict: 'integration_id', // Corrected: Use integration_id as the conflict target
-                   ignoreDuplicates: false, // Ensure updates happen
-                 }
-              );
-            if (upsertError) {
-              console.error(`[fetchInstancesAndSetState] Error upserting instance ${instanceId} for integration ${integrationId}:`, upsertError);
-              // Optionally throw or collect errors
+            const insertPayload = {
+              integration_id: integrationId,
+              instance_id: instanceId,
+              instance_display_name: instanceDisplayName,
+              owner_id: ownerId,
+              user_reference_id: userReferenceId,
+              pipeline_id: currentPipelineId || null,
+              token: instance.token,
+              tenant_id: tenantId,
+            };
+            console.log(`[DEBUG DUPLICATE CHECK][fetchInstancesAndSetState] Attempting to call upsert_integration_config RPC for instance_id: ${instanceId}, tenant_id: ${tenantId}.`);
+            const rpcArgs = {
+              p_integration_id: integrationId,
+              p_instance_id: instanceId,
+              p_tenant_id: tenantId,
+              p_instance_display_name: instanceDisplayName,
+              p_token: instance.token,
+              p_owner_id: ownerId,
+              p_user_reference_id: userReferenceId,
+              p_pipeline_id: currentPipelineId || null,
+              p_status: instance.connectionStatus // Pass connectionStatus as p_status
+            };
+            console.log('[DEBUG DUPLICATE CHECK][fetchInstancesAndSetState] RPC Args:', rpcArgs);
+            const { error: rpcError } = await supabase.rpc('upsert_integration_config', rpcArgs);
+
+            if (rpcError) {
+              console.error(`[DEBUG DUPLICATE CHECK][fetchInstancesAndSetState] ERROR calling upsert_integration_config RPC for instance ${instanceId} (tenant: ${tenantId}):`, rpcError, 'Args were:', rpcArgs);
             } else {
-               console.log(`[fetchInstancesAndSetState] Successfully upserted instance ${instanceId} for integration ${integrationId}`);
+               console.log(`[fetchInstancesAndSetState] Successfully called upsert_integration_config RPC for instance ${instanceId} (tenant: ${tenantId}).`);
             }
           } catch (err) {
-            console.error(`[fetchInstancesAndSetState] Exception during upsert for instance ${instanceId}:`, err);
+            console.error(`[fetchInstancesAndSetState] Exception during insert for instance ${instanceId}:`, err);
           }
         });
-        await Promise.all(upsertPromises);
-        console.log("[fetchInstancesAndSetState] Finished upserting instances.");
+        await Promise.all(insertPromises);
+        console.log("[fetchInstancesAndSetState] Finished upserting instances via RPC.");
+
+        // --- BEGIN: Delete stale instances from DB ---
+        if (validInstances.length > 0) { // Only run deletion if we have a valid list of live instances
+          const liveInstanceIds = validInstances.map(inst => inst.id);
+          console.log(`[fetchInstancesAndSetState] Live instance IDs from API for integration ${integrationId} (tenant: ${tenantId}):`, liveInstanceIds);
+
+          const { data: dbInstances, error: fetchDbError } = await supabase
+            .from('integrations_config')
+            .select('instance_id')
+            .eq('integration_id', integrationId)
+            .eq('tenant_id', tenantId); // Ensure we only check against the current tenant
+
+          if (fetchDbError) {
+            console.error(`[fetchInstancesAndSetState] Error fetching DB instance_ids for deletion check:`, fetchDbError);
+          } else if (dbInstances) {
+            const dbInstanceIds = dbInstances.map(dbInst => dbInst.instance_id).filter(id => id !== null) as string[];
+            console.log(`[fetchInstancesAndSetState] DB instance IDs for integration ${integrationId} (tenant: ${tenantId}):`, dbInstanceIds);
+
+            const staleInstanceIds = dbInstanceIds.filter(dbId => !liveInstanceIds.includes(dbId));
+
+            if (staleInstanceIds.length > 0) {
+              console.log(`[fetchInstancesAndSetState] Stale instance IDs to delete for integration ${integrationId} (tenant: ${tenantId}):`, staleInstanceIds);
+              const { error: deleteError } = await supabase
+                .from('integrations_config')
+                .delete()
+                .eq('integration_id', integrationId)
+                .eq('tenant_id', tenantId)
+                .in('instance_id', staleInstanceIds);
+
+              if (deleteError) {
+                console.error(`[fetchInstancesAndSetState] Error deleting stale instances for integration ${integrationId} (tenant: ${tenantId}):`, deleteError);
+              } else {
+                console.log(`[fetchInstancesAndSetState] Successfully deleted ${staleInstanceIds.length} stale instances for integration ${integrationId} (tenant: ${tenantId}).`);
+              }
+            } else {
+              console.log(`[fetchInstancesAndSetState] No stale instances to delete for integration ${integrationId} (tenant: ${tenantId}).`);
+            }
+          }
+        } else { // If validInstances is empty, it implies all existing instances for this integration_id/tenant_id might be stale
+            console.log(`[fetchInstancesAndSetState] API returned no live instances for integration ${integrationId} (tenant: ${tenantId}). Deleting all associated DB instances.`);
+            const { error: deleteAllError } = await supabase
+                .from('integrations_config')
+                .delete()
+                .eq('integration_id', integrationId)
+                .eq('tenant_id', tenantId); // Make sure to scope by tenant_id
+
+            if (deleteAllError) {
+                console.error(`[fetchInstancesAndSetState] Error deleting all instances for integration ${integrationId} (tenant: ${tenantId}) when API returned none:`, deleteAllError);
+            } else {
+                console.log(`[fetchInstancesAndSetState] Successfully deleted all instances for integration ${integrationId} (tenant: ${tenantId}) as API returned none.`);
+            }
+        }
+        // --- END: Delete stale instances from DB ---
       }
-      // --- END: Upsert fetched instances ---
+      // --- END: Insert fetched instances ---
 
       if (validInstances.length > 0) {
         let currentSelectedInstanceName = selectedInstanceName;
@@ -364,11 +496,7 @@ export function useIntegrationConnectionState(
         const currentSelectedInstance = validInstances.find(inst => inst.name === currentSelectedInstanceName);
         const fetchedStatus = currentSelectedInstance?.connectionStatus;
 
-        // *** FINAL MODIFICATION START ***
-        // DO NOT set localConnectionState based on initial fetch.
-        // Let the state remain 'unknown' until user interaction via handleConnect/handleCreateAndConnect.
         console.log(`[fetchInstancesAndSetState] Fetched status is '${fetchedStatus}'. NOT setting localConnectionState based on initial fetch.`);
-        // *** FINAL MODIFICATION END ***
 
 
         // Update user_reference_id for the first instance (consider if this should be for the selected one)
@@ -384,13 +512,10 @@ export function useIntegrationConnectionState(
 
       } else {
         setSelectedInstanceName("");
-        // Also ensure state is not 'qrcode' if no instances exist - This part might be okay, or could also be removed if handleConnect handles reset properly. Let's keep it for now.
         if (localConnectionState === 'qrcode') {
              console.log("[fetchInstancesAndSetState] No valid instances found, resetting 'qrcode' state to 'unknown'.");
              setLocalConnectionState('unknown');
         } else {
-            // If state wasn't qrcode and no instances, ensure it's unknown (might be redundant if initial state is unknown)
-            // setLocalConnectionState('unknown'); // Let's comment this out, initial state should be unknown anyway.
              console.log("[fetchInstancesAndSetState] No valid instances found, state remains:", localConnectionState);
         }
       }
@@ -399,16 +524,92 @@ export function useIntegrationConnectionState(
       toast({ variant: "destructive", title: "Error Fetching Instances", description: (err as Error).message });
       setFetchedInstances([]);
       setSelectedInstanceName("");
-      // Reset state on error, ensuring not stuck in qrcode
       setLocalConnectionState('unknown');
     } finally {
       setIsFetchingInstances(false);
     }
-    // Update dependencies if needed, add localConnectionState
-  }, [selectedInstanceName, localConnectionState]); // Added localConnectionState dependency
+  }, [selectedInstanceName, localConnectionState, tenantId, currentPipelineId, config]); // Dependency array is correct
 
 
   // --- Effects ---
+
+  // Effect to fetch integration limits
+  useEffect(() => {
+    const fetchIntegrationLimits = async () => {
+      if (!open || !tenantId) {
+        setCanAddMoreIntegrations(true); // Reset if not open or no tenantId
+        setCurrentIntegrationCount(0);
+        setMaxIntegrationsAllowed(null);
+        return;
+      }
+
+      setIsLoading(true);
+      try {
+        // 1. Get current integration count for the tenant
+        const { count: integrationsCount, error: countError } = await supabase
+          .from('integrations_config')
+          .select('*', { count: 'exact', head: true })
+          .eq('tenant_id', tenantId);
+
+        if (countError) throw countError;
+        setCurrentIntegrationCount(integrationsCount ?? 0);
+
+        // 2. Get allowed integrations from plan
+        const { data: tenantDataUntyped, error: tenantError } = await supabase
+          .from('tenants')
+          .select('profile_id') // Fetch profile_id from tenants
+          .eq('id', tenantId)
+          .single();
+        
+        // Cast to unknown first, then to the expected shape, to bypass stricter type checking
+        // This assumes 'profile_id' exists at runtime despite potential stale Supabase types.
+        const tenantData = tenantDataUntyped as unknown as ({ profile_id: string | null } | null);
+
+        if (tenantError || !tenantData || !tenantData.profile_id) {
+          // If tenant not found or profile_id is null (either from DB or due to type issue)
+          console.warn('Tenant not found, or profile_id is missing/null. Assuming no specific integration limit from plan.', { tenantError, tenantDataFromQuery: tenantDataUntyped });
+          setMaxIntegrationsAllowed(null); 
+          setCanAddMoreIntegrations(true);
+        } else {
+          // Now use tenantData.profile_id (which should be a string due to the !tenantData.profile_id check)
+          const { data: subscriptionData, error: subscriptionError } = await supabase
+            .from('subscriptions')
+            .select('plan_id, plans ( integrations_allowed )')
+            .eq('profile_id', tenantData.profile_id) // Link subscriptions via profile_id
+            .eq('status', 'active') 
+            .single();
+
+          if (subscriptionError || !subscriptionData || !subscriptionData.plans) {
+            console.warn('No active subscription with plan details found for this profile, or integrations_allowed not set on plan.', { subscriptionError, subscriptionData });
+            setMaxIntegrationsAllowed(null); 
+            setCanAddMoreIntegrations(true); 
+          } else {
+            setMaxIntegrationsAllowed(subscriptionData.plans.integrations_allowed);
+            if (subscriptionData.plans.integrations_allowed !== null) {
+              setCanAddMoreIntegrations((integrationsCount ?? 0) < subscriptionData.plans.integrations_allowed);
+            } else {
+              setCanAddMoreIntegrations(true); // null integrations_allowed means unlimited
+            }
+          }
+        }
+      } catch (error) {
+        console.error("Error fetching integration limits:", error);
+        toast({
+          title: "Error",
+          description: "Could not fetch integration limits.",
+          variant: "destructive",
+        });
+        // Default to allowing addition on error to not block user, or set to false for stricter control
+        setCanAddMoreIntegrations(true); 
+        setMaxIntegrationsAllowed(null);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchIntegrationLimits();
+  }, [open, tenantId, selectedIntegration?.id]); // Re-run if dialog opens, tenant changes, or selectedIntegration changes (as it might trigger other logic)
+
 
   // Initial fetch on dialog open
   useEffect(() => {
@@ -445,8 +646,6 @@ export function useIntegrationConnectionState(
        const newStatus = await checkInstanceStatus(instanceName, integrationId);
        console.log("[pollConnectionStatus] Poll result:", newStatus);
 
-       // Only update state if the new status is valid AND
-       // (current state is NOT qrcode OR the new status IS open)
        if (isValidConnectionState(newStatus)) {
          if (localConnectionState !== 'qrcode' || newStatus === 'open') {
            console.log(`[pollConnectionStatus] Updating state from ${localConnectionState} to ${newStatus}`);
@@ -463,8 +662,7 @@ export function useIntegrationConnectionState(
       setLocalConnectionState('unknown');
       setIsPollingForConnection(false);
     }
-    // Pass localConnectionState as dependency because the logic inside depends on its current value
-  }, [selectedInstanceName, selectedIntegration?.id, localConnectionState]); // Added localConnectionState
+  }, [selectedInstanceName, selectedIntegration?.id, localConnectionState]);
 
   // Effect to START polling only when QR code is shown
   useEffect(() => {
@@ -477,7 +675,7 @@ export function useIntegrationConnectionState(
          setIsPollingForConnection(false);
       }
     }
-  }, [localConnectionState, isPollingForConnection]); // Added isPollingForConnection dependency
+  }, [localConnectionState, isPollingForConnection]);
 
   // Effect to run the polling interval
   useEffect(() => {
@@ -486,25 +684,21 @@ export function useIntegrationConnectionState(
      setQrPollingInterval(null);
    }
 
-   let startTimeoutId: NodeJS.Timeout | null = null; // Timeout ID for delaying the start
+   let startTimeoutId: NodeJS.Timeout | null = null;
 
    if (isPollingForConnection && open) {
      console.log(`[Polling Interval Effect] Scheduling interval start after 5s delay.`);
      startTimeoutId = setTimeout(() => {
        console.log(`[Polling Interval Effect] Delay complete. Starting interval.`);
-       // Start the interval *after* the delay
        const intervalId = setInterval(pollConnectionStatus, 5000);
        setQrPollingInterval(intervalId);
-       // Optionally, run the first poll immediately after delay if needed
-       // pollConnectionStatus();
-     }, 5000); // 5-second delay before starting the interval
+     }, 5000);
 
    } else {
       console.log(`[Polling Interval Effect] Not starting or stopping interval (isPolling: ${isPollingForConnection}, open: ${open}).`);
    }
 
    return () => {
-     // Clear both timeout and interval on cleanup
      if (startTimeoutId) {
        console.log("[Polling Interval Cleanup] Clearing start timeout.");
        clearTimeout(startTimeoutId);
@@ -515,7 +709,7 @@ export function useIntegrationConnectionState(
        setQrPollingInterval(null);
      }
    };
- }, [open, isPollingForConnection, pollConnectionStatus]); // Keep dependencies
+ }, [open, isPollingForConnection, pollConnectionStatus]);
 
 
   // --- Effect for 'open' state ---
@@ -523,23 +717,21 @@ export function useIntegrationConnectionState(
     if (localConnectionState === 'open') {
       console.log("[Open State Effect] State is 'open'.");
       setIsConnected(true);
-      setIsPollingForConnection(false); // Ensure polling stops
+      setIsPollingForConnection(false); 
       setQrCodeBase64(null);
       setPairingCode(null);
       if (onConnectionEstablished) {
         onConnectionEstablished();
       }
        if (selectedIntegration?.id) {
-         // Define an async function inside the effect to use await
          const handleOpenState = async () => {
-           // Setup webhook and update details
            const setupWebhook = async () => {
              try {
                const { data: integrationData, error: integrationError } = await supabase.from('integrations').select('webhook_url, webhook_events').eq('id', selectedIntegration.id).single();
              if (integrationError || !integrationData) throw new Error(`Failed to fetch integration details: ${integrationError?.message || 'No data'}`);
              const { data: configData, error: configError } = await supabase.from('integrations_config').select('instance_display_name').eq('integration_id', selectedIntegration.id).maybeSingle();
              if (configError) console.error(`Error fetching config for webhook: ${configError.message}`);
-             const instanceDisplayName = configData?.instance_display_name || selectedInstanceName; // Use selected name as fallback
+             const instanceDisplayName = configData?.instance_display_name || selectedInstanceName; 
              const webhookEventsValid = Array.isArray(integrationData.webhook_events) && integrationData.webhook_events.length > 0;
              if (!integrationData.webhook_url || !webhookEventsValid || !instanceDisplayName) {
                console.warn(`[Webhook Setup] Skipping: Missing URL, Events, or Display Name.`); return;
@@ -549,13 +741,11 @@ export function useIntegrationConnectionState(
            } catch (error) { console.error("[Webhook Setup] Error:", error); toast({ title: "Webhook Setup Error", description: (error as Error).message, variant: "destructive" }); }
           };
            
-           // Run webhook setup and detail fetching in parallel (or sequentially if needed)
            await Promise.all([
              setupWebhook(),
-             fetchAndUpdateDetails(selectedIntegration.id) // Call function defined above
+             fetchAndUpdateDetails(selectedIntegration.id) 
            ]);
 
-          // --- Add logic to update pipeline_id ---
           if (currentPipelineId) {
             console.log(`[Open State Effect] Updating pipeline_id to ${currentPipelineId} for integration ${selectedIntegration.id}`);
             const { error: pipelineUpdateError } = await supabase
@@ -572,27 +762,32 @@ export function useIntegrationConnectionState(
               });
             } else {
               console.log(`[Open State Effect] Successfully updated pipeline_id for integration ${selectedIntegration.id}`);
-              // Optionally clear currentPipelineId state after successful update
-              // setCurrentPipelineId(undefined);
              }
            } else {
               console.log(`[Open State Effect] No currentPipelineId set, skipping pipeline update for integration ${selectedIntegration.id}`);
            }
-           // --- End pipeline_id update logic ---
-         }; // End of handleOpenState async function
+         }; 
 
-         // Call the async function
          handleOpenState();
        }
      }
-   }, [localConnectionState, selectedIntegration, onConnectionEstablished, selectedInstanceName, fetchAndUpdateDetails, currentPipelineId]); // Added currentPipelineId and fetchAndUpdateDetails
+   }, [localConnectionState, selectedIntegration, onConnectionEstablished, selectedInstanceName, fetchAndUpdateDetails, currentPipelineId]);
 
 
   // --- Connection/Creation Handlers ---
   const handleConnect = useCallback(async (instanceNameToConnect: string | null | undefined = null, pipelineId?: string | undefined) => {
     const targetInstanceName = instanceNameToConnect || selectedInstanceName;
     console.log("[handleConnect] Function called for instance:", targetInstanceName, "Pipeline ID:", pipelineId);
-    setCurrentPipelineId(pipelineId); // Store pipeline ID for potential upsert later
+    setCurrentPipelineId(pipelineId);
+
+    if (!canAddMoreIntegrations && maxIntegrationsAllowed !== null) { // Check if explicitly cannot add more
+        toast({
+            title: "Integration Limit Reached",
+            description: `You have reached the maximum of ${maxIntegrationsAllowed} integrations allowed for your current plan.`,
+            variant: "destructive",
+        });
+        return;
+    }
 
     if (!targetInstanceName) {
       toast({ title: "Error", description: "No instance name provided or selected.", variant: "destructive" });
@@ -611,7 +806,7 @@ export function useIntegrationConnectionState(
 
     try {
       const connectResponse = await evolutionConnectToInstance(targetInstanceName, selectedIntegration.id);
-      console.log("[handleConnect] Raw connectResponse:", JSON.stringify(connectResponse, null, 2)); // Log the raw response
+      console.log("[handleConnect] Raw connectResponse:", JSON.stringify(connectResponse, null, 2)); 
 
        if (!connectResponse.instance) {
          console.log("[handleConnect] connectResponse.instance is missing. Checking top-level base64/pairingCode.");
@@ -639,14 +834,6 @@ export function useIntegrationConnectionState(
          }
        } else {
          const instanceStatus = connectResponse.instance?.status as ConnectionState | undefined;
-
-         // --- MODIFICATION START ---
-         // ALWAYS proceed to QR/Pairing code check, even if status is initially 'open'
-         // Let polling handle the final transition to 'open' after successful scan/pairing
-         // if (instanceStatus === 'open') { // REMOVED Condition
-         //   setLocalConnectionState('open'); // REMOVED
-         //   toast({ title: "Already Connected", description: "The WhatsApp instance is already connected." }); // REMOVED
-         // } else { // Now this block always runs if instance object exists
 
            let useBase64: string | null = null;
            let usePairingCode: string | null = null;
@@ -676,8 +863,6 @@ export function useIntegrationConnectionState(
              toast({ variant: "destructive", title: "Connection Error", description: `Failed to retrieve QR/Pairing code. Status: ${instanceStatus || 'Unknown'}.` });
              setLocalConnectionState('close');
            }
-         // } // End of original else block
-         // --- MODIFICATION END ---
        }
     } catch (error) {
       console.error("[handleConnect] Error during connection process:", error);
@@ -686,26 +871,37 @@ export function useIntegrationConnectionState(
     } finally {
         setIsLoading(false);
     }
-    // Add localConnectionState dependency? No, handleConnect should trigger state changes, not react to them.
   }, [selectedIntegration?.id, selectedInstanceName]);
 
 
   const handleCreateAndConnect = useCallback(async (pipelineId?: string | undefined) => {
     if (!newInstanceName || !selectedIntegration?.id) return;
+
+    if (!canAddMoreIntegrations && maxIntegrationsAllowed !== null) {
+        toast({
+            title: "Integration Limit Reached",
+            description: `You cannot create a new instance as you've reached the maximum of ${maxIntegrationsAllowed} integrations allowed for your plan.`,
+            variant: "destructive",
+        });
+        return;
+    }
+
     console.log("[handleCreateAndConnect] Function called for new instance:", newInstanceName, "Pipeline ID:", pipelineId);
-    setCurrentPipelineId(pipelineId); // Store pipeline ID for potential upsert later
+    setCurrentPipelineId(pipelineId);
     setIsLoading(true);
     const { success, error, instanceData } = await createEvolutionInstance(newInstanceName, selectedIntegration.id);
     if (success && instanceData) {
-      // Important: Pass the pipelineId to the subsequent handleConnect call
-      await refetchInstances(); // Use the refetch function defined above
+      await refetchInstances();
       setSelectedInstanceName(newInstanceName);
-      await handleConnect(newInstanceName, pipelineId); // Pass pipelineId here
+      // After creating, the connect logic will run, which also has the canAddMoreIntegrations check.
+      // This is slightly redundant but ensures consistency if connect is called standalone.
+      // If the creation itself counts as one integration, the check here is primary.
+      await handleConnect(newInstanceName, pipelineId);
     } else {
       toast({ variant: "destructive", title: "Instance Creation Failed", description: error || "Failed to create instance." });
       setIsLoading(false);
     }
-  }, [newInstanceName, selectedIntegration?.id, refetchInstances, handleConnect]); // Added refetchInstances
+  }, [newInstanceName, selectedIntegration?.id, refetchInstances, handleConnect, canAddMoreIntegrations, maxIntegrationsAllowed]);
 
 
   // --- Other Handlers ---
@@ -713,14 +909,13 @@ export function useIntegrationConnectionState(
     setSelectedInstanceName(name);
     const instance = fetchedInstances.find(inst => inst.name === name);
     const status = instance?.connectionStatus;
-    // Prevent overwriting qrcode state when simply changing selection
     if (localConnectionState !== 'qrcode') {
         setLocalConnectionState(isValidConnectionState(status) ? status : 'unknown');
     }
-    setQrCodeBase64(null); // Clear QR when selection changes
-    setPairingCode(null); // Clear pairing code
-    setIsPollingForConnection(false); // Stop polling
-  }, [fetchedInstances, localConnectionState]); // Added localConnectionState
+    setQrCodeBase64(null); 
+    setPairingCode(null); 
+    setIsPollingForConnection(false); 
+  }, [fetchedInstances, localConnectionState]); 
 
   const handleNewInstanceNameChange = useCallback((name: string) => {
     setNewInstanceName(name);
@@ -747,7 +942,7 @@ export function useIntegrationConnectionState(
     handleConnect,
     fetchedInstances,
     isFetchingInstances,
-    selectedInstanceName, // Expose selectedInstanceName
+    selectedInstanceName, 
     handleSelectedInstanceNameChange,
     newInstanceName,
     handleNewInstanceNameChange,
@@ -756,5 +951,9 @@ export function useIntegrationConnectionState(
     pendingWebhookIntegrationId,
     handleWebhookSetupComplete,
     refetch: refetchInstances,
+    // Expose new state for UI display
+    currentIntegrationCount,
+    maxIntegrationsAllowed,
+    canAddMoreIntegrations,
   };
 }

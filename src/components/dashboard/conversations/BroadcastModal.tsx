@@ -310,7 +310,6 @@ export function BroadcastModal({
 
        const result = await sendBroadcastService(paramsToSend);
 
-      console.log("Broadcast Service Response:", result);
       const { successfulSends, failedSends, totalAttempted, broadcastId } = result;
 
       if (failedSends > 0) {

@@ -1,73 +1,48 @@
-
-import { useState, useEffect } from "react"; // Added useEffect
-import { SettingsSidebar } from "./SettingsSidebar";
+import { useState, useEffect } from "react";
+import { useLocation } from "react-router-dom";
 import { SettingsContent } from "./SettingsContent";
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
-import { Button } from "@/components/ui/button";
-import { SidebarOpen } from "lucide-react";
-import { cn } from "@/lib/utils";
-import { useMediaQuery } from "@/hooks/use-media-query"; // Use consistent hook
+import { SettingsSearchProvider } from "@/context/SettingsSearchContext"; // Import the provider
+// SettingsSidebar, Sheet, Button, SidebarOpen, cn, useMediaQuery are no longer needed here
 
 export function SettingsLayout() {
-  const [selectedSection, setSelectedSection] = useState("integrations");
-  const [isSettingsCollapsed, setIsSettingsCollapsed] = useState(false); // State for desktop collapse
-  const [isMobileSettingsDrawerOpen, setIsMobileSettingsDrawerOpen] = useState(false); // State for mobile drawer
-  const isDesktop = useMediaQuery("(min-width: 768px)"); // md breakpoint
+  const location = useLocation();
 
-  const handleSectionChange = (sectionId: string) => {
-    setSelectedSection(sectionId);
-    if (!isDesktop) {
-      setIsMobileSettingsDrawerOpen(false); // Close drawer on selection
+  const getSectionFromPath = () => {
+    const pathParts = location.pathname.split("/");
+    const lastPart = pathParts[pathParts.length - 1];
+    const validSections: Record<string, string> = {
+      "billing": "billing",
+      "users": "users",
+      "access-control": "access",
+      "integrations": "integrations",
+      "database": "database",
+      "profile": "profile",
+      "notifications": "notifications",
+      "api-keys": "api-keys",
+      "general": "general"
+    };
+    // Handle the case where the path is just /dashboard/settings
+    if (lastPart === "settings" && pathParts.includes("dashboard")) {
+        return "integrations"; // Or your preferred default section for the base settings path
     }
+    if (pathParts.includes("settings") && validSections[lastPart]) {
+      return validSections[lastPart];
+    }
+    return "integrations"; // Default section if no specific match
   };
 
-  const handleCollapseToggle = () => {
-    setIsSettingsCollapsed(!isSettingsCollapsed);
-  };
+  const [selectedSection, setSelectedSection] = useState(getSectionFromPath());
 
-  // Extracted Sidebar Content
-  const settingsSidebarContent = (
-    <SettingsSidebar
-      selectedSection={selectedSection}
-      onSectionChange={handleSectionChange}
-      isCollapsed={isDesktop ? isSettingsCollapsed : false} // Pass collapse state
-      onCollapse={handleCollapseToggle} // Pass toggle handler
-    />
-  );
+  useEffect(() => {
+    setSelectedSection(getSectionFromPath());
+  }, [location.pathname]);
 
   return (
-    // Use h-full, remove negative margins if they exist from parent
-    <div className="flex h-full"> 
-      
-      {/* Mobile Drawer Trigger */}
-      <div className="md:hidden p-2 border-r"> 
-        <Sheet open={isMobileSettingsDrawerOpen} onOpenChange={setIsMobileSettingsDrawerOpen}>
-          <SheetTrigger asChild>
-            <Button variant="outline" size="icon">
-              <SidebarOpen className="h-5 w-5" />
-              <span className="sr-only">Open Settings Menu</span>
-            </Button>
-          </SheetTrigger>
-          {/* Remove default close button using CSS workaround */}
-          <SheetContent side="left" className="p-0 w-60 [&>button]:hidden"> 
-            {settingsSidebarContent}
-          </SheetContent>
-        </Sheet>
+    <SettingsSearchProvider> {/* Wrap with the provider */}
+      <div className="flex-1 flex flex-col overflow-auto h-full">
+        {/* SettingsContent will now take the full space */}
+        <SettingsContent section={selectedSection} />
       </div>
-
-      {/* Desktop Sidebar */}
-      <div className={cn(
-        "hidden md:flex", // Show only on md+
-        isSettingsCollapsed ? "w-16" : "w-64", // Control width based on state
-        "transition-all duration-300" // Added transition
-      )}>
-        {settingsSidebarContent}
-      </div>
-
-      {/* Main Content Area - Removed padding again, let SettingsContent/IntegrationsView handle it */}
-      <div className="flex-1 flex flex-col overflow-auto"> 
-         <SettingsContent section={selectedSection} />
-      </div>
-    </div>
+    </SettingsSearchProvider>
   );
 }

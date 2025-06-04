@@ -51,7 +51,7 @@ export const LoginForm = () => {
             </svg>
           </div>
           <div className="text-center">
-            <h1 className="text-3xl font-bold tracking-tight mb-1">Chatalyst</h1>
+            <h1 className="text-3xl font-bold tracking-tight mb-1">Chattalyst</h1>
             <p className="text-muted-foreground text-sm">Communicate smarter, respond faster</p>
           </div>
         </div>

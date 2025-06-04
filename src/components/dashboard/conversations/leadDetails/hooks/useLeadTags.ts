@@ -28,14 +28,11 @@ export function useLeadTags(lead: Lead | null) {
     if (!tag.trim() || !lead?.id) return;
     
     try {
-      console.log('Adding tag to lead:', lead.id, tag.trim());
       const success = await addTagToLead(lead.id, tag.trim());
       
       if (success) {
         // Optimistically update the UI
         setTags(prev => [...prev, tag.trim()]);
-        
-        console.log(`Added tag ${tag.trim()} to lead ${lead.id}`);
         
         toast({
           title: "Tag added",
@@ -62,14 +59,11 @@ export function useLeadTags(lead: Lead | null) {
     if (!lead?.id) return;
     
     try {
-      console.log('Removing tag from lead:', lead.id, tagToRemove);
       const success = await removeTagFromLead(lead.id, tagToRemove);
       
       if (success) {
         // Optimistically update the UI
         setTags(prev => prev.filter(tag => tag !== tagToRemove));
-        
-        console.log(`Removed tag ${tagToRemove} from lead ${lead.id}`);
         
         toast({
           title: "Tag removed",
@@ -94,10 +88,8 @@ export function useLeadTags(lead: Lead | null) {
 
   useEffect(() => {
     if (lead?.id) {
-      console.log('Loading tags for lead:', lead.id);
       loadLeadTags(lead.id);
     } else {
-      console.log('No lead ID available, clearing tags');
       setTags([]);
     }
   }, [lead?.id]);
@@ -105,7 +97,6 @@ export function useLeadTags(lead: Lead | null) {
   useEffect(() => {
     if (!lead?.id) return;
 
-    console.log('Setting up lead_tags realtime subscription for lead:', lead.id);
     const leadTagsChannel = supabase
       .channel('lead-tags-changes')
       .on(
@@ -116,7 +107,6 @@ export function useLeadTags(lead: Lead | null) {
           table: 'lead_tags'
         },
         (payload) => {
-          console.log('Lead tags change detected:', payload);
           // Only refresh if it's our current lead
           if (lead?.id && payload.new && typeof payload.new === 'object' && 'lead_id' in payload.new && payload.new.lead_id === lead.id) {
             loadLeadTags(lead.id);
@@ -126,7 +116,6 @@ export function useLeadTags(lead: Lead | null) {
       .subscribe();
 
     return () => {
-      console.log('Cleaning up lead_tags subscription');
       supabase.removeChannel(leadTagsChannel);
     };
   }, [lead?.id]);

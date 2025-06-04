@@ -11,8 +11,6 @@ export function useEvolutionApiConfig(selectedIntegration: Integration | null) {
     queryFn: async () => {
       if (!selectedIntegration?.id) return null;
       
-      console.log('Fetching config for integration ID:', selectedIntegration.id);
-      
       // First fetch the integration to get the base_url
       const { data: integration, error: integrationError } = await supabase
         .from('integrations')
@@ -25,8 +23,6 @@ export function useEvolutionApiConfig(selectedIntegration: Integration | null) {
         throw integrationError;
       }
       
-      console.log('Integration data:', integration);
-
       // Define the expected shape of the data returned by the query
       type ConfigDataShape = {
         id: string;
@@ -58,7 +54,6 @@ export function useEvolutionApiConfig(selectedIntegration: Integration | null) {
       // 2. Check if data exists in the result
       if (!configResult.data) {
         // This means no config row was found (PGRST116 or null data)
-        console.log('No existing config found, returning default structure matching EvolutionApiConfig.');
         // Ensure all fields from EvolutionApiConfig are present, setting missing ones to null/undefined
         const defaultConfig: EvolutionApiConfig = {
           integration_id: selectedIntegration.id, // Required
@@ -72,7 +67,6 @@ export function useEvolutionApiConfig(selectedIntegration: Integration | null) {
         return defaultConfig;
       } else {
         // 3. If we reach here, there was no error and configResult.data is not null.
-        console.log('Existing config found, constructing final config:', configResult.data);
         // Construct finalConfig directly using configResult.data
         const finalConfig: EvolutionApiConfig = {
           integration_id: selectedIntegration.id,

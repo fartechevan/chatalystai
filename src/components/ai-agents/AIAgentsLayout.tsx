@@ -5,115 +5,51 @@ import AgentListPanel from './AgentListPanel';
 import AgentDetailsPanel from './AgentDetailsPanel';
 import AgentConversationLogs from './AgentConversationLogs';
 import SessionListPanel from './SessionListPanel'; // Import the SessionListPanel
-import Breadcrumbs from '@/components/ui/Breadcrumbs';
-import { getAIAgent } from '@/services/aiAgents/agentService';
-import { AIAgent } from '@/types/aiAgents';
 import { cn } from '@/lib/utils'; // Import cn for conditional classes
-import { Button } from '@/components/ui/button'; // Import Button for sidebar
+// Button import is removed as sidebar is removed
 
-// Add 'logs' to the view state
-type ViewState = 'list' | 'detail' | 'create' | 'logs';
+// Add 'logs' to the view state and export it
+export type ViewState = 'list' | 'detail' | 'create' | 'logs';
+type AgentSubView = 'list' | 'detail' | 'create';
 
-const AIAgentsLayout: React.FC = () => {
-  // Default to 'list' view, which now represents the "Agents" section
-  const [currentView, setCurrentView] = useState<ViewState>('list');
-  const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
-  const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null); // Add state for selected session
-  // State to track the sub-view within the "Agents" section
-  const [agentSubView, setAgentSubView] = useState<'list' | 'detail' | 'create'>('list');
+interface AIAgentsLayoutProps {
+  currentView: ViewState;
+  setCurrentView: React.Dispatch<React.SetStateAction<ViewState>>;
+  selectedAgentId: string | null;
+  setSelectedAgentId: React.Dispatch<React.SetStateAction<string | null>>;
+  selectedSessionId: string | null;
+  setSelectedSessionId: React.Dispatch<React.SetStateAction<string | null>>;
+  agentSubView: AgentSubView;
+  setAgentSubView: React.Dispatch<React.SetStateAction<AgentSubView>>;
+  onNavigateToDetail: (agentId: string) => void;
+  onNavigateToCreate: () => void;
+  onNavigateBackToAgentList: () => void;
+  // onNavigateToLogs and onNavigateToAgents are handled by parent via context
+}
 
-  const handleNavigateToDetail = (agentId: string) => {
-    setSelectedAgentId(agentId);
-    setAgentSubView('detail'); // Set the sub-view
-    setCurrentView('detail'); // Keep top-level view consistent for breadcrumbs etc. if needed
-  };
-
-  const handleNavigateToCreate = () => {
-    setSelectedAgentId(null);
-    setAgentSubView('create'); // Set the sub-view
-    setCurrentView('create'); // Keep top-level view consistent
-  };
-
-  // Navigate back within the "Agents" section
-  const handleNavigateBackToAgentList = () => {
-    setSelectedAgentId(null);
-    setAgentSubView('list');
-    setCurrentView('list'); // Reset top-level view to list
-  };
-
-  // Navigate to the "Conversation Logs" section
-  const handleNavigateToLogs = () => {
-    setSelectedAgentId(null); // Clear agent selection
-    setSelectedSessionId(null); // Clear session selection when navigating to logs view
-    setAgentSubView('list'); // Reset agent sub-view
-    setCurrentView('logs'); // Set top-level view to logs
-  };
-
-  // Navigate to the "Agents" section (list view)
-  const handleNavigateToAgents = () => {
-     handleNavigateBackToAgentList(); // Reuse existing logic to go to agent list
-  };
-
-
-  // Fetch selected agent details for breadcrumb name (only when in detail view)
-  const { data: selectedAgentData } = useQuery<AIAgent | null, Error>({
-    queryKey: ['aiAgent', selectedAgentId],
-    queryFn: () => selectedAgentId ? getAIAgent(selectedAgentId) : null,
-    enabled: !!selectedAgentId && agentSubView === 'detail', // Fetch only when showing agent details
-  });
-
-
-  // --- Breadcrumb Logic ---
-  const breadcrumbItems = React.useMemo(() => {
-    const base: { label: string; onClick?: () => void; isCurrent?: boolean }[] = [
-      // Base breadcrumb for the AI Agents section
-      {
-        label: 'AI Agents',
-        onClick: currentView !== 'list' ? handleNavigateToAgents : undefined, // Clickable only if not already in list view
-        isCurrent: currentView !== 'logs' && agentSubView === 'list'
-      }
-    ];
-
-    if (currentView === 'logs') {
-       // Add breadcrumb for Conversation Logs view
-       base.push({ label: 'Conversation Logs', isCurrent: true });
-    } else if (agentSubView === 'create') {
-       // Add breadcrumb for Create Agent view
-       base.push({ label: 'Create New Agent', isCurrent: true });
-    } else if (agentSubView === 'detail' && selectedAgentId) {
-       // Add breadcrumb for Agent Detail view
-       base.push({ label: selectedAgentData?.name || 'Loading...', isCurrent: true });
-    }
-    return base;
-  }, [currentView, agentSubView, selectedAgentId, selectedAgentData, handleNavigateToAgents]);
-
+const AIAgentsLayout: React.FC<AIAgentsLayoutProps> = ({
+  currentView,
+  // setCurrentView, // Not directly used for navigation buttons here anymore
+  selectedAgentId,
+  // setSelectedAgentId, // Not directly used for navigation buttons here anymore
+  selectedSessionId,
+  setSelectedSessionId,
+  agentSubView,
+  // setAgentSubView, // Not directly used for navigation buttons here anymore
+  onNavigateToDetail,
+  onNavigateToCreate,
+  onNavigateBackToAgentList,
+}) => {
+  // Internal state and handlers are removed, props are used instead.
 
   return (
-    <div className="h-full w-full flex p-0"> {/* Remove padding from outer div */}
-      {/* Sidebar */}
-      <div className="w-64 border-r bg-muted/40 p-4 flex flex-col space-y-2">
-         <h2 className="text-lg font-semibold mb-4">AI Agents</h2>
-         <Button
-           variant={currentView !== 'logs' ? 'secondary' : 'ghost'}
-           className="w-full justify-start"
-           onClick={handleNavigateToAgents}
-         >
-           <Bot className="mr-2 h-4 w-4" />
-           Agents
-         </Button>
-         <Button
-           variant={currentView === 'logs' ? 'secondary' : 'ghost'}
-           className="w-full justify-start"
-           onClick={handleNavigateToLogs}
-         >
-           <MessageSquareText className="mr-2 h-4 w-4" />
-           Conversation Logs
-         </Button>
-      </div>
+    // The outer div no longer needs to be a flex container for a sidebar
+    // It just needs to ensure its children can take up full height/width as needed.
+    <div className="h-full w-full flex flex-col"> {/* Ensure it's a flex column for content growth */}
+      {/* Sidebar is removed */}
 
-      {/* Main Content Area */}
-      <div className="flex-grow flex flex-col p-4 space-y-4">
-         <Breadcrumbs items={breadcrumbItems} />
+      {/* Main Content Area - ensure it grows and has padding */}
+      <div className="flex-grow flex flex-col p-4 space-y-4 overflow-auto"> {/* Added overflow-auto */}
           {/* Use grid layout for logs view, otherwise flex for other views */}
           <div className={cn(
             "flex-grow",
@@ -138,16 +74,16 @@ const AIAgentsLayout: React.FC = () => {
               <div className="w-full h-full">
                 <AgentListPanel
                   selectedAgentId={selectedAgentId}
-                  onSelectAgent={handleNavigateToDetail}
-                  onInitiateCreate={handleNavigateToCreate}
+                  onSelectAgent={onNavigateToDetail}
+                  onInitiateCreate={onNavigateToCreate}
                 />
               </div>
             ) : ( // 'detail' or 'create' sub-views take full width
               <div className="w-full h-full">
                 <AgentDetailsPanel
                   selectedAgentId={selectedAgentId}
-                  onAgentUpdate={handleNavigateBackToAgentList} // Navigate back within agents section
-                  onNavigateBack={handleNavigateBackToAgentList} // Navigate back within agents section
+                  onAgentUpdate={onNavigateBackToAgentList} // Navigate back within agents section
+                  onNavigateBack={onNavigateBackToAgentList} // Navigate back within agents section
                   key={selectedAgentId || 'create'}
                 />
               </div>

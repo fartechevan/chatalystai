@@ -14,7 +14,7 @@ import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, L
 // Removed duplicate recharts import line
 import { Skeleton } from '@/components/ui/skeleton';
 import { Button } from '@/components/ui/button';
-import { Loader2, DatabaseZap, Calendar as CalendarIcon } from 'lucide-react'; // Added DatabaseZap icon and CalendarIcon
+import { Loader2, DatabaseZap, Calendar as CalendarIcon, PlusCircle, Smile, Frown, Meh } from 'lucide-react'; // Added DatabaseZap icon, CalendarIcon, PlusCircle, Smile, Frown, Meh
 import { format, parseISO, startOfDay, subDays } from 'date-fns'; // Added subDays
 import { DateRange } from "react-day-picker"; // Added DateRange
 import { TagCloud } from 'react-tagcloud'; // Import TagCloud
@@ -34,6 +34,7 @@ import { toast } from '@/hooks/use-toast'; // Import toast
 import BatchSentimentHistoryList from '../analytics/BatchSentimentHistoryList'; // Import the history list directly
 import { BatchDateRangeDialog } from './BatchDateRangeDialog'; // Import the new dialog
 import { Database } from '@/types/supabase'; // Import the Database type
+import { usePageActionContext } from '@/context/PageActionContext'; // Import the context
 
 // Define type for batch details fetch - reflect potential production column names
 type BatchDetails = {
@@ -284,7 +285,8 @@ export function ConversationStatsView() {
   const [batchCreationError, setBatchCreationError] = useState<string | null>(null);
   const [selectedBatchDateRange, setSelectedBatchDateRange] = useState<DateRange | undefined>(undefined);
   const [isLoadingBatchDetails, setIsLoadingBatchDetails] = useState(false);
-  const [isDateRangeDialogOpen, setIsDateRangeDialogOpen] = useState(false);
+  // const [isDateRangeDialogOpen, setIsDateRangeDialogOpen] = useState(false); // Controlled by context now
+  const { isBatchDateRangeDialogOpen, setIsBatchDateRangeDialogOpen } = usePageActionContext(); // Use context
   // Add state for sentiment counts
   const [batchSentimentCounts, setBatchSentimentCounts] = useState<{ good: number; moderate: number; bad: number; unknown: number } | null>(null);
   // Add state for selected sentiment
@@ -398,7 +400,7 @@ export function ConversationStatsView() {
 
       toast({ title: "Batch sentiment analysis started.", description: `Batch ID: ${data?.batch_analysis_id}` });
       queryClient.invalidateQueries({ queryKey: ['batchAnalyses'] }); 
-      setIsDateRangeDialogOpen(false); 
+      setIsBatchDateRangeDialogOpen(false); // Use context setter
 
     } catch (error: unknown) { 
       console.error("Error creating new batch analysis:", error);
@@ -426,7 +428,6 @@ export function ConversationStatsView() {
      queryKey: ['batchSentimentDetails', selectedBatchAnalysisId],
      queryFn: () => {
        if (!selectedBatchAnalysisId) return Promise.resolve([]);
-       console.log(`Fetching details for batch: ${selectedBatchAnalysisId}`); // Debug log
        return fetchBatchSentimentDetails(selectedBatchAnalysisId);
      },
      enabled: !!selectedBatchAnalysisId, // Fetch whenever a batch ID is selected
@@ -436,10 +437,8 @@ export function ConversationStatsView() {
    useEffect(() => {
      // Wait for both conversations and details to load before merging
      if (selectedBatchAnalysisId && initialConversationsData && selectedBatchConversationIds && batchDetailsData) {
-       console.log("Merging conversation data with details...");
        const batchConvIdsSet = new Set(selectedBatchConversationIds);
        const sentimentDetailsMap = new Map(batchDetailsData.map(d => [d.conversation_id, d]));
-       console.log(`Details map size: ${sentimentDetailsMap.size}`);
 
        const mergedConversations = initialConversationsData
          .filter(conv => batchConvIdsSet.has(conv.conversation_id))
@@ -456,7 +455,6 @@ export function ConversationStatsView() {
            } as AnalyzedConversation;
          });
 
-       console.log(`Merged conversations count: ${mergedConversations.length}`);
        setAnalyzedConversations(mergedConversations);
        // Reset selections when batch data changes
        setSelectedSentiment(null);
@@ -474,10 +472,8 @@ export function ConversationStatsView() {
    // Click handler for sentiment bars - Filters the merged conversations
    const handleSentimentClick = (sentiment: 'good' | 'moderate' | 'bad' | 'unknown') => {
      setSelectedSentiment(sentiment);
-     console.log(`Filtering for sentiment: ${sentiment}`);
      // Filter the already merged analyzedConversations state
      const filtered = analyzedConversations.filter(conv => conv.sentimentResult?.sentiment === sentiment);
-     console.log(`Filtered count: ${filtered.length}`);
      setFilteredSentimentConversations(filtered);
    };
 
@@ -516,15 +512,15 @@ export function ConversationStatsView() {
           <BatchSentimentHistoryList
             selectedAnalysisId={selectedBatchAnalysisId}
             onSelectAnalysis={handleSelectBatchAnalysis}
-              onCreateNewBatch={async () => setIsDateRangeDialogOpen(true)}
-              isCreatingBatch={isCreatingBatch}
+            // onCreateNewBatch prop removed
+            isCreatingBatch={isCreatingBatch}
             />
         </div>
 
         {/* BatchDateRangeDialog - position might need review based on its modal nature */}
         <BatchDateRangeDialog
-            isOpen={isDateRangeDialogOpen}
-            onOpenChange={setIsDateRangeDialogOpen}
+            isOpen={isBatchDateRangeDialogOpen} // Use context state
+            onOpenChange={setIsBatchDateRangeDialogOpen} // Use context setter
             onSubmit={handleCreateNewBatchAnalysis}
             isCreatingBatch={isCreatingBatch}
         />
@@ -532,17 +528,17 @@ export function ConversationStatsView() {
         {/* Center content area - Changed to span 3, added border */}
         <div className="lg:col-span-3 h-full overflow-y-auto p-4 md:p-6 border-r">
           {/* Center Panel Content */}
-          {/* Removed redundant inner div */}
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-4">
-              <h1 className="text-2xl font-semibold">Conversation Analysis</h1>
-              {selectedBatchAnalysisId && selectedBatchDateRange?.from && selectedBatchDateRange?.to && (
-               <p className="text-sm text-muted-foreground">
-                 Batch Analysis Date Range: {format(selectedBatchDateRange.from, "LLL dd, y")} -{" "}
-                 {format(selectedBatchDateRange.to, "LLL dd, y")}
-               </p>
-             )}
-             <div className="flex items-center space-x-2 flex-wrap">
-             </div>
+              <div className="flex-grow">
+                <h1 className="text-2xl font-semibold">Conversation Analysis</h1>
+                {selectedBatchAnalysisId && selectedBatchDateRange?.from && selectedBatchDateRange?.to && (
+                 <p className="text-sm text-muted-foreground mt-1">
+                   Batch Date Range: {format(selectedBatchDateRange.from, "LLL dd, y")} -{" "}
+                   {format(selectedBatchDateRange.to, "LLL dd, y")}
+                 </p>
+               )}
+              </div>
+             {/* Removed the local "Create New Batch" button div */}
           </div>
           <Tabs defaultValue="divergent-stacked-bar">
            <TabsList className="grid w-full grid-cols-2 gap-2 mb-4">
@@ -580,20 +576,22 @@ export function ConversationStatsView() {
                 <CardTitle>Sentiment Summary (Selected Batch)</CardTitle>
               </CardHeader>
               <CardContent>
-                {/* Use batchSentimentCounts for the summary - Removed Moderate */}
-                <div className="grid grid-cols-3 gap-4 text-center"> {/* Adjusted grid columns */}
-                  <div>
+                {/* Use batchSentimentCounts for the summary - Enhanced with Icons */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-center">
+                  <div className="flex flex-col items-center p-2">
+                    <Smile className="h-8 w-8 text-green-500 mb-1" />
                     <p className="text-2xl font-bold text-green-500">{batchSentimentCounts?.good ?? 0}</p>
-                    <p className="text-sm text-muted-foreground">Good</p>
+                    <p className="text-xs text-muted-foreground">GOOD</p>
                   </div>
-                  {/* Removed Moderate div */}
-                  <div>
+                  <div className="flex flex-col items-center p-2">
+                    <Frown className="h-8 w-8 text-red-500 mb-1" />
                     <p className="text-2xl font-bold text-red-500">{batchSentimentCounts?.bad ?? 0}</p>
-                    <p className="text-sm text-muted-foreground">Bad</p>
+                    <p className="text-xs text-muted-foreground">BAD</p>
                  </div>
-                 <div>
+                 <div className="flex flex-col items-center p-2">
+                   <Meh className="h-8 w-8 text-gray-500 mb-1" />
                    <p className="text-2xl font-bold text-gray-500">{batchSentimentCounts?.unknown ?? 0}</p>
-                   <p className="text-sm text-muted-foreground">Unknown/Not Analyzed</p>
+                   <p className="text-xs text-muted-foreground">UNKNOWN</p>
                  </div>
                </div>
              </CardContent>

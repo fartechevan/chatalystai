@@ -1,27 +1,24 @@
-import React, { useState, useEffect, useCallback } from "react"; // Import hooks
-import { supabase } from "@/integrations/supabase/client"; // Import supabase client
-import type { Lead } from "@/components/dashboard/conversations/types"; // Import Lead type
+import React, { useState, useEffect, useCallback } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import type { Lead } from "@/components/dashboard/conversations/types";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
-import { MoreHorizontal, Plus } from "lucide-react";
+import { MoreHorizontal, Plus, Check, ChevronsUpDown, X } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuTrigger,
   DropdownMenuContent,
   DropdownMenuItem,
 } from "@/components/ui/dropdown-menu";
-import { Badge } from "@/components/ui/badge"; // Import Badge for status
-// Imports for Filters
+import { Badge } from "@/components/ui/badge";
 import { Popover, PopoverTrigger, PopoverContent } from "@/components/ui/popover";
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command";
-import { Check, ChevronsUpDown, X } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { LeadFormDialog } from "@/components/leads/LeadFormDialog"; // Import the dialog
-import { useToast } from "@/hooks/use-toast"; // Import useToast
-// Import Alert Dialog components
+import { LeadFormDialog } from "@/components/leads/LeadFormDialog";
+import { useToast } from "@/hooks/use-toast";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -32,9 +29,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 
-
-// Interface for fetched filter data
 interface Pipeline {
   id: string;
   name: string;
@@ -44,8 +40,6 @@ interface Tag {
   name: string;
 }
 
-// Define the shape of the data we expect from Supabase, including relations
-// Note: Adjusted lead_pipeline to expect an object, not array, if fetching via leads.*
 type FetchedLead = Lead & {
   customers: {
     name: string | null;
@@ -58,7 +52,7 @@ type FetchedLead = Lead & {
     pipeline_stages: {
       name: string | null;
     } | null;
-  }[] | null; // Correctly typed as an array or null
+  }[] | null; 
   lead_tags: {
     tags: {
       id: string;
@@ -67,15 +61,13 @@ type FetchedLead = Lead & {
   }[] | null;
 };
 
-
 export function LeadsList() {
-  const [allLeads, setAllLeads] = useState<Lead[]>([]); // Store all fetched leads
-  const [filteredLeads, setFilteredLeads] = useState<Lead[]>([]); // Store leads after filtering
+  const [allLeads, setAllLeads] = useState<Lead[]>([]);
+  const [filteredLeads, setFilteredLeads] = useState<Lead[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const { toast } = useToast(); // For delete/edit feedback
+  const { toast } = useToast();
 
-  // State for filters
   const [availablePipelines, setAvailablePipelines] = useState<Pipeline[]>([]);
   const [availableTags, setAvailableTags] = useState<Tag[]>([]);
   const [selectedPipelineId, setSelectedPipelineId] = useState<string | null>(null);
@@ -83,21 +75,16 @@ export function LeadsList() {
   const [pipelinePopoverOpen, setPipelinePopoverOpen] = useState(false);
   const [tagPopoverOpen, setTagPopoverOpen] = useState(false);
 
-  // State for the form dialog
   const [isFormOpen, setIsFormOpen] = useState(false);
-  const [leadForForm, setLeadForForm] = useState<Lead | null>(null); // null for add, Lead object for edit
+  const [leadForForm, setLeadForForm] = useState<Lead | null>(null);
 
-  // State for delete confirmation dialog
   const [isAlertOpen, setIsAlertOpen] = useState(false);
   const [leadToDelete, setLeadToDelete] = useState<Lead | null>(null);
 
-
-  // Function to refetch leads data (encapsulated)
   const fetchData = useCallback(async () => {
     setLoading(true);
     setError(null);
     try {
-      // Fetch Pipelines
       const { data: pipelinesData, error: pipelinesError } = await supabase
         .from('pipelines')
         .select('id, name')
@@ -105,7 +92,6 @@ export function LeadsList() {
       if (pipelinesError) throw pipelinesError;
       setAvailablePipelines(pipelinesData || []);
 
-      // Fetch Tags
       const { data: tagsData, error: tagsError } = await supabase
         .from('tags')
         .select('id, name')
@@ -113,9 +99,6 @@ export function LeadsList() {
       if (tagsError) throw tagsError;
       setAvailableTags(tagsData || []);
 
-      // Fetch Leads (adjust select based on actual relations/views)
-      // This query assumes a view or function might be better for combining lead+pipeline+stage info
-      // Or adjust based on how lead_pipeline is structured (is it one-to-one?)
       const { data: leadsData, error: leadsError } = await supabase
         .from("leads")
         .select(`
@@ -127,15 +110,13 @@ export function LeadsList() {
         .order('created_at', { ascending: false });
         if (leadsError) throw leadsError;
 
-        // Map the fetched data using the FetchedLead type
-        const mappedLeads = (leadsData || []).map((item: FetchedLead) => {
-           // Access the first element of the lead_pipeline array
+        const mappedLeads = (leadsData || []).map((item: FetchedLead) => { 
            const pipelineEntry = item.lead_pipeline?.[0]; 
            const stageName = pipelineEntry?.pipeline_stages?.name ?? 'Unassigned';
            const pipelineId = pipelineEntry?.pipeline_id ?? null; 
            const tags = item.lead_tags
-             ?.map(lt => lt.tags) // lt is { tags: Tag | null } | null
-             .filter((tag): tag is Tag => tag !== null) || null; // Ensure tag is not null
+             ?.map((lt: { tags: Tag | null } | null) => lt?.tags) 
+             .filter((tag): tag is Tag => tag !== null) || []; // Ensure it's an array, not null
 
            return {
            id: item.id,
@@ -153,10 +134,9 @@ export function LeadsList() {
            stage_name: stageName,
            tags: tags,
            pipeline_id: pipelineId,
-         } as Lead; // Assert as Lead type
+         } as Lead;
        });
        setAllLeads(mappedLeads);
-       // Apply filters immediately after fetching all leads
        applyFilters(mappedLeads, selectedPipelineId, selectedTagIds);
 
     } catch (fetchError: unknown) {
@@ -168,9 +148,8 @@ export function LeadsList() {
     } finally {
        setLoading(false);
     }
-  }, [selectedPipelineId, selectedTagIds]); // Include filters in dependency if filtering server-side
+  }, []);
 
-  // Extracted filter logic
   const applyFilters = (
       leads: Lead[],
       pipelineId: string | null,
@@ -188,21 +167,16 @@ export function LeadsList() {
       setFilteredLeads(leadsToFilter);
   };
 
-
-  // Fetch initial data on mount
   useEffect(() => {
     fetchData();
-  }, [fetchData]); // fetchData is memoized with useCallback
+  }, [fetchData]);
 
-  // Apply filters when filter state changes
   useEffect(() => {
     applyFilters(allLeads, selectedPipelineId, selectedTagIds);
   }, [selectedPipelineId, selectedTagIds, allLeads]);
 
-
-  // --- Handlers ---
   const handleAddLead = () => {
-    setLeadForForm(null); // Ensure it's in 'add' mode
+    setLeadForForm(null);
     setIsFormOpen(true);
   };
 
@@ -217,31 +191,24 @@ export function LeadsList() {
   };
 
   const handleViewDetails = (lead: Lead) => {
-    // Placeholder: Log details or implement navigation/panel opening
-    console.log("View Details:", lead);
     toast({ title: "View Details", description: `Details for ${lead.name || lead.company_name} logged to console.` });
   };
 
   const handleDeleteConfirm = async () => {
     if (!leadToDelete) return;
-
     try {
-      // 1. Delete from lead_pipeline (junction table)
       const { error: pipelineError } = await supabase
         .from('lead_pipeline')
         .delete()
         .eq('lead_id', leadToDelete.id);
       if (pipelineError) throw pipelineError;
 
-      // 2. Delete from lead_tags (junction table)
        const { error: tagsError } = await supabase
          .from('lead_tags')
          .delete()
          .eq('lead_id', leadToDelete.id);
-       // Log error but continue, maybe lead had no tags
        if (tagsError) console.warn("Error deleting lead tags:", tagsError.message); 
 
-      // 3. Delete from leads table
       const { error: leadError } = await supabase
         .from('leads')
         .delete()
@@ -249,8 +216,7 @@ export function LeadsList() {
       if (leadError) throw leadError;
 
       toast({ title: "Lead Deleted", description: `${leadToDelete.name || leadToDelete.company_name} has been deleted.` });
-      fetchData(); // Refresh the list
-
+      fetchData(); 
     } catch (error: unknown) {
       console.error("Error deleting lead:", error);
       const message = error instanceof Error ? error.message : "An unknown error occurred.";
@@ -261,29 +227,21 @@ export function LeadsList() {
     }
   };
 
-
-  // Helper to get selected tag names for display
   const selectedTagObjects = availableTags.filter(tag => selectedTagIds?.includes(tag.id));
 
-
   return (
-    <div className="flex flex-col h-full">
-      {/* Header */}
-      <div className="p-4 border-b flex items-center justify-between gap-2">
-        {/* Left side: Title, Search, Filters */}
-        <div className="flex items-center gap-2 flex-wrap flex-grow min-w-0">
-          <h2 className="text-lg font-semibold mr-2 flex-shrink-0">LEADS</h2>
+    <div className="flex flex-col h-full space-y-4">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 px-1">
+        <div className="flex items-center gap-2 flex-wrap">
+          <h1 className="text-xl font-semibold mr-2 flex-shrink-0">Leads</h1>
           <Input
             placeholder="Search leads..."
-            className="w-full sm:w-[200px] h-8 text-sm" // Responsive width
-            // Add onChange handler later for search functionality
+            className="w-full sm:w-[200px] h-9 text-sm"
           />
-
-          {/* Pipeline Filter */}
           <Popover open={pipelinePopoverOpen} onOpenChange={setPipelinePopoverOpen}>
             <PopoverTrigger asChild>
-              <Button variant="outline" role="combobox" aria-expanded={pipelinePopoverOpen} className="w-full sm:w-[180px] justify-between h-8 text-xs px-2">
-                {selectedPipelineId ? availablePipelines.find((p) => p.id === selectedPipelineId)?.name : "Select Pipeline..."}
+              <Button variant="outline" role="combobox" aria-expanded={pipelinePopoverOpen} className="w-full sm:w-[180px] justify-between h-9 text-sm px-3">
+                {selectedPipelineId ? availablePipelines.find((p) => p.id === selectedPipelineId)?.name : "Select Pipeline"}
                 <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
               </Button>
             </PopoverTrigger>
@@ -306,12 +264,10 @@ export function LeadsList() {
               </Command>
             </PopoverContent>
           </Popover>
-
-          {/* Tag Filter */}
           <Popover open={tagPopoverOpen} onOpenChange={setTagPopoverOpen}>
             <PopoverTrigger asChild>
-              <Button variant="outline" role="combobox" aria-expanded={tagPopoverOpen} className="w-full sm:w-[180px] justify-between h-8 text-xs px-2">
-                 <span className="truncate">{selectedTagObjects.length > 0 ? `${selectedTagObjects.length} tag${selectedTagObjects.length > 1 ? 's' : ''} selected` : "Filter by tag..."}</span>
+              <Button variant="outline" role="combobox" aria-expanded={tagPopoverOpen} className="w-full sm:w-[180px] justify-between h-9 text-sm px-3">
+                 <span className="truncate">{selectedTagObjects.length > 0 ? `${selectedTagObjects.length} tag${selectedTagObjects.length > 1 ? 's' : ''} selected` : "Filter by tags"}</span>
                 <ChevronsUpDown className="ml-2 h-4 w-4 shrink-0 opacity-50" />
               </Button>
             </PopoverTrigger>
@@ -331,86 +287,78 @@ export function LeadsList() {
               </Command>
             </PopoverContent>
           </Popover>
-
-           {/* Display selected tags as badges */}
-           <div className="flex gap-1 flex-wrap items-center flex-grow min-w-0">
+           <div className="flex gap-1.5 flex-wrap items-center flex-grow min-w-0 mt-2 sm:mt-0">
              {selectedTagObjects.map(tag => (
-               <Badge key={tag.id} variant="secondary" className="flex items-center gap-1 text-xs h-5 px-1.5 flex-shrink-0">
+               <Badge key={tag.id} variant="outline" className="flex items-center gap-1 text-xs h-6 px-2">
                  <span className="truncate">{tag.name}</span>
-                 <Button variant="ghost" size="icon" className="h-3 w-3 p-0 ml-0.5" onClick={() => { const newSelectedIds = selectedTagIds?.filter(id => id !== tag.id) ?? []; setSelectedTagIds(newSelectedIds.length > 0 ? newSelectedIds : null); }}>
-                   <X className="h-2.5 w-2.5" />
+                 <Button variant="ghost" size="icon" className="h-3.5 w-3.5 p-0 ml-0.5 hover:bg-destructive/20 rounded-full" onClick={() => { const newSelectedIds = selectedTagIds?.filter(id => id !== tag.id) ?? []; setSelectedTagIds(newSelectedIds.length > 0 ? newSelectedIds : null); }} title={`Remove tag ${tag.name}`}>
+                   <X className="h-2.5 w-2.5 text-muted-foreground hover:text-destructive" />
                  </Button>
                </Badge>
              ))}
            </div>
-
-          {/* Lead Count - Pushed to the right */}
-          <span className="text-sm text-muted-foreground ml-auto flex-shrink-0">
+        </div>
+        <div className="flex items-center gap-2 mt-2 sm:mt-0 flex-shrink-0">
+          <span className="text-sm text-muted-foreground">
             {loading ? 'Loading...' : `${filteredLeads.length} leads`}
           </span>
-        </div>
-
-        {/* Right side: Add Lead Button */}
-        {/* Removed Add Lead button as context is unclear in list view */}
-        {/* <div className="flex items-center gap-2 flex-shrink-0">
-          <Button size="sm" className="h-8" onClick={handleAddLead}>
-            <Plus className="h-4 w-4 mr-2" />
-            ADD LEAD
+          <Button size="sm" className="h-9" onClick={handleAddLead}>
+            <Plus className="h-4 w-4 mr-1.5" />
+            Add Lead
           </Button>
-        </div> */}
+        </div>
       </div>
 
-      {/* Table Area */}
-      <div className="flex-1 min-h-0">
+      <div className="flex-1 min-h-0 border rounded-lg overflow-hidden">
         <ScrollArea className="h-full">
-          <table className="w-full text-sm"> {/* Base text size */}
-            <thead className="sticky top-0 bg-background border-b z-10">
-              <tr>
-                <th className="w-12 p-2 text-left"><Checkbox /></th>
-                <th className="p-2 text-left font-medium text-muted-foreground">NAME</th>
-                <th className="p-2 text-left font-medium text-muted-foreground">COMPANY</th>
-                <th className="p-2 text-left font-medium text-muted-foreground">STAGE</th>
-                <th className="p-2 text-left font-medium text-muted-foreground">PHONE</th>
-                <th className="p-2 text-left font-medium text-muted-foreground">EMAIL</th>
-                <th className="p-2 text-left font-medium text-muted-foreground">TAGS</th>
-                <th className="w-12 p-2 text-right"><span className="sr-only">Actions</span></th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border">
+          <Table>
+            <TableHeader>
+              <TableRow className="hover:bg-transparent bg-muted/50">
+                <TableHead className="h-12 px-3 text-left align-middle w-12"><Checkbox /></TableHead>
+                <TableHead className="h-12 px-3 text-left align-middle font-medium text-muted-foreground">NAME</TableHead>
+                <TableHead className="h-12 px-3 text-left align-middle font-medium text-muted-foreground">COMPANY</TableHead>
+                <TableHead className="h-12 px-3 text-left align-middle font-medium text-muted-foreground">STAGE</TableHead>
+                <TableHead className="h-12 px-3 text-left align-middle font-medium text-muted-foreground">PHONE</TableHead>
+                <TableHead className="h-12 px-3 text-left align-middle font-medium text-muted-foreground">EMAIL</TableHead>
+                <TableHead className="h-12 px-3 text-left align-middle font-medium text-muted-foreground">TAGS</TableHead>
+                <TableHead className="h-12 px-3 text-right align-middle font-medium text-muted-foreground w-12"><span className="sr-only">Actions</span></TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
               {loading ? (
                 Array.from({ length: 8 }).map((_, index) => (
-                  <tr key={index}>
-                    <td className="p-2"><Skeleton className="h-4 w-4" /></td>
-                    <td className="p-2"><Skeleton className="h-4 w-32" /></td>
-                    <td className="p-2"><Skeleton className="h-4 w-24" /></td>
-                    <td className="p-2"><Skeleton className="h-4 w-20" /></td>
-                    <td className="p-2"><Skeleton className="h-4 w-28" /></td>
-                    <td className="p-2"><Skeleton className="h-4 w-40" /></td>
-                    <td className="p-2"><Skeleton className="h-4 w-24" /></td>
-                    <td className="p-2"><Skeleton className="h-8 w-8" /></td>
-                  </tr>
+                  <TableRow key={index} className="hover:bg-muted/50">
+                    <TableCell className="p-3 align-middle"><Skeleton className="h-4 w-4" /></TableCell>
+                    <TableCell className="p-3 align-middle"><Skeleton className="h-4 w-32" /></TableCell>
+                    <TableCell className="p-3 align-middle"><Skeleton className="h-4 w-24" /></TableCell>
+                    <TableCell className="p-3 align-middle"><Skeleton className="h-4 w-20" /></TableCell>
+                    <TableCell className="p-3 align-middle"><Skeleton className="h-4 w-28" /></TableCell>
+                    <TableCell className="p-3 align-middle"><Skeleton className="h-4 w-40" /></TableCell>
+                    <TableCell className="p-3 align-middle"><Skeleton className="h-4 w-24" /></TableCell>
+                    <TableCell className="p-3 align-middle text-right"><Skeleton className="h-8 w-8" /></TableCell>
+                  </TableRow>
                 ))
               ) : error ? (
-                 <tr><td colSpan={8} className="py-8 text-center text-destructive">{error}</td></tr>
+                 <TableRow><TableCell colSpan={8} className="h-24 text-center p-4 align-middle text-destructive">{error}</TableCell></TableRow>
               ) : filteredLeads.length === 0 ? (
-                <tr><td colSpan={8} className="py-8 text-center text-muted-foreground">No leads found matching filters.</td></tr>
+                <TableRow><TableCell colSpan={8} className="h-24 text-center p-4 align-middle text-muted-foreground">No leads found matching filters.</TableCell></TableRow>
               ) : (
                 filteredLeads.map((lead) => (
-                  <tr key={lead.id} className="hover:bg-muted/50">
-                    <td className="p-2"><Checkbox /></td>
-                    <td className="p-2 font-medium">{lead.name}</td>
-                    <td className="p-2 text-muted-foreground">{lead.company_name}</td>
-                    <td className="p-2 text-muted-foreground"><Badge variant="outline" className="font-normal">{lead.stage_name}</Badge></td>
-                    <td className="p-2 text-muted-foreground">{lead.contact_phone}</td>
-                    <td className="p-2 text-muted-foreground">{lead.contact_email}</td>
-                    <td className="p-2">
+                  <TableRow key={lead.id} className="hover:bg-muted/50">
+                    <TableCell className="p-3 align-middle"><Checkbox /></TableCell>
+                    <TableCell className="p-3 align-middle font-medium">{lead.name}</TableCell>
+                    <TableCell className="p-3 align-middle text-muted-foreground">{lead.company_name}</TableCell>
+                    <TableCell className="p-3 align-middle text-muted-foreground"><Badge variant="outline" className="font-normal text-xs">{lead.stage_name}</Badge></TableCell>
+                    <TableCell className="p-3 align-middle text-muted-foreground">{lead.contact_phone}</TableCell>
+                    <TableCell className="p-3 align-middle text-muted-foreground">{lead.contact_email}</TableCell>
+                    <TableCell className="p-3 align-middle">
                       <div className="flex gap-1 flex-wrap">
                         {lead.tags?.map(tag => (
-                          <Badge key={tag.id} variant="secondary" className="font-normal">{tag.name}</Badge>
+                          <Badge key={tag.id} variant="secondary" className="font-normal text-xs">{tag.name}</Badge>
                         ))}
                       </div>
-                    </td>
-                    <td className="p-2 text-right">
+                    </TableCell>
+                    <TableCell className="p-3 align-middle text-right">
                        <DropdownMenu>
                          <DropdownMenuTrigger asChild>
                            <Button variant="ghost" size="icon" className="h-8 w-8">
@@ -423,25 +371,22 @@ export function LeadsList() {
                            <DropdownMenuItem className="text-destructive" onSelect={() => handleDeleteLead(lead)}>Delete Lead</DropdownMenuItem>
                          </DropdownMenuContent>
                        </DropdownMenu>
-                    </td>
-                  </tr>
+                    </TableCell>
+                  </TableRow>
                 ))
               )}
-            </tbody>
-          </table>
+            </TableBody>
+          </Table>
         </ScrollArea>
       </div>
 
-      {/* Dialogs */}
       <LeadFormDialog
         isOpen={isFormOpen}
         onClose={() => setIsFormOpen(false)}
         leadToEdit={leadForForm}
-        // Pass null for pipelineStageId when editing from list view, 
-        // or determine how to handle adding from list view if re-enabled
         pipelineStageId={null} 
-        onLeadAdded={fetchData} // Refresh list after adding
-        onLeadUpdated={fetchData} // Refresh list after updating
+        onLeadAdded={fetchData}
+        onLeadUpdated={fetchData}
       />
 
       <AlertDialog open={isAlertOpen} onOpenChange={setIsAlertOpen}>
@@ -459,7 +404,6 @@ export function LeadsList() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-
     </div>
   );
 }

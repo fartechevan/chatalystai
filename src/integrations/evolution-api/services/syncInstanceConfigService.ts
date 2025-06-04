@@ -26,9 +26,6 @@ export async function syncEvolutionInstanceConfig(
 
   if (instanceName) {
     requestBody.instanceName = instanceName; // Add name to body if provided
-    console.log(`[syncEvolutionInstanceConfig] Invoking backend function for integration ID: ${integrationId} with instance name: ${instanceName}`);
-  } else {
-    console.log(`[syncEvolutionInstanceConfig] Invoking backend function for integration ID: ${integrationId} (no specific name provided for creation)`);
   }
 
 
@@ -40,8 +37,6 @@ export async function syncEvolutionInstanceConfig(
     console.error('[syncEvolutionInstanceConfig] Error invoking Supabase function:', error);
     throw new Error(`Failed to sync instance configuration: ${error.message}`);
   }
-
-  console.log('[syncEvolutionInstanceConfig] Backend function invoked successfully. Response data:', data);
 
   // Assuming the backend function returns { success: true, data: configData } on success
   if (data?.success && data?.data) {

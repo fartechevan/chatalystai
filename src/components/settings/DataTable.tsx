@@ -49,13 +49,13 @@ export function DataTable<TData, TValue>({
   });
 
   return (
-    <div className="rounded-md border">
+    <div className="rounded-lg border overflow-hidden"> {/* Ensured consistent container styling */}
       <Table>
         <TableHeader>
           {table.getHeaderGroups().map((headerGroup) => (
-            <TableRow key={headerGroup.id}>
+            <TableRow key={headerGroup.id} className="hover:bg-transparent bg-muted/50"> {/* Added subtle bg to header row */}
               {headerGroup.headers.map((header) => (
-                <TableHead key={header.id}>
+                <TableHead key={header.id} className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">
                   {header.isPlaceholder
                     ? null
                     : flexRender(
@@ -73,9 +73,10 @@ export function DataTable<TData, TValue>({
               <TableRow
                 key={row.id}
                 data-state={row.getIsSelected() && "selected"}
+                className="hover:bg-muted/50" /* Added hover state */
               >
                 {row.getVisibleCells().map((cell) => (
-                  <TableCell key={cell.id}>
+                  <TableCell key={cell.id} className="p-4 align-middle"> {/* Standardized padding and alignment */}
                     {flexRender(cell.column.columnDef.cell, cell.getContext())}
                   </TableCell>
                 ))}

@@ -24,7 +24,6 @@ interface SessionListPanelProps {
 }
 
 const fetchRecentSessions = async (): Promise<SessionRow[]> => {
-  // @ts-expect-error - Keep this to bypass potential type mismatch until types are regenerated
   const { data, error } = await supabase
     .from('ai_agent_sessions') // This line might error if types are outdated
     .select(`
@@ -62,7 +61,7 @@ const SessionListPanel: React.FC<SessionListPanelProps> = ({
       <CardHeader>
         <CardTitle>Recent Sessions</CardTitle>
       </CardHeader>
-      <CardContent className="flex-grow p-0">
+      <CardContent className="flex-grow p-0 min-h-0">
         <ScrollArea className="h-full">
           <div className="p-4 space-y-2">
             {isLoading ? (
@@ -98,15 +97,18 @@ const SessionListPanel: React.FC<SessionListPanelProps> = ({
                          {session.contact_identifier || 'Unknown Contact'}
                        </p>
                     </div>
-                    <p className="text-xs text-muted-foreground pl-4"> {/* Indent agent name */}
-                      Agent: {session.ai_agents?.name || 'N/A'}
-                    </p>
+                    {/* Agent name removed */}
                   </div>
-                  <span className="text-xs text-muted-foreground whitespace-nowrap pl-2">
-                    {session.last_interaction_timestamp
-                      ? new Date(session.last_interaction_timestamp).toLocaleString()
-                      : 'No interactions'}
-                  </span>
+                  <div className="text-xs text-muted-foreground text-right pl-2">
+                    {session.last_interaction_timestamp ? (
+                      <>
+                        <div>{new Date(session.last_interaction_timestamp).toLocaleDateString()}</div>
+                        <div>{new Date(session.last_interaction_timestamp).toLocaleTimeString()}</div>
+                      </>
+                    ) : (
+                      'No interactions'
+                    )}
+                  </div>
                 </button>
               ))
             ) : (

@@ -1,4 +1,3 @@
-
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
 import { Switch } from "@/components/ui/switch";
@@ -61,40 +60,42 @@ export function UserTable({
         </div>
       </div>
 
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Name</TableHead>
-            <TableHead>Email</TableHead>
-            <TableHead>Joined Date</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {isLoading ? (
-            <TableRow>
-              <TableCell colSpan={3} className="text-center">
-                Loading...
-              </TableCell>
+      <div className="border rounded-lg overflow-hidden"> {/* Added container for consistent styling */}
+        <Table>
+          <TableHeader>
+            <TableRow className="hover:bg-transparent bg-muted/50"> {/* Added subtle bg to header row */}
+              <TableHead className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Name</TableHead>
+              <TableHead className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Email</TableHead>
+              <TableHead className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Joined Date</TableHead>
             </TableRow>
-          ) : users.length === 0 ? (
-            <TableRow>
-              <TableCell colSpan={3} className="text-center">
-                No users found
-              </TableCell>
-            </TableRow>
-          ) : (
-            users.map((user) => (
-              <TableRow key={user.id}>
-                <TableCell>{user.name || 'N/A'}</TableCell>
-                <TableCell>{user.email}</TableCell>
-                <TableCell>
-                  {format(new Date(user.created_at), "PPpp")}
+          </TableHeader>
+          <TableBody>
+            {isLoading ? (
+              <TableRow>
+                <TableCell colSpan={3} className="h-24 text-center p-4 align-middle"> {/* Standardized empty/loading cell */}
+                  Loading...
                 </TableCell>
               </TableRow>
-            ))
-          )}
-        </TableBody>
-      </Table>
+            ) : users.length === 0 ? (
+              <TableRow>
+                <TableCell colSpan={3} className="h-24 text-center p-4 align-middle"> {/* Standardized empty/loading cell */}
+                  No users found
+                </TableCell>
+              </TableRow>
+            ) : (
+              users.map((user) => (
+                <TableRow key={user.id} className="hover:bg-muted/50"> {/* Added hover state */}
+                  <TableCell className="p-4 align-middle">{user.name || 'N/A'}</TableCell>
+                  <TableCell className="p-4 align-middle">{user.email}</TableCell>
+                  <TableCell className="p-4 align-middle text-muted-foreground"> {/* Standardized text color */}
+                    {format(new Date(user.created_at), "PPpp")}
+                  </TableCell>
+                </TableRow>
+              ))
+            )}
+          </TableBody>
+        </Table>
+      </div>
 
       {totalPages > 1 && (
         <div className="mt-4 flex justify-center">

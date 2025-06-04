@@ -1,7 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 
     async function testSecrets() {
-      console.log("Invoking test-secrets Supabase function...");
       try {
         // Ensure the function name matches the deployed function directory
         const { data, error } = await supabase.functions.invoke('test-secrets');
@@ -18,9 +17,8 @@ import { supabase } from "@/integrations/supabase/client";
           return null;
         }
 
-        console.log('Response from test-secrets function:', data);
         // Use alert to display the result directly in the UI
-        alert(`Secrets Status:\nAPI Key: ${data.EVOLUTION_API_KEY}\nAPI URL: ${data.EVOLUTION_API_URL}`); 
+        alert(`Secrets Status:\nAPI Key: ${data.EVOLUTION_API_KEY}\nAPI URL: ${data.EVOLUTION_API_URL}`);
         return data;
 
       } catch (err) {

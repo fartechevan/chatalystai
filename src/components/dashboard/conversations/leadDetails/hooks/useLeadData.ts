@@ -20,7 +20,6 @@ export function useLeadData(
   useRealTimeUpdates(isExpanded, lead, selectedConversation?.conversation_id);
 
   const handleLeadData = useCallback((leadData: Lead) => {
-    console.log("Handling lead data:", leadData);
     setLead(leadData);
     
     const daysSinceCreated = calculateDaysSinceCreation(leadData.created_at);
@@ -36,8 +35,6 @@ export function useLeadData(
       setCustomer(null);
       setLead(null);
       setIsLoading(true);
-      console.log('Conversation changed in LeadDetailsPanel - resetting state',
-        selectedConversation.conversation_id);
     }
   }, [selectedConversation?.conversation_id, setCustomer]);
 
@@ -46,7 +43,6 @@ export function useLeadData(
       setIsLoading(true);
       try {
         if (selectedConversation) {
-          console.log("Fetching data for conversation:", selectedConversation.conversation_id);
           if (selectedConversation.lead) {
             handleLeadData(selectedConversation.lead);
           } else if (selectedConversation.lead_id) {
@@ -64,7 +60,6 @@ export function useLeadData(
               );
               
               if (customerParticipant && customerParticipant.external_user_identifier) {
-                console.log("Finding lead for customer with phone number:", customerParticipant.external_user_identifier);
                 
                 // Fetch customer by phone number
                 const { data: existingCustomer, error: customerError } = await supabase

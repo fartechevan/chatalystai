@@ -399,15 +399,15 @@ export function ChunksList({ documentId }: ChunksListProps) {
         </Card>
       )}
       
-      <div className="max-h-[70vh] overflow-y-auto pr-2">
-        <Table className="border rounded-lg">
+      <div className="max-h-[70vh] overflow-y-auto pr-2 border rounded-lg"> {/* Moved border and rounded-lg to the container */}
+        <Table> {/* Removed className="border rounded-lg" */}
           <TableHeader>
-            <TableRow className="hover:bg-transparent">
-              <TableHead>Chunk</TableHead>
-              <TableHead className="w-[150px]">Characters</TableHead>
-              {/* <TableHead className="w-[180px]">Retrieval count</TableHead> */}
-              <TableHead className="w-[80px] text-center">Status</TableHead>
-              <TableHead className="w-[100px] text-right">Actions</TableHead>
+            <TableRow className="hover:bg-transparent bg-muted/50"> {/* Added subtle bg to header row */}
+              <TableHead className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Chunk</TableHead>
+              <TableHead className="h-12 px-4 text-left align-middle font-medium text-muted-foreground w-[150px]">Characters</TableHead>
+              {/* <TableHead className="h-12 px-4 text-left align-middle font-medium text-muted-foreground w-[180px]">Retrieval count</TableHead> */}
+              <TableHead className="h-12 px-4 text-center align-middle font-medium text-muted-foreground w-[80px]">Status</TableHead>
+              <TableHead className="h-12 px-4 text-right align-middle font-medium text-muted-foreground w-[100px]">Actions</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -429,8 +429,8 @@ export function ChunksList({ documentId }: ChunksListProps) {
               const retrievalCount = metadata.customOptions?.headerLevels?.length || 0;
               
               return (
-                <TableRow key={chunk.id} className="group">
-                  <TableCell>
+                <TableRow key={chunk.id} className="group hover:bg-muted/50"> {/* Ensured hover state */}
+                  <TableCell className="p-4 align-middle">
                     <div className="space-y-1">
                       <div className="font-medium flex items-center gap-2">
                         <Hash className="h-4 w-4 text-muted-foreground" />
@@ -452,13 +452,13 @@ export function ChunksList({ documentId }: ChunksListProps) {
                       </div>
                     </div>
                   </TableCell>
-                  <TableCell>
+                  <TableCell className="p-4 align-middle text-muted-foreground">
                     {chunk.content.length.toLocaleString()} characters
                   </TableCell>
-                  <TableCell>
+                  <TableCell className="p-4 align-middle text-muted-foreground"> {/* Added consistent styling */}
                     {retrievalCount} Retrieval count
                   </TableCell>
-                  <TableCell className="text-right">
+                  <TableCell className="p-4 align-middle text-center"> {/* Centered switch */}
                     <Switch
                       checked={chunk.enabled}
                       onCheckedChange={() => handleToggleChunk(chunk.id, chunk.enabled)}
@@ -466,7 +466,7 @@ export function ChunksList({ documentId }: ChunksListProps) {
                       aria-label={chunk.enabled ? "Disable chunk" : "Enable chunk"}
                     />
                   </TableCell>
-                  <TableCell className="text-right">
+                  <TableCell className="p-4 align-middle text-right">
                     <div className="flex justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                        <Button variant="ghost" size="icon" onClick={() => handleEditClick(chunk)} title="Edit Chunk">
                          <Pencil className="h-4 w-4" />

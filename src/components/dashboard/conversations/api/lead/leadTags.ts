@@ -19,7 +19,6 @@ export async function fetchLeadTags(leadId: string): Promise<string[]> {
   }
   
   try {
-    console.log('Fetching tags for lead:', leadId);
     const { data, error } = await supabase
       .from('lead_tags')
       .select('tag:tags(name)')
@@ -52,7 +51,6 @@ export async function addTagToLead(leadId: string, tagName: string): Promise<boo
   }
   
   try {
-    console.log('Adding tag to lead:', { leadId, tagName });
     
     // First, get or create the tag
     let tagId: string;
@@ -69,7 +67,6 @@ export async function addTagToLead(leadId: string, tagName: string): Promise<boo
     
     if (existingTag) {
       tagId = existingTag.id;
-      console.log('Found existing tag:', tagId);
     } else {
       // Create a new tag
       const { data: newTag, error: createError } = await supabase
@@ -84,11 +81,9 @@ export async function addTagToLead(leadId: string, tagName: string): Promise<boo
       }
       
       tagId = newTag.id;
-      console.log('Created new tag:', tagId);
     }
     
     // Now create the lead_tag association
-    console.log('Creating lead_tag association:', { leadId, tagId });
     const { error: linkError } = await supabase
       .from('lead_tags')
       .insert({
@@ -99,14 +94,12 @@ export async function addTagToLead(leadId: string, tagName: string): Promise<boo
     if (linkError) {
       // If it's a duplicate, that's fine
       if (linkError.code === '23505') { // Unique violation
-        console.log('Tag already associated with lead (duplicate)');
         return true;
       }
       console.error('Error adding tag to lead:', linkError);
       return false;
     }
     
-    console.log('Successfully added tag to lead');
     return true;
   } catch (error) {
     console.error('Error in addTagToLead:', error);
@@ -129,7 +122,6 @@ export async function removeTagFromLead(leadId: string, tagName: string): Promis
   }
   
   try {
-    console.log('Removing tag from lead:', { leadId, tagName });
     
     // First, get the tag ID
     const { data: tag, error: tagError } = await supabase
@@ -143,8 +135,6 @@ export async function removeTagFromLead(leadId: string, tagName: string): Promis
       return false;
     }
     
-    console.log('Found tag to remove:', tag.id);
-    
     // Now remove the association
     const { error: removeError } = await supabase
       .from('lead_tags')
@@ -157,7 +147,6 @@ export async function removeTagFromLead(leadId: string, tagName: string): Promis
       return false;
     }
     
-    console.log('Successfully removed tag from lead');
     return true;
   } catch (error) {
     console.error('Error in removeTagFromLead:', error);

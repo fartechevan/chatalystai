@@ -229,12 +229,12 @@ export function ContactList({ onSelectContact }: ContactListProps) {
          </div>
        </div>
 
-       <div className="flex-1 min-h-0 relative"> {/* Added relative positioning */}
+       <div className="flex-1 min-h-0 relative border rounded-lg overflow-hidden"> {/* Added border and overflow to container */}
         <ScrollArea className="h-full absolute inset-0"> {/* Use absolute positioning for scroll area */}
           <Table className="w-full">
-            <TableHeader className="sticky top-0 bg-background z-10"> {/* Make header sticky */}
-              <TableRow>
-                <TableHead className="w-12 px-3"> {/* Adjusted padding */}
+            <TableHeader className="sticky top-0 bg-muted/50 z-10"> {/* Make header sticky and add bg */}
+              <TableRow className="hover:bg-transparent"> {/* Remove hover from header row itself */}
+                <TableHead className="h-12 px-3 text-left align-middle font-medium text-muted-foreground w-12"> {/* Standardized header style */}
                   <Checkbox
                     checked={allContactsSelected}
                     onCheckedChange={handleSelectAll}
@@ -242,62 +242,62 @@ export function ContactList({ onSelectContact }: ContactListProps) {
                     disabled={!contacts || contacts.length === 0}
                   />
                 </TableHead>
-                <TableHead className="px-3">
+                <TableHead className="h-12 px-3 text-left align-middle font-medium text-muted-foreground"> {/* Standardized header style */}
                   <Button
                     variant="ghost"
                     onClick={() => handleSort('name')}
-                    className="px-0 hover:bg-transparent"
+                    className="px-0 hover:bg-transparent font-medium text-muted-foreground" // Ensure button text matches header
                   >
                     NAME
                     <ArrowUpDown className="ml-2 h-4 w-4" />
                   </Button>
                 </TableHead>
-                <TableHead className="px-3">
+                <TableHead className="h-12 px-3 text-left align-middle font-medium text-muted-foreground"> {/* Standardized header style */}
                    <Button
                      variant="ghost"
                      onClick={() => handleSort('company')} // Assuming 'company' is a valid column in your DB
-                     className="px-0 hover:bg-transparent"
+                     className="px-0 hover:bg-transparent font-medium text-muted-foreground" // Ensure button text matches header
                    >
                      COMPANY
                      <ArrowUpDown className="ml-2 h-4 w-4" />
                    </Button>
                  </TableHead>
-                <TableHead className="px-3">
+                <TableHead className="h-12 px-3 text-left align-middle font-medium text-muted-foreground"> {/* Standardized header style */}
                   <Button
                     variant="ghost"
                     onClick={() => handleSort('phone_number')}
-                    className="px-0 hover:bg-transparent"
+                    className="px-0 hover:bg-transparent font-medium text-muted-foreground" // Ensure button text matches header
                   >
                     PHONE
                     <ArrowUpDown className="ml-2 h-4 w-4" />
                   </Button>
                 </TableHead>
-                 <TableHead className="px-3">
+                 <TableHead className="h-12 px-3 text-left align-middle font-medium text-muted-foreground"> {/* Standardized header style */}
                    <Button
                      variant="ghost"
                      onClick={() => handleSort('email')}
-                     className="px-0 hover:bg-transparent"
+                     className="px-0 hover:bg-transparent font-medium text-muted-foreground" // Ensure button text matches header
                    >
                      EMAIL
                      <ArrowUpDown className="ml-2 h-4 w-4" />
                    </Button>
                  </TableHead>
-                 <TableHead className="text-right px-3">
+                 <TableHead className="h-12 px-3 text-right align-middle font-medium text-muted-foreground"> {/* Standardized header style */}
                    ACTIONS
                  </TableHead>
                </TableRow>
              </TableHeader>
              <TableBody>
-              {isLoading && ( // Simplified loading state within tbody
+              {isLoading && ( 
                 <TableRow>
-                  <TableCell colSpan={6} className="h-24 text-center">
+                  <TableCell colSpan={6} className="h-24 text-center p-4 align-middle"> {/* Standardized empty/loading cell */}
                     Loading contacts...
                   </TableCell>
                 </TableRow>
               )}
-              {!isLoading && contacts?.length === 0 && ( // Empty state
+              {!isLoading && contacts?.length === 0 && ( 
                 <TableRow>
-                  <TableCell colSpan={6} className="h-24 text-center">
+                  <TableCell colSpan={6} className="h-24 text-center p-4 align-middle"> {/* Standardized empty/loading cell */}
                     No contacts found. Add your first contact!
                   </TableCell>
                 </TableRow>
@@ -307,21 +307,21 @@ export function ContactList({ onSelectContact }: ContactListProps) {
                   key={contact.id}
                   onClick={() => onSelectContact(contact.id)}
                   className="hover:bg-muted/50 cursor-pointer"
-                  data-state={selectedContactIds.has(contact.id) ? 'selected' : undefined} // Add selected state
+                  data-state={selectedContactIds.has(contact.id) ? 'selected' : undefined} 
                 >
-                  <TableCell className="px-3"> {/* Adjusted padding */}
+                  <TableCell className="p-3 align-middle"> {/* Standardized padding */}
                     <Checkbox
                       checked={selectedContactIds.has(contact.id)}
                       onCheckedChange={(checked) => handleSelectContact(contact.id, !!checked)}
-                      onClick={(e) => e.stopPropagation()} // Prevent row click when clicking checkbox
+                      onClick={(e) => e.stopPropagation()} 
                       aria-label={`Select contact ${contact.name}`}
                     />
                   </TableCell>
-                  <TableCell className="font-medium px-3">{contact.name}</TableCell> {/* Adjusted padding */}
-                  <TableCell className="text-muted-foreground px-3">{/* Removed dot */}</TableCell> {/* Adjusted padding */}
-                  <TableCell className="px-3">{contact.phone_number}</TableCell> {/* Adjusted padding */}
-                   <TableCell className="px-3">{contact.email}</TableCell> {/* Adjusted padding */}
-                   <TableCell className="text-right px-3"> {/* Adjusted padding */}
+                  <TableCell className="p-3 align-middle font-medium">{contact.name}</TableCell> {/* Standardized padding */}
+                  <TableCell className="p-3 align-middle text-muted-foreground">{/* Removed dot */}</TableCell> {/* Standardized padding */}
+                  <TableCell className="p-3 align-middle text-muted-foreground">{contact.phone_number}</TableCell> {/* Standardized padding and text color */}
+                   <TableCell className="p-3 align-middle text-muted-foreground">{contact.email}</TableCell> {/* Standardized padding and text color */}
+                   <TableCell className="p-3 align-middle text-right"> {/* Standardized padding */}
                      <Dialog open={contactToDelete?.id === contact.id} onOpenChange={(isOpen) => !isOpen && setContactToDelete(null)}>
                        <DialogTrigger asChild>
                          <Button 

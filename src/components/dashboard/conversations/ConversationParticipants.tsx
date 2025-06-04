@@ -23,7 +23,6 @@ export function ConversationParticipants({
   open,
   onOpenChange
 }: ConversationParticipantsProps) {
-  // console.log("CP: Conversation:", conversation); // Removed log
 
   if (!conversation || !conversation.participants) {
     return null;

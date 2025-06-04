@@ -2,19 +2,14 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { DocumentList } from "./DocumentList";
-import { ImportDocumentForm } from "./ImportDocumentForm";
+// ImportDocumentForm removed
 import { ChunksList } from "./ChunksList";
-import { CreateDocumentDialog } from "./CreateDocumentDialog";
+// CreateDocumentDialog removed
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
-import { PlusCircle, Upload, FilePlus } from "lucide-react";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+// PlusCircle, Upload, FilePlus removed
+// DropdownMenu components removed
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
 import { ChunkForm } from "./ChunkForm";
 import {
@@ -37,8 +32,7 @@ interface Document {
 }
 
 export function KnowledgeBaseLayout() {
-  const [showImportForm, setShowImportForm] = useState(false);
-  const [showCreateDialog, setShowCreateDialog] = useState(false);
+  // showImportForm and showCreateDialog state removed
   const [selectedDocumentId, setSelectedDocumentId] = useState<string | null>(null);
   const [selectedDocument, setSelectedDocument] = useState<Document | null>(null);
   const [isDocumentSelected, setIsDocumentSelected] = useState(false);
@@ -47,30 +41,9 @@ export function KnowledgeBaseLayout() {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const handleImportSuccess = () => {
-    setShowImportForm(false);
-    toast({
-      title: "Document imported",
-      description: "Your document has been successfully imported.",
-    });
-  };
-
-  const handleCreateSuccess = (documentId: string) => {
-    setShowCreateDialog(false);
-    toast({
-      title: "Document created",
-      description: "Your document has been created. Now you can add chunks to it.",
-    });
-
-    // Select the newly created document instead of navigating away
-    handleSelectDocument(documentId); 
-  };
-
-  // Ensure this handler explicitly sets showImportForm to true
-  const handleShowImportForm = () => {
-    setShowImportForm(true);
-    // console.log("Import form visibility set to:", true); // Removed log
-  };
+  // handleImportSuccess removed
+  // handleCreateSuccess removed
+  // handleShowImportForm removed
 
   const handleSelectDocument = async (documentId: string | null) => {
     setSelectedDocumentId(documentId);
@@ -128,49 +101,15 @@ export function KnowledgeBaseLayout() {
 
   return (
     <div className="container mx-auto p-4">
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold">Knowledge Base</h1>
+      {/* The div that held the title and add document button is removed */}
+      {/* ImportDocumentForm rendering removed */}
+      {/* CreateDocumentDialog rendering removed */}
 
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button className="flex items-center gap-2">
-              <PlusCircle className="h-4 w-4" />
-              Add Document
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={handleShowImportForm} className="cursor-pointer">
-              <Upload className="h-4 w-4 mr-2" />
-              Import Document
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => setShowCreateDialog(true)} className="cursor-pointer">
-              <FilePlus className="h-4 w-4 mr-2" />
-              Create New Document
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
-
-      {showImportForm && (
-        <div className="mb-8">
-          <ImportDocumentForm
-            onCancel={() => setShowImportForm(false)}
-            onSuccess={handleImportSuccess}
-          />
-        </div>
-      )}
-
-      <CreateDocumentDialog
-        open={showCreateDialog}
-        onOpenChange={setShowCreateDialog}
-        onSuccess={handleCreateSuccess}
-      />
-
-      <div className="flex">
+      <div className="flex pt-0"> {/* Adjusted pt-0 here, or remove if p-4 on parent is enough */}
         {isDocumentSelected ? (
           <>
             <div className="w-1/4 pr-4">
-              <h2 className="text-xl font-semibold mb-4">Documents</h2>
+              {/* <h2 className="text-xl font-semibold mb-4">Documents</h2> */}
               <DocumentList
                 onSelectDocument={handleSelectDocument}
                 selectedDocumentId={selectedDocumentId}
@@ -185,7 +124,7 @@ export function KnowledgeBaseLayout() {
           </>
         ) : (
           <div className="w-full">
-            <h2 className="text-xl font-semibold mb-4">Documents</h2>
+            {/* <h2 className="text-xl font-semibold mb-4">Documents</h2> */}
             <DocumentList
               onSelectDocument={handleSelectDocument}
               selectedDocumentId={selectedDocumentId}

@@ -1,12 +1,13 @@
-
 import { 
   Plus, 
   Users,
   PanelLeftClose, // Icon for collapsing
-  PanelLeftOpen   // Icon for expanding
+  PanelLeftOpen,   // Icon for expanding
+  // Settings2 // Example icon, ensure it's used or remove
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState, useEffect } from "react";
+import { Button } from "@/components/ui/button"; // Import Button
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { PipelineSetupDialog } from "./PipelineSetupDialog";
@@ -14,15 +15,15 @@ import { PipelineSetupDialog } from "./PipelineSetupDialog";
 interface LeadsSidebarProps {
   selectedPipelineId: string | null;
   onPipelineSelect: (id: string) => void;
-  isCollapsed: boolean;
-  onCollapse: () => void;
+  // isCollapsed: boolean; // Removed
+  // onCollapse: () => void; // Removed
 }
 
 export function LeadsSidebar({
   selectedPipelineId,
   onPipelineSelect,
-  isCollapsed,
-  onCollapse,
+  // isCollapsed, // Removed
+  // onCollapse, // Removed
 }: LeadsSidebarProps) {
   const { toast } = useToast();
   const [pipelines, setPipelines] = useState<Array<{ id: string; name: string; is_default: boolean }>>([]);
@@ -58,52 +59,57 @@ export function LeadsSidebar({
   // eslint-disable-next-line react-hooks/exhaustive-deps 
   }, []); // Run only once on mount
 
-  // Added 'h-full' for use within SheetContent/Layout containers
   return (
     <div className={cn(
-      "border-r bg-muted/30 transition-all duration-300 relative flex flex-col h-full", 
+      "border-r bg-background transition-all duration-300 relative flex flex-col h-full", 
       // Width and visibility are now controlled by the parent (LeadsLayout or SheetContent)
     )}>
-      <nav className="p-3 space-y-1">
+      {/* Header-like section removed or simplified */}
+      {/* The div below can be removed if no header elements remain, or kept for styling if other elements are added later */}
+      {/* For now, let's assume we remove the header section entirely if only the button and title were there */}
+      {/* <div className={cn("flex items-center border-b h-[57px] justify-center")}></div> */} {/* Example if it were to be always collapsed height */}
+      <nav className={cn("flex-grow px-3 py-2 space-y-1 pt-4", "overflow-y-auto")}> {/* Removed isCollapsed logic, default to expanded style */}
         {pipelines.map((pipeline) => (
-          <button
+          <Button
             key={pipeline.id}
-            onClick={() => onPipelineSelect(pipeline.id)}
+            variant={selectedPipelineId === pipeline.id ? "secondary" : "ghost"}
             className={cn(
-              "w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm truncate",
-              selectedPipelineId === pipeline.id 
-                ? "bg-primary text-primary-foreground" 
-                : "hover:bg-muted"
+              "w-full justify-start gap-2 text-sm truncate",
+              "px-3" // Default to expanded padding
             )}
+            onClick={() => onPipelineSelect(pipeline.id)}
             title={pipeline.name}
           >
             <Users className="h-4 w-4 flex-shrink-0" />
-            {/* Hide text span based on collapse state */}
-            {!isCollapsed && <span>{pipeline.name}</span>}
-          </button>
+            <span>{pipeline.name}</span> {/* Always show name */}
+          </Button>
         ))}
       </nav>
-      <div className="mt-2 px-3">
-        <button
+      <div className={cn("mt-auto border-t p-3")}> {/* Removed isCollapsed logic, default to expanded style */}
+        <Button
+          variant="outline"
+          className={cn(
+            "w-full justify-start gap-2 text-sm",
+            "px-3" // Default to expanded padding
+          )}
           onClick={() => setIsSetupOpen(true)}
-          className="w-full flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm text-muted-foreground hover:bg-muted"
+          title="New Pipeline"
         >
           <Plus className="h-4 w-4 flex-shrink-0" />
-           {/* Hide text span based on collapse state */}
-          {!isCollapsed && <span>New Pipeline</span>}
-        </button>
+          <span>New Pipeline</span> {/* Always show name */}
+        </Button>
       </div>
-      {/* Collapse button - Visibility controlled by parent (LeadsLayout) */}
-      {/* The button itself remains, but its container in LeadsLayout will be hidden on mobile */}
+      {/* The old collapse button was moved to the header-like section above.
+          The comment block below was causing a syntax error.
+      */}
+      {/*
       <button
         onClick={onCollapse}
         className={cn(
           "absolute -right-3 top-3 p-1 rounded-full bg-background border shadow-sm hover:bg-accent",
-          "transition-transform", // Removed responsive hiding
-          // Parent container in LeadsLayout will handle hiding this for mobile drawer
+          "transition-transform", 
         )}
       >
-        {/* Use different icons based on collapsed state */}
         {isCollapsed ? (
           <PanelLeftOpen className="h-4 w-4" /> 
         ) : (
@@ -111,6 +117,7 @@ export function LeadsSidebar({
         )}
         <span className="sr-only">{isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}</span>
       </button>
+      */}
 
       <PipelineSetupDialog
         isOpen={isSetupOpen}
