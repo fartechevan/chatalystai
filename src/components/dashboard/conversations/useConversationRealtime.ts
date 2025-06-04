@@ -19,7 +19,6 @@ export function useConversationRealtime(
           table: 'conversations'
         },
         (payload) => {
-          console.log('Conversation change detected:', payload);
           queryClient.invalidateQueries({ queryKey: ['conversations'] });
         }
       )
@@ -38,7 +37,6 @@ export function useConversationRealtime(
             : undefined
         },
         (payload) => {
-          console.log('Message change detected:', payload);
           if (selectedConversation) {
             queryClient.invalidateQueries({ 
               queryKey: ['messages', selectedConversation.conversation_id] 

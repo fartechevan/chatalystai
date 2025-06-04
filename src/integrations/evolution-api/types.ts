@@ -42,8 +42,7 @@ export type ConnectionState =
   | "qrcode"
   | "pairingCode"
   | "idle"
-  | "unknown"
-  | string;
+  | "unknown";
 
 // You can add other Evolution API related types here as needed
 

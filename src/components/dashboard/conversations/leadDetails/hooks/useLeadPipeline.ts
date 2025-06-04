@@ -66,7 +66,6 @@ export function useLeadPipeline(
   const findAndSelectStage = useCallback(async (stageId: string) => {
     if (!stageId) return;
     
-    console.log("Finding stage:", stageId);
 
     if (allPipelines.length > 0) {
       for (const pipeline of allPipelines) {
@@ -74,7 +73,6 @@ export function useLeadPipeline(
         
         const stage = pipeline.stages.find(s => s.id === stageId);
         if (stage) {
-          console.log("Found stage in existing pipelines:", stage.name);
           setSelectedPipeline(pipeline);
           setSelectedStage(stage);
           return;
@@ -131,11 +129,9 @@ export function useLeadPipeline(
             
             const stage = stagesData.find(s => s.id === stageId);
             if (stage) {
-              console.log("Setting selected stage:", stage.name);
               setSelectedStage(stage);
             }
             
-            console.log("Setting selected pipeline:", pipelineData.name);
             setSelectedPipeline(pipelineWithStages);
             
             setAllPipelines(prev => {
@@ -175,7 +171,6 @@ export function useLeadPipeline(
     
     const stage = selectedPipeline.stages?.find(s => s.id === stageId);
     if (stage) {
-      console.log(`Changing stage for lead ${lead.id} to ${stage.name} (${stageId})`);
       
       setSelectedStage(stage);
       
@@ -195,8 +190,6 @@ export function useLeadPipeline(
             });
             return;
           }
-          
-          console.log(`Updated lead ${lead.id} to stage ${stage.name}`);
           
           const { error: pipelineError } = await supabase
             .from('lead_pipeline')
@@ -245,10 +238,8 @@ export function useLeadPipeline(
 
   useEffect(() => {
     if (lead?.pipeline_stage_id) {
-      console.log("Lead has pipeline_stage_id:", lead.pipeline_stage_id);
       findAndSelectStage(lead.pipeline_stage_id);
     } else if (selectedPipeline?.stages && selectedPipeline.stages.length > 0) {
-      console.log("Setting default stage");
       setSelectedStage(selectedPipeline.stages[0]);
     }
   }, [lead, findAndSelectStage, selectedPipeline]);

@@ -213,12 +213,7 @@ export function ProfileAccessManagement() {
 
   return (
     <div className="p-4 space-y-8">
-      <div className="flex justify-between items-center">
-        <div>
-          <h2 className="text-2xl font-semibold">Integration Access</h2>
-          <p className="text-muted-foreground">Manage who can access which integrations</p>
-        </div>
-      </div>
+      {/* Title and subtitle removed */}
 
       {/* Loading State */}
       {(isLoading || isCheckingRole) && (
@@ -318,25 +313,25 @@ export function ProfileAccessManagement() {
             </div>
           ) : (
             // Desktop Table View
-            <div className="border rounded-md">
-              <Table>
+            <div className="border rounded-lg overflow-hidden"> {/* Added overflow-hidden */}
+              <Table> {/* Removed border rounded-md from table itself */}
                 <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-[30%]">Integration</TableHead>
-                    <TableHead>Users with Access</TableHead>
-                    <TableHead className="text-right w-[150px]">Actions</TableHead>
+                  <TableRow className="hover:bg-transparent bg-muted/50"> {/* Added subtle bg to header row */}
+                    <TableHead className="h-12 px-4 text-left align-middle font-medium text-muted-foreground w-[30%]">Integration</TableHead>
+                    <TableHead className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Users with Access</TableHead>
+                    <TableHead className="h-12 px-4 text-right align-middle font-medium text-muted-foreground w-[150px]">Actions</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {integrationsWithAccess.map((integration) => (
-                    <TableRow key={integration.id}>
-                      <TableCell>
+                    <TableRow key={integration.id} className="hover:bg-muted/50"> {/* Ensured hover state */}
+                      <TableCell className="p-4 align-middle">
                         <div className="font-medium">{integration.name}</div>
                         {integration.description && (
                           <div className="text-xs text-muted-foreground">{integration.description}</div>
                         )}
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="p-4 align-middle">
                         {integration.access?.length > 0 ? (
                           <div className="flex flex-col space-y-1">
                             {integration.access.map((access) => (
@@ -355,7 +350,7 @@ export function ProfileAccessManagement() {
                           </div>
                         )}
                       </TableCell>
-                      <TableCell className="text-right">
+                      <TableCell className="p-4 align-middle text-right">
                         <Button
                           variant="outline"
                           size="sm"

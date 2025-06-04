@@ -20,11 +20,10 @@ export function MessageList({ messages, isLoading, conversation }: MessageListPr
   }, [messages]);
 
   return (
-    <div className="flex-1 overflow-y-scroll">
-      <ScrollArea className="h-full">
-        <div className="flex flex-col gap-4 p-4">
-          {messages.map((message) => (
-            <MessageItem 
+    <ScrollArea className="flex-1 h-full"> {/* ScrollArea is now flex-1 and takes full height */}
+      <div className="flex flex-col gap-4 p-4">
+        {messages.map((message) => (
+          <MessageItem 
               key={message.message_id} 
               message={message} 
               conversation={conversation} 
@@ -33,7 +32,7 @@ export function MessageList({ messages, isLoading, conversation }: MessageListPr
           {isLoading && <Loader2 className="h-4 w-4 animate-spin" />}
           <div ref={bottomRef} />
         </div>
-      </ScrollArea>
-    </div>
+    </ScrollArea>
+    // Outer div removed
   );
 }

@@ -5,7 +5,6 @@ import { supabase } from "@/integrations/supabase/client";
  * Fetches messages for a specific conversation
  */
 export async function fetchMessages(conversationId: string) {
-  console.log('Fetching messages for conversation:', conversationId);
   
   const { data, error } = await supabase
     .from('messages')
@@ -26,6 +25,5 @@ export async function fetchMessages(conversationId: string) {
      throw error;
    }
  
-   // console.log('Fetched messages:', data); // Removed log
    return data;
  }

@@ -90,7 +90,7 @@ export function LeadDetailsPanel({
       <LeadHeader 
         lead={lead} 
         isLoading={isLoading} 
-        // Removed onClose prop pass
+        // onClose prop removed from here
       />
 
       {/* Content always rendered now, parent controls visibility */}
@@ -167,18 +167,7 @@ export function LeadDetailsPanel({
                       isLoading={isLoading}
                     />
                   </div>
-                  {/* Common Footer */}
-                  <div className="mt-auto border-t p-4">
-                    <div className="flex items-center justify-end gap-2"> {/* Adjusted justify-between to justify-end */}
-                      {/* Removed Accept Button */}
-                      <Button variant="outline" size="icon" className="shrink-0">
-                        <LinkIcon className="h-4 w-4" />
-                      </Button>
-                      <Button variant="outline" size="icon" className="shrink-0">
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
+                  {/* Common Footer Removed */}
                 </TabsContent>
 
                 {/* Statistics Tab Content */}
@@ -186,18 +175,7 @@ export function LeadDetailsPanel({
                   <div className="flex-1 flex items-center justify-center h-full"> {/* Placeholder */}
                     <p className="text-sm text-muted-foreground">Statistics will appear here</p>
                   </div>
-                   {/* Common Footer */}
-                   <div className="mt-auto border-t p-4">
-                    <div className="flex items-center justify-end gap-2"> {/* Adjusted justify-between to justify-end */}
-                      {/* Removed Accept Button */}
-                      <Button variant="outline" size="icon" className="shrink-0">
-                        <LinkIcon className="h-4 w-4" />
-                      </Button>
-                      <Button variant="outline" size="icon" className="shrink-0">
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
+                  {/* Common Footer Removed */}
                 </TabsContent>
 
                 {/* Media Tab Content */}
@@ -205,18 +183,7 @@ export function LeadDetailsPanel({
                   <div className="flex-1 flex items-center justify-center h-full"> {/* Placeholder */}
                     <p className="text-sm text-muted-foreground">Media files will appear here</p>
                   </div>
-                   {/* Common Footer */}
-                   <div className="mt-auto border-t p-4">
-                    <div className="flex items-center justify-end gap-2"> {/* Adjusted justify-between to justify-end */}
-                      {/* Removed Accept Button */}
-                      <Button variant="outline" size="icon" className="shrink-0">
-                        <LinkIcon className="h-4 w-4" />
-                      </Button>
-                      <Button variant="outline" size="icon" className="shrink-0">
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
+                  {/* Common Footer Removed */}
                 </TabsContent>
 
                 {/* Setup Tab Content */}
@@ -224,18 +191,7 @@ export function LeadDetailsPanel({
                   <div className="flex-1 flex items-center justify-center h-full"> {/* Placeholder */}
                     <p className="text-sm text-muted-foreground">Setup options will appear here</p>
                   </div>
-                   {/* Common Footer */}
-                   <div className="mt-auto border-t p-4">
-                    <div className="flex items-center justify-end gap-2"> {/* Adjusted justify-between to justify-end */}
-                      {/* Removed Accept Button */}
-                      <Button variant="outline" size="icon" className="shrink-0">
-                        <LinkIcon className="h-4 w-4" />
-                      </Button>
-                      <Button variant="outline" size="icon" className="shrink-0">
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
+                  {/* Common Footer Removed */}
                 </TabsContent>
               </Tabs>
             </>
@@ -243,7 +199,6 @@ export function LeadDetailsPanel({
              <EmptyLeadState 
                conversationId={selectedConversation?.conversation_id || ''}
                onLeadCreated={async (leadId) => {
-                 // console.log("Lead created:", leadId); // Removed log
                  // Invalidate the conversations query to refetch conversations
                  await queryClient.invalidateQueries({ queryKey: ['conversations'] });
 

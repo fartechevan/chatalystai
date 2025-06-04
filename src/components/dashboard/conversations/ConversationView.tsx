@@ -1,37 +1,33 @@
-
-import { useState, useEffect, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import type { Conversation } from "./types";
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet"; 
-import { Button } from "@/components/ui/button"; 
-import { SidebarOpen, UserCog } from "lucide-react"; 
-import { cn } from "@/lib/utils"; 
-import { useMediaQuery } from "@/hooks/use-media-query"; 
+import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { Button } from "@/components/ui/button";
+import { UserCog, PanelLeft, PanelRightOpen } from "lucide-react"; // Added PanelRightOpen
+import { cn } from "@/lib/utils";
+import { useMediaQuery } from "@/hooks/use-media-query";
 import { ConversationLeftPanel } from "./ConversationLeftPanel";
 import { ConversationMainArea } from "./ConversationMainArea";
 import { LeadDetailsPanel } from "./LeadDetailsPanel";
-import { ConversationHeader } from "./ConversationHeader"; 
 import { useConversationData } from "./hooks/useConversationData";
-import { useConversationRealtime } from "./useConversationRealtime"; 
+import { useConversationRealtime } from "./useConversationRealtime";
 import { useParticipantsData } from "./hooks/useParticipantsData";
-import { useCustomersData } from "./hooks/useCustomersData"; 
+import { useCustomersData } from "./hooks/useCustomersData";
 import {
   processConversationsWithCustomerNames,
   filterConversations
 } from "./utils/conversationProcessing";
 
 export function ConversationView() {
-  const [searchQuery, setSearchQuery] = useState("");
+  // const [searchQuery, setSearchQuery] = useState(""); // Moved to ConversationLeftPanel
   const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
-  // Mobile drawer states
   const [isMobileConvoListDrawerOpen, setIsMobileConvoListDrawerOpen] = useState(false);
-  const [isMobileLeadDetailsDrawerOpen, setIsMobileLeadDetailsDrawerOpen] = useState(false);
-  
+  const [isLeadDetailsDrawerOpen, setIsLeadDetailsDrawerOpen] = useState(false); // Renamed
+
   const [newMessage, setNewMessage] = useState("");
   const queryClient = useQueryClient();
-  const isDesktop = useMediaQuery("(min-width: 1024px)"); // Use lg breakpoint for 3 panels
+  const isDesktop = useMediaQuery("(min-width: 1024px)"); // lg breakpoint
 
-  // Fetch core conversation data
   const {
     conversations,
     messages,
@@ -42,139 +38,146 @@ export function ConversationView() {
     summarizeMutation
   } = useConversationData(selectedConversation);
 
-  // Fetch participants and customers data (needed for processing/filtering)
   const { participantsData, isLoadingParticipants } = useParticipantsData();
-  const { customersData, isLoadingCustomers } = useCustomersData(); 
+  const { customersData, isLoadingCustomers } = useCustomersData();
 
-  // Setup real-time updates for conversations
   useConversationRealtime(queryClient, selectedConversation);
 
-  // Combine loading states
   const isLoading = isLoadingConversationData || isLoadingParticipants || isLoadingCustomers;
 
-  // Process conversations to include customer names (memoized)
   const processedConversations = useMemo(() => {
-    return processConversationsWithCustomerNames(conversations, participantsData, customersData); 
+    // Pass raw conversations here; ConversationLeftPanel will do its own filtering
+    return processConversationsWithCustomerNames(conversations, participantsData, customersData);
   }, [conversations, participantsData, customersData]);
 
-  // Filter conversations based on search query (memoized)
-  const filteredConversations = useMemo(() => {
-    return filterConversations(processedConversations, customersData, searchQuery); 
-  }, [processedConversations, customersData, searchQuery]);
+  // Filtering is now done inside ConversationLeftPanel
+  // const filteredConversations = useMemo(() => {
+  //   return filterConversations(processedConversations, customersData, searchQuery);
+  // }, [processedConversations, customersData, searchQuery]);
 
-  // --- Handlers ---
+  useEffect(() => {
+    if (!isDesktop && selectedConversation) {
+      setIsMobileConvoListDrawerOpen(false);
+    }
+  }, [selectedConversation, isDesktop]);
+
   const handleSelectConversation = (conversation: Conversation | null) => {
     setSelectedConversation(conversation);
-    // Close drawers on mobile when a conversation is selected
     if (!isDesktop) {
       setIsMobileConvoListDrawerOpen(false);
-      setIsMobileLeadDetailsDrawerOpen(false); 
+      // setIsMobileLeadDetailsDrawerOpen(false); // Keep lead details open if user explicitly opened it
     }
   };
 
   const handleSendMessage = () => {
     if (!newMessage.trim() || !selectedConversation) return;
-
-    // --- Determine recipient phone ---
     const customerParticipant = selectedConversation.participants?.find(p => p.customer_id);
-    const recipientCustomer = customerParticipant?.customer_id 
+    const recipientCustomer = customerParticipant?.customer_id
       ? customersData?.[customerParticipant.customer_id]
       : null;
     const recipientPhone = recipientCustomer?.phone_number;
 
     if (!recipientPhone) {
       console.error("Could not determine recipient phone number for conversation:", selectedConversation.conversation_id);
-      return; 
+      return;
     }
-    
-    // --- Determine instance ID ---
     const instanceId = selectedConversation.integrations_id;
     if (!instanceId) {
       console.error("Could not determine instance ID for conversation:", selectedConversation.conversation_id);
       return;
     }
-
     sendMessageMutation.mutate(newMessage.trim());
     setNewMessage("");
   };
 
-  // --- Extracted Panel Components ---
-  const conversationListPanel = (
-     <ConversationLeftPanel
-        searchQuery={searchQuery}
-        setSearchQuery={setSearchQuery}
-        filteredConversations={filteredConversations} 
-        selectedConversation={selectedConversation}
-        setSelectedConversation={handleSelectConversation}
-      />
+  const conversationListPanelContent = (
+    <ConversationLeftPanel
+      // searchQuery and setSearchQuery removed
+      conversations={processedConversations || []} // Pass processed (but unfiltered) conversations
+      customersData={customersData} // Pass customersData for filtering inside
+      selectedConversation={selectedConversation}
+      setSelectedConversation={handleSelectConversation}
+      onConversationSelect={() => { // Re-added for mobile drawer closing, as it's in ConversationLeftPanel's props
+        if(!isDesktop) setIsMobileConvoListDrawerOpen(false);
+      }}
+    />
   );
 
-  const leadDetailsPanel = selectedConversation ? (
-      <LeadDetailsPanel
-        selectedConversation={selectedConversation}
-        setSelectedConversation={handleSelectConversation}
-        queryClient={queryClient}
-      />
+  const leadDetailsPanelContent = selectedConversation ? (
+    <LeadDetailsPanel
+      selectedConversation={selectedConversation}
+      setSelectedConversation={handleSelectConversation}
+      queryClient={queryClient}
+      onClose={() => setIsLeadDetailsDrawerOpen(false)} // Use renamed state setter
+    />
   ) : null;
+
+  const currentChatPartnerName = useMemo(() => {
+    if (!selectedConversation || !participantsData || !customersData) return "Chat";
+    const partnerParticipant = selectedConversation.participants?.find(p => p.customer_id);
+    if (partnerParticipant?.customer_id && customersData[partnerParticipant.customer_id]) {
+      return customersData[partnerParticipant.customer_id].name || customersData[partnerParticipant.customer_id].phone_number || "Chat";
+    }
+    return "Chat";
+  }, [selectedConversation, participantsData, customersData]);
 
 
   return (
-    <div className="flex h-full"> 
+    <div className="flex h-full flex-col lg:flex-row overflow-hidden bg-background text-foreground">
       
-      {/* Mobile Drawers & Trigger Area */}
+      {/* Mobile Header Bar for Triggers */}
       {!isDesktop && (
-        <div className="p-2 border-r flex flex-col gap-2"> 
-          {/* Convo List Drawer Trigger */}
+        <div className="p-2 border-b flex items-center gap-2 lg:hidden sticky top-0 bg-background z-10">
           <Sheet open={isMobileConvoListDrawerOpen} onOpenChange={setIsMobileConvoListDrawerOpen}>
             <SheetTrigger asChild>
-              <Button variant="outline" size="icon" aria-label="Open Conversations List">
-                <SidebarOpen className="h-5 w-5" />
+              <Button variant="ghost" size="icon" aria-label="Open Conversations List">
+                <PanelLeft className="h-5 w-5" />
               </Button>
             </SheetTrigger>
-            <SheetContent side="left" className="p-0 w-80 [&>button]:hidden">
-              {conversationListPanel}
+            <SheetContent side="left" className="p-0 w-80 sm:w-[320px] bg-card flex flex-col">
+              {conversationListPanelContent}
             </SheetContent>
           </Sheet>
+          
+          <h1 className="text-md font-semibold flex-1 truncate text-center px-2">
+            {selectedConversation ? currentChatPartnerName : "Inbox"}
+          </h1>
 
-           {/* Lead Details Drawer Trigger (only show if a convo is selected) */}
-           {selectedConversation && (
-             <Sheet open={isMobileLeadDetailsDrawerOpen} onOpenChange={setIsMobileLeadDetailsDrawerOpen}>
-               <SheetTrigger asChild>
-                 <Button variant="outline" size="icon" aria-label="Open Lead Details">
-                   <UserCog className="h-5 w-5" /> 
-                 </Button>
-               </SheetTrigger>
-               <SheetContent side="right" className="p-0 w-80 [&>button]:hidden">
-                 {leadDetailsPanel}
-               </SheetContent>
-             </Sheet>
-           )}
+          {/* Mobile Lead Details Trigger - This button will now also be the primary way to open it on desktop if no other trigger is added */}
+          {selectedConversation && (
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              aria-label="Toggle Lead Details" // Changed aria-label
+              onClick={() => setIsLeadDetailsDrawerOpen(prev => !prev)} // Toggle state
+              className="lg:hidden" 
+            >
+              <UserCog className="h-5 w-5" />
+            </Button>
+          )}
+          {!selectedConversation && <div className="w-10 h-10 lg:hidden" /> /* Placeholder */}
         </div>
       )}
 
-      {/* Desktop Layout */}
+      {/* Desktop Left Panel (Conversation List) */}
       {isDesktop && (
-        <>
-          {/* Desktop Left Panel (Conversation List) */}
-          <div className="w-80 border-r flex-shrink-0">
-            {conversationListPanel}
-          </div>
-
-           {/* Desktop Right Panel (Lead Details) */}
-           {selectedConversation && (
-              <div className="w-96 border-l flex-shrink-0">
-                {leadDetailsPanel}
-              </div>
-           )}
-        </>
+        <div className="w-[240px] lg:w-[280px] xl:w-[300px] bg-card border-r flex-shrink-0 hidden lg:flex flex-col h-full"> {/* Added h-full */}
+          {conversationListPanelContent}
+        </div>
       )}
 
-      {/* Main Conversation Area (Common for Mobile/Desktop) */}
-      <div className="flex-1 flex flex-col min-w-0"> 
-         <ConversationMainArea
-            selectedConversation={selectedConversation}
-            isLoading={isLoading}
-            messages={messages}
+      {/* Wrapper for Main Conversation Area */}
+      {/* The desktop trigger button for lead details will be moved to ConversationHeader */}
+      <div className={cn(
+        "flex-1 flex flex-col min-w-0 relative", // Keep relative if ConversationMainArea needs it for internal absolute elements
+        "bg-background flex-grow"
+      )}>
+        <ConversationMainArea
+          key={selectedConversation?.conversation_id || 'empty'}
+          onOpenLeadDetails={() => setIsLeadDetailsDrawerOpen(prev => !prev)} // Changed to toggle
+          selectedConversation={selectedConversation}
+          isLoading={isLoading}
+          messages={messages}
             newMessage={newMessage}
             setNewMessage={setNewMessage}
             handleSendMessage={handleSendMessage}
@@ -182,9 +185,34 @@ export function ConversationView() {
             summarizeMutation={summarizeMutation}
             summary={summary}
             summaryTimestamp={summaryTimestamp}
+            isDesktop={isDesktop}
+            partnerName={currentChatPartnerName}
           />
-      </div> 
+      </div> {/* This closes the main conversation area wrapper */}
 
+      {/* Lead Details Panel - Drawer on mobile, "Push" panel on desktop */}
+      {selectedConversation && (
+        <>
+          {/* Mobile: Drawer */}
+          {!isDesktop && (
+            <Sheet open={isLeadDetailsDrawerOpen} onOpenChange={setIsLeadDetailsDrawerOpen}>
+              <SheetContent 
+                side="right" 
+                className="p-0 w-full sm:w-[350px] bg-card flex flex-col"
+              >
+                {leadDetailsPanelContent}
+              </SheetContent>
+            </Sheet>
+          )}
+
+          {/* Desktop: Conditionally rendered "push" panel */}
+          {isDesktop && isLeadDetailsDrawerOpen && (
+            <div className="w-[280px] lg:w-[320px] xl:w-[350px] bg-card border-l flex-shrink-0 flex flex-col h-full"> {/* Added h-full */}
+              {leadDetailsPanelContent}
+            </div>
+          )}
+        </>
+      )}
     </div>
   );
 }

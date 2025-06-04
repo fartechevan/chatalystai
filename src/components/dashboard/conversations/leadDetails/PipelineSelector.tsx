@@ -1,6 +1,8 @@
 
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Label } from "@/components/ui/label"; // Added Label
+import { Progress } from "@/components/ui/progress"; // Added Progress
 import { ChevronDown } from "lucide-react";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Card } from "@/components/ui/card";
@@ -38,11 +40,11 @@ export function PipelineSelector({
   };
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-3"> {/* Slightly increased spacing */}
       {isChangingPipeline ? (
         <div className="space-y-2">
-          <label className="text-xs text-muted-foreground">Select Pipeline</label>
-          <div className="space-y-2 max-h-48 overflow-y-auto">
+          <Label className="text-xs text-muted-foreground">Select Pipeline</Label>
+          <div className="space-y-2 max-h-48 overflow-y-auto border rounded-md p-2"> {/* Added border and padding to scroll area */}
             {allPipelines.map((pipeline) => (
               <Card 
                 key={pipeline.id} 
@@ -66,7 +68,7 @@ export function PipelineSelector({
       ) : (
         <>
           <div className="flex justify-between items-center">
-            <label className="text-xs text-muted-foreground">Pipeline</label>
+            <Label className="text-xs text-muted-foreground">Pipeline</Label>
             <Button 
               variant="ghost" 
               size="sm" 
@@ -88,34 +90,35 @@ export function PipelineSelector({
                 </div>
               </Button>
             </PopoverTrigger>
-            <PopoverContent className="w-72 p-2">
-              {selectedPipeline?.stages?.map((stage) => (
-                <Card 
-                  key={stage.id} 
-                  className={cn(
-                    "p-2 mb-2 cursor-pointer hover:bg-accent",
-                    stage.id === selectedStage?.id && "border-primary"
-                  )}
-                  onClick={() => handleStageChange(stage.id)}
-                >
-                  {stage.name}
-                </Card>
-              ))}
+            <PopoverContent className="w-[var(--radix-popover-trigger-width)] p-1"> {/* Adjusted width and padding */}
+              {selectedPipeline?.stages?.length ? (
+                selectedPipeline.stages.map((stage) => (
+                  <Button // Using Button for items for better click handling and styling
+                    key={stage.id}
+                    variant="ghost"
+                    className={cn(
+                      "w-full justify-start px-2 py-1.5 text-sm h-auto mb-1",
+                      stage.id === selectedStage?.id && "bg-accent text-accent-foreground"
+                    )}
+                    onClick={() => handleStageChange(stage.id)}
+                  >
+                    {stage.name}
+                  </Button>
+                ))
+              ) : (
+                <div className="p-2 text-sm text-muted-foreground text-center">No stages in this pipeline.</div>
+              )}
             </PopoverContent>
           </Popover>
-          <div className="h-2 bg-muted rounded-full overflow-hidden">
-            {selectedPipeline?.stages && selectedStage && (
-              <div 
-                className="bg-primary h-full rounded-full"
-                style={{
-                  width: `${(
-                    ((selectedPipeline.stages.findIndex(s => s.id === selectedStage.id) + 1) / 
-                    (selectedPipeline.stages.length || 1)) * 100
-                  )}%`
-                }}
-              ></div>
-            )}
-          </div>
+          {selectedPipeline?.stages && selectedStage && selectedPipeline.stages.length > 0 && (
+            <Progress 
+              value={(
+                ((selectedPipeline.stages.findIndex(s => s.id === selectedStage.id) + 1) / 
+                (selectedPipeline.stages.length)) * 100
+              )} 
+              className="h-2 w-full" 
+            />
+          )}
         </>
       )}
     </div>

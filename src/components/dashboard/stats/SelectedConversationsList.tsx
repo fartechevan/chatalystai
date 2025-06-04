@@ -102,14 +102,6 @@ export function SelectedConversationsList({ conversations, selectedSentiment }: 
   const uniqueCustomerIdsCount = getUniqueCustomerIds().length;
 
   // Debugging logs
-  console.log("[SelectedConversationsList] Rendering. Props:", { conversationsLength: conversations.length, selectedSentiment });
-  console.log("[SelectedConversationsList] State:", { uniqueCustomerIdsCount, isLoadingUser, isCreatingSegment });
-  console.log("[SelectedConversationsList] Button visibility conditions:", {
-    cond1_selectedSentiment: !!selectedSentiment,
-    cond2_conversationsLength: conversations.length > 0,
-    cond3_uniqueCustomerIdsCount: uniqueCustomerIdsCount > 0,
-    cond4_notIsLoadingUser: !isLoadingUser,
-  });
 
 
   if (!conversations || conversations.length === 0) {

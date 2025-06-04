@@ -9,8 +9,6 @@ import { Database } from '@/integrations/supabase/types';
  * @throws If the integration is not found or credentials are missing.
  */
 export async function getEvolutionCredentials(integrationId: string): Promise<{ apiKey: string; baseUrl: string }> { // Removed metadata from return type
-  console.log(`Fetching credentials for integration ID: ${integrationId}`); // Updated log
-
   if (!integrationId) {
     throw new Error("Integration ID is required to fetch credentials.");
   }
@@ -42,7 +40,6 @@ export async function getEvolutionCredentials(integrationId: string): Promise<{ 
     throw new Error(`Missing required credentials (${missing.join(' and ')}) for integration ${integrationId}.`);
   }
 
-  console.log(`Successfully fetched credentials for integration ID: ${integrationId}`); // Updated log
   // Non-null assertions for apiKey and baseUrl are safe here due to the check above
   return { apiKey: apiKey!, baseUrl: baseUrl! }; // Removed metadata from return
 }

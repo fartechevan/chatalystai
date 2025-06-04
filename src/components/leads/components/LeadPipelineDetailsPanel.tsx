@@ -63,13 +63,10 @@ export function LeadPipelineDetailsPanel({ lead: initialLead, onClose, queryClie
 
   // --- Data Fetching (Profiles & Customer) ---
   useEffect(() => {
-    // console.log("[Effect Profiles] Running for lead:", initialLead?.id); 
     const getProfiles = async () => {
-      // console.log("[Effect Profiles] Fetching profiles..."); 
       setIsLoadingProfiles(true); // Set loading true before fetch
       try {
         const profilesData = await fetchProfiles();
-        // console.log("[Effect Profiles] Fetched profiles data:", profilesData); 
         setProfiles(profilesData as Profile[]); 
       } catch (error) {
         console.error("Error fetching profiles:", error); // Keep error log
@@ -134,95 +131,63 @@ export function LeadPipelineDetailsPanel({ lead: initialLead, onClose, queryClie
   // const isLoading = isLoadingCustomer || isTagsLoading || isLoadingProfiles; 
 
   return (
-    <div className={cn("border-l bg-background flex flex-col h-full")}> 
-      {/* Reinstate original CardHeader */}
-      <CardHeader className="flex flex-row items-center justify-between p-4 border-b">
-        <CardTitle className="text-lg font-semibold">
-          {/* Restore customer name logic in title */}
+    <div className={cn("border-l bg-card flex flex-col h-full shadow-lg")}> {/* Changed bg to card, added shadow */}
+      <CardHeader className="flex flex-row items-center justify-between p-4 border-b sticky top-0 bg-card z-10"> {/* Made header sticky */}
+        <CardTitle className="text-lg font-semibold truncate"> {/* Added truncate */}
           {customer?.name || initialLead?.name || 'Lead Details'} 
         </CardTitle>
-        <Button variant="ghost" size="icon" onClick={onClose}>
+        <Button variant="ghost" size="icon" onClick={onClose} className="flex-shrink-0"> {/* Ensure button doesn't shrink */}
           <X className="h-5 w-5" />
         </Button>
       </CardHeader>
 
-      {/* Remove top-level loading check - render structure directly */}
-      <div className="flex-1 overflow-auto flex flex-col"> 
-        <> 
-          <div className="p-4 space-y-4">
-            {/* Pass isTagsLoading to LeadTags */}
-            <LeadTags 
-              tags={tags} 
-              setTags={setTags} 
-              onAddTag={handleAddTag} 
-              onRemoveTag={handleRemoveTag}
-              isLoading={isTagsLoading} 
-            />
-            {/* Correct PipelineSelector usage */}
-            <PipelineSelector 
-              selectedPipeline={selectedPipeline}
-              selectedStage={selectedStage}
-              allPipelines={allPipelines}
-              daysSinceCreation={daysSinceCreation}
-              onPipelineChange={handlePipelineChange}
-              onStageChange={handleStageChange}
-            />
-          </div>
+      <div className="flex-1 overflow-y-auto"> {/* Moved overflow-y-auto here */}
+        <div className="p-4 space-y-4"> {/* Outer padding for content below header */}
+          <LeadTags 
+            tags={tags} 
+            setTags={setTags} 
+            onAddTag={handleAddTag} 
+            onRemoveTag={handleRemoveTag}
+            isLoading={isTagsLoading} 
+          />
+          <PipelineSelector 
+            selectedPipeline={selectedPipeline}
+            selectedStage={selectedStage}
+            allPipelines={allPipelines}
+            daysSinceCreation={daysSinceCreation}
+            onPipelineChange={handlePipelineChange}
+            onStageChange={handleStageChange}
+          />
+        </div>
             
-          <Tabs defaultValue="main" className="w-full flex flex-col flex-1" value={activeTab} onValueChange={setActiveTab}>
-              <div className="border-t border-b">
-                <TabsList className="w-full h-auto grid grid-cols-4 rounded-none bg-background p-0">
-                  <TabsTrigger value="main" className="py-3 rounded-none data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:shadow-none">Main</TabsTrigger>
-                  <TabsTrigger value="statistics" disabled className="py-3 rounded-none data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:shadow-none">Statistics</TabsTrigger>
-                  <TabsTrigger value="media" disabled className="py-3 rounded-none data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:shadow-none">Media</TabsTrigger>
-                  <TabsTrigger value="setup" disabled className="py-3 rounded-none data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:shadow-none">Setup</TabsTrigger>
-                </TabsList>
-              </div>
+        <Tabs defaultValue="main" className="w-full flex flex-col flex-1" value={activeTab} onValueChange={setActiveTab}>
+          <div className="border-t border-b sticky top-[69px] bg-card z-10"> {/* Made TabsList sticky below header */}
+            <TabsList className="w-full h-auto grid grid-cols-2 sm:grid-cols-4 rounded-none bg-card p-0"> {/* Adjusted grid for responsiveness */}
+              <TabsTrigger value="main" className="py-3 rounded-none data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:shadow-none data-[state=active]:text-primary">Main</TabsTrigger>
+              <TabsTrigger value="statistics" disabled className="py-3 rounded-none data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:shadow-none">Statistics</TabsTrigger>
+              <TabsTrigger value="media" disabled className="py-3 rounded-none data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:shadow-none sm:block hidden">Media</TabsTrigger> {/* Hide on small screens */}
+              <TabsTrigger value="setup" disabled className="py-3 rounded-none data-[state=active]:border-b-2 data-[state=active]:border-primary data-[state=active]:shadow-none sm:block hidden">Setup</TabsTrigger> {/* Hide on small screens */}
+            </TabsList>
+          </div>
 
-              {/* Let TabsContent handle scrolling directly */}
-              <TabsContent value="main" className="flex-1 overflow-auto p-0 m-0 flex flex-col"> 
-                {/* Remove inner scrollable div */}
-                {/* <div className="flex-1 overflow-auto">  */}
-                  <LeadContactInfo 
-                    customer={customer} // Restore customer prop
-                    lead={initialLead} // Pass initialLead
-                    isLoadingCustomer={isLoadingCustomer} // Restore isLoadingCustomer prop
-                  />
-                  <LeadDetailsInfo 
-                    profiles={profiles}
-                    selectedAssignee={selectedAssignee}
-                    onAssigneeChange={handleAssigneeChange}
-                    customer={customer} // Restore customer prop
-                    lead={initialLead} // Pass initialLead
-                    isLoading={isLoadingProfiles} // Pass profile loading state
-                  />
-                {/* </div> */}
-                {/* Remove the fixed footer section */}
-                {/* <div className="mt-auto border-t p-4"> 
-                  <div className="flex items-center justify-end gap-2"> 
-                    <Button variant="outline" size="icon" className="shrink-0" disabled>
-                      <LinkIcon className="h-4 w-4" />
-                    </Button>
-                    <Button variant="outline" size="icon" className="shrink-0" disabled>
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div> */}
-              </TabsContent>
-
-              {/* Remove placeholder tabs */}
-              {/* <TabsContent value="statistics" className="flex-1 p-4 m-0 flex flex-col">
-                 <p className="text-sm text-muted-foreground">Statistics (Not Implemented)</p>
-              </TabsContent>
-              <TabsContent value="media" className="flex-1 p-4 m-0 flex flex-col">
-                 <p className="text-sm text-muted-foreground">Media (Not Implemented)</p>
-              </TabsContent>
-              <TabsContent value="setup" className="flex-1 p-4 m-0 flex flex-col">
-                 <p className="text-sm text-muted-foreground">Setup (Not Implemented)</p>
-              </TabsContent> */}
-            </Tabs>
-         </> 
-        {/* )} <- This closing parenthesis belongs to the removed isLoading check */}
+          <TabsContent value="main" className="flex-1 p-0 m-0 flex flex-col"> {/* Removed overflow-auto, parent handles it */}
+            {/* Content now flows directly, padding handled by children or a wrapper if needed */}
+            <LeadContactInfo 
+              customer={customer} 
+              lead={initialLead} 
+              isLoadingCustomer={isLoadingCustomer} 
+            />
+            <LeadDetailsInfo 
+              profiles={profiles}
+              selectedAssignee={selectedAssignee}
+              onAssigneeChange={handleAssigneeChange}
+              customer={customer} 
+              lead={initialLead} 
+              isLoading={isLoadingProfiles} 
+            />
+          </TabsContent>
+          {/* Placeholder TabsContent can be added back if needed, ensure they also don't have conflicting scroll containers */}
+        </Tabs>
       </div> 
     </div> 
   );

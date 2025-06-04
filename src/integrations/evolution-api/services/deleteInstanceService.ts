@@ -26,9 +26,7 @@ export async function deleteEvolutionInstance(instanceDisplayName: string, integ
     const { apiKey, baseUrl } = await getEvolutionCredentials(integrationId);
 
     // 2. Fetch all live instances for the integration
-    console.log(`[deleteEvolutionInstance] Fetching all instances for integration ${integrationId} to find display name '${instanceDisplayName}'...`);
     const liveInstances = await fetchEvolutionInstances(integrationId);
-    console.log(`[deleteEvolutionInstance] Found ${liveInstances.length} live instances.`);
 
     // 3. Find the instance matching the display name (using the 'name' field)
     const instanceToDelete = liveInstances.find(inst => inst.name === instanceDisplayName);
@@ -42,11 +40,9 @@ export async function deleteEvolutionInstance(instanceDisplayName: string, integ
 
     // 4. Extract the actual API instance name (which we matched against)
     const instanceApiName = instanceToDelete.name;
-    console.log(`[deleteEvolutionInstance] Found matching instance. API name for deletion: ${instanceApiName}`);
 
     // 5. Construct the Evolution API URL using the API name
     const deleteUrl = `${baseUrl}/instance/delete/${instanceApiName}`;
-    console.log(`[deleteEvolutionInstance] Calling DELETE ${deleteUrl}`);
 
     // 6. Make the DELETE request using ApiService
     await apiServiceInstance.request<unknown>(deleteUrl, {
@@ -59,7 +55,6 @@ export async function deleteEvolutionInstance(instanceDisplayName: string, integ
     });
 
     // 7. If the request succeeded (didn't throw), deletion was successful.
-    console.log(`[deleteEvolutionInstance] Successfully deleted instance with display name '${instanceDisplayName}' (API name: ${instanceApiName}).`);
     return true;
 
   } catch (error) {

@@ -74,7 +74,6 @@ export async function fetchLeadByConversation(conversationId: string): Promise<L
       .maybeSingle();
     
     if (error || !conversation?.lead_id) {
-      console.log('No lead associated with this conversation:', conversationId);
       return null;
     }
     

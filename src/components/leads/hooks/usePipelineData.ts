@@ -60,8 +60,6 @@ export function usePipelineData(pipelineId: string | null, selectedTagIds: strin
       return;
     }
     
-    console.log("Loading stages for pipeline:", pipelineId);
-    
     const { data, error } = await supabase
       .from('pipeline_stages')
       .select('id, name, position')
@@ -150,7 +148,6 @@ export function usePipelineData(pipelineId: string | null, selectedTagIds: strin
          }
        }
 
-       console.log("Final filtered leads data structure:", JSON.stringify(filteredLeadsData, null, 2)); // Log filtered data
        setStageLeads(filteredLeadsData); // Set the filtered leads
      }
 

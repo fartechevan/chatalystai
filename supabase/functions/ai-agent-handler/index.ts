@@ -17,6 +17,7 @@ interface NewAgentPayload {
   knowledge_document_ids?: string[]; // IDs to link
   integration_ids?: string[];
   is_enabled?: boolean;
+  activation_mode?: 'keyword' | 'always_on';
 }
 
 interface UpdateAgentPayload {
@@ -26,6 +27,7 @@ interface UpdateAgentPayload {
   knowledge_document_ids?: string[]; // IDs to link
   integration_ids?: string[];
   is_enabled?: boolean;
+  activation_mode?: 'keyword' | 'always_on';
 }
 
 // Combined type for responses including integrations and knowledge docs
@@ -400,11 +402,12 @@ Response:`;
       // 1. Prepare agent data for insertion (excluding knowledge_document_ids)
       const { knowledge_document_ids: knowledgeIdsToLink, ...agentPayload } = payload;
       // Explicitly include is_enabled in the intersection type
-      const agentToCreate: Omit<BaseAIAgent, 'id' | 'created_at' | 'updated_at' | 'user_id'> & { user_id: string; is_enabled?: boolean } = {
+      const agentToCreate: Omit<BaseAIAgent, 'id' | 'created_at' | 'updated_at' | 'user_id'> & { user_id: string; is_enabled?: boolean; activation_mode?: 'keyword' | 'always_on' } = {
         name: agentPayload.name,
         prompt: agentPayload.prompt,
         keyword_trigger: agentPayload.keyword_trigger || null,
         is_enabled: agentPayload.is_enabled ?? true,
+        activation_mode: agentPayload.activation_mode || 'keyword', // Add activation_mode
         user_id: userId,
       };
 
@@ -505,11 +508,12 @@ Response:`;
       console.log(`[${requestStartTime}] Update Agent (ID: ${agentIdFromPath}): Received knowledge_document_ids for update: [${(knowledgeIdsToUpdate || []).join(', ')}]`); // Log received IDs
 
       // Prepare update object for ai_agents table (excluding knowledge_document_ids)
-      const agentToUpdate: Partial<BaseAIAgent & { is_enabled?: boolean }> = {};
+      const agentToUpdate: Partial<BaseAIAgent & { is_enabled?: boolean; activation_mode?: 'keyword' | 'always_on' }> = {};
       if (agentPayload.name !== undefined) agentToUpdate.name = agentPayload.name;
       if (agentPayload.prompt !== undefined) agentToUpdate.prompt = agentPayload.prompt;
       if (agentPayload.keyword_trigger !== undefined) agentToUpdate.keyword_trigger = agentPayload.keyword_trigger;
       if (agentPayload.is_enabled !== undefined) agentToUpdate.is_enabled = agentPayload.is_enabled;
+      if (agentPayload.activation_mode !== undefined) agentToUpdate.activation_mode = agentPayload.activation_mode; // Add activation_mode
 
       // 1. Update the agent table (only if there are fields to update)
       let updatedAgentData: BaseAIAgent | null = null;

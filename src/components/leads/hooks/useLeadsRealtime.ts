@@ -16,7 +16,6 @@ export function useLeadsRealtime(pipelineId: string | null, onDataChange: () => 
           table: 'lead_pipeline'
         },
         (payload) => {
-          console.log('Lead pipeline change detected:', payload);
           onDataChange();
         }
       )
@@ -32,7 +31,6 @@ export function useLeadsRealtime(pipelineId: string | null, onDataChange: () => 
           table: 'leads'
         },
         (payload) => {
-          console.log('Leads change detected:', payload);
           onDataChange();
         }
       )

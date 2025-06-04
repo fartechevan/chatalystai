@@ -67,7 +67,6 @@ export function ChatPopup({ isOpen, onOpenChange }: ChatPopupProps) {
 
     try {
       // Call the backend function, now including history
-      console.log("Sending history:", historyPayload); // Log history being sent
       const { data, error } = await supabase.functions.invoke('query-data-with-ai', {
         body: { 
           query: userMessage, 

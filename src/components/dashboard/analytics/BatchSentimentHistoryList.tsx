@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 // Removed Card imports as they are not used
 import { Button } from '@/components/ui/button';
-import { Loader2 } from 'lucide-react'; // Import Loader2
+import { Loader2, CalendarDays, Clock, Smile, Frown, Meh } from 'lucide-react'; // Import Loader2 and new icons
 // Removed DateRangeFilter import
 import { supabase } from '@/integrations/supabase/client'; // Assuming supabase client is correctly set up
 // Removed DateRange import as it's not used
@@ -21,14 +21,14 @@ export type BatchSentimentAnalysis = {
 interface BatchSentimentHistoryListProps {
   onSelectAnalysis: (id: string | null) => void;
   selectedAnalysisId: string | null;
-  onCreateNewBatch: () => Promise<void>; // New prop for triggering batch creation
-  isCreatingBatch: boolean; // New prop for loading state of batch creation
+  onCreateNewBatch?: () => Promise<void>; // Made optional
+  isCreatingBatch: boolean; 
 }
 
 const BatchSentimentHistoryList: React.FC<BatchSentimentHistoryListProps> = ({
   onSelectAnalysis,
   selectedAnalysisId,
-  onCreateNewBatch,
+  onCreateNewBatch, // This can now be undefined
   isCreatingBatch,
 }) => {
   // Note: The DateRangeFilter from this component is a string-based dropdown,
@@ -100,14 +100,16 @@ const BatchSentimentHistoryList: React.FC<BatchSentimentHistoryListProps> = ({
       <div className="border-b p-4">
         <div className="flex justify-between items-center">
           <h2 className="text-lg font-semibold">Analysis</h2> {/* Changed title */}
-          <Button
-            size="sm"
-            onClick={onCreateNewBatch} 
-            disabled={isCreatingBatch}
-          >
-            {isCreatingBatch ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
-            New Batch
-          </Button>
+          {onCreateNewBatch && ( // Conditionally render the button
+            <Button
+              size="sm"
+              onClick={onCreateNewBatch}
+              disabled={isCreatingBatch}
+            >
+              {isCreatingBatch ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+              New Batch
+            </Button>
+          )}
         </div>
         {/* Removed DateRangeFilter component */}
       </div>
@@ -127,18 +129,20 @@ const BatchSentimentHistoryList: React.FC<BatchSentimentHistoryListProps> = ({
               key={analysis.id}
               onClick={() => onSelectAnalysis(analysis.id)}
               // Add px-3 py-2 to button
-              className={`w-full text-left px-3 py-2 rounded-md text-sm hover:bg-accent hover:text-accent-foreground
-                ${selectedAnalysisId === analysis.id ? 'bg-accent text-accent-foreground font-medium' : 'bg-transparent'}`}
+              className={`w-full text-left px-3 py-2 rounded-md text-sm hover:bg-muted/50 
+                ${selectedAnalysisId === analysis.id ? 'bg-muted text-foreground font-medium' : 'bg-transparent text-muted-foreground hover:text-foreground'}`}
             >
-              <div className="font-semibold">
+              <div className="font-semibold flex items-center mb-1">
+                <CalendarDays className="mr-2 h-4 w-4 text-muted-foreground" />
                 {formatDate(analysis.start_date)} - {formatDate(analysis.end_date)}
               </div>
-              <div className="text-xs text-muted-foreground">
-                Analyzed: {formatDate(analysis.created_at)}
+              <div className="text-xs text-muted-foreground flex items-center">
+                <Clock className="mr-1.5 h-3 w-3" />
+                <span className="bg-muted/70 px-1.5 py-0.5 rounded-sm text-foreground/80">
+                  {formatDate(analysis.created_at)}
+                </span>
               </div>
-              <div className="text-xs text-muted-foreground">
-                P: {analysis.positive_count} | N: {analysis.negative_count} | Neu: {analysis.neutral_count}
-              </div>
+              {/* Removed the div containing sentiment counts */}
             </button>
           ))
         )}

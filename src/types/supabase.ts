@@ -9,6 +9,53 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      agent_availability_settings: {
+        Row: {
+          agent_id: string
+          appointment_duration_minutes: number | null
+          buffer_time_minutes: number | null
+          created_at: string | null
+          day_of_week: Database["public"]["Enums"]["day_of_week"]
+          end_time: string | null
+          id: string
+          is_available: boolean | null
+          start_time: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          agent_id: string
+          appointment_duration_minutes?: number | null
+          buffer_time_minutes?: number | null
+          created_at?: string | null
+          day_of_week: Database["public"]["Enums"]["day_of_week"]
+          end_time?: string | null
+          id?: string
+          is_available?: boolean | null
+          start_time?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          agent_id?: string
+          appointment_duration_minutes?: number | null
+          buffer_time_minutes?: number | null
+          created_at?: string | null
+          day_of_week?: Database["public"]["Enums"]["day_of_week"]
+          end_time?: string | null
+          id?: string
+          is_available?: boolean | null
+          start_time?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_availability_settings_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "ai_agents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       agent_conversations: {
         Row: {
           added_to_knowledge_base: boolean | null
@@ -69,6 +116,47 @@ export type Database = {
             columns: ["session_id"]
             isOneToOne: false
             referencedRelation: "ai_agent_sessions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      agent_google_calendar_settings: {
+        Row: {
+          access_token: string | null
+          agent_id: string
+          calendar_id: string | null
+          created_at: string | null
+          id: string
+          refresh_token: string | null
+          token_expiry_timestamp: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          access_token?: string | null
+          agent_id: string
+          calendar_id?: string | null
+          created_at?: string | null
+          id?: string
+          refresh_token?: string | null
+          token_expiry_timestamp?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          access_token?: string | null
+          agent_id?: string
+          calendar_id?: string | null
+          created_at?: string | null
+          id?: string
+          refresh_token?: string | null
+          token_expiry_timestamp?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agent_google_calendar_settings_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "ai_agents"
             referencedColumns: ["id"]
           },
         ]
@@ -210,6 +298,9 @@ export type Database = {
       }
       ai_agents: {
         Row: {
+          activation_mode:
+            | Database["public"]["Enums"]["agent_activation_mode"]
+            | null
           created_at: string
           id: string
           is_enabled: boolean | null
@@ -221,6 +312,9 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          activation_mode?:
+            | Database["public"]["Enums"]["agent_activation_mode"]
+            | null
           created_at?: string
           id?: string
           is_enabled?: boolean | null
@@ -232,6 +326,9 @@ export type Database = {
           user_id: string
         }
         Update: {
+          activation_mode?:
+            | Database["public"]["Enums"]["agent_activation_mode"]
+            | null
           created_at?: string
           id?: string
           is_enabled?: boolean | null
@@ -636,6 +733,7 @@ export type Database = {
           owner_id: string | null
           pipeline_id: string | null
           status: string | null
+          tenant_id: string | null
           token: string | null
           updated_at: string
           user_reference_id: string | null
@@ -649,6 +747,7 @@ export type Database = {
           owner_id?: string | null
           pipeline_id?: string | null
           status?: string | null
+          tenant_id?: string | null
           token?: string | null
           updated_at?: string
           user_reference_id?: string | null
@@ -662,6 +761,7 @@ export type Database = {
           owner_id?: string | null
           pipeline_id?: string | null
           status?: string | null
+          tenant_id?: string | null
           token?: string | null
           updated_at?: string
           user_reference_id?: string | null
@@ -670,7 +770,7 @@ export type Database = {
           {
             foreignKeyName: "integrations_config_integration_id_fkey"
             columns: ["integration_id"]
-            isOneToOne: true
+            isOneToOne: false
             referencedRelation: "integrations"
             referencedColumns: ["id"]
           },
@@ -679,6 +779,13 @@ export type Database = {
             columns: ["pipeline_id"]
             isOneToOne: false
             referencedRelation: "pipelines"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "integrations_config_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
             referencedColumns: ["id"]
           },
         ]
@@ -860,6 +967,7 @@ export type Database = {
           customer_id: string | null
           id: string
           pipeline_stage_id: string | null
+          team_id: string | null
           updated_at: string
           user_id: string
           value: number | null
@@ -869,6 +977,7 @@ export type Database = {
           customer_id?: string | null
           id?: string
           pipeline_stage_id?: string | null
+          team_id?: string | null
           updated_at?: string
           user_id: string
           value?: number | null
@@ -878,6 +987,7 @@ export type Database = {
           customer_id?: string | null
           id?: string
           pipeline_stage_id?: string | null
+          team_id?: string | null
           updated_at?: string
           user_id?: string
           value?: number | null
@@ -895,6 +1005,13 @@ export type Database = {
             columns: ["pipeline_stage_id"]
             isOneToOne: false
             referencedRelation: "pipeline_stages"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "leads_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
             referencedColumns: ["id"]
           },
         ]
@@ -985,6 +1102,7 @@ export type Database = {
           id: string
           is_default: boolean | null
           name: string
+          team_id: string | null
           updated_at: string
           user_id: string
         }
@@ -993,6 +1111,7 @@ export type Database = {
           id?: string
           is_default?: boolean | null
           name: string
+          team_id?: string | null
           updated_at?: string
           user_id: string
         }
@@ -1001,10 +1120,73 @@ export type Database = {
           id?: string
           is_default?: boolean | null
           name?: string
+          team_id?: string | null
           updated_at?: string
           user_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "pipelines_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      plans: {
+        Row: {
+          created_at: string
+          features: Json | null
+          id: string
+          integrations_allowed: number | null
+          messages_per_month: number | null
+          name: string
+          owner_id: string | null
+          price: number
+          team_id: string | null
+          token_allocation: number | null
+        }
+        Insert: {
+          created_at?: string
+          features?: Json | null
+          id?: string
+          integrations_allowed?: number | null
+          messages_per_month?: number | null
+          name: string
+          owner_id?: string | null
+          price: number
+          team_id?: string | null
+          token_allocation?: number | null
+        }
+        Update: {
+          created_at?: string
+          features?: Json | null
+          id?: string
+          integrations_allowed?: number | null
+          messages_per_month?: number | null
+          name?: string
+          owner_id?: string | null
+          price?: number
+          team_id?: string | null
+          token_allocation?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "plans_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "plans_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       profile_integration_access: {
         Row: {
@@ -1160,6 +1342,76 @@ export type Database = {
         }
         Relationships: []
       }
+      subscriptions: {
+        Row: {
+          cancel_at_period_end: boolean | null
+          canceled_at: string | null
+          created_at: string
+          current_period_end: string
+          current_period_start: string
+          ended_at: string | null
+          id: string
+          plan_id: string
+          profile_id: string
+          status: Database["public"]["Enums"]["subscription_status"]
+          subscribed_at: string
+          team_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          cancel_at_period_end?: boolean | null
+          canceled_at?: string | null
+          created_at?: string
+          current_period_end: string
+          current_period_start: string
+          ended_at?: string | null
+          id?: string
+          plan_id: string
+          profile_id: string
+          status: Database["public"]["Enums"]["subscription_status"]
+          subscribed_at?: string
+          team_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          cancel_at_period_end?: boolean | null
+          canceled_at?: string | null
+          created_at?: string
+          current_period_end?: string
+          current_period_start?: string
+          ended_at?: string | null
+          id?: string
+          plan_id?: string
+          profile_id?: string
+          status?: Database["public"]["Enums"]["subscription_status"]
+          subscribed_at?: string
+          team_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "subscriptions_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "plans"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "subscriptions_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "subscriptions_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tags: {
         Row: {
           created_at: string
@@ -1225,6 +1477,98 @@ export type Database = {
             columns: ["created_by"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      team_users: {
+        Row: {
+          created_at: string | null
+          id: string
+          role: Database["public"]["Enums"]["team_role"]
+          team_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          role?: Database["public"]["Enums"]["team_role"]
+          team_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          role?: Database["public"]["Enums"]["team_role"]
+          team_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "team_users_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      teams: {
+        Row: {
+          created_at: string | null
+          id: string
+          name: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          name: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          name?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      tenants: {
+        Row: {
+          created_at: string
+          id: string
+          owner_profile_id: string
+          team_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          owner_profile_id: string
+          team_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          owner_profile_id?: string
+          team_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tenants_owner_profile_id_fkey"
+            columns: ["owner_profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tenants_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: true
+            referencedRelation: "teams"
             referencedColumns: ["id"]
           },
         ]
@@ -1306,6 +1650,15 @@ export type Database = {
         Args: { "": string } | { "": unknown }
         Returns: unknown
       }
+      create_new_team: {
+        Args: { p_name: string }
+        Returns: {
+          created_at: string | null
+          id: string
+          name: string
+          updated_at: string | null
+        }[]
+      }
       execute_dynamic_sql: {
         Args: { sql_query: string }
         Returns: Json
@@ -1359,6 +1712,14 @@ export type Database = {
       hnswhandler: {
         Args: { "": unknown }
         Returns: unknown
+      }
+      is_user_team_admin_or_owner: {
+        Args: { p_user_id: string; p_team_id: string }
+        Returns: boolean
+      }
+      is_user_team_member: {
+        Args: { p_user_id: string; p_team_id: string }
+        Returns: boolean
       }
       ivfflat_bit_support: {
         Args: { "": unknown }
@@ -1451,9 +1812,24 @@ export type Database = {
           id: string
           is_default: boolean | null
           name: string
+          team_id: string | null
           updated_at: string
           user_id: string
         }[]
+      }
+      upsert_integration_config: {
+        Args: {
+          p_integration_id: string
+          p_instance_id: string
+          p_tenant_id: string
+          p_instance_display_name: string
+          p_token: string
+          p_owner_id: string
+          p_user_reference_id: string
+          p_pipeline_id: string
+          p_status: string
+        }
+        Returns: undefined
       }
       vector_avg: {
         Args: { "": number[] }
@@ -1481,8 +1857,17 @@ export type Database = {
       }
     }
     Enums: {
+      agent_activation_mode: "keyword" | "always_on"
       ai_session_status: "active" | "closed" | "error"
       app_role: "admin" | "user" | "customer"
+      day_of_week:
+        | "monday"
+        | "tuesday"
+        | "wednesday"
+        | "thursday"
+        | "friday"
+        | "saturday"
+        | "sunday"
       integration_status: "available" | "coming_soon"
       new_app_role: "user" | "admin"
       role_enum: "admin" | "member"
@@ -1490,8 +1875,17 @@ export type Database = {
       sentiment_enum: "good" | "moderate" | "bad" | "unknown"
       sentiment_level: "bad" | "moderate" | "good"
       sentiment_type: "bad" | "moderate" | "good"
+      subscription_status:
+        | "active"
+        | "trialing"
+        | "past_due"
+        | "canceled"
+        | "incomplete"
+        | "incomplete_expired"
+        | "unpaid"
       sync_status: "pending" | "completed" | "failed"
       task_status: "follow-up" | "meeting"
+      team_role: "owner" | "admin" | "member"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1607,8 +2001,18 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      agent_activation_mode: ["keyword", "always_on"],
       ai_session_status: ["active", "closed", "error"],
       app_role: ["admin", "user", "customer"],
+      day_of_week: [
+        "monday",
+        "tuesday",
+        "wednesday",
+        "thursday",
+        "friday",
+        "saturday",
+        "sunday",
+      ],
       integration_status: ["available", "coming_soon"],
       new_app_role: ["user", "admin"],
       role_enum: ["admin", "member"],
@@ -1616,8 +2020,18 @@ export const Constants = {
       sentiment_enum: ["good", "moderate", "bad", "unknown"],
       sentiment_level: ["bad", "moderate", "good"],
       sentiment_type: ["bad", "moderate", "good"],
+      subscription_status: [
+        "active",
+        "trialing",
+        "past_due",
+        "canceled",
+        "incomplete",
+        "incomplete_expired",
+        "unpaid",
+      ],
       sync_status: ["pending", "completed", "failed"],
       task_status: ["follow-up", "meeting"],
+      team_role: ["owner", "admin", "member"],
     },
   },
 } as const

@@ -9,8 +9,8 @@ import { PostgrestError } from "@supabase/supabase-js";
 // Define types for cleaner code
 interface AgentIntegrationSettings {
   agent_id: string;
-  activation_mode: 'keyword' | 'always_on';
-  keyword_trigger: string | null;
+  // activation_mode: 'keyword' | 'always_on'; // This will come from the nested ai_agents object
+  // keyword_trigger: string | null; // This will come from the nested ai_agents object
   stop_keywords: string[];
   session_timeout_minutes: number;
   error_message: string;
@@ -210,7 +210,7 @@ export async function handleMessageEvent(supabaseClient: SupabaseClient, data: W
             session_timeout_minutes,
             error_message,
             integration_id,
-            ai_agents ( keyword_trigger, is_enabled ) // Fetch is_enabled status
+            ai_agents ( keyword_trigger, is_enabled, activation_mode ) // Fetch activation_mode from ai_agents
           `)
           .eq('integration_id', hardcodedIntegrationId)
           .maybeSingle(); // Assuming one agent per integration for now
@@ -222,10 +222,11 @@ export async function handleMessageEvent(supabaseClient: SupabaseClient, data: W
         }
 
         // Type assertion for cleaner access
-        const agentSettings = agentSettingsData as unknown as AgentIntegrationSettings & { ai_agents: { keyword_trigger: string | null, is_enabled: boolean | null } | null };
+        const agentSettings = agentSettingsData as unknown as AgentIntegrationSettings & { ai_agents: { keyword_trigger: string | null, is_enabled: boolean | null, activation_mode: 'keyword' | 'always_on' | null } | null };
         const agentId = agentSettings.agent_id;
         const triggerKeyword = agentSettings.ai_agents?.keyword_trigger;
         const agentIsEnabled = agentSettings.ai_agents?.is_enabled ?? false; // Default to false if null/undefined
+        const agentActivationMode = agentSettings.ai_agents?.activation_mode || 'keyword'; // Get from ai_agents, default to 'keyword'
 
         console.log(`[MessageHandler] Agent settings found for Agent ID: ${agentId}`, agentSettings);
 
@@ -259,26 +260,9 @@ export async function handleMessageEvent(supabaseClient: SupabaseClient, data: W
 
         console.log(`[MessageHandler] Current session state: ID=${sessionId}, Status=${currentStatus}, LastInteraction=${lastInteraction}`);
 
-        // 3. Log Incoming User Message to agent_conversations
-        // Do this early, regardless of whether the AI responds
-        if (sessionId) { // Only log if a session exists or is about to be created
-           console.log(`[MessageHandler] Logging user message to agent_conversations for session ${sessionId}`);
-           const { error: logUserMsgError } = await supabaseClient
-             .from('agent_conversations')
-             .insert({
-               session_id: sessionId,
-               sender_type: 'user',
-               message_content: messageText,
-             });
-           if (logUserMsgError) console.error(`[MessageHandler] Error logging user message: ${logUserMsgError.message}`); // Log error but continue
-        } else {
-            console.log(`[MessageHandler] No active session ID yet, skipping user message logging for now.`); // Will be logged after session creation if needed
-        }
-
-
         // 4. Session State Logic
         let shouldAiRespond = false;
-        let sessionNeedsUpdate = false; // Flag to indicate if DB needs update
+        // let sessionNeedsUpdate = false; // Flag to indicate if DB needs update - will be handled by direct logic
 
         // Check for timeout first if currently active
         if (currentStatus === 'active' && lastInteraction && agentSettings.session_timeout_minutes > 0) {
@@ -301,12 +285,12 @@ export async function handleMessageEvent(supabaseClient: SupabaseClient, data: W
           // No status change, but timestamp needs update
         } else if (nextStatus === 'closed' || nextStatus === 'error') {
           // Session is inactive, check for activation
-          if (agentSettings.activation_mode === 'always_on') {
-            console.log(`[MessageHandler] Activation mode is 'always_on'. Activating session.`);
+          if (agentActivationMode === 'always_on') {
+            console.log(`[MessageHandler] Activation mode is 'always_on' (from ai_agents). Activating session.`);
             nextStatus = 'active'; // Set intended status to active
             shouldAiRespond = true;
-          } else if (agentSettings.activation_mode === 'keyword' && triggerKeyword && messageText.toLowerCase().startsWith(triggerKeyword.toLowerCase())) {
-            console.log(`[MessageHandler] Trigger keyword "${triggerKeyword}" matched. Activating session.`);
+          } else if (agentActivationMode === 'keyword' && triggerKeyword && messageText.toLowerCase().startsWith(triggerKeyword.toLowerCase())) {
+            console.log(`[MessageHandler] Trigger keyword "${triggerKeyword}" matched (activation_mode: ${agentActivationMode} from ai_agents). Activating session.`);
             nextStatus = 'active'; // Set intended status to active
             shouldAiRespond = true;
           } else {
@@ -316,57 +300,74 @@ export async function handleMessageEvent(supabaseClient: SupabaseClient, data: W
 
         // Determine if DB update is needed
         // Update if status changed OR if it's active (to update timestamp)
-        sessionNeedsUpdate = (nextStatus !== currentStatus) || (nextStatus === 'active');
+        // sessionNeedsUpdate = (nextStatus !== currentStatus) || (nextStatus === 'active'); // Replaced by direct logic below
 
         // 5. Update or Create Session in DB if needed
-        if (sessionNeedsUpdate) {
-          const sessionPayload = {
-            status: nextStatus, // Use the determined next status
-            last_interaction_timestamp: now.toISOString(),
-            // TODO: Add conversation_history update logic if needed
-          };
 
-          if (sessionId) {
-            // Update existing session
-            console.log(`[MessageHandler] Updating session ${sessionId}:`, sessionPayload);
-            const { error: updateError } = await supabaseClient
-              .from('ai_agent_sessions')
-              .update(sessionPayload)
-              .eq('id', sessionId);
-            if (updateError) throw new Error(`Error updating session: ${updateError.message}`);
-          } else if (nextStatus === 'active') {
-            // Create new session only if it's being activated
+        if (!session && nextStatus === 'active') {
+            // Case 1: No session exists, and we need to create an active one.
+            console.log(`[MessageHandler] No existing session found. Creating new active session.`);
             const createPayload = {
-               ...sessionPayload, // Includes status: 'active' and timestamp
-               contact_identifier: remoteJid,
-               agent_id: agentId,
-               integration_id: hardcodedIntegrationId,
-             };
-             console.log(`[MessageHandler] Creating new session:`, createPayload);
-             const { data: newSession, error: createError } = await supabaseClient
-               .from('ai_agent_sessions')
-               .insert(createPayload)
-               .select('id')
-               .single();
-             if (createError) throw new Error(`Error creating session: ${createError.message}`);
-             sessionId = newSession.id; // Get the new session ID
-             console.log(`[MessageHandler] New session created with ID: ${sessionId}`);
+                status: 'active',
+                last_interaction_timestamp: now.toISOString(),
+                contact_identifier: remoteJid,
+                agent_id: agentId,
+                integration_id: hardcodedIntegrationId,
+                // conversation_history: {} // Initialize history for new session
+            };
+            const { data: newSession, error: createError } = await supabaseClient
+                .from('ai_agent_sessions')
+                .insert(createPayload)
+                .select('id')
+                .single();
+            if (createError) throw new Error(`Error creating new session: ${createError.message}`);
+            sessionId = newSession.id; // Update sessionId to the new one
+            console.log(`[MessageHandler] New session created with ID: ${sessionId}`);
 
-             // Log the initial user message now that we have a session ID
-             console.log(`[MessageHandler] Logging initial user message to agent_conversations for new session ${sessionId}`);
-             const { error: logUserMsgError } = await supabaseClient
-               .from('agent_conversations')
-               .insert({
-                 session_id: sessionId,
-                 sender_type: 'user',
-                 message_content: messageText,
-               });
-             if (logUserMsgError) console.error(`[MessageHandler] Error logging initial user message: ${logUserMsgError.message}`);
+        } else if (session && (nextStatus !== currentStatus || nextStatus === 'active')) {
+            // Case 2: Session exists. Update its status and/or timestamp.
+            // This covers:
+            // - Activating a 'closed'/'error' session.
+            // - Continuing an 'active' session (timestamp update).
+            // - Deactivating an 'active' session to 'closed'/'error'.
+            console.log(`[MessageHandler] Existing session ${session.id} found. Current status: ${currentStatus}, Next status: ${nextStatus}. Updating session.`);
+            const updatePayload: { last_interaction_timestamp: string; status?: 'active' | 'closed' | 'error'; conversation_history?: unknown } = {
+                last_interaction_timestamp: now.toISOString(),
+            };
+            if (nextStatus !== currentStatus) {
+                updatePayload.status = nextStatus;
+            }
+            // If reactivating a closed/error session, consider resetting conversation_history
+            if ((currentStatus === 'closed' || currentStatus === 'error') && nextStatus === 'active') {
+                // updatePayload.conversation_history = {}; // Uncomment to clear history on reactivation
+                console.log(`[MessageHandler] Session ${session.id} reactivated. Consider if conversation history should be reset.`);
+            }
 
-          }
+            const { error: updateError } = await supabaseClient
+                .from('ai_agent_sessions')
+                .update(updatePayload)
+                .eq('id', session.id); // Use session.id from the fetched session
+            if (updateError) throw new Error(`Error updating session ${session.id}: ${updateError.message}`);
+            sessionId = session.id; // Ensure sessionId is correctly set to the existing session's ID
+            console.log(`[MessageHandler] Session ${sessionId} updated. New status (if changed): ${nextStatus}.`);
+        }
+        // If session exists but nextStatus is the same as currentStatus and not 'active' (e.g. remains 'closed'), no DB update needed.
+
+        // Log Incoming User Message to agent_conversations, now that session ID is definitively established
+        // Only log if the session is now active (either newly created or continued)
+        if (sessionId && nextStatus === 'active') {
+           console.log(`[MessageHandler] Logging user message to agent_conversations for active session ${sessionId}`);
+           const { error: logUserMsgError } = await supabaseClient
+             .from('agent_conversations')
+             .insert({
+               session_id: sessionId, // This will be the new ID if a new session was created
+               sender_type: 'user',
+               message_content: messageText,
+             });
+           if (logUserMsgError) console.error(`[MessageHandler] Error logging user message for session ${sessionId}: ${logUserMsgError.message}`);
         }
 
-        // 6. Invoke AI Agent Handler if required
+        // 6. Invoke AI Agent Handler if required (sessionId here is the correct one for the active/newly active session)
         if (shouldAiRespond && sessionId) {
           console.log(`[MessageHandler] Invoking ai-agent-handler for session ${sessionId}, agent ${agentId}`);
           // Invoke asynchronously, adding a header to signal internal call

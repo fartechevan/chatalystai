@@ -1,12 +1,12 @@
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { useState } from "react";
-import type { Integration } from "../../types";
-import { WhatsAppCloudApiContent } from "./WhatsAppCloudApiContent";
+import type { Integration, PlanDetails } from "../../types"; // Import PlanDetails
+// import { WhatsAppCloudApiContent } from "./WhatsAppCloudApiContent"; // Removed
 import { usePipelinesList } from "@/hooks/usePipelinesList"; // Import pipeline hook
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"; // Import Select components
 import { Label } from "@/components/ui/label"; // Import Label
-import { WhatsAppAuthorizationContent } from "./WhatsAppAuthorizationContent";
+// import { WhatsAppAuthorizationContent } from "./WhatsAppAuthorizationContent"; // Removed
 // import { WhatsAppBusinessSettings } from "./WhatsAppBusinessSettings"; // Remove unused import
 import { WhatsAppBusinessAuthorization } from "./WhatsAppBusinessAuthorization";
 import { useToast } from "@/hooks/use-toast";
@@ -26,6 +26,8 @@ interface IntegrationTabsProps {
   onClose: () => void; // Keep for closing dialog
   open: boolean; // Add open state for the hook
   onOpenChange: (open: boolean) => void; // Add onOpenChange for the hook
+  currentPlan?: PlanDetails | null; // Add currentPlan prop
+  tenantId?: string | null; // Add tenantId prop
 }
 
 export function IntegrationTabs({
@@ -34,6 +36,8 @@ export function IntegrationTabs({
   onClose,
   open,
   onOpenChange,
+  currentPlan, // Destructure currentPlan
+  tenantId, // Destructure tenantId
 }: IntegrationTabsProps) {
   const [activeTab, setActiveTab] = useState<"settings" | "authorization">("settings");
   const [isClearing, setIsClearing] = useState(false);
@@ -70,7 +74,7 @@ export function IntegrationTabs({
     handleWebhookSetupComplete,
     // Need refetch function from the hook to update list after delete/logout
     refetch: refetchInstances, // Assuming the hook exposes a refetch function for instances
-  } = useIntegrationConnectionState(selectedIntegration, open); // Pass open state
+  } = useIntegrationConnectionState(selectedIntegration, open, tenantId); // Pass tenantId to the hook
 
   // --- End hook call ---
 
@@ -234,23 +238,11 @@ export function IntegrationTabs({
         <TabsTrigger value="authorization" className="flex-1">Authorization</TabsTrigger>
       </TabsList>
 
-      {/* Render the content based on selected integration */}
-      {selectedIntegration?.name === "WhatsApp Cloud API" ? (
-        <>
-          <TabsContent value="settings" className="space-y-6 h-96">
-            <WhatsAppCloudApiContent handleConnectWithFacebook={handleConnectWithFacebook} />
-          </TabsContent>
-
-          <TabsContent value="authorization">
-            <WhatsAppAuthorizationContent />
-          </TabsContent>
-        </>
-      ) : (
-        // --- Render content for other WhatsApp types (Evolution API) ---
-        <>
-          <TabsContent value="settings" className="space-y-6 h-96 overflow-y-auto"> {/* Added overflow */}
-            {/* --- Conditional Rendering Logic (Moved from WhatsAppBusinessSettings) --- */}
-            {(() => {
+      {/* --- Render content for WhatsApp types (Evolution API) --- */}
+      <>
+        <TabsContent value="settings" className="space-y-6 h-96 overflow-y-auto"> {/* Added overflow */}
+          {/* --- Conditional Rendering Logic (Moved from WhatsAppBusinessSettings) --- */}
+          {(() => {
               // Loading State
               if (isLoading || isFetchingInstances) {
                 return (
@@ -387,20 +379,21 @@ export function IntegrationTabs({
                   <p className="text-sm text-muted-foreground">
                     Select an instance below to connect or manage.
                   </p>
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Instance Name</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead className="text-right">Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {fetchedInstances.map((instance) => (
-                        <TableRow key={instance.id || instance.name}>
-                          <TableCell className="font-medium">{instance.name || 'Unnamed Instance'}</TableCell>
-                          <TableCell>{renderStatus(instance.connectionStatus as ConnectionState)}</TableCell>
-                          <TableCell className="text-right">
+                  <div className="border rounded-lg overflow-hidden"> {/* Added container for consistent styling */}
+                    <Table>
+                      <TableHeader>
+                        <TableRow className="hover:bg-transparent bg-muted/50"> {/* Added subtle bg to header row */}
+                          <TableHead className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Instance Name</TableHead>
+                          <TableHead className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Status</TableHead>
+                          <TableHead className="h-12 px-4 text-right align-middle font-medium text-muted-foreground">Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {fetchedInstances.map((instance) => (
+                          <TableRow key={instance.id || instance.name} className="hover:bg-muted/50"> {/* Added hover state */}
+                            <TableCell className="p-4 align-middle font-medium">{instance.name || 'Unnamed Instance'}</TableCell>
+                            <TableCell className="p-4 align-middle">{renderStatus(instance.connectionStatus as ConnectionState)}</TableCell>
+                            <TableCell className="p-4 align-middle text-right">
                             <div className="flex items-center justify-end space-x-1"> {/* Wrapper div */}
                               {/* Connect Button */}
                               <Button
@@ -445,6 +438,7 @@ export function IntegrationTabs({
                       ))}
                     </TableBody>
                   </Table>
+                  </div> {/* Close container div */}
                   {/* Section to create additional instances */}
                   <div className="pt-4 border-t mt-4">
                     <h4 className="text-md font-semibold mb-2">Create New Instance</h4>
@@ -511,7 +505,7 @@ export function IntegrationTabs({
             <WhatsAppBusinessAuthorization selectedIntegration={selectedIntegration} />
           </TabsContent>
         </>
-      )}
+      {/* Removed the closing parenthesis of the ternary operator that is no longer needed */}
 
       <div className="mt-6 flex justify-end gap-2">
         <AlertDialog>
