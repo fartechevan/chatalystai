@@ -7,6 +7,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import {
   Form,
   FormControl,
@@ -20,7 +21,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Upload, FileText, ChevronRight, ExternalLink } from "lucide-react";
+import { Loader2, Upload, X, Download, ExternalLink, Trash2, ZoomIn } from "lucide-react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { apiServiceInstance } from "@/services/api/apiService";
@@ -58,6 +59,15 @@ export function ImportDocumentForm({ onCancel, onSuccess }: ImportDocumentFormPr
   const [isUploadingToEndpoint, setIsUploadingToEndpoint] = useState(false);
   const [uploadResponse, setUploadResponse] = useState<{success: boolean; message?: string; fileUrl?: string} | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const [extractedImages, setExtractedImages] = useState<string[]>([])
+
+  const [previewImage, setPreviewImage] = useState<string | null>(null)
+  const [previewImageIndex, setPreviewImageIndex] = useState<number | null>(null)
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false)
+  const [deletingImageIndex, setDeletingImageIndex] = useState<number | null>(null)
+
+  const [isTextEdited, setIsTextEdited] = useState(false);
   
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -135,6 +145,7 @@ export function ImportDocumentForm({ onCancel, onSuccess }: ImportDocumentFormPr
           // For first file, set the content directly
           if (successCount === 1) {
             setPdfText(response.text_content);
+            setExtractedImages(response.image_urls)
             form.setValue("content", response.text_content);
           } else {
             // For subsequent files, append with a separator
@@ -206,100 +217,101 @@ export function ImportDocumentForm({ onCancel, onSuccess }: ImportDocumentFormPr
     }
   };
 
-const handlePreviewChunks_v2 = async () => {
-  const content = form.getValues("content");
-    
-  if (!content) {
-    toast({
-      variant: "destructive",
-      title: "No content",
-      description: "Please add content or upload a PDF to preview chunks.",
-    });
-    return;
-  }
-    
-  setIsProcessingChunks(true);
-    
-  // Define the expected response type
-  interface ChunkResponse {
-    chunks: string[];
-  }
-    
-  try {
-    // Get the session_id from localStorage
-    let session_id : any
-    if(typeof window !== undefined){
-      session_id = localStorage.getItem("upload_session_id");
-    }
-
-    
-    if (!session_id) {
+  const handlePreviewChunks_v2 = async () => {
+    const content = form.getValues("content");
+      
+    if (!content) {
       toast({
         variant: "destructive",
-        title: "No session ID found",
-        description: "Please upload a PDF first to generate a session ID.",
+        title: "No content",
+        description: "Please add content or upload a PDF to preview chunks.",
       });
-      
-      // Fallback to paragraph chunking if no session_id is available
-      const options: ChunkingOptions = {
-        method: 'paragraph' as ChunkingMethod,
-      };
-        
-      const generatedChunks = generateChunks(content, options);
-      setChunks(generatedChunks);
-      setShowChunks(true);
-      setIsProcessingChunks(false);
       return;
     }
-    
-    // Call the external chunking API endpoint using apiServiceInstance with session_id
-    const data = await apiServiceInstance.request<ChunkResponse>('http://127.0.0.1:5000/chunk-text', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ "session_id": session_id }),
-      logRequests: true, // Enable logging for this request
-    });
+      
+    setIsProcessingChunks(true);
+      
+    // Define the expected response type
+    interface ChunkResponse {
+      chunks: [string[], Record<string, any>]; // Tuple: [chunks, metadata]
+    }
+
+      
+    try {
+      // Get the session_id from localStorage
+      let session_id : any
+      if(typeof window !== undefined){
+        session_id = localStorage.getItem("upload_session_id");
+      }
+
+      
+      if (!session_id) {
+        toast({
+          variant: "destructive",
+          title: "No session ID found",
+          description: "Please upload a PDF first to generate a session ID.",
+        });
         
-    if (data.chunks && Array.isArray(data.chunks)) {
-      setChunks(data.chunks);
-      setShowChunks(true);
-    } else {
-      // Fallback to paragraph chunking if API response doesn't contain chunks
+        // Fallback to paragraph chunking if no session_id is available
+        const options: ChunkingOptions = {
+          method: 'paragraph' as ChunkingMethod,
+        };
+          
+        const generatedChunks = generateChunks(content, options);
+        setChunks(generatedChunks);
+        setShowChunks(true);
+        setIsProcessingChunks(false);
+        return;
+      }
+      
+      // Call the external chunking API endpoint using apiServiceInstance with session_id
+      const data = await apiServiceInstance.request<ChunkResponse>('http://127.0.0.1:5000/chunk-text', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ "session_id": session_id, "text": pdfText, "text_edited": isTextEdited }),
+        logRequests: true, // Enable logging for this request
+      });
+          
+      if (data.chunks && Array.isArray(data.chunks)) {
+        setChunks(data.chunks[0]);      // data.chunks[1] is the images metadata
+        setShowChunks(true);
+      } else {
+        // Fallback to paragraph chunking if API response doesn't contain chunks
+        const options: ChunkingOptions = {
+          method: 'paragraph' as ChunkingMethod,
+        };
+              
+        const generatedChunks = generateChunks(content, options);
+        setChunks(generatedChunks);
+        setShowChunks(true);
+              
+        toast({
+          title: "Using fallback chunking",
+          description: "External chunking service failed. Using paragraph-based chunking instead.",
+        });
+      }
+    } catch (error) {
+      console.error("Error previewing chunks:", error);
+          
+      // Fallback to paragraph chunking if there's an error
       const options: ChunkingOptions = {
         method: 'paragraph' as ChunkingMethod,
       };
-            
+          
       const generatedChunks = generateChunks(content, options);
       setChunks(generatedChunks);
       setShowChunks(true);
-            
+          
       toast({
         title: "Using fallback chunking",
         description: "External chunking service failed. Using paragraph-based chunking instead.",
       });
+    } finally {
+      setIsProcessingChunks(false);
     }
-  } catch (error) {
-    console.error("Error previewing chunks:", error);
-        
-    // Fallback to paragraph chunking if there's an error
-    const options: ChunkingOptions = {
-      method: 'paragraph' as ChunkingMethod,
-    };
-        
-    const generatedChunks = generateChunks(content, options);
-    setChunks(generatedChunks);
-    setShowChunks(true);
-        
-    toast({
-      title: "Using fallback chunking",
-      description: "External chunking service failed. Using paragraph-based chunking instead.",
-    });
-  } finally {
-    setIsProcessingChunks(false);
-  }
-};
+  };
 
   const handlePreviewChunks = async () => {
     const content = form.getValues("content");
@@ -499,6 +511,51 @@ const handlePreviewChunks_v2 = async () => {
     }
   };
 
+  const handleDeleteImage = async (indexToDelete: number, src: string) => {
+    setDeletingImageIndex(indexToDelete)
+
+    interface DeleteImageResponse {
+      [key: string]: any
+    }
+
+    try {
+      const data = await apiServiceInstance.request<DeleteImageResponse>("http://127.0.0.1:5000/delete-image", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ image_url: src }),
+      })
+
+      // Only remove from state if API call was successful
+      setExtractedImages((prev) => prev.filter((_, index) => index !== indexToDelete))
+
+      toast({
+        title: "Image deleted",
+        description: "The image has been removed from the extracted images.",
+      })
+    } catch (error) {
+      console.error("Error deleting image:", error)
+      toast({
+        variant: "destructive",
+        title: "Delete failed",
+        description: "Failed to delete the image. Please try again.",
+      })
+    } finally {
+      setDeletingImageIndex(null)
+    }
+  }
+
+  const handleImageClick = (src: string, index: number) => {
+    setPreviewImage(src)
+    setPreviewImageIndex(index)
+    setIsPreviewOpen(true)
+  }
+
+  const closePreview = () => {
+    setIsPreviewOpen(false)
+  }
+
   return (
     <Card className="w-full">
       <CardHeader>
@@ -537,9 +594,12 @@ const handlePreviewChunks_v2 = async () => {
           </div>
         ) : (
           <Tabs defaultValue="upload">
-            <TabsList className="grid grid-cols-2 mb-4">
+            <TabsList className="grid grid-cols-3 mb-4">
               <TabsTrigger value="upload">Upload PDF</TabsTrigger>
               <TabsTrigger value="paste">Paste Text</TabsTrigger>
+              <TabsTrigger value="images" disabled={!pdfFile}>
+                Extracted Images
+              </TabsTrigger>
             </TabsList>
             
             <TabsContent value="upload" className="space-y-4">
@@ -629,6 +689,43 @@ const handlePreviewChunks_v2 = async () => {
                   />
                   
                   <FormField
+                      control={form.control}
+                      name="content"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>
+                            Document Content
+                            {isTextEdited && (
+                              <span className="ml-2 text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded">
+                                Text edited
+                              </span>
+                            )}
+                          </FormLabel>
+                          <FormControl>
+                            <Textarea 
+                              placeholder="Paste or type document content here" 
+                              className="min-h-[300px]"
+                              {...field}
+                              onChange={(e) => {
+                                field.onChange(e);
+                                // Check if the current value differs from the original PDF text
+                                if (pdfText && e.target.value !== pdfText) {
+                                  setIsTextEdited(true);
+                                } else if (e.target.value === pdfText) {
+                                  setIsTextEdited(false);
+                                }
+                                // Update pdfText to reflect the current edited state
+                                setPdfText(e.target.value);
+                              }}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+
+                  {/* <FormField
                     control={form.control}
                     name="content"
                     render={({ field }) => (
@@ -644,9 +741,87 @@ const handlePreviewChunks_v2 = async () => {
                         <FormMessage />
                       </FormItem>
                     )}
-                  />
+                  /> */}
                 </form>
               </Form>
+            </TabsContent>
+
+            <TabsContent value="images" className="space-y-4">
+              <div className="space-y-4">
+                <div className="flex justify-between items-center">
+                  <h3 className="text-sm font-medium">Images Extracted from PDF</h3>
+                  {extractedImages.length > 0 && (
+                    <span className="text-xs text-muted-foreground">
+                      {extractedImages.length} image{extractedImages.length !== 1 ? "s" : ""} found
+                    </span>
+                  )}
+                </div>
+
+                <div className="max-h-[400px] overflow-y-auto border rounded-md p-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {extractedImages.map((src, index) => (
+                      <div key={index} className="border rounded-md overflow-hidden relative group">
+                        <div className="aspect-video relative">
+                          <img
+                            src={src || "/placeholder.svg"}
+                            alt={`Extracted image ${index + 1}`}
+                            className="object-cover w-full h-full cursor-pointer"
+                            onClick={() => handleImageClick(src, index)}
+                          />
+                          <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center opacity-0 group-hover:opacity-100">
+                            <Button
+                              variant="secondary"
+                              size="sm"
+                              className="mr-2"
+                              onClick={() => handleImageClick(src, index)}
+                            >
+                              <ZoomIn className="h-4 w-4 mr-1" />
+                              View
+                            </Button>
+                            <Button
+                              variant="destructive"
+                              size="sm"
+                              disabled={deletingImageIndex === index}
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                handleDeleteImage(index, src)
+                              }}
+                            >
+                              {deletingImageIndex === index ? (
+                                <Loader2 className="h-4 w-4 mr-1 animate-spin" />
+                              ) : (
+                                <Trash2 className="h-4 w-4 mr-1" />
+                              )}
+                              Delete
+                            </Button>
+                          </div>
+                        </div>
+                        <div className="p-2 bg-muted/20 flex justify-between items-center">
+                          <div>
+                            <p className="text-sm font-medium">Image {index + 1}</p>
+                            {/* <p className="text-xs text-muted-foreground">Extracted from page {index + 1}</p> */}
+                          </div>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            className="h-8 w-8 p-0"
+                            onClick={() => handleImageClick(src, index)}
+                          >
+                            <ZoomIn className="h-4 w-4" />
+                            <span className="sr-only">View image</span>
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {extractedImages.length === 0 && (
+                  <div className="flex flex-col items-center justify-center p-8 border-2 border-dashed rounded-lg">
+                    <p className="text-muted-foreground">No images extracted from this PDF</p>
+                  </div>
+                )}
+              </div>
             </TabsContent>
           </Tabs>
         )}
@@ -721,6 +896,41 @@ const handlePreviewChunks_v2 = async () => {
           </Button>
         </CardFooter>
       )}
+
+      {/* Image Preview Modal */}
+      <Dialog open={isPreviewOpen} onOpenChange={setIsPreviewOpen}>
+        <DialogContent className="max-w-4xl w-[90vw]">
+          <DialogHeader>
+            <DialogTitle className="flex justify-between items-center">
+              <span>Image {previewImageIndex !== null ? previewImageIndex + 1 : ""}</span>
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm" onClick={closePreview}>
+                  <X className="h-4 w-4 mr-1" />
+                  Close
+                </Button>
+                <Button variant="outline" size="sm" asChild>
+                  <a href={previewImage || "#"} download target="_blank" rel="noopener noreferrer">
+                    <Download className="h-4 w-4 mr-1" />
+                    Download
+                  </a>
+                </Button>
+              </div>
+            </DialogTitle>
+          </DialogHeader>
+          <div className="flex items-center justify-center p-2 max-h-[70vh] overflow-auto">
+            {previewImage && (
+              <img
+                src={previewImage || "/placeholder.svg"}
+                alt={`Full size preview of image ${previewImageIndex !== null ? previewImageIndex + 1 : ""}`}
+                className="max-w-full max-h-full object-contain"
+              />
+            )}
+          </div>
+          <div className="p-2 text-center text-sm text-muted-foreground">
+            {previewImageIndex !== null && `Extracted from page ${previewImageIndex + 1} of the PDF document`}
+          </div>
+        </DialogContent>
+      </Dialog>
     </Card>
   );
 }

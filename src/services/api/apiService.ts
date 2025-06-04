@@ -9,6 +9,7 @@ interface FileUploadResponse {
   error?: string;
   text_content?: string;
   session_id?: string;
+  image_urls?: string[];
 }
 
 interface ApiServiceConfig {
