@@ -110,8 +110,12 @@ export const createAIAgent = async (agentData: NewAIAgent): Promise<AIAgent> => 
  * Updates an existing AI agent.
  */
 export const updateAIAgent = async (agentId: string, updates: UpdateAIAgent): Promise<AIAgent> => {
+  const functionUrl = `ai-agent-handler/${agentId}`;
+  console.log(`[CLIENT SERVICE DEBUG] Invoking Supabase function: PUT ${functionUrl}`);
+  console.log(`[CLIENT SERVICE DEBUG] Payload for ${agentId}:`, JSON.stringify(updates, null, 2));
+
    // Call the handler with PUT/PATCH and agent ID in the path
-   const { data, error } = await supabase.functions.invoke(`ai-agent-handler/${agentId}`, {
+   const { data, error } = await supabase.functions.invoke(functionUrl, { // Use logged functionUrl
     method: 'PUT', // or PATCH - handler supports both
     body: updates,
   });
