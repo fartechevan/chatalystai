@@ -45,6 +45,9 @@ const AgentDetailsPanel: React.FC<AgentDetailsPanelProps> = ({ selectedAgentId, 
   const [selectedIntegrationIds, setSelectedIntegrationIds] = useState<string[]>([]);
   const [isEnabled, setIsEnabled] = useState<boolean>(true);
   const [activationMode, setActivationMode] = useState<'keyword' | 'always_on'>('keyword'); // Added state for activation mode
+  const [agentType, setAgentType] = useState<'chattalyst' | 'n8n'>('chattalyst'); // Added state for agent type
+  const [n8nWebhookUrl, setN8nWebhookUrl] = useState(''); // Added state for n8n webhook URL
+  const [formStage, setFormStage] = useState<'selectType' | 'configureDetails'>('configureDetails'); // Added state for form stage
   const [isSuggestDialogOpen, setIsSuggestDialogOpen] = useState(false);
   // --- State for Testing ---
   const [testQuery, setTestQuery] = useState('');
@@ -132,16 +135,11 @@ const AgentDetailsPanel: React.FC<AgentDetailsPanelProps> = ({ selectedAgentId, 
       setSelectedDocumentIds(selectedAgent.knowledge_document_ids || []);
       setSelectedIntegrationIds(selectedAgent.integration_ids || []);
       setIsEnabled(selectedAgent.is_enabled ?? true);
-      // Assuming activation_mode is fetched with the agent or integration details
-      // Need to adjust the query/type if activation_mode isn't directly on selectedAgent
-      // For now, let's assume it might be missing and default
-      // TODO: Adjust this based on where activation_mode is actually stored/fetched from
-      // Fetching activation_mode requires joining ai_agent_integrations. For now, keep default.
-      setActivationMode(selectedAgent.activation_mode || 'keyword'); // Default to 'keyword'
-      // Keep default setting logic for now until data fetching is updated
-       if (!selectedAgentId) { // Only reset if creating
-         setActivationMode('keyword');
-       }
+      setActivationMode(selectedAgent.activation_mode || 'keyword');
+      setAgentType(selectedAgent.agent_type || 'chattalyst');
+      setN8nWebhookUrl(selectedAgent.n8n_webhook_url || '');
+      // setSelectedReplyInstanceId(selectedAgent.reply_evolution_instance_id || null); // Removed
+      setFormStage('configureDetails'); // For existing agents, go straight to details
     } else if (!selectedAgentId) {
       // Reset form for creating
       setAgentName('');
@@ -150,7 +148,11 @@ const AgentDetailsPanel: React.FC<AgentDetailsPanelProps> = ({ selectedAgentId, 
       setSelectedDocumentIds([]);
       setSelectedIntegrationIds([]);
       setIsEnabled(true);
-      setActivationMode('keyword'); // Default for new agents
+      setActivationMode('keyword');
+      setAgentType('chattalyst');
+      setN8nWebhookUrl('');
+      // setSelectedReplyInstanceId(null); // Removed
+      setFormStage('selectType'); // For new agents, start with type selection
     }
   }, [selectedAgentId, selectedAgent]);
 
@@ -297,44 +299,56 @@ const AgentDetailsPanel: React.FC<AgentDetailsPanelProps> = ({ selectedAgentId, 
         toast({ variant: "destructive", title: "Validation Error", description: "Agent name is required." });
         return;
       }
-      if (!promptText.trim()) {
-        toast({ variant: "destructive", title: "Validation Error", description: "System prompt is required." });
+      if (agentType === 'chattalyst' && !promptText.trim()) {
+        toast({ variant: "destructive", title: "Validation Error", description: "System prompt is required for Chattalyst agents." });
+        return;
+      }
+      if (agentType === 'n8n' && !n8nWebhookUrl.trim()) {
+        toast({ variant: "destructive", title: "Validation Error", description: "N8n Webhook URL is required for N8n agents." });
         return;
       }
 
-      const newAgentData: NewAIAgent = {
+      const agentData: NewAIAgent = {
         name: agentName,
-        prompt: promptText,
-        knowledge_document_ids: selectedDocumentIds.length > 0 ? selectedDocumentIds : null,
+        prompt: agentType === 'chattalyst' ? promptText : '', // Only save prompt for chattalyst
+        knowledge_document_ids: agentType === 'chattalyst' && selectedDocumentIds.length > 0 ? selectedDocumentIds : null,
         keyword_trigger: keywordTrigger?.trim() || null,
-         integration_ids: selectedIntegrationIds.length > 0 ? selectedIntegrationIds : [],
-         is_enabled: isEnabled,
-         activation_mode: activationMode,
-       };
-       createMutation.mutate(newAgentData);
+        integration_ids: selectedIntegrationIds.length > 0 ? selectedIntegrationIds : [],
+        is_enabled: isEnabled,
+        activation_mode: activationMode,
+        agent_type: agentType,
+        n8n_webhook_url: agentType === 'n8n' ? n8nWebhookUrl.trim() : null,
+        // reply_evolution_instance_id: selectedReplyInstanceId, // Removed
+      };
+      createMutation.mutate(agentData);
 
     } else if (selectedAgentId && selectedAgent) {
-       // --- Update Agent ---
-       // Basic validation (can be enhanced with zod/react-hook-form)
-       // Use agentName state variable for validation
-       if (!agentName.trim()) {
-         toast({ variant: "destructive", title: "Validation Error", description: "Agent name is required." });
-         return;
-       }
-        if (!promptText.trim()) {
-         toast({ variant: "destructive", title: "Validation Error", description: "System prompt is required." });
-         return;
-       }
+      // --- Update Agent ---
+      if (!agentName.trim()) {
+        toast({ variant: "destructive", title: "Validation Error", description: "Agent name is required." });
+        return;
+      }
+      if (agentType === 'chattalyst' && !promptText.trim()) {
+        toast({ variant: "destructive", title: "Validation Error", description: "System prompt is required for Chattalyst agents." });
+        return;
+      }
+      if (agentType === 'n8n' && !n8nWebhookUrl.trim()) {
+        toast({ variant: "destructive", title: "Validation Error", description: "N8n Webhook URL is required for N8n agents." });
+        return;
+      }
 
-       const updates: UpdateAIAgent = {
-         name: agentName.trim(), // Use the agentName state variable
-         prompt: promptText,
-         knowledge_document_ids: selectedDocumentIds.length > 0 ? selectedDocumentIds : null,
-         keyword_trigger: keywordTrigger?.trim() || null,
-         integration_ids: selectedIntegrationIds.length > 0 ? selectedIntegrationIds : [],
-         is_enabled: isEnabled,
-         activation_mode: activationMode,
-       };
+      const updates: UpdateAIAgent = {
+        name: agentName.trim(),
+        prompt: agentType === 'chattalyst' ? promptText : '', // Only save prompt for chattalyst
+        knowledge_document_ids: agentType === 'chattalyst' && selectedDocumentIds.length > 0 ? selectedDocumentIds : null,
+        keyword_trigger: keywordTrigger?.trim() || null,
+        integration_ids: selectedIntegrationIds.length > 0 ? selectedIntegrationIds : [],
+        is_enabled: isEnabled,
+        activation_mode: activationMode,
+        agent_type: agentType,
+        n8n_webhook_url: agentType === 'n8n' ? n8nWebhookUrl.trim() : null,
+        // reply_evolution_instance_id: selectedReplyInstanceId, // Removed
+      };
 
        // Only send update if something actually changed (optional optimization)
        // Consider comparing keyword_trigger and integration_ids as well
@@ -348,6 +362,16 @@ const AgentDetailsPanel: React.FC<AgentDetailsPanelProps> = ({ selectedAgentId, 
 
        // Logging removed
        // console.log("Updating agent", selectedAgentId, "with data:", updates); // Remove this log as well
+       
+       console.log('[CLIENT DEBUG] Attempting to update agent. ID:', selectedAgentId);
+       console.log('[CLIENT DEBUG] Update payload:', JSON.stringify(updates, null, 2)); // Pretty print JSON
+
+       if (!selectedAgentId) {
+         toast({ variant: "destructive", title: "Critical Error", description: "Agent ID is missing before update attempt. Please refresh." });
+         console.error('[CLIENT DEBUG] CRITICAL: selectedAgentId is null or undefined before mutate call.');
+         return;
+       }
+
        updateMutation.mutate({ agentId: selectedAgentId, updates });
     }
   };
@@ -429,32 +453,35 @@ const AgentDetailsPanel: React.FC<AgentDetailsPanelProps> = ({ selectedAgentId, 
          />
        </div>
 
-       {/* Activation Mode */}
-        <div className="space-y-3">
-           <Label>Activation Mode</Label>
-           <RadioGroup
-             value={activationMode}
-             onValueChange={(value: 'keyword' | 'always_on') => setActivationMode(value)}
-             className="flex space-x-4"
-             disabled={isCreating || updateMutation.isPending || isLoadingAgent}
-           >
-             <div className="flex items-center space-x-2">
-               <RadioGroupItem value="keyword" id="mode-keyword" />
-               <Label htmlFor="mode-keyword" className="font-normal">Keyword Trigger</Label>
-             </div>
-             <div className="flex items-center space-x-2">
-               <RadioGroupItem value="always_on" id="mode-always" />
-               <Label htmlFor="mode-always" className="font-normal">Always On</Label>
-             </div>
-           </RadioGroup>
-           <p className="text-sm text-muted-foreground">
-             Choose how the agent activates in connected channels. 'Always On' responds to every message.
-           </p>
-         </div>
+       {/* Agent Type Selection (Disabled after creation) - Commented out as per request */}
+       {/*
+       <div className="space-y-3">
+         <Label>Agent Type</Label>
+         <RadioGroup
+           value={agentType}
+           // onValueChange should not be active for existing agents if type is immutable
+           // onValueChange={(value: 'chattalyst' | 'n8n') => setAgentType(value)} 
+           className="flex space-x-4"
+           // Disable this field for existing agents
+           disabled={!isCreating || updateMutation.isPending || isLoadingAgent}
+         >
+           <div className="flex items-center space-x-2">
+             <RadioGroupItem value="chattalyst" id="type-chattalyst" />
+             <Label htmlFor="type-chattalyst" className="font-normal">Chattalyst Agent</Label>
+           </div>
+           <div className="flex items-center space-x-2">
+             <RadioGroupItem value="n8n" id="type-n8n" />
+             <Label htmlFor="type-n8n" className="font-normal">N8n Agent</Label>
+           </div>
+         </RadioGroup>
+         <p className="text-sm text-muted-foreground">
+           The type of agent. This cannot be changed after creation.
+         </p>
+       </div>
+       */}
 
-
-      {/* Agent Name */}
-      <div className="space-y-2">
+       {/* Agent Name */}
+       <div className="space-y-2">
         <Label htmlFor="agent-name">Agent Name</Label>
         <Input
           id="agent-name"
@@ -464,10 +491,13 @@ const AgentDetailsPanel: React.FC<AgentDetailsPanelProps> = ({ selectedAgentId, 
           disabled={isCreating || updateMutation.isPending || isLoadingAgent}
         />
       </div>
-      <div className="space-y-2">
-        <div className="flex justify-between items-center">
-          <Label htmlFor="agent-prompt">System Prompt</Label>
-          <Button
+
+      {agentType === 'chattalyst' && (
+        <>
+          <div className="space-y-2">
+            <div className="flex justify-between items-center">
+              <Label htmlFor="agent-prompt">System Prompt</Label>
+              <Button
             variant="outline"
             size="sm"
             onClick={() => setIsSuggestDialogOpen(true)}
@@ -498,20 +528,63 @@ const AgentDetailsPanel: React.FC<AgentDetailsPanelProps> = ({ selectedAgentId, 
           disabled={isCreating || updateMutation.isPending || isLoadingAgent}
         />
       </div>
-      {/* Keyword Trigger Input */}
-      <div className="space-y-2">
-        <Label htmlFor="agent-keyword-trigger">Keyword Trigger (Optional)</Label>
-        <Input
-          id="agent-keyword-trigger"
-          value={keywordTrigger ?? ''}
-          onChange={(e) => setKeywordTrigger(e.target.value)}
-          placeholder="e.g., !support"
+        </>
+      )}
+      {agentType === 'n8n' && (
+        <div className="space-y-2">
+          <Label htmlFor="n8n-webhook-url">N8n Webhook URL</Label>
+          <Input
+            id="n8n-webhook-url"
+            value={n8nWebhookUrl}
+            onChange={(e) => setN8nWebhookUrl(e.target.value)}
+            placeholder="Enter your n8n webhook URL"
+            disabled={isCreating || updateMutation.isPending || isLoadingAgent}
+          />
+          <p className="text-sm text-muted-foreground">
+            The webhook URL your n8n workflow will receive requests at.
+          </p>
+        </div>
+      )}
+      
+      {/* Activation Mode */}
+      <div className="space-y-3">
+        <Label>Activation Mode</Label>
+        <RadioGroup
+          value={activationMode}
+          onValueChange={(value: 'keyword' | 'always_on') => setActivationMode(value)}
+          className="flex space-x-4"
           disabled={isCreating || updateMutation.isPending || isLoadingAgent}
-        />
-         <p className="text-sm text-muted-foreground">
-           If set, the agent will only respond in connected channels when a message starts with this keyword.
-         </p>
+        >
+          <div className="flex items-center space-x-2">
+            <RadioGroupItem value="keyword" id="mode-keyword" />
+            <Label htmlFor="mode-keyword" className="font-normal">Keyword Trigger</Label>
+          </div>
+          <div className="flex items-center space-x-2">
+            <RadioGroupItem value="always_on" id="mode-always" />
+            <Label htmlFor="mode-always" className="font-normal">Always On</Label>
+          </div>
+        </RadioGroup>
+        <p className="text-sm text-muted-foreground">
+          Choose how the agent activates in connected channels. 'Always On' responds to every message.
+        </p>
       </div>
+
+      {/* Keyword Trigger Input (Moved after Activation Mode) */}
+      {activationMode === 'keyword' && (
+        <div className="space-y-2">
+          <Label htmlFor="agent-keyword-trigger">Keyword Trigger</Label>
+          <Input
+            id="agent-keyword-trigger"
+            value={keywordTrigger ?? ''}
+            onChange={(e) => setKeywordTrigger(e.target.value)}
+            placeholder="e.g., !support"
+            disabled={isCreating || updateMutation.isPending || isLoadingAgent}
+          />
+          <p className="text-sm text-muted-foreground">
+            If set, the agent will only respond in connected channels when a message starts with this keyword.
+          </p>
+        </div>
+      )}
       {/* Connected Integrations Selector (Placeholder) */}
       <div className="space-y-2">
          <Label>Connected Integrations</Label>
@@ -553,6 +626,7 @@ const AgentDetailsPanel: React.FC<AgentDetailsPanelProps> = ({ selectedAgentId, 
            <p className="text-sm text-muted-foreground">No integrations found or available to connect.</p>
          )}
        </div>
+      {/* Reply Evolution Instance Selector Removed */}
     </div>
   );
 
@@ -569,10 +643,12 @@ const AgentDetailsPanel: React.FC<AgentDetailsPanelProps> = ({ selectedAgentId, 
            disabled={createMutation.isPending}
          />
        </div>
-       <div className="space-y-2">
-         <div className="flex justify-between items-center">
-           <Label htmlFor="agent-prompt-create">System Prompt</Label>
-           <Button
+       {agentType === 'chattalyst' && (
+         <>
+           <div className="space-y-2">
+             <div className="flex justify-between items-center">
+               <Label htmlFor="agent-prompt-create">System Prompt</Label>
+               <Button
              variant="outline"
              size="sm"
              onClick={() => setIsSuggestDialogOpen(true)}
@@ -603,21 +679,24 @@ const AgentDetailsPanel: React.FC<AgentDetailsPanelProps> = ({ selectedAgentId, 
           disabled={createMutation.isPending}
         />
       </div>
-       {/* Keyword Trigger Input - Create */}
-       <div className="space-y-2">
-         <Label htmlFor="agent-keyword-trigger-create">Keyword Trigger (Optional)</Label>
-         <Input
-           id="agent-keyword-trigger-create"
-           value={keywordTrigger ?? ''}
-           onChange={(e) => setKeywordTrigger(e.target.value)}
-           placeholder="e.g., !support"
-           disabled={createMutation.isPending}
-         />
+         </>
+       )}
+       {agentType === 'n8n' && (
+        <div className="space-y-2">
+          <Label htmlFor="n8n-webhook-url-create">N8n Webhook URL</Label>
+          <Input
+            id="n8n-webhook-url-create"
+            value={n8nWebhookUrl}
+            onChange={(e) => setN8nWebhookUrl(e.target.value)}
+            placeholder="Enter your n8n webhook URL"
+            disabled={createMutation.isPending}
+          />
           <p className="text-sm text-muted-foreground">
-            If set, the agent will only respond in connected channels when a message starts with this keyword.
+            The webhook URL your n8n workflow will receive requests at.
           </p>
-       </div>
-        {/* Activation Mode - Create */}
+        </div>
+       )}
+       {/* Activation Mode - Create */}
         <div className="space-y-3">
            <Label>Activation Mode</Label>
            <RadioGroup
@@ -639,6 +718,22 @@ const AgentDetailsPanel: React.FC<AgentDetailsPanelProps> = ({ selectedAgentId, 
              Choose how the agent activates in connected channels. 'Always On' responds to every message.
            </p>
          </div>
+       {/* Keyword Trigger Input - Create (Moved after Activation Mode) */}
+       {activationMode === 'keyword' && (
+         <div className="space-y-2">
+           <Label htmlFor="agent-keyword-trigger-create">Keyword Trigger (Optional)</Label>
+           <Input
+             id="agent-keyword-trigger-create"
+             value={keywordTrigger ?? ''}
+             onChange={(e) => setKeywordTrigger(e.target.value)}
+             placeholder="e.g., !support"
+             disabled={createMutation.isPending}
+           />
+           <p className="text-sm text-muted-foreground">
+             If set, the agent will only respond in connected channels when a message starts with this keyword. Only applicable if Activation Mode is 'Keyword Trigger'.
+           </p>
+         </div>
+       )}
        {/* Connected Integrations Selector (Placeholder) - Create */}
        <div className="space-y-2">
           <Label>Connected Integrations</Label>
@@ -676,10 +771,11 @@ const AgentDetailsPanel: React.FC<AgentDetailsPanelProps> = ({ selectedAgentId, 
                 </div>
               ))}
             </div>
-          ) : (
-            <p className="text-sm text-muted-foreground">No integrations found or available to connect.</p>
-          )}
+         ) : (
+           <p className="text-sm text-muted-foreground">No integrations found or available to connect.</p>
+         )}
         </div>
+       {/* Reply Evolution Instance Selector - Create Removed */}
     </div>
   );
 
@@ -752,24 +848,33 @@ const AgentDetailsPanel: React.FC<AgentDetailsPanelProps> = ({ selectedAgentId, 
 
 
   // Determine main content based on state
-  let mainContent;
-  if (selectedAgentId && isLoadingAgent) {
-    mainContent = (
-      <div className="space-y-4 p-4">
-        <Skeleton className="h-8 w-1/2" /> <Skeleton className="h-6 w-1/4" /> <Skeleton className="h-10 w-full" /> <Skeleton className="h-6 w-1/4" /> <Skeleton className="h-20 w-full" /> <Skeleton className="h-6 w-1/4" /> <Skeleton className="h-16 w-full" />
+  // This local 'mainContent' variable is no longer needed as rendering is handled in the return JSX.
+
+  const renderSelectTypeStage = () => (
+    <div className="p-6 space-y-6">
+      <div className="space-y-3">
+        <Label>Select Agent Type</Label>
+        <RadioGroup
+          value={agentType}
+          onValueChange={(value: 'chattalyst' | 'n8n') => setAgentType(value)}
+          className="flex space-x-4"
+        >
+          <div className="flex items-center space-x-2">
+            <RadioGroupItem value="chattalyst" id="type-chattalyst-select" />
+            <Label htmlFor="type-chattalyst-select" className="font-normal">Chattalyst Agent</Label>
+          </div>
+          <div className="flex items-center space-x-2">
+            <RadioGroupItem value="n8n" id="type-n8n-select" />
+            <Label htmlFor="type-n8n-select" className="font-normal">N8n Agent</Label>
+          </div>
+        </RadioGroup>
+        <p className="text-sm text-muted-foreground">
+          Choose the type of agent you want to create.
+        </p>
       </div>
-    );
-  } else if (selectedAgentId && isFetchError) {
-    mainContent = (
-      <Alert variant="destructive" className="m-4">
-        <Terminal className="h-4 w-4" /> <AlertTitle>Error Fetching Agent Details</AlertTitle> <AlertDescription>{fetchError?.message || "An unknown error occurred."}</AlertDescription>
-      </Alert>
-    );
-  } else if (isCreating) {
-     mainContent = renderCreateAgentForm();
-  }
-  // Removed conditional rendering based on detailView for existing agent
-  // else if (selectedAgent) { ... }
+      <Button onClick={() => setFormStage('configureDetails')}>Next</Button>
+    </div>
+  );
 
 
   return (
@@ -779,51 +884,64 @@ const AgentDetailsPanel: React.FC<AgentDetailsPanelProps> = ({ selectedAgentId, 
         <Button variant="outline" size="icon" onClick={onNavigateBack} aria-label="Back to list">
           <ArrowLeft className="h-4 w-4" />
         </Button>
-        <CardTitle className="flex-grow">{isCreating ? 'Create New Agent' : (isLoadingAgent ? 'Loading...' : `${selectedAgent?.name ?? ''}`)}</CardTitle>
+        <CardTitle className="flex-grow">
+          {isCreating ? 
+            (formStage === 'selectType' ? 'Select Agent Type' : 'Create New Agent') : 
+            (isLoadingAgent ? 'Loading...' : `${selectedAgent?.name ?? ''}`)}
+        </CardTitle>
       </CardHeader>
 
       {/* Main Content Area */}
-      <CardContent className="flex-grow overflow-auto p-0"> {/* Remove padding here, add to inner panels */}
-        {isCreating ? (
-          // Render create form directly if creating
-          <div className="p-6"> {/* Add padding back for create view */}
-             {mainContent}
+      <CardContent className="flex-grow overflow-auto p-0">
+        {isCreating && formStage === 'selectType' ? (
+          renderSelectTypeStage()
+        ) : isCreating && formStage === 'configureDetails' ? (
+          <div className="p-6">
+            {renderCreateAgentForm()}
           </div>
         ) : selectedAgentId && isLoadingAgent ? (
-           // Loading Skeleton for detail view
-           <div className="p-6"> {mainContent} </div>
+          <div className="p-6 space-y-4"> {/* For loading skeleton */}
+            <Skeleton className="h-8 w-1/2" /> <Skeleton className="h-6 w-1/4" /> 
+            <Skeleton className="h-10 w-full" /> <Skeleton className="h-6 w-1/4" /> 
+            <Skeleton className="h-20 w-full" /> <Skeleton className="h-6 w-1/4" /> 
+            <Skeleton className="h-16 w-full" />
+          </div>
         ) : selectedAgentId && isFetchError ? (
-           // Error Alert for detail view
-           <div className="p-6"> {mainContent} </div>
+          <div className="p-6"> {/* For error alert */}
+            <Alert variant="destructive" className="m-4">
+              <Terminal className="h-4 w-4" /> <AlertTitle>Error Fetching Agent Details</AlertTitle> 
+              <AlertDescription>{fetchError?.message || "An unknown error occurred."}</AlertDescription>
+            </Alert>
+          </div>
         ) : selectedAgent ? (
-          // Side-by-side layout for existing agent details and testing
           <ResizablePanelGroup direction="horizontal" className="h-full w-full">
             <ResizablePanel defaultSize={50} minSize={30}>
-              <div className="h-full overflow-auto p-6"> {/* Add padding */}
+              <div className="h-full overflow-auto p-6">
                 {renderAgentDetailsForm()}
               </div>
             </ResizablePanel>
             <ResizableHandle withHandle />
             <ResizablePanel defaultSize={50} minSize={30}>
-              <div className="h-full overflow-auto p-6"> {/* Add padding */}
+              <div className="h-full overflow-auto p-6">
                 {renderTestAgentSection()}
               </div>
             </ResizablePanel>
           </ResizablePanelGroup>
-        ) : null /* Should not happen if layout logic is correct */}
+        ) : null}
       </CardContent>
 
-      {/* Footer with Save/Delete Buttons - Enable buttons based on main state */}
-      <CardFooter className="border-t pt-4 flex justify-between">
-          <Button
-            variant="outline"
-            onClick={handleSave} // Revert to direct handler call
-            // Disable only during mutations/loading, not based on view
-            disabled={createMutation.isPending || updateMutation.isPending || isLoadingAgent}
-          >
-            {createMutation.isPending ? 'Creating...' : (updateMutation.isPending ? 'Saving...' : (isCreating ? 'Create Agent' : 'Save Changes'))}
-          </Button>
-          {!isCreating && selectedAgentId && (
+      {/* Footer with Save/Delete Buttons */}
+      {/* Only show footer if not in 'selectType' stage or if editing */}
+      {(!isCreating || formStage === 'configureDetails') && (
+        <CardFooter className="border-t pt-4 flex justify-between">
+            <Button
+              variant="outline"
+              onClick={handleSave}
+              disabled={createMutation.isPending || updateMutation.isPending || isLoadingAgent || (isCreating && formStage === 'selectType')}
+            >
+              {createMutation.isPending ? 'Creating...' : (updateMutation.isPending ? 'Saving...' : (isCreating ? 'Create Agent' : 'Save Changes'))}
+            </Button>
+            {!isCreating && selectedAgentId && (
             <Button
               variant="destructive"
               size="icon"
@@ -837,6 +955,7 @@ const AgentDetailsPanel: React.FC<AgentDetailsPanelProps> = ({ selectedAgentId, 
            </Button>
          )}
       </CardFooter>
+      )} {/* Close the conditional rendering for CardFooter */}
 
        {/* Render the Dialog */}
        <PromptSuggestionDialog

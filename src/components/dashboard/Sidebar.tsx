@@ -73,7 +73,7 @@ export const menuItems: MenuItem[] = [
   // }, // "Lists" item removed
   { id: "knowledge", title: "Knowledge", icon: BookOpen, path: "/dashboard/knowledge" },
   { id: "ai-agents", title: "AI Agents", icon: Bot, path: "/dashboard/ai-agents" },
-  { id: "multi-ai-agents", title: "Multi AI Agents", icon: Bot, path: "/dashboard/multi-ai-agents" }, // New Menu Item
+  // { id: "automation", title: "Reply Configuration", icon: RadioTower, path: "/dashboard/automation" }, // Removed Reply Configuration link
   { id: "teams", title: "Teams", icon: Users, path: "/dashboard/teams" },
   {
     id: "management",
