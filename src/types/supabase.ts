@@ -671,8 +671,8 @@ export type Database = {
           integration_id: string
           owner_id: string | null
           pipeline_id: string | null
+          profile_id: string | null
           status: string | null
-          tenant_id: string | null
           token: string | null
           updated_at: string
           user_reference_id: string | null
@@ -685,8 +685,8 @@ export type Database = {
           integration_id: string
           owner_id?: string | null
           pipeline_id?: string | null
+          profile_id?: string | null
           status?: string | null
-          tenant_id?: string | null
           token?: string | null
           updated_at?: string
           user_reference_id?: string | null
@@ -699,8 +699,8 @@ export type Database = {
           integration_id?: string
           owner_id?: string | null
           pipeline_id?: string | null
+          profile_id?: string | null
           status?: string | null
-          tenant_id?: string | null
           token?: string | null
           updated_at?: string
           user_reference_id?: string | null
@@ -721,10 +721,10 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "integrations_config_tenant_id_fkey"
-            columns: ["tenant_id"]
+            foreignKeyName: "integrations_config_profile_id_fkey"
+            columns: ["profile_id"]
             isOneToOne: false
-            referencedRelation: "tenants"
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -906,7 +906,6 @@ export type Database = {
           customer_id: string | null
           id: string
           pipeline_stage_id: string | null
-          team_id: string | null
           updated_at: string
           user_id: string
           value: number | null
@@ -916,7 +915,6 @@ export type Database = {
           customer_id?: string | null
           id?: string
           pipeline_stage_id?: string | null
-          team_id?: string | null
           updated_at?: string
           user_id: string
           value?: number | null
@@ -926,7 +924,6 @@ export type Database = {
           customer_id?: string | null
           id?: string
           pipeline_stage_id?: string | null
-          team_id?: string | null
           updated_at?: string
           user_id?: string
           value?: number | null
@@ -944,13 +941,6 @@ export type Database = {
             columns: ["pipeline_stage_id"]
             isOneToOne: false
             referencedRelation: "pipeline_stages"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "leads_team_id_fkey"
-            columns: ["team_id"]
-            isOneToOne: false
-            referencedRelation: "teams"
             referencedColumns: ["id"]
           },
         ]
@@ -1041,7 +1031,6 @@ export type Database = {
           id: string
           is_default: boolean | null
           name: string
-          team_id: string | null
           updated_at: string
           user_id: string
         }
@@ -1050,7 +1039,6 @@ export type Database = {
           id?: string
           is_default?: boolean | null
           name: string
-          team_id?: string | null
           updated_at?: string
           user_id: string
         }
@@ -1059,19 +1047,10 @@ export type Database = {
           id?: string
           is_default?: boolean | null
           name?: string
-          team_id?: string | null
           updated_at?: string
           user_id?: string
         }
-        Relationships: [
-          {
-            foreignKeyName: "pipelines_team_id_fkey"
-            columns: ["team_id"]
-            isOneToOne: false
-            referencedRelation: "teams"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
       plans: {
         Row: {
@@ -1083,7 +1062,6 @@ export type Database = {
           name: string
           owner_id: string | null
           price: number
-          team_id: string | null
           token_allocation: number | null
         }
         Insert: {
@@ -1095,7 +1073,6 @@ export type Database = {
           name: string
           owner_id?: string | null
           price: number
-          team_id?: string | null
           token_allocation?: number | null
         }
         Update: {
@@ -1107,7 +1084,6 @@ export type Database = {
           name?: string
           owner_id?: string | null
           price?: number
-          team_id?: string | null
           token_allocation?: number | null
         }
         Relationships: [
@@ -1116,13 +1092,6 @@ export type Database = {
             columns: ["owner_id"]
             isOneToOne: false
             referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "plans_team_id_fkey"
-            columns: ["team_id"]
-            isOneToOne: false
-            referencedRelation: "teams"
             referencedColumns: ["id"]
           },
         ]
@@ -1294,7 +1263,6 @@ export type Database = {
           profile_id: string
           status: Database["public"]["Enums"]["subscription_status"]
           subscribed_at: string
-          team_id: string | null
           updated_at: string
         }
         Insert: {
@@ -1309,7 +1277,6 @@ export type Database = {
           profile_id: string
           status: Database["public"]["Enums"]["subscription_status"]
           subscribed_at?: string
-          team_id?: string | null
           updated_at?: string
         }
         Update: {
@@ -1324,7 +1291,6 @@ export type Database = {
           profile_id?: string
           status?: Database["public"]["Enums"]["subscription_status"]
           subscribed_at?: string
-          team_id?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -1340,13 +1306,6 @@ export type Database = {
             columns: ["profile_id"]
             isOneToOne: false
             referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "subscriptions_team_id_fkey"
-            columns: ["team_id"]
-            isOneToOne: false
-            referencedRelation: "teams"
             referencedColumns: ["id"]
           },
         ]
@@ -1420,79 +1379,62 @@ export type Database = {
           },
         ]
       }
-      team_users: {
+      tenant_users: {
         Row: {
-          created_at: string | null
-          id: string
-          role: Database["public"]["Enums"]["team_role"]
-          team_id: string
+          created_at: string
+          role: string
+          tenant_id: string
+          updated_at: string
           user_id: string
         }
         Insert: {
-          created_at?: string | null
-          id?: string
-          role?: Database["public"]["Enums"]["team_role"]
-          team_id: string
+          created_at?: string
+          role?: string
+          tenant_id: string
+          updated_at?: string
           user_id: string
         }
         Update: {
-          created_at?: string | null
-          id?: string
-          role?: Database["public"]["Enums"]["team_role"]
-          team_id?: string
+          created_at?: string
+          role?: string
+          tenant_id?: string
+          updated_at?: string
           user_id?: string
         }
         Relationships: [
           {
-            foreignKeyName: "team_users_team_id_fkey"
-            columns: ["team_id"]
+            foreignKeyName: "tenant_users_tenant_id_fkey"
+            columns: ["tenant_id"]
             isOneToOne: false
-            referencedRelation: "teams"
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tenant_users_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
-      }
-      teams: {
-        Row: {
-          created_at: string | null
-          id: string
-          name: string
-          updated_at: string | null
-        }
-        Insert: {
-          created_at?: string | null
-          id?: string
-          name: string
-          updated_at?: string | null
-        }
-        Update: {
-          created_at?: string | null
-          id?: string
-          name?: string
-          updated_at?: string | null
-        }
-        Relationships: []
       }
       tenants: {
         Row: {
           created_at: string
           id: string
           owner_profile_id: string
-          team_id: string | null
           updated_at: string
         }
         Insert: {
           created_at?: string
           id?: string
           owner_profile_id: string
-          team_id?: string | null
           updated_at?: string
         }
         Update: {
           created_at?: string
           id?: string
           owner_profile_id?: string
-          team_id?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -1501,13 +1443,6 @@ export type Database = {
             columns: ["owner_profile_id"]
             isOneToOne: false
             referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "tenants_team_id_fkey"
-            columns: ["team_id"]
-            isOneToOne: true
-            referencedRelation: "teams"
             referencedColumns: ["id"]
           },
         ]
@@ -1589,15 +1524,6 @@ export type Database = {
         Args: { "": string } | { "": unknown }
         Returns: unknown
       }
-      create_new_team: {
-        Args: { p_name: string }
-        Returns: {
-          created_at: string | null
-          id: string
-          name: string
-          updated_at: string | null
-        }[]
-      }
       execute_dynamic_sql: {
         Args: { sql_query: string }
         Returns: Json
@@ -1636,6 +1562,14 @@ export type Database = {
         Args: { "": unknown[] }
         Returns: number
       }
+      has_any_tenant_role: {
+        Args: { p_tenant_id: string; p_user_id: string; p_roles: string[] }
+        Returns: boolean
+      }
+      has_tenant_role: {
+        Args: { p_tenant_id: string; p_user_id: string; p_role: string }
+        Returns: boolean
+      }
       hnsw_bit_support: {
         Args: { "": unknown }
         Returns: unknown
@@ -1651,6 +1585,10 @@ export type Database = {
       hnswhandler: {
         Args: { "": unknown }
         Returns: unknown
+      }
+      is_tenant_member: {
+        Args: { p_tenant_id: string; p_user_id: string }
+        Returns: boolean
       }
       is_user_team_admin_or_owner: {
         Args: { p_user_id: string; p_team_id: string }
@@ -1772,7 +1710,6 @@ export type Database = {
           id: string
           is_default: boolean | null
           name: string
-          team_id: string | null
           updated_at: string
           user_id: string
         }[]

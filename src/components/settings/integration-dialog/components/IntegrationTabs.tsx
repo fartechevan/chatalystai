@@ -27,7 +27,7 @@ interface IntegrationTabsProps {
   open: boolean; // Add open state for the hook
   onOpenChange: (open: boolean) => void; // Add onOpenChange for the hook
   currentPlan?: PlanDetails | null; // Add currentPlan prop
-  tenantId?: string | null; // Add tenantId prop
+  profileId?: string | null; // Changed tenantId to profileId
 }
 
 export function IntegrationTabs({
@@ -37,7 +37,7 @@ export function IntegrationTabs({
   open,
   onOpenChange,
   currentPlan, // Destructure currentPlan
-  tenantId, // Destructure tenantId
+  profileId, // Changed tenantId to profileId
 }: IntegrationTabsProps) {
   const [activeTab, setActiveTab] = useState<"settings" | "authorization">("settings");
   const [isClearing, setIsClearing] = useState(false);
@@ -74,7 +74,7 @@ export function IntegrationTabs({
     handleWebhookSetupComplete,
     // Need refetch function from the hook to update list after delete/logout
     refetch: refetchInstances, // Assuming the hook exposes a refetch function for instances
-  } = useIntegrationConnectionState(selectedIntegration, open, tenantId); // Pass tenantId to the hook
+  } = useIntegrationConnectionState(selectedIntegration, open, profileId); // Pass profileId to the hook
 
   // --- End hook call ---
 
