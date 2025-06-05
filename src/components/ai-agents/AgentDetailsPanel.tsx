@@ -45,8 +45,8 @@ const AgentDetailsPanel: React.FC<AgentDetailsPanelProps> = ({ selectedAgentId, 
   const [selectedIntegrationIds, setSelectedIntegrationIds] = useState<string[]>([]);
   const [isEnabled, setIsEnabled] = useState<boolean>(true);
   const [activationMode, setActivationMode] = useState<'keyword' | 'always_on'>('keyword'); // Added state for activation mode
-  const [agentType, setAgentType] = useState<'chattalyst' | 'n8n'>('chattalyst'); // Added state for agent type
-  const [n8nWebhookUrl, setN8nWebhookUrl] = useState(''); // Added state for n8n webhook URL
+  const [agentType, setAgentType] = useState<'chattalyst' | 'CustomAgent'>('chattalyst'); // Updated state for agent type
+  const [n8nWebhookUrl, setN8nWebhookUrl] = useState(''); // This will store the webhook_url from custom_agent_config
   const [formStage, setFormStage] = useState<'selectType' | 'configureDetails'>('configureDetails'); // Added state for form stage
   const [isSuggestDialogOpen, setIsSuggestDialogOpen] = useState(false);
   // --- State for Testing ---
@@ -136,8 +136,8 @@ const AgentDetailsPanel: React.FC<AgentDetailsPanelProps> = ({ selectedAgentId, 
       setSelectedIntegrationIds(selectedAgent.integration_ids || []);
       setIsEnabled(selectedAgent.is_enabled ?? true);
       setActivationMode(selectedAgent.activation_mode || 'keyword');
-      setAgentType(selectedAgent.agent_type || 'chattalyst');
-      setN8nWebhookUrl(selectedAgent.n8n_webhook_url || '');
+      setAgentType(selectedAgent.agent_type || 'chattalyst'); // DB migration already handled 'n8n' to 'CustomAgent'
+      setN8nWebhookUrl(selectedAgent.custom_agent_config?.webhook_url || ''); // Use new field
       // setSelectedReplyInstanceId(selectedAgent.reply_evolution_instance_id || null); // Removed
       setFormStage('configureDetails'); // For existing agents, go straight to details
     } else if (!selectedAgentId) {
@@ -149,7 +149,7 @@ const AgentDetailsPanel: React.FC<AgentDetailsPanelProps> = ({ selectedAgentId, 
       setSelectedIntegrationIds([]);
       setIsEnabled(true);
       setActivationMode('keyword');
-      setAgentType('chattalyst');
+      setAgentType('chattalyst'); // Default for new agent
       setN8nWebhookUrl('');
       // setSelectedReplyInstanceId(null); // Removed
       setFormStage('selectType'); // For new agents, start with type selection
@@ -303,8 +303,8 @@ const AgentDetailsPanel: React.FC<AgentDetailsPanelProps> = ({ selectedAgentId, 
         toast({ variant: "destructive", title: "Validation Error", description: "System prompt is required for Chattalyst agents." });
         return;
       }
-      if (agentType === 'n8n' && !n8nWebhookUrl.trim()) {
-        toast({ variant: "destructive", title: "Validation Error", description: "N8n Webhook URL is required for N8n agents." });
+      if (agentType === 'CustomAgent' && !n8nWebhookUrl.trim()) {
+        toast({ variant: "destructive", title: "Validation Error", description: "Webhook URL is required for Custom Agents." });
         return;
       }
 
@@ -316,8 +316,8 @@ const AgentDetailsPanel: React.FC<AgentDetailsPanelProps> = ({ selectedAgentId, 
         integration_ids: selectedIntegrationIds.length > 0 ? selectedIntegrationIds : [],
         is_enabled: isEnabled,
         activation_mode: activationMode,
-        agent_type: agentType,
-        n8n_webhook_url: agentType === 'n8n' ? n8nWebhookUrl.trim() : null,
+        agent_type: agentType, // Will be 'chattalyst' or 'CustomAgent'
+        custom_agent_config: agentType === 'CustomAgent' ? { webhook_url: n8nWebhookUrl.trim() } : null,
         // reply_evolution_instance_id: selectedReplyInstanceId, // Removed
       };
       createMutation.mutate(agentData);
@@ -332,8 +332,8 @@ const AgentDetailsPanel: React.FC<AgentDetailsPanelProps> = ({ selectedAgentId, 
         toast({ variant: "destructive", title: "Validation Error", description: "System prompt is required for Chattalyst agents." });
         return;
       }
-      if (agentType === 'n8n' && !n8nWebhookUrl.trim()) {
-        toast({ variant: "destructive", title: "Validation Error", description: "N8n Webhook URL is required for N8n agents." });
+      if (agentType === 'CustomAgent' && !n8nWebhookUrl.trim()) {
+        toast({ variant: "destructive", title: "Validation Error", description: "Webhook URL is required for Custom Agents." });
         return;
       }
 
@@ -345,8 +345,8 @@ const AgentDetailsPanel: React.FC<AgentDetailsPanelProps> = ({ selectedAgentId, 
         integration_ids: selectedIntegrationIds.length > 0 ? selectedIntegrationIds : [],
         is_enabled: isEnabled,
         activation_mode: activationMode,
-        agent_type: agentType,
-        n8n_webhook_url: agentType === 'n8n' ? n8nWebhookUrl.trim() : null,
+        agent_type: agentType, // Will be 'chattalyst' or 'CustomAgent'
+        custom_agent_config: agentType === 'CustomAgent' ? { webhook_url: n8nWebhookUrl.trim() } : null,
         // reply_evolution_instance_id: selectedReplyInstanceId, // Removed
       };
 
@@ -460,7 +460,7 @@ const AgentDetailsPanel: React.FC<AgentDetailsPanelProps> = ({ selectedAgentId, 
          <RadioGroup
            value={agentType}
            // onValueChange should not be active for existing agents if type is immutable
-           // onValueChange={(value: 'chattalyst' | 'n8n') => setAgentType(value)} 
+           // onValueChange={(value: 'chattalyst' | 'CustomAgent') => setAgentType(value)} 
            className="flex space-x-4"
            // Disable this field for existing agents
            disabled={!isCreating || updateMutation.isPending || isLoadingAgent}
@@ -470,8 +470,8 @@ const AgentDetailsPanel: React.FC<AgentDetailsPanelProps> = ({ selectedAgentId, 
              <Label htmlFor="type-chattalyst" className="font-normal">Chattalyst Agent</Label>
            </div>
            <div className="flex items-center space-x-2">
-             <RadioGroupItem value="n8n" id="type-n8n" />
-             <Label htmlFor="type-n8n" className="font-normal">N8n Agent</Label>
+             <RadioGroupItem value="CustomAgent" id="type-custom" />
+             <Label htmlFor="type-custom" className="font-normal">Custom Agent</Label>
            </div>
          </RadioGroup>
          <p className="text-sm text-muted-foreground">
@@ -530,18 +530,18 @@ const AgentDetailsPanel: React.FC<AgentDetailsPanelProps> = ({ selectedAgentId, 
       </div>
         </>
       )}
-      {agentType === 'n8n' && (
+      {agentType === 'CustomAgent' && (
         <div className="space-y-2">
-          <Label htmlFor="n8n-webhook-url">N8n Webhook URL</Label>
+          <Label htmlFor="custom-agent-webhook-url">Webhook URL</Label>
           <Input
-            id="n8n-webhook-url"
-            value={n8nWebhookUrl}
+            id="custom-agent-webhook-url"
+            value={n8nWebhookUrl} // State still named n8nWebhookUrl, but represents generic webhook
             onChange={(e) => setN8nWebhookUrl(e.target.value)}
-            placeholder="Enter your n8n webhook URL"
+            placeholder="Enter your webhook URL"
             disabled={isCreating || updateMutation.isPending || isLoadingAgent}
           />
           <p className="text-sm text-muted-foreground">
-            The webhook URL your n8n workflow will receive requests at.
+            The webhook URL your custom agent will receive requests at.
           </p>
         </div>
       )}
@@ -681,18 +681,18 @@ const AgentDetailsPanel: React.FC<AgentDetailsPanelProps> = ({ selectedAgentId, 
       </div>
          </>
        )}
-       {agentType === 'n8n' && (
+       {agentType === 'CustomAgent' && (
         <div className="space-y-2">
-          <Label htmlFor="n8n-webhook-url-create">N8n Webhook URL</Label>
+          <Label htmlFor="custom-agent-webhook-url-create">Webhook URL</Label>
           <Input
-            id="n8n-webhook-url-create"
-            value={n8nWebhookUrl}
+            id="custom-agent-webhook-url-create"
+            value={n8nWebhookUrl} // State still named n8nWebhookUrl
             onChange={(e) => setN8nWebhookUrl(e.target.value)}
-            placeholder="Enter your n8n webhook URL"
+            placeholder="Enter your webhook URL"
             disabled={createMutation.isPending}
           />
           <p className="text-sm text-muted-foreground">
-            The webhook URL your n8n workflow will receive requests at.
+            The webhook URL your custom agent will receive requests at.
           </p>
         </div>
        )}
@@ -856,7 +856,7 @@ const AgentDetailsPanel: React.FC<AgentDetailsPanelProps> = ({ selectedAgentId, 
         <Label>Select Agent Type</Label>
         <RadioGroup
           value={agentType}
-          onValueChange={(value: 'chattalyst' | 'n8n') => setAgentType(value)}
+          onValueChange={(value: 'chattalyst' | 'CustomAgent') => setAgentType(value)}
           className="flex space-x-4"
         >
           <div className="flex items-center space-x-2">
@@ -864,8 +864,8 @@ const AgentDetailsPanel: React.FC<AgentDetailsPanelProps> = ({ selectedAgentId, 
             <Label htmlFor="type-chattalyst-select" className="font-normal">Chattalyst Agent</Label>
           </div>
           <div className="flex items-center space-x-2">
-            <RadioGroupItem value="n8n" id="type-n8n-select" />
-            <Label htmlFor="type-n8n-select" className="font-normal">N8n Agent</Label>
+            <RadioGroupItem value="CustomAgent" id="type-custom-select" />
+            <Label htmlFor="type-custom-select" className="font-normal">Custom Agent</Label>
           </div>
         </RadioGroup>
         <p className="text-sm text-muted-foreground">

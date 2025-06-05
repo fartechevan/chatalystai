@@ -86,8 +86,8 @@ serve(async (req) => {
     // Define a simple type for AI Agent data needed here
     interface ActiveAIAgent {
       id: string;
-      agent_type: 'chattalyst' | 'n8n';
-      n8n_webhook_url: string | null;
+      agent_type: 'chattalyst' | 'CustomAgent'; // Updated
+      custom_agent_config: { webhook_url?: string; [key: string]: string | number | boolean | null | undefined; } | null; // Updated for ESLint
       keyword_trigger: string | null;
       activation_mode: 'keyword' | 'always_on' | null;
       // reply_evolution_instance_id is removed, reply will use incoming instance
@@ -98,7 +98,7 @@ serve(async (req) => {
       try {
         const { data: activeAgents, error: agentFetchError } = await supabaseClient
           .from('ai_agents')
-          .select('id, agent_type, n8n_webhook_url, keyword_trigger, activation_mode') // Removed reply_evolution_instance_id
+          .select('id, agent_type, custom_agent_config, keyword_trigger, activation_mode') // Updated
           .eq('is_enabled', true)
           .order('created_at', { ascending: true }); // Process older agents first or define priority
 
@@ -169,38 +169,39 @@ serve(async (req) => {
                   // If responseValue was undefined or null, agentReplyText is correctly null.
                 }
               }
-            } else if (matchedAgent.agent_type === 'n8n' && matchedAgent.n8n_webhook_url) {
-              console.log(`[${requestId}] Forwarding to N8N agent webhook: ${matchedAgent.n8n_webhook_url}`);
+            } else if (matchedAgent.agent_type === 'CustomAgent' && matchedAgent.custom_agent_config?.webhook_url) {
+              const webhookUrl = matchedAgent.custom_agent_config.webhook_url;
+              console.log(`[${requestId}] Forwarding to Custom Agent webhook: ${webhookUrl}`);
               const formData = new FormData();
               formData.append('message', messageContent);
               formData.append('phone_number', phoneNumber); // Extracted earlier
 
-              const n8nAgentResponse = await fetch(matchedAgent.n8n_webhook_url, {
+              const customAgentResponse = await fetch(webhookUrl, {
                 method: 'POST',
                 body: formData,
               });
 
-              let n8nAgentResponseData: N8nAgentResponse; // Uses N8nAgentResponse from higher scope
-              const contentType = n8nAgentResponse.headers.get("content-type");
+              let customAgentResponseData: N8nAgentResponse; // Uses N8nAgentResponse type for structure
+              const contentType = customAgentResponse.headers.get("content-type");
               if (contentType && contentType.includes("application/json")) {
-                n8nAgentResponseData = await n8nAgentResponse.json() as N8nAgentResponse;
+                customAgentResponseData = await customAgentResponse.json() as N8nAgentResponse;
               } else {
-                const textResponse = await n8nAgentResponse.text();
+                const textResponse = await customAgentResponse.text();
                 try { 
-                  n8nAgentResponseData = JSON.parse(textResponse) as N8nAgentResponse; 
+                  customAgentResponseData = JSON.parse(textResponse) as N8nAgentResponse; 
                 } catch (e) { 
-                  if (typeof textResponse === 'string') n8nAgentResponseData = { output: textResponse };
-                  else n8nAgentResponseData = { output: "Received non-JSON response from N8N Agent", raw: textResponse };
+                  if (typeof textResponse === 'string') customAgentResponseData = { output: textResponse };
+                  else customAgentResponseData = { output: "Received non-JSON response from Custom Agent", raw: textResponse };
                 }
               }
-              console.log(`[${requestId}] Response from N8N Agent:`, n8nAgentResponseData);
-              agentReplyText = n8nAgentResponseData?.output ?? null; // Converts undefined to null
+              console.log(`[${requestId}] Response from Custom Agent:`, customAgentResponseData);
+              agentReplyText = customAgentResponseData?.output ?? null; // Converts undefined to null
               if (!agentReplyText) { // This check is now for if it's null (after being undefined or explicitly null)
-                 agentProcessingError = "N8N Agent did not return an 'output' field or it was null.";
+                 agentProcessingError = "Custom Agent did not return an 'output' field or it was null.";
                  console.warn(`[${requestId}] ${agentProcessingError}`);
               }
             } else {
-               agentProcessingError = `Agent type ${matchedAgent.agent_type} not supported or n8n_webhook_url missing.`;
+               agentProcessingError = `Agent type ${matchedAgent.agent_type} not supported or custom_agent_config.webhook_url missing.`;
                console.warn(`[${requestId}] ${agentProcessingError}`);
             }
 

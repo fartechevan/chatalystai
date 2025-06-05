@@ -24,7 +24,18 @@ export type ContactEntry = {
   // Add any other fields from 'customers' table you might use, even if not directly in columns
 };
 
-export const columns: ColumnDef<ContactEntry>[] = [
+// Define the type for the onDeleteContact function
+type OnDeleteContactHandler = (id: string) => Promise<void>;
+// Define the type for the onEditContact function
+type OnEditContactHandler = (contact: ContactEntry) => void;
+// Define the type for the onViewContact function
+type OnViewContactHandler = (contact: ContactEntry) => void;
+
+export const getColumns = (
+  onDeleteContact: OnDeleteContactHandler,
+  onEditContact: OnEditContactHandler,
+  onViewContact: OnViewContactHandler // Add onViewContact parameter
+): ColumnDef<ContactEntry>[] => [
   // If row selection is needed:
   // {
   //   id: "select",
@@ -117,9 +128,18 @@ export const columns: ColumnDef<ContactEntry>[] = [
               Copy contact ID
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem>View contact</DropdownMenuItem> {/* Placeholder */}
-            <DropdownMenuItem>Edit contact</DropdownMenuItem> {/* Placeholder */}
-            <DropdownMenuItem className="text-red-600">Delete contact</DropdownMenuItem> {/* Placeholder */}
+            <DropdownMenuItem onClick={() => onViewContact(contact)}>
+              View contact
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => onEditContact(contact)}>
+              Edit contact
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              className="text-red-600 hover:text-red-700 focus:text-red-700"
+              onClick={() => onDeleteContact(contact.id)}
+            >
+              Delete contact
+            </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
       );
