@@ -57,12 +57,12 @@ function hasResponseError(obj: unknown): obj is ApiErrorWithResponse {
 export function useIntegrationConnectionState(
   selectedIntegration: Integration | null,
   open: boolean,
-  tenantId: string | null, // Added tenantId parameter
+  profileId: string | null, // Changed tenantId to profileId
   onConnectionEstablished?: () => void // Make it optional for safety
 ) {
   useEffect(() => {
-    console.log(`[DEBUG DUPLICATE CHECK][useIntegrationConnectionState] Hook initialized/props updated. tenantId prop value:`, tenantId);
-  }, [tenantId]);
+    console.log(`[DEBUG DUPLICATE CHECK][useIntegrationConnectionState] Hook initialized/props updated. profileId prop value:`, profileId);
+  }, [profileId]);
   const [integrationMainPopup, setIntegrationMainPopup] = useState(true);
   const [showDeviceSelect, setShowDeviceSelect] = useState(false);
   const [isConnected, setIsConnected] = useState(false); // Represents if connection was ever 'open'
@@ -247,7 +247,7 @@ export function useIntegrationConnectionState(
       // --- BEGIN: Insert fetched instances into integrations_config ---
       if (validInstances.length > 0) {
         console.log("[refetchInstances] Inserting fetched instances into DB...");
-        console.log(`[DEBUG DUPLICATE CHECK][refetchInstances] Preparing to insert/update ${validInstances.length} instances. Current tenantId for these operations:`, tenantId);
+        console.log(`[DEBUG DUPLICATE CHECK][refetchInstances] Preparing to insert/update ${validInstances.length} instances. Current profileId for these operations:`, profileId);
         const insertPromises = validInstances.map(async (instance) => {
           const instanceId = instance.id;
           const instanceDisplayName = instance.name;
@@ -263,13 +263,13 @@ export function useIntegrationConnectionState(
               user_reference_id: userReferenceId,
               pipeline_id: currentPipelineId || null,
               token: instance.token,
-              tenant_id: tenantId,
+              profile_id: profileId, // Changed tenant_id to profile_id
             };
-            console.log(`[DEBUG DUPLICATE CHECK][refetchInstances] Attempting to call upsert_integration_config RPC for instance_id: ${instanceId}, tenant_id: ${tenantId}.`);
+            console.log(`[DEBUG DUPLICATE CHECK][refetchInstances] Attempting to call upsert_integration_config RPC for instance_id: ${instanceId}, profile_id: ${profileId}.`);
             const rpcArgs = {
               p_integration_id: integrationId,
               p_instance_id: instanceId,
-              p_tenant_id: tenantId,
+              p_profile_id: profileId, // Changed p_tenant_id to p_profile_id
               p_instance_display_name: instanceDisplayName,
               p_token: instance.token,
               p_owner_id: ownerId,
@@ -281,9 +281,9 @@ export function useIntegrationConnectionState(
             const { error: rpcError } = await supabase.rpc('upsert_integration_config', rpcArgs);
 
             if (rpcError) {
-              console.error(`[DEBUG DUPLICATE CHECK][refetchInstances] ERROR calling upsert_integration_config RPC for instance ${instanceId} (tenant: ${tenantId}):`, rpcError, 'Args were:', rpcArgs);
+              console.error(`[DEBUG DUPLICATE CHECK][refetchInstances] ERROR calling upsert_integration_config RPC for instance ${instanceId} (profile: ${profileId}):`, rpcError, 'Args were:', rpcArgs);
             } else {
-               console.log(`[refetchInstances] Successfully called upsert_integration_config RPC for instance ${instanceId} (tenant: ${tenantId}).`);
+               console.log(`[refetchInstances] Successfully called upsert_integration_config RPC for instance ${instanceId} (profile: ${profileId}).`);
             }
           } catch (err) {
             console.error(`[refetchInstances] Exception during insert for instance ${instanceId}:`, err);
@@ -295,52 +295,52 @@ export function useIntegrationConnectionState(
         // --- BEGIN: Delete stale instances from DB ---
         if (validInstances.length > 0) { // Only run deletion if we have a valid list of live instances
           const liveInstanceIds = validInstances.map(inst => inst.id);
-          console.log(`[refetchInstances] Live instance IDs from API for integration ${integrationId} (tenant: ${tenantId}):`, liveInstanceIds);
+          console.log(`[refetchInstances] Live instance IDs from API for integration ${integrationId} (profile: ${profileId}):`, liveInstanceIds);
 
           const { data: dbInstances, error: fetchDbError } = await supabase
             .from('integrations_config')
             .select('instance_id')
             .eq('integration_id', integrationId)
-            .eq('tenant_id', tenantId); // Ensure we only check against the current tenant
+            .eq('profile_id', profileId); // Ensure we only check against the current profile
 
           if (fetchDbError) {
             console.error(`[refetchInstances] Error fetching DB instance_ids for deletion check:`, fetchDbError);
           } else if (dbInstances) {
             const dbInstanceIds = dbInstances.map(dbInst => dbInst.instance_id).filter(id => id !== null) as string[];
-            console.log(`[refetchInstances] DB instance IDs for integration ${integrationId} (tenant: ${tenantId}):`, dbInstanceIds);
+            console.log(`[refetchInstances] DB instance IDs for integration ${integrationId} (profile: ${profileId}):`, dbInstanceIds);
             
             const staleInstanceIds = dbInstanceIds.filter(dbId => !liveInstanceIds.includes(dbId));
 
             if (staleInstanceIds.length > 0) {
-              console.log(`[refetchInstances] Stale instance IDs to delete for integration ${integrationId} (tenant: ${tenantId}):`, staleInstanceIds);
+              console.log(`[refetchInstances] Stale instance IDs to delete for integration ${integrationId} (profile: ${profileId}):`, staleInstanceIds);
               const { error: deleteError } = await supabase
                 .from('integrations_config')
                 .delete()
                 .eq('integration_id', integrationId)
-                .eq('tenant_id', tenantId)
+                .eq('profile_id', profileId) // Changed tenant_id to profile_id
                 .in('instance_id', staleInstanceIds);
 
               if (deleteError) {
-                console.error(`[refetchInstances] Error deleting stale instances for integration ${integrationId} (tenant: ${tenantId}):`, deleteError);
+                console.error(`[refetchInstances] Error deleting stale instances for integration ${integrationId} (profile: ${profileId}):`, deleteError);
               } else {
-                console.log(`[refetchInstances] Successfully deleted ${staleInstanceIds.length} stale instances for integration ${integrationId} (tenant: ${tenantId}).`);
+                console.log(`[refetchInstances] Successfully deleted ${staleInstanceIds.length} stale instances for integration ${integrationId} (profile: ${profileId}).`);
               }
             } else {
-              console.log(`[refetchInstances] No stale instances to delete for integration ${integrationId} (tenant: ${tenantId}).`);
+              console.log(`[refetchInstances] No stale instances to delete for integration ${integrationId} (profile: ${profileId}).`);
             }
           }
-        } else { // If validInstances is empty, it implies all existing instances for this integration_id/tenant_id might be stale
-            console.log(`[refetchInstances] API returned no live instances for integration ${integrationId} (tenant: ${tenantId}). Deleting all associated DB instances.`);
+        } else { // If validInstances is empty, it implies all existing instances for this integration_id/profile_id might be stale
+            console.log(`[refetchInstances] API returned no live instances for integration ${integrationId} (profile: ${profileId}). Deleting all associated DB instances.`);
             const { error: deleteAllError } = await supabase
                 .from('integrations_config')
                 .delete()
                 .eq('integration_id', integrationId)
-                .eq('tenant_id', tenantId); // Make sure to scope by tenant_id
+                .eq('profile_id', profileId); // Make sure to scope by profile_id
 
             if (deleteAllError) {
-                console.error(`[refetchInstances] Error deleting all instances for integration ${integrationId} (tenant: ${tenantId}) when API returned none:`, deleteAllError);
+                console.error(`[refetchInstances] Error deleting all instances for integration ${integrationId} (profile: ${profileId}) when API returned none:`, deleteAllError);
             } else {
-                console.log(`[refetchInstances] Successfully deleted all instances for integration ${integrationId} (tenant: ${tenantId}) as API returned none.`);
+                console.log(`[refetchInstances] Successfully deleted all instances for integration ${integrationId} (profile: ${profileId}) as API returned none.`);
             }
         }
         // --- END: Delete stale instances from DB ---
@@ -360,7 +360,7 @@ export function useIntegrationConnectionState(
     } finally {
       setIsFetchingInstances(false);
     }
-  }, [selectedIntegration?.id, selectedInstanceName, tenantId, currentPipelineId, config]); // Dependency array is correct
+  }, [selectedIntegration?.id, selectedInstanceName, profileId, currentPipelineId, config]); // Dependency array is correct
 
 
   // --- Instance Fetching ---
@@ -382,7 +382,7 @@ export function useIntegrationConnectionState(
       // --- BEGIN: Insert fetched instances into integrations_config ---
       if (validInstances.length > 0) {
         console.log("[fetchInstancesAndSetState] Inserting fetched instances into DB...");
-        console.log(`[DEBUG DUPLICATE CHECK][fetchInstancesAndSetState] Preparing to insert/update ${validInstances.length} instances. Current tenantId for these operations:`, tenantId);
+        console.log(`[DEBUG DUPLICATE CHECK][fetchInstancesAndSetState] Preparing to insert/update ${validInstances.length} instances. Current profileId for these operations:`, profileId);
         const insertPromises = validInstances.map(async (instance) => {
           const instanceId = instance.id;
           const instanceDisplayName = instance.name;
@@ -398,13 +398,13 @@ export function useIntegrationConnectionState(
               user_reference_id: userReferenceId,
               pipeline_id: currentPipelineId || null,
               token: instance.token,
-              tenant_id: tenantId,
+              profile_id: profileId, // Changed tenant_id to profile_id
             };
-            console.log(`[DEBUG DUPLICATE CHECK][fetchInstancesAndSetState] Attempting to call upsert_integration_config RPC for instance_id: ${instanceId}, tenant_id: ${tenantId}.`);
+            console.log(`[DEBUG DUPLICATE CHECK][fetchInstancesAndSetState] Attempting to call upsert_integration_config RPC for instance_id: ${instanceId}, profile_id: ${profileId}.`);
             const rpcArgs = {
               p_integration_id: integrationId,
               p_instance_id: instanceId,
-              p_tenant_id: tenantId,
+              p_profile_id: profileId, // Changed p_tenant_id to p_profile_id
               p_instance_display_name: instanceDisplayName,
               p_token: instance.token,
               p_owner_id: ownerId,
@@ -416,9 +416,9 @@ export function useIntegrationConnectionState(
             const { error: rpcError } = await supabase.rpc('upsert_integration_config', rpcArgs);
 
             if (rpcError) {
-              console.error(`[DEBUG DUPLICATE CHECK][fetchInstancesAndSetState] ERROR calling upsert_integration_config RPC for instance ${instanceId} (tenant: ${tenantId}):`, rpcError, 'Args were:', rpcArgs);
+              console.error(`[DEBUG DUPLICATE CHECK][fetchInstancesAndSetState] ERROR calling upsert_integration_config RPC for instance ${instanceId} (profile: ${profileId}):`, rpcError, 'Args were:', rpcArgs);
             } else {
-               console.log(`[fetchInstancesAndSetState] Successfully called upsert_integration_config RPC for instance ${instanceId} (tenant: ${tenantId}).`);
+               console.log(`[fetchInstancesAndSetState] Successfully called upsert_integration_config RPC for instance ${instanceId} (profile: ${profileId}).`);
             }
           } catch (err) {
             console.error(`[fetchInstancesAndSetState] Exception during insert for instance ${instanceId}:`, err);
@@ -430,52 +430,52 @@ export function useIntegrationConnectionState(
         // --- BEGIN: Delete stale instances from DB ---
         if (validInstances.length > 0) { // Only run deletion if we have a valid list of live instances
           const liveInstanceIds = validInstances.map(inst => inst.id);
-          console.log(`[fetchInstancesAndSetState] Live instance IDs from API for integration ${integrationId} (tenant: ${tenantId}):`, liveInstanceIds);
+          console.log(`[fetchInstancesAndSetState] Live instance IDs from API for integration ${integrationId} (profile: ${profileId}):`, liveInstanceIds);
 
           const { data: dbInstances, error: fetchDbError } = await supabase
             .from('integrations_config')
             .select('instance_id')
             .eq('integration_id', integrationId)
-            .eq('tenant_id', tenantId); // Ensure we only check against the current tenant
+            .eq('profile_id', profileId); // Ensure we only check against the current profile
 
           if (fetchDbError) {
             console.error(`[fetchInstancesAndSetState] Error fetching DB instance_ids for deletion check:`, fetchDbError);
           } else if (dbInstances) {
             const dbInstanceIds = dbInstances.map(dbInst => dbInst.instance_id).filter(id => id !== null) as string[];
-            console.log(`[fetchInstancesAndSetState] DB instance IDs for integration ${integrationId} (tenant: ${tenantId}):`, dbInstanceIds);
+            console.log(`[fetchInstancesAndSetState] DB instance IDs for integration ${integrationId} (profile: ${profileId}):`, dbInstanceIds);
 
             const staleInstanceIds = dbInstanceIds.filter(dbId => !liveInstanceIds.includes(dbId));
 
             if (staleInstanceIds.length > 0) {
-              console.log(`[fetchInstancesAndSetState] Stale instance IDs to delete for integration ${integrationId} (tenant: ${tenantId}):`, staleInstanceIds);
+              console.log(`[fetchInstancesAndSetState] Stale instance IDs to delete for integration ${integrationId} (profile: ${profileId}):`, staleInstanceIds);
               const { error: deleteError } = await supabase
                 .from('integrations_config')
                 .delete()
                 .eq('integration_id', integrationId)
-                .eq('tenant_id', tenantId)
+                .eq('profile_id', profileId) // Changed tenant_id to profile_id
                 .in('instance_id', staleInstanceIds);
 
               if (deleteError) {
-                console.error(`[fetchInstancesAndSetState] Error deleting stale instances for integration ${integrationId} (tenant: ${tenantId}):`, deleteError);
+                console.error(`[fetchInstancesAndSetState] Error deleting stale instances for integration ${integrationId} (profile: ${profileId}):`, deleteError);
               } else {
-                console.log(`[fetchInstancesAndSetState] Successfully deleted ${staleInstanceIds.length} stale instances for integration ${integrationId} (tenant: ${tenantId}).`);
+                console.log(`[fetchInstancesAndSetState] Successfully deleted ${staleInstanceIds.length} stale instances for integration ${integrationId} (profile: ${profileId}).`);
               }
             } else {
-              console.log(`[fetchInstancesAndSetState] No stale instances to delete for integration ${integrationId} (tenant: ${tenantId}).`);
+              console.log(`[fetchInstancesAndSetState] No stale instances to delete for integration ${integrationId} (profile: ${profileId}).`);
             }
           }
-        } else { // If validInstances is empty, it implies all existing instances for this integration_id/tenant_id might be stale
-            console.log(`[fetchInstancesAndSetState] API returned no live instances for integration ${integrationId} (tenant: ${tenantId}). Deleting all associated DB instances.`);
+        } else { // If validInstances is empty, it implies all existing instances for this integration_id/profile_id might be stale
+            console.log(`[fetchInstancesAndSetState] API returned no live instances for integration ${integrationId} (profile: ${profileId}). Deleting all associated DB instances.`);
             const { error: deleteAllError } = await supabase
                 .from('integrations_config')
                 .delete()
                 .eq('integration_id', integrationId)
-                .eq('tenant_id', tenantId); // Make sure to scope by tenant_id
+                .eq('profile_id', profileId); // Make sure to scope by profile_id
 
             if (deleteAllError) {
-                console.error(`[fetchInstancesAndSetState] Error deleting all instances for integration ${integrationId} (tenant: ${tenantId}) when API returned none:`, deleteAllError);
+                console.error(`[fetchInstancesAndSetState] Error deleting all instances for integration ${integrationId} (profile: ${profileId}) when API returned none:`, deleteAllError);
             } else {
-                console.log(`[fetchInstancesAndSetState] Successfully deleted all instances for integration ${integrationId} (tenant: ${tenantId}) as API returned none.`);
+                console.log(`[fetchInstancesAndSetState] Successfully deleted all instances for integration ${integrationId} (profile: ${profileId}) as API returned none.`);
             }
         }
         // --- END: Delete stale instances from DB ---
@@ -528,7 +528,7 @@ export function useIntegrationConnectionState(
     } finally {
       setIsFetchingInstances(false);
     }
-  }, [selectedInstanceName, localConnectionState, tenantId, currentPipelineId, config]); // Dependency array is correct
+  }, [selectedInstanceName, localConnectionState, profileId, currentPipelineId, config]); // Dependency array is correct
 
 
   // --- Effects ---
@@ -536,8 +536,8 @@ export function useIntegrationConnectionState(
   // Effect to fetch integration limits
   useEffect(() => {
     const fetchIntegrationLimits = async () => {
-      if (!open || !tenantId) {
-        setCanAddMoreIntegrations(true); // Reset if not open or no tenantId
+      if (!open || !profileId) { // Changed tenantId to profileId
+        setCanAddMoreIntegrations(true); // Reset if not open or no profileId
         setCurrentIntegrationCount(0);
         setMaxIntegrationsAllowed(null);
         return;
@@ -545,51 +545,33 @@ export function useIntegrationConnectionState(
 
       setIsLoading(true);
       try {
-        // 1. Get current integration count for the tenant
+        // 1. Get current integration count for the profile
         const { count: integrationsCount, error: countError } = await supabase
           .from('integrations_config')
           .select('*', { count: 'exact', head: true })
-          .eq('tenant_id', tenantId);
+          .eq('profile_id', profileId); // Changed tenant_id to profile_id
 
         if (countError) throw countError;
         setCurrentIntegrationCount(integrationsCount ?? 0);
 
-        // 2. Get allowed integrations from plan
-        const { data: tenantDataUntyped, error: tenantError } = await supabase
-          .from('tenants')
-          .select('profile_id') // Fetch profile_id from tenants
-          .eq('id', tenantId)
+        // 2. Get allowed integrations from plan (linked to profile via subscriptions)
+        const { data: subscriptionData, error: subscriptionError } = await supabase
+          .from('subscriptions')
+          .select('plan_id, plans ( integrations_allowed )')
+          .eq('profile_id', profileId) // Use profileId directly
+          .eq('status', 'active')
           .single();
-        
-        // Cast to unknown first, then to the expected shape, to bypass stricter type checking
-        // This assumes 'profile_id' exists at runtime despite potential stale Supabase types.
-        const tenantData = tenantDataUntyped as unknown as ({ profile_id: string | null } | null);
 
-        if (tenantError || !tenantData || !tenantData.profile_id) {
-          // If tenant not found or profile_id is null (either from DB or due to type issue)
-          console.warn('Tenant not found, or profile_id is missing/null. Assuming no specific integration limit from plan.', { tenantError, tenantDataFromQuery: tenantDataUntyped });
-          setMaxIntegrationsAllowed(null); 
+        if (subscriptionError || !subscriptionData || !subscriptionData.plans) {
+          console.warn('No active subscription with plan details found for this profile, or integrations_allowed not set on plan.', { subscriptionError, subscriptionData });
+          setMaxIntegrationsAllowed(null);
           setCanAddMoreIntegrations(true);
         } else {
-          // Now use tenantData.profile_id (which should be a string due to the !tenantData.profile_id check)
-          const { data: subscriptionData, error: subscriptionError } = await supabase
-            .from('subscriptions')
-            .select('plan_id, plans ( integrations_allowed )')
-            .eq('profile_id', tenantData.profile_id) // Link subscriptions via profile_id
-            .eq('status', 'active') 
-            .single();
-
-          if (subscriptionError || !subscriptionData || !subscriptionData.plans) {
-            console.warn('No active subscription with plan details found for this profile, or integrations_allowed not set on plan.', { subscriptionError, subscriptionData });
-            setMaxIntegrationsAllowed(null); 
-            setCanAddMoreIntegrations(true); 
+          setMaxIntegrationsAllowed(subscriptionData.plans.integrations_allowed);
+          if (subscriptionData.plans.integrations_allowed !== null) {
+            setCanAddMoreIntegrations((integrationsCount ?? 0) < subscriptionData.plans.integrations_allowed);
           } else {
-            setMaxIntegrationsAllowed(subscriptionData.plans.integrations_allowed);
-            if (subscriptionData.plans.integrations_allowed !== null) {
-              setCanAddMoreIntegrations((integrationsCount ?? 0) < subscriptionData.plans.integrations_allowed);
-            } else {
-              setCanAddMoreIntegrations(true); // null integrations_allowed means unlimited
-            }
+            setCanAddMoreIntegrations(true); // null integrations_allowed means unlimited
           }
         }
       } catch (error) {
@@ -600,7 +582,7 @@ export function useIntegrationConnectionState(
           variant: "destructive",
         });
         // Default to allowing addition on error to not block user, or set to false for stricter control
-        setCanAddMoreIntegrations(true); 
+        setCanAddMoreIntegrations(true);
         setMaxIntegrationsAllowed(null);
       } finally {
         setIsLoading(false);
@@ -608,7 +590,7 @@ export function useIntegrationConnectionState(
     };
 
     fetchIntegrationLimits();
-  }, [open, tenantId, selectedIntegration?.id]); // Re-run if dialog opens, tenant changes, or selectedIntegration changes (as it might trigger other logic)
+  }, [open, profileId, selectedIntegration?.id]); // Re-run if dialog opens, profile changes, or selectedIntegration changes
 
 
   // Initial fetch on dialog open
