@@ -10,8 +10,8 @@ export interface AIAgent {
   integration_ids?: string[]; // Optional array of integration IDs linked to this agent
   is_enabled?: boolean; // Added: Whether the agent is globally enabled
   activation_mode?: 'keyword' | 'always_on'; // Added: How the agent activates
-  agent_type: 'chattalyst' | 'n8n'; // Added: Type of agent
-  n8n_webhook_url?: string | null; // Added: Webhook URL for n8n agents
+  agent_type: 'chattalyst' | 'CustomAgent'; // Updated: Type of agent
+  custom_agent_config?: { webhook_url?: string; [key: string]: string | number | boolean | null | undefined; } | null; // Added: Configuration for CustomAgent type
   created_at: string; // Timestamp of creation
   updated_at: string; // Timestamp of last update
   // Add any other relevant fields as needed, e.g., user_id, organization_id

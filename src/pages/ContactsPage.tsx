@@ -19,8 +19,11 @@ import {
 } from "@tanstack/react-table";
 
 import { ContactsDataTable } from '@/components/contacts/list/ContactsDataTable';
-import { columns, ContactEntry } from '@/components/contacts/list/columns';
+// import { columns, ContactEntry } from '@/components/contacts/list/columns'; // Will be replaced by getColumns
+import { getColumns, ContactEntry } from '@/components/contacts/list/columns'; // Import getColumns
 import { CreateContactDialog } from '@/components/contacts/CreateContactDialog'; // Import the dialog
+import { EditContactDialog } from '@/components/contacts/EditContactDialog'; // Import the Edit dialog
+import { ViewContactDialog } from '@/components/contacts/ViewContactDialog'; // Import the View dialog
 
 // Define JsonValue type locally
 type JsonPrimitive = string | number | boolean | null;
@@ -51,13 +54,59 @@ const ContactsPage: React.FC = () => {
   
   // State for TanStack Table
   const [globalFilter, setGlobalFilter] = useState('');
-  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false); // State for dialog
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false); // State for create dialog
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false); // State for edit dialog
+  const [editingContact, setEditingContact] = useState<ContactEntry | null>(null); // Contact to edit
+  const [isViewDialogOpen, setIsViewDialogOpen] = useState(false); // State for view dialog
+  const [viewingContact, setViewingContact] = useState<ContactEntry | null>(null); // Contact to view
   const [sorting, setSorting] = React.useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = React.useState<ColumnFiltersState>([]);
   const [columnVisibility, setColumnVisibility] = React.useState<VisibilityState>({});
   const [rowSelection, setRowSelection] = React.useState({});
 
   // const { setPrimaryAction, setSecondaryActionNode } = usePageActionContext(); // This was the duplicate, remove it. Already declared above.
+
+  const handleOpenEditDialog = (contact: ContactEntry) => {
+    setEditingContact(contact);
+    setIsEditDialogOpen(true);
+  };
+
+  const handleOpenViewDialog = (contact: ContactEntry) => {
+    setViewingContact(contact);
+    setIsViewDialogOpen(true);
+  };
+
+  const handleDeleteContact = async (contactId: string) => {
+    if (!window.confirm('Are you sure you want to delete this contact?')) {
+      return;
+    }
+    try {
+      const { error: deleteError } = await supabase
+        .from('customers')
+        .delete()
+        .match({ id: contactId });
+
+      if (deleteError) {
+        throw deleteError;
+      }
+      toast({
+        title: 'Success',
+        description: 'Contact deleted successfully.',
+      });
+      fetchCustomers(); // Refresh the list
+    } catch (err) {
+      let errorMessage = 'Failed to delete contact.';
+      if (err instanceof Error) {
+        errorMessage = err.message;
+      }
+      console.error('Error deleting contact:', err);
+      toast({
+        title: 'Error',
+        description: errorMessage,
+        variant: 'destructive',
+      });
+    }
+  };
 
   useEffect(() => {
     // Define header actions
@@ -125,6 +174,12 @@ const ContactsPage: React.FC = () => {
     // Dialog is closed by itself from within CreateContactDialog
   };
 
+  const handleEditSuccess = () => {
+    fetchCustomers(); // Refetch data on successful update
+    setIsEditDialogOpen(false); // Close dialog
+    setEditingContact(null);
+  };
+
   // Map Customer data to ContactEntry for DataTable
   const tableData: ContactEntry[] = useMemo(() => 
     allCustomers.map(customer => ({
@@ -136,9 +191,15 @@ const ContactsPage: React.FC = () => {
       // Ensure all fields required by ContactEntry or columns are mapped
     })), [allCustomers]);
 
+  // Generate columns with the delete handler
+  const columns = useMemo(
+    () => getColumns(handleDeleteContact, handleOpenEditDialog, handleOpenViewDialog),
+    [handleDeleteContact, handleOpenEditDialog, handleOpenViewDialog]
+  );
+
   const table = useReactTable({
     data: tableData,
-    columns,
+    columns, // Use the dynamically generated columns
     state: {
       sorting,
       columnVisibility,
@@ -176,6 +237,21 @@ const ContactsPage: React.FC = () => {
         onOpenChange={setIsCreateDialogOpen}
         onSuccess={handleCreateSuccess}
       />
+      {editingContact && (
+        <EditContactDialog
+          open={isEditDialogOpen}
+          onOpenChange={setIsEditDialogOpen}
+          onSuccess={handleEditSuccess}
+          contactData={editingContact}
+        />
+      )}
+      {viewingContact && (
+        <ViewContactDialog
+          open={isViewDialogOpen}
+          onOpenChange={setIsViewDialogOpen}
+          contactData={viewingContact}
+        />
+      )}
     </div>
   );
 };
