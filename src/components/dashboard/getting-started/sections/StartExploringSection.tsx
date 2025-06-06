@@ -2,7 +2,7 @@
 import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { MessageSquare, Clock, RadioTower } from "lucide-react";
+import { MessageSquare, RadioTower, UserPlus } from "lucide-react"; // Added UserPlus, removed Clock
 
 interface Feature {
   title: string;
@@ -14,18 +14,6 @@ interface Feature {
 
 const features: Feature[] = [
   {
-    title: "Create a Keyword Reply",
-    description: "Automate responses based on keywords",
-    icon: MessageSquare,
-    isAvailable: false,
-  },
-  {
-    title: "Setup an Offline Bot",
-    description: "Automatic responses when you are away",
-    icon: Clock,
-    isAvailable: false,
-  },
-  {
     title: "Send a Broadcast",
     description: "Send a message to multiple contacts",
     icon: RadioTower,
@@ -33,10 +21,18 @@ const features: Feature[] = [
     isAvailable: true,
   },
   {
-    title: "Create a Chatbot",
-    description: "Automate responses based on keywords",
-    icon: MessageSquare,
-    isAvailable: false,
+    title: "Create AI Agent",
+    description: "Build and deploy intelligent AI agents",
+    icon: MessageSquare, // Using MessageSquare as a placeholder icon
+    path: "/dashboard/ai-agents", // Assuming this path
+    isAvailable: true,
+  },
+  {
+    title: "Invite Team Member",
+    description: "Add new members to your team",
+    icon: UserPlus,
+    path: "/dashboard/settings/users", // Path to user settings/invitations
+    isAvailable: true,
   },
 ];
 
