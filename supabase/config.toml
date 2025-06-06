@@ -32,7 +32,8 @@ verify_jwt = false
 # New auth section from the diff
 [auth]
 enabled = true
-site_url = "http://localhost:3000"
+site_url = "https://app.chattalyst.com"
+
 additional_redirect_urls = []
 jwt_expiry = 3600
 enable_refresh_token_rotation = true
