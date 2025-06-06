@@ -31,6 +31,7 @@ import ContactsPage from "@/pages/ContactsPage"; // Import Contacts page using @
 import SegmentsPage from "./pages/SegmentsPage"; // Import Segments page
 // import ReplyConfiguration from "./pages/Automation"; // Removed import for Automation/ReplyConfiguration page
 // Removed import for BatchSentimentAnalysisLayout as it will be rendered within ConversationStatsView
+import ConfirmInvitePage from "./pages/ConfirmInvitePage"; // Import the ConfirmInvitePage
 
 const App = () => {
   const queryClient = new QueryClient({
@@ -56,6 +57,7 @@ const App = () => {
                 <Routes>
                   <Route path="/" element={<Navigate to="/dashboard" replace />} />
                   <Route path="/login" element={<LoginForm />} />
+                  <Route path="/auth/confirm-invite" element={<ConfirmInvitePage />} /> {/* Add route for ConfirmInvitePage */}
                   <Route
                     path="/dashboard"
                     element={
