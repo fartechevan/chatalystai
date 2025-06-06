@@ -671,7 +671,6 @@ export type Database = {
           integration_id: string
           owner_id: string | null
           pipeline_id: string | null
-          profile_id: string | null
           status: string | null
           token: string | null
           updated_at: string
@@ -685,7 +684,6 @@ export type Database = {
           integration_id: string
           owner_id?: string | null
           pipeline_id?: string | null
-          profile_id?: string | null
           status?: string | null
           token?: string | null
           updated_at?: string
@@ -699,7 +697,6 @@ export type Database = {
           integration_id?: string
           owner_id?: string | null
           pipeline_id?: string | null
-          profile_id?: string | null
           status?: string | null
           token?: string | null
           updated_at?: string
@@ -718,13 +715,6 @@ export type Database = {
             columns: ["pipeline_id"]
             isOneToOne: false
             referencedRelation: "pipelines"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "integrations_config_profile_id_fkey"
-            columns: ["profile_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
         ]
@@ -1379,74 +1369,6 @@ export type Database = {
           },
         ]
       }
-      tenant_users: {
-        Row: {
-          created_at: string
-          role: string
-          tenant_id: string
-          updated_at: string
-          user_id: string
-        }
-        Insert: {
-          created_at?: string
-          role?: string
-          tenant_id: string
-          updated_at?: string
-          user_id: string
-        }
-        Update: {
-          created_at?: string
-          role?: string
-          tenant_id?: string
-          updated_at?: string
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "tenant_users_tenant_id_fkey"
-            columns: ["tenant_id"]
-            isOneToOne: false
-            referencedRelation: "tenants"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "tenant_users_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      tenants: {
-        Row: {
-          created_at: string
-          id: string
-          owner_profile_id: string
-          updated_at: string
-        }
-        Insert: {
-          created_at?: string
-          id?: string
-          owner_profile_id: string
-          updated_at?: string
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          owner_profile_id?: string
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "tenants_owner_profile_id_fkey"
-            columns: ["owner_profile_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       token_allocations: {
         Row: {
           created_at: string | null
@@ -1562,14 +1484,6 @@ export type Database = {
         Args: { "": unknown[] }
         Returns: number
       }
-      has_any_tenant_role: {
-        Args: { p_tenant_id: string; p_user_id: string; p_roles: string[] }
-        Returns: boolean
-      }
-      has_tenant_role: {
-        Args: { p_tenant_id: string; p_user_id: string; p_role: string }
-        Returns: boolean
-      }
       hnsw_bit_support: {
         Args: { "": unknown }
         Returns: unknown
@@ -1585,18 +1499,6 @@ export type Database = {
       hnswhandler: {
         Args: { "": unknown }
         Returns: unknown
-      }
-      is_tenant_member: {
-        Args: { p_tenant_id: string; p_user_id: string }
-        Returns: boolean
-      }
-      is_user_team_admin_or_owner: {
-        Args: { p_user_id: string; p_team_id: string }
-        Returns: boolean
-      }
-      is_user_team_member: {
-        Args: { p_user_id: string; p_team_id: string }
-        Returns: boolean
       }
       ivfflat_bit_support: {
         Args: { "": unknown }
@@ -1718,7 +1620,6 @@ export type Database = {
         Args: {
           p_integration_id: string
           p_instance_id: string
-          p_tenant_id: string
           p_instance_display_name: string
           p_token: string
           p_owner_id: string
@@ -1782,7 +1683,6 @@ export type Database = {
         | "unpaid"
       sync_status: "pending" | "completed" | "failed"
       task_status: "follow-up" | "meeting"
-      team_role: "owner" | "admin" | "member"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1928,7 +1828,6 @@ export const Constants = {
       ],
       sync_status: ["pending", "completed", "failed"],
       task_status: ["follow-up", "meeting"],
-      team_role: ["owner", "admin", "member"],
     },
   },
 } as const

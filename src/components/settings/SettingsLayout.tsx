@@ -1,11 +1,13 @@
 import { useState, useEffect } from "react";
-import { useLocation } from "react-router-dom";
+import { useLocation, useOutletContext } from "react-router-dom"; // Added useOutletContext
 import { SettingsContent } from "./SettingsContent";
 import { SettingsSearchProvider } from "@/context/SettingsSearchContext"; // Import the provider
+import type { PageHeaderContextType } from "@/components/dashboard/DashboardLayout"; // Import context type
 // SettingsSidebar, Sheet, Button, SidebarOpen, cn, useMediaQuery are no longer needed here
 
 export function SettingsLayout() {
   const location = useLocation();
+  const { integrationsTab, setIntegrationsTab } = useOutletContext<PageHeaderContextType>();
 
   const getSectionFromPath = () => {
     const pathParts = location.pathname.split("/");
@@ -41,7 +43,11 @@ export function SettingsLayout() {
     <SettingsSearchProvider> {/* Wrap with the provider */}
       <div className="flex-1 flex flex-col overflow-auto h-full">
         {/* SettingsContent will now take the full space */}
-        <SettingsContent section={selectedSection} />
+        <SettingsContent 
+          section={selectedSection} 
+          integrationsTab={integrationsTab} 
+          setIntegrationsTab={setIntegrationsTab} 
+        />
       </div>
     </SettingsSearchProvider>
   );

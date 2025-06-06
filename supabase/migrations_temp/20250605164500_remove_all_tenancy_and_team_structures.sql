@@ -134,7 +134,7 @@ DO $$ BEGIN IF EXISTS (SELECT FROM information_schema.tables WHERE table_name = 
     ALTER TABLE public.batch_sentiment_analysis DROP CONSTRAINT IF EXISTS batch_sentiment_analysis_tenant_id_fkey;
     ALTER TABLE public.batch_sentiment_analysis DROP COLUMN IF EXISTS tenant_id;
     ALTER TABLE public.batch_sentiment_analysis DROP CONSTRAINT IF EXISTS batch_sentiment_analysis_team_id_fkey;
-    ALTER TABLE public.batch_sentiment_analysis DROP COLUMN IF EXISTS team_id;
+    ALTER TABLE public.batch_sentiment_analysis DROP COLUMN IF EXISTS team_id CASCADE; -- Added CASCADE
 END IF; END $$;
 
 -- Table: conversations

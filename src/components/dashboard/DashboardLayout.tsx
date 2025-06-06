@@ -28,11 +28,15 @@ import { useQueryClient } from "@tanstack/react-query";
 import React, { useState, useEffect } from "react"; // Import React for useState
 
 export type TabValue = "overview" | "analytics";
+export type IntegrationsTabValue = "all" | "connected"; // New type for integrations tabs
 
 export interface PageHeaderContextType {
   setHeaderActions: React.Dispatch<React.SetStateAction<React.ReactNode | null>>;
   activeTab: TabValue;
   setActiveTab: React.Dispatch<React.SetStateAction<TabValue>>;
+  // Optional props for integrations settings tabs
+  integrationsTab?: IntegrationsTabValue;
+  setIntegrationsTab?: React.Dispatch<React.SetStateAction<IntegrationsTabValue>>;
 }
 
 // Define a new internal component for the header content
@@ -48,6 +52,10 @@ const DashboardHeaderContent: React.FC<{
   activeTab: TabValue; // Added activeTab
   setActiveTab: React.Dispatch<React.SetStateAction<TabValue>>; // Added setActiveTab
   isDashboardPage: boolean; // To conditionally show tabs
+  // Props for integrations settings tabs
+  isIntegrationsSettingsPage?: boolean;
+  integrationsTab?: IntegrationsTabValue;
+  setIntegrationsTab?: React.Dispatch<React.SetStateAction<IntegrationsTabValue>>;
 }> = ({
   pageTitle,
   isKnowledgeBasePage,
@@ -60,6 +68,9 @@ const DashboardHeaderContent: React.FC<{
   activeTab, // Added activeTab
   setActiveTab, // Added setActiveTab
   isDashboardPage, // To conditionally show tabs
+  isIntegrationsSettingsPage, // Added
+  integrationsTab, // Added
+  setIntegrationsTab, // Added
 }) => {
   const { headerNavNode, setIsBatchDateRangeDialogOpen } = usePageActionContext(); // Now called within a child of PageActionProvider
 
@@ -126,6 +137,39 @@ const DashboardHeaderContent: React.FC<{
       </div>
     </div>
   )}
+
+  {/* Integrations Settings Tab Bar - Conditionally rendered */}
+  {isIntegrationsSettingsPage && integrationsTab && setIntegrationsTab && (
+    <div className="flex items-center ml-4">
+      <div role="tablist" aria-orientation="horizontal" className="bg-muted text-muted-foreground inline-flex h-9 w-fit items-center justify-center rounded-lg p-[3px]" tabIndex={0} style={{ outline: "none" }}>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={integrationsTab === "all"}
+          data-state={integrationsTab === "all" ? "active" : "inactive"}
+          className={integrationsTab === "all"
+            ? "inline-flex h-[calc(100%-1px)] flex-1 items-center justify-center gap-1.5 rounded-md border border-transparent px-2 py-1 text-sm font-medium whitespace-nowrap transition-[color,box-shadow] focus-visible:ring-[3px] focus-visible:outline-1 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:outline-ring data-[state=active]:shadow-sm data-[state=active]:bg-background dark:data-[state=active]:text-foreground dark:data-[state=active]:border-input dark:data-[state=active]:bg-input/30 text-foreground"
+            : "inline-flex h-[calc(100%-1px)] flex-1 items-center justify-center gap-1.5 rounded-md border border-transparent px-2 py-1 text-sm font-medium whitespace-nowrap transition-[color,box-shadow] focus-visible:ring-[3px] focus-visible:outline-1 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:outline-ring text-foreground dark:text-muted-foreground"}
+          onClick={() => setIntegrationsTab("all")}
+        >
+          All
+        </button>
+        <button
+          type="button"
+          role="tab"
+          aria-selected={integrationsTab === "connected"}
+          data-state={integrationsTab === "connected" ? "active" : "inactive"}
+          className={integrationsTab === "connected"
+            ? "inline-flex h-[calc(100%-1px)] flex-1 items-center justify-center gap-1.5 rounded-md border border-transparent px-2 py-1 text-sm font-medium whitespace-nowrap transition-[color,box-shadow] focus-visible:ring-[3px] focus-visible:outline-1 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:outline-ring data-[state=active]:shadow-sm data-[state=active]:bg-background dark:data-[state=active]:text-foreground dark:data-[state=active]:border-input dark:data-[state=active]:bg-input/30 text-foreground"
+            : "inline-flex h-[calc(100%-1px)] flex-1 items-center justify-center gap-1.5 rounded-md border border-transparent px-2 py-1 text-sm font-medium whitespace-nowrap transition-[color,box-shadow] focus-visible:ring-[3px] focus-visible:outline-1 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4 focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:outline-ring text-foreground dark:text-muted-foreground"}
+          onClick={() => setIntegrationsTab("connected")}
+        >
+          <span className="h-2 w-2 rounded-full bg-green-500 mr-1.5" />
+          Connected
+        </button>
+      </div>
+    </div>
+  )}
   
   <div className="ml-auto flex items-center gap-4 md:gap-2 lg:gap-4">
         <HeaderSettingsSearchInput />
@@ -173,6 +217,7 @@ export function DashboardLayout() {
   const [showImportForm, setShowImportForm] = useState(false);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [activeTab, setActiveTab] = useState<TabValue>("overview"); // Moved tab state here
+  const [integrationsTab, setIntegrationsTab] = useState<IntegrationsTabValue>("all"); // New state for integrations tabs
 
   // headerNavNode is now consumed by DashboardHeaderContent
 
@@ -205,6 +250,7 @@ export function DashboardLayout() {
   const isKnowledgeBasePage = location.pathname.startsWith("/dashboard/knowledge");
   const isStatsPage = location.pathname === "/dashboard/stats"; 
   const isDashboardPage = location.pathname === "/dashboard" || location.pathname === "/dashboard/"; // Check if it's the main dashboard page
+  const isIntegrationsSettingsPage = location.pathname === "/dashboard/settings/integrations"; // Check for integrations settings page
 
   const getCurrentTitle = () => {
     const { pathname } = location;
@@ -290,9 +336,13 @@ export function DashboardLayout() {
             activeTab={activeTab} // Pass activeTab
             setActiveTab={setActiveTab} // Pass setActiveTab
             isDashboardPage={isDashboardPage} // Pass isDashboardPage
+            // Pass integrations tab state
+            isIntegrationsSettingsPage={isIntegrationsSettingsPage}
+            integrationsTab={integrationsTab}
+            setIntegrationsTab={setIntegrationsTab}
           />
           <main className="flex flex-1 flex-col overflow-auto py-4 pr-4 pl-2 lg:py-6 lg:pr-6 lg:pl-3">
-            <Outlet context={{ setHeaderActions, activeTab, setActiveTab } satisfies PageHeaderContextType} />
+            <Outlet context={{ setHeaderActions, activeTab, setActiveTab, integrationsTab, setIntegrationsTab } satisfies PageHeaderContextType} />
           </main>
         </div>
         {showImportForm && (

@@ -269,10 +269,10 @@ export function useIntegrationConnectionState(
             const rpcArgs = {
               p_integration_id: integrationId,
               p_instance_id: instanceId,
-              p_profile_id: profileId, // Changed p_tenant_id to p_profile_id
+              // p_tenant_id: profileId, // Removed p_tenant_id
               p_instance_display_name: instanceDisplayName,
               p_token: instance.token,
-              p_owner_id: ownerId,
+              p_owner_id: profileId, // Assign profileId to p_owner_id
               p_user_reference_id: userReferenceId,
               p_pipeline_id: currentPipelineId || null,
               p_status: instance.connectionStatus // Pass connectionStatus as p_status
@@ -301,7 +301,7 @@ export function useIntegrationConnectionState(
             .from('integrations_config')
             .select('instance_id')
             .eq('integration_id', integrationId)
-            .eq('profile_id', profileId); // Ensure we only check against the current profile
+            .eq('owner_id', profileId); // Ensure we only check against the current profile's owner_id
 
           if (fetchDbError) {
             console.error(`[refetchInstances] Error fetching DB instance_ids for deletion check:`, fetchDbError);
@@ -317,7 +317,7 @@ export function useIntegrationConnectionState(
                 .from('integrations_config')
                 .delete()
                 .eq('integration_id', integrationId)
-                .eq('profile_id', profileId) // Changed tenant_id to profile_id
+                .eq('owner_id', profileId) // Changed tenant_id to profile_id, then profile_id to owner_id
                 .in('instance_id', staleInstanceIds);
 
               if (deleteError) {
@@ -335,7 +335,7 @@ export function useIntegrationConnectionState(
                 .from('integrations_config')
                 .delete()
                 .eq('integration_id', integrationId)
-                .eq('profile_id', profileId); // Make sure to scope by profile_id
+                .eq('owner_id', profileId); // Make sure to scope by owner_id
 
             if (deleteAllError) {
                 console.error(`[refetchInstances] Error deleting all instances for integration ${integrationId} (profile: ${profileId}) when API returned none:`, deleteAllError);
@@ -404,10 +404,10 @@ export function useIntegrationConnectionState(
             const rpcArgs = {
               p_integration_id: integrationId,
               p_instance_id: instanceId,
-              p_profile_id: profileId, // Changed p_tenant_id to p_profile_id
+              // p_tenant_id: profileId, // Removed p_tenant_id
               p_instance_display_name: instanceDisplayName,
               p_token: instance.token,
-              p_owner_id: ownerId,
+              p_owner_id: profileId, // Assign profileId to p_owner_id
               p_user_reference_id: userReferenceId,
               p_pipeline_id: currentPipelineId || null,
               p_status: instance.connectionStatus // Pass connectionStatus as p_status
@@ -436,7 +436,7 @@ export function useIntegrationConnectionState(
             .from('integrations_config')
             .select('instance_id')
             .eq('integration_id', integrationId)
-            .eq('profile_id', profileId); // Ensure we only check against the current profile
+            .eq('owner_id', profileId); // Ensure we only check against the current profile's owner_id
 
           if (fetchDbError) {
             console.error(`[fetchInstancesAndSetState] Error fetching DB instance_ids for deletion check:`, fetchDbError);
@@ -452,7 +452,7 @@ export function useIntegrationConnectionState(
                 .from('integrations_config')
                 .delete()
                 .eq('integration_id', integrationId)
-                .eq('profile_id', profileId) // Changed tenant_id to profile_id
+                .eq('owner_id', profileId) // Changed tenant_id to profile_id, then profile_id to owner_id
                 .in('instance_id', staleInstanceIds);
 
               if (deleteError) {
@@ -470,7 +470,7 @@ export function useIntegrationConnectionState(
                 .from('integrations_config')
                 .delete()
                 .eq('integration_id', integrationId)
-                .eq('profile_id', profileId); // Make sure to scope by profile_id
+                .eq('owner_id', profileId); // Make sure to scope by owner_id
 
             if (deleteAllError) {
                 console.error(`[fetchInstancesAndSetState] Error deleting all instances for integration ${integrationId} (profile: ${profileId}) when API returned none:`, deleteAllError);
@@ -549,7 +549,7 @@ export function useIntegrationConnectionState(
         const { count: integrationsCount, error: countError } = await supabase
           .from('integrations_config')
           .select('*', { count: 'exact', head: true })
-          .eq('profile_id', profileId); // Changed tenant_id to profile_id
+          .eq('owner_id', profileId); // Changed profile_id to owner_id
 
         if (countError) throw countError;
         setCurrentIntegrationCount(integrationsCount ?? 0);

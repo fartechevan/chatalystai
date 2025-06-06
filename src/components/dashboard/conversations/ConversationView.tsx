@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import type { Conversation } from "./types";
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"; // Added SheetHeader, SheetTitle
 import { Button } from "@/components/ui/button";
 import { UserCog, PanelLeft, PanelRightOpen } from "lucide-react"; // Added PanelRightOpen
 import { cn } from "@/lib/utils";
@@ -135,7 +135,12 @@ export function ConversationView() {
               </Button>
             </SheetTrigger>
             <SheetContent side="left" className="p-0 w-80 sm:w-[320px] bg-card flex flex-col">
-              {conversationListPanelContent}
+              <SheetHeader>
+                <SheetTitle className="sr-only">Conversations List</SheetTitle>
+              </SheetHeader>
+              <div className="flex-1 overflow-auto"> {/* Add a wrapper for scrolling if panel content doesn't manage it */}
+                {conversationListPanelContent}
+              </div>
             </SheetContent>
           </Sheet>
           
@@ -200,7 +205,12 @@ export function ConversationView() {
                 side="right" 
                 className="p-0 w-full sm:w-[350px] bg-card flex flex-col"
               >
-                {leadDetailsPanelContent}
+                <SheetHeader>
+                  <SheetTitle className="sr-only">Lead Details</SheetTitle>
+                </SheetHeader>
+                <div className="flex-1 overflow-auto"> {/* Add a wrapper for scrolling if panel content doesn't manage it */}
+                  {leadDetailsPanelContent}
+                </div>
               </SheetContent>
             </Sheet>
           )}
