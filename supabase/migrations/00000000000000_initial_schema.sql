@@ -60,7 +60,8 @@ CREATE EXTENSION IF NOT EXISTS "pgcrypto" WITH SCHEMA "extensions";
 CREATE EXTENSION IF NOT EXISTS "pgjwt" WITH SCHEMA "extensions";
 
 
-CREATE SCHEMA IF NOT EXISTS "pgmq";
+
+
 
 
 CREATE EXTENSION IF NOT EXISTS "pgmq" WITH SCHEMA "pgmq";
@@ -2231,6 +2232,12 @@ CREATE POLICY "Allow authenticated users to view chunks" ON "public"."knowledge_
 
 
 
+CREATE POLICY "Allow authenticated users with profiles to read all ai_agents" ON "public"."ai_agents" FOR SELECT TO "authenticated" USING ((EXISTS ( SELECT 1
+   FROM "public"."profiles"
+  WHERE ("profiles"."id" = "auth"."uid"()))));
+
+
+
 CREATE POLICY "Allow full access to contacts in own segments" ON "public"."segment_contacts" USING ((EXISTS ( SELECT 1
    FROM "public"."segments" "s"
   WHERE (("s"."id" = "segment_contacts"."segment_id") AND ("s"."user_id" = "auth"."uid"()))))) WITH CHECK ((EXISTS ( SELECT 1
@@ -2337,11 +2344,11 @@ CREATE POLICY "Allow users to create subscriptions for self or admined teams" ON
 
 
 
-CREATE POLICY "Allow users to delete their own agents" ON "public"."ai_agents" FOR DELETE USING (("auth"."uid"() = "user_id"));
+CREATE POLICY "Allow users to delete their own ai_agents" ON "public"."ai_agents" FOR DELETE TO "authenticated" USING (("auth"."uid"() = "user_id"));
 
 
 
-CREATE POLICY "Allow users to insert their own agents" ON "public"."ai_agents" FOR INSERT WITH CHECK (("auth"."uid"() = "user_id"));
+CREATE POLICY "Allow users to insert their own ai_agents" ON "public"."ai_agents" FOR INSERT TO "authenticated" WITH CHECK (("auth"."uid"() = "user_id"));
 
 
 
@@ -2363,17 +2370,13 @@ CREATE POLICY "Allow users to see their team's or own plans" ON "public"."plans"
 
 
 
-CREATE POLICY "Allow users to update their own agents" ON "public"."ai_agents" FOR UPDATE USING (("auth"."uid"() = "user_id")) WITH CHECK (("auth"."uid"() = "user_id"));
+CREATE POLICY "Allow users to update their own ai_agents" ON "public"."ai_agents" FOR UPDATE TO "authenticated" USING (("auth"."uid"() = "user_id")) WITH CHECK (("auth"."uid"() = "user_id"));
 
 
 
 CREATE POLICY "Allow users to update their own or admined team subscriptions" ON "public"."subscriptions" FOR UPDATE USING ((("profile_id" = "auth"."uid"()) OR (("team_id" IS NOT NULL) AND (EXISTS ( SELECT 1
    FROM "public"."team_users" "tu"
   WHERE (("tu"."team_id" = "subscriptions"."team_id") AND ("tu"."user_id" = "auth"."uid"()) AND ("tu"."role" = ANY (ARRAY['admin'::"public"."team_role", 'owner'::"public"."team_role"]))))))));
-
-
-
-CREATE POLICY "Allow users to view their own agents" ON "public"."ai_agents" FOR SELECT USING (("auth"."uid"() = "user_id"));
 
 
 
@@ -2499,6 +2502,9 @@ CREATE POLICY "Users can view their pipeline leads" ON "public"."lead_pipeline" 
 
 
 
+ALTER TABLE "public"."ai_agents" ENABLE ROW LEVEL SECURITY;
+
+
 ALTER TABLE "public"."batch_sentiment_analysis_details" ENABLE ROW LEVEL SECURITY;
 
 
@@ -2526,10 +2532,6 @@ ALTER TABLE "public"."tasks" ENABLE ROW LEVEL SECURITY;
 
 
 ALTER PUBLICATION "supabase_realtime" OWNER TO "postgres";
-
-
-
-
 
 
 ALTER PUBLICATION "supabase_realtime" ADD TABLE ONLY "public"."conversations";
@@ -2821,6 +2823,12 @@ GRANT ALL ON FUNCTION "public"."vector"("public"."vector", integer, boolean) TO 
 GRANT ALL ON FUNCTION "public"."vector"("public"."vector", integer, boolean) TO "anon";
 GRANT ALL ON FUNCTION "public"."vector"("public"."vector", integer, boolean) TO "authenticated";
 GRANT ALL ON FUNCTION "public"."vector"("public"."vector", integer, boolean) TO "service_role";
+
+
+
+
+
+
 
 
 

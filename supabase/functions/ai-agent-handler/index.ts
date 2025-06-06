@@ -171,9 +171,21 @@ serve(async (req: Request) => {
     // --- LIST AGENTS (GET /) ---
     else if (req.method === 'GET' && !agentIdFromPath) {
       if (!userId) return createJsonResponse({ error: 'User authentication required' }, 401);
-      console.log(`[${requestStartTime}] Routing to: List Agents (REST)`);
+      // Ensure the user has a profile before allowing them to list all agents
+      const { data: userProfile, error: profileError } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('id', userId)
+        .single();
+
+      if (profileError || !userProfile) {
+        console.error(`[${requestStartTime}] Profile check failed for user ${userId}:`, profileError);
+        return createJsonResponse({ error: 'User profile not found or access denied.' }, 403);
+      }
+      
+      console.log(`[${requestStartTime}] Routing to: List Agents (REST) - User ${userId} has a profile.`);
       const { data: agentsData, error: fetchAgentsError } = await supabase
-        .from('ai_agents').select('*').eq('user_id', userId).order('created_at', { ascending: false });
+        .from('ai_agents').select('*').order('created_at', { ascending: false }); // Removed .eq('user_id', userId)
       if (fetchAgentsError) return createJsonResponse({ error: 'Failed to fetch agents', details: fetchAgentsError.message }, 500);
       if (!agentsData) return createJsonResponse({ agents: [] }, 200);
 
