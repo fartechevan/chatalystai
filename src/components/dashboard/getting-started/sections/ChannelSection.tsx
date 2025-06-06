@@ -89,10 +89,6 @@ export function ChannelSection() {
     <Card>
       <CardHeader>
         <CardTitle>Channels</CardTitle>
-        {/* Optional: Add a button to navigate to settings/integrations */}
-        <Button variant="outline" size="sm" className="ml-auto" onClick={() => navigate('/dashboard/settings')}>
-          Manage Integrations
-        </Button>
       </CardHeader>
       <CardContent>
         {isLoadingChannels ? (

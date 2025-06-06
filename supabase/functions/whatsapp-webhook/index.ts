@@ -81,6 +81,8 @@ serve(async (req) => {
       response?: string;
       [key: string]: unknown; // Use 'unknown' for other potential properties
     }
+    
+    let agentProcessingError: string | null = null; // Declare agentProcessingError in a higher scope
 
     // --- AI Agent Integration Start ---
     // Define a simple type for AI Agent data needed here
@@ -131,7 +133,7 @@ serve(async (req) => {
           if (matchedAgent) {
             console.log(`[${requestId}] Processing with AI Agent ID: ${matchedAgent.id}, Type: ${matchedAgent.agent_type}`);
             let agentReplyText: string | null = null;
-            let agentProcessingError: string | null = null;
+            // Removed redundant declaration of agentProcessingError here, use the one from higher scope
 
             if (matchedAgent.agent_type === 'chattalyst') {
               console.log(`[${requestId}] Invoking 'query-agent' for Chattalyst agent ID: ${matchedAgent.id}`);
@@ -254,11 +256,12 @@ serve(async (req) => {
               }
             }
             
-            // Acknowledge WhatsApp, AI agent has handled it.
-            return new Response(
-              JSON.stringify({ success: true, message: "AI Agent processing attempted.", agent_id: matchedAgent.id, error: agentProcessingError }),
-              { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 }
-            );
+            // AI agent processing is complete. The reply (if any) has been attempted.
+            // Do NOT return here. Allow the main flow to continue to save the original message
+            // and send a final acknowledgment to WhatsApp.
+            // The status of AI agent processing (agentProcessingError) can be incorporated into the final response.
+            console.log(`[${requestId}] AI Agent ${matchedAgent.id} processing finished. Status: ${agentProcessingError || 'Reply attempted.'}`);
+            // The variable 'agentProcessingError' is now in the outer scope and will be used in the final response.
           } else {
             console.log(`[${requestId}] No AI agent matched for the message.`);
           }
@@ -303,9 +306,16 @@ serve(async (req) => {
     // 5. Construct and Return Response
     // Always return 200 OK to acknowledge webhook receipt,
     // include processing status in the body.
-    const responseBody = (processingResult === true)
-        ? { success: true, processed: true, message: "Webhook received and processed." }
-        : { success: true, processed: false, error: `Webhook received but processing failed: ${processingResult}` };
+    let finalMessage = "Webhook received and processed.";
+    const overallSuccess = processingResult === true; // Base success on handleMessageEvent
+
+    if (agentProcessingError) { // If there was an error during AI agent processing
+        finalMessage += ` AI Agent processing had an issue: ${agentProcessingError}.`;
+    }
+
+    const responseBody = overallSuccess
+        ? { success: true, processed: true, message: finalMessage }
+        : { success: true, processed: false, error: `Main processing failed: ${processingResult}. ${finalMessage.replace("Webhook received and processed.", "Details:")}` };
 
     console.log(`[${requestId}] Webhook processing completed. Sending response.`);
     return new Response(
