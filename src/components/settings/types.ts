@@ -16,7 +16,7 @@ export interface Integration {
   icon_url?: string;
   description?: string;
   // is_connected?: boolean; // Remove is_connected
-  status?: 'available' | 'coming_soon' | string; // Original availability status
+  status?: string; // Original availability status - Broadened to string
   connectionStatus?: ConnectionState; // New field for connection state
   config_id?: string; // Added optional config ID for access checks
 }
@@ -43,7 +43,7 @@ export type DBIntegrationType = {
   description?: string;
   base_url?: string;
   icon_url?: string;
-  status?: 'available' | 'coming_soon' | string;
+  status?: string; // Broadened to string
   type?: string; // Optional to match potential DB nullability
 };
 
@@ -54,22 +54,22 @@ export type DBUserIntegrationConfig = {
   profile_id?: string; 
   instance_id?: string;
   token?: string;
-  status?: string; 
+  status?: string | null; // Reverted to string | null to match DB
 };
 
 // Combined type for display, used in IntegrationsView and passed to cards/dialogs
-export type ProcessedIntegration = {
+export interface ProcessedIntegration {
   id: string;
   name: string;
   type: string; // Revert to required, as mapping logic provides a default
   description?: string;
   base_url?: string;
   icon_url?: string;
-  status?: 'available' | 'coming_soon' | string; // Availability status of the integration type
+  status?: string; // Availability status of the integration type - Broadened to string
   connectionStatus: ConnectionState; // Actual connection status from user's config
 
   user_config_id?: string; // ID of the user's integrations_config record
   instance_id?: string;    // From user's config
   token?: string;          // From user's config
   connectedInstances: number; // 1 if user has a config, 0 otherwise
-};
+}

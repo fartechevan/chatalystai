@@ -53,6 +53,12 @@ export function useConversationData(selectedConversation?: Conversation | null) 
       // If this conversation is linked to a WhatsApp integration, first send via WhatsApp
       if (selectedConversation.integrations_id) {
         try {
+          // Ensure selectedConversation.integrations_id exists before trying to use it
+          if (!selectedConversation.integrations_id) {
+            console.error("sendMessageMutation: selectedConversation.integrations_id is missing.");
+            throw new Error("Conversation is not properly linked to an integration (missing integrations_id).");
+          }
+
           // Get instance_id from integrations_config table
           const { data: integrationConfigData, error: integrationConfigError } = await supabase
             .from('integrations_config') // TODO: Should this table name also change? Assuming not for now.
@@ -60,9 +66,19 @@ export function useConversationData(selectedConversation?: Conversation | null) 
             .eq('integration_id', selectedConversation.integrations_id) // Assuming the column to match on integrations_config is integration_id
             .single();
 
-          if (integrationConfigError || !integrationConfigData?.instance_id) {
-            console.error("Integration config not found or missing instance_id:", integrationConfigError);
-            throw new Error("Could not find instance_id");
+          if (integrationConfigError) {
+            console.error(`Error fetching integration config for integration_id ${selectedConversation.integrations_id}:`, integrationConfigError);
+            throw new Error(`Failed to fetch integration configuration: ${integrationConfigError.message}`);
+          }
+          
+          if (!integrationConfigData) {
+            console.error(`No integration config found in 'integrations_config' for integration_id: ${selectedConversation.integrations_id}`);
+            throw new Error("Integration configuration not found for this conversation.");
+          }
+
+          if (!integrationConfigData.instance_id) {
+            console.error(`Integration config found for integration_id ${selectedConversation.integrations_id}, but 'instance_id' is missing:`, integrationConfigData);
+            throw new Error("Instance ID is missing from the integration configuration.");
           }
 
           const instanceId = integrationConfigData.instance_id;

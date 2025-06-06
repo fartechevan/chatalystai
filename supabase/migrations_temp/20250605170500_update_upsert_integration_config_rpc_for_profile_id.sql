@@ -22,7 +22,7 @@ BEGIN
         ) VALUES (
             p_integration_id, p_instance_id, p_profile_id, p_instance_display_name, p_token, p_owner_id, p_user_reference_id, p_pipeline_id, p_status
         )
-        ON CONFLICT (profile_id, instance_id) -- Assumes a unique constraint exists or will be added for (profile_id, instance_id)
+        ON CONFLICT (profile_id, instance_id) WHERE (profile_id IS NOT NULL AND instance_id IS NOT NULL)
         DO UPDATE SET
             instance_display_name = EXCLUDED.instance_display_name,
             token = EXCLUDED.token,

@@ -14,11 +14,16 @@ import { ProfileAccessManagement } from "./integration-access/ProfileAccessManag
 import { UserCardList } from "./UserCardList"; // Import the new card list component
 import { Skeleton } from "@/components/ui/skeleton"; // Import Skeleton for loading state
 
+import type { IntegrationsTabValue } from "@/components/dashboard/DashboardLayout"; // Import the specific tab value type
+
 interface SettingsContentProps {
   section: string;
+  // Props for lifted state for integrations tab
+  integrationsTab?: IntegrationsTabValue; // Use specific type
+  setIntegrationsTab?: React.Dispatch<React.SetStateAction<IntegrationsTabValue>>; // Use React's Dispatch type
 }
 
-export function SettingsContent({ section }: SettingsContentProps) {
+export function SettingsContent({ section, integrationsTab, setIntegrationsTab }: SettingsContentProps) {
   const isMobile = useMediaQuery("(max-width: 768px)"); // Check for mobile screen size
   const [isVectorizing, setIsVectorizing] = useState(false); // State for schema vectorization
   const [vectorizeStatus, setVectorizeStatus] = useState<string | null>(null); // Status message for vectorization
@@ -106,9 +111,24 @@ export function SettingsContent({ section }: SettingsContentProps) {
 
   if (section === 'integrations') {
     // Use responsive padding for the wrapper
+    // Ensure integrationsTab and setIntegrationsTab are passed if they exist
+    if (integrationsTab === undefined || setIntegrationsTab === undefined) {
+      // Fallback or error handling if props are not passed, though they should be
+      // This might indicate an issue with how props are threaded through
+      console.error("Integrations tab state not provided to SettingsContent");
+      return (
+        <div className="p-4 md:p-6">
+          Error: Integrations tab state missing.
+        </div>
+      );
+    }
     return (
       <div className="p-4 md:p-6"> 
-        <IntegrationsView isActive={section === 'integrations'} />
+        <IntegrationsView 
+          isActive={section === 'integrations'} 
+          activeTab={integrationsTab} 
+          setActiveTab={setIntegrationsTab} 
+        />
       </div>
     );
   }

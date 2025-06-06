@@ -48,7 +48,18 @@ export function useEvolutionAPI(instanceId: string | null) {
         .eq('instance_id', instanceId)
         .single();
       
-      if (configError) throw configError;
+      if (configError) {
+        console.error("Error fetching instance_config for instanceId:", instanceId, configError);
+        throw new Error(`Error fetching configuration for instance ID ${instanceId}: ${configError.message}`);
+      }
+      if (!instanceConfig) {
+        console.error("No instance_config found for instanceId:", instanceId);
+        throw new Error(`No configuration found for instance ID ${instanceId} in integrations_config.`);
+      }
+      if (!instanceConfig.integration_id) {
+        console.error("instance_config found, but missing integration_id for instanceId:", instanceId, instanceConfig);
+        throw new Error(`Configuration for instance ID ${instanceId} is missing integration_id.`);
+      }
       
       // Then get the base_url from the integration
       const { data: integration, error: integrationError } = await supabase
@@ -57,11 +68,22 @@ export function useEvolutionAPI(instanceId: string | null) {
         .eq('id', instanceConfig.integration_id)
         .single();
       
-      if (integrationError) throw integrationError;
+      if (integrationError) {
+        console.error("Error fetching integration details for integration_id:", instanceConfig.integration_id, integrationError);
+        throw new Error(`Error fetching integration details for ID ${instanceConfig.integration_id}: ${integrationError.message}`);
+      }
+      if (!integration) {
+        console.error("No integration found for integration_id:", instanceConfig.integration_id);
+        throw new Error(`No integration details found for ID ${instanceConfig.integration_id}.`);
+      }
+      if (!integration.base_url) {
+        console.error("Integration details found, but missing base_url for integration_id:", instanceConfig.integration_id, integration);
+        throw new Error(`Integration details for ID ${instanceConfig.integration_id} are missing base_url.`);
+      }
       
       return { 
         base_url: integration.base_url, 
-        instance_id: instanceId,
+        instance_id: instanceConfig.instance_id || instanceId, // Prefer fetched, fallback to param
         integration_id: instanceConfig.integration_id
       };
     },
@@ -165,7 +187,18 @@ export function useEvolutionAPI(instanceId: string | null) {
   // Send message mutation
   const sendMessage = useMutation({
     mutationFn: async ({ chatId, message }: { chatId: string; message: string }) => {
-      if (!config || !instanceId) throw new Error('No configuration found');
+      if (!instanceId) { // Check instanceId from hook params first
+        console.error("sendMessage: instanceId parameter is missing.");
+        throw new Error('Instance ID is missing.');
+      }
+      if (!config) {
+        console.error("sendMessage: Configuration (config) is not available. instanceId:", instanceId);
+        throw new Error('Configuration not available. The instance might not be properly configured or there was an error fetching its details.');
+      }
+      if (!config.instance_id) { // Check instance_id within the fetched config
+        console.error("sendMessage: instance_id is missing from fetched config. instanceId (param):", instanceId, "config:", config);
+        throw new Error('Instance ID is missing from configuration data.');
+      }
       
       // TODO: Replace with local whatsapp/services function (e.g., sendTextService)
       // const { data, error } = await supabase.functions.invoke('integrations/message/sendText', {
