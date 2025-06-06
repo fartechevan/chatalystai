@@ -1,10 +1,11 @@
 import React, { useEffect } from 'react';
-// import { useTeams } from '@/context/TeamContext'; // OLD - Team/Tenant context removed
-// import TeamDetails from '@/components/teams/TeamDetails'; // OLD - Team/Tenant details component
-// import TeamUsers from '@/components/teams/TeamUsers';   // OLD - Team/Tenant users component
 import { Button } from '@/components/ui/button';
 import { UserPlus } from 'lucide-react'; // Icon for inviting users
-import { usePageActionContext } from '@/context/PageActionContext';
+// import { usePageActionContext } from '@/context/PageActionContext'; // No longer used for primary action here
+import { useOutletContext } from 'react-router-dom';
+import type { PageHeaderContextType } from '@/components/dashboard/DashboardLayout'; // Import context type
+import { supabase } from '@/integrations/supabase/client'; // Import Supabase client
+import { toast } from '@/hooks/use-toast'; // Import toast
 
 // Removed DisplayTeam and DisplayTeamMember interfaces as they were tenant-based.
 
@@ -12,57 +13,81 @@ const UsersPage: React.FC = () => {
   // Removed state related to currentTeam, teamMembers as they were tenant-based.
   const [isLoading, setIsLoading] = React.useState(false); // Kept for general loading, though its use might change.
 
-  const { setPrimaryAction } = usePageActionContext();
+  // const { setPrimaryAction } = usePageActionContext(); // No longer used for primary action here
+  const outletContext = useOutletContext<PageHeaderContextType | undefined>();
+  const setHeaderActions = outletContext?.setHeaderActions;
+
 
   const [showInviteMemberModal, setShowInviteMemberModal] = React.useState(false);
   const [inviteEmail, setInviteEmail] = React.useState('');
   const [inviteRole, setInviteRole] = React.useState('member'); // Default role
 
   useEffect(() => {
-    // Removed TODOs related to fetching tenant data.
-    // The primary action "Invite Member" might still be relevant for inviting users to the platform/profile.
-    setPrimaryAction({
-      id: 'invite-user', // Renamed from 'invite-team-member'
-      label: 'Invite User',
-      icon: UserPlus,
-      action: () => setShowInviteMemberModal(true),
-    });
+    const inviteButton = (
+      <Button onClick={() => setShowInviteMemberModal(true)} className="flex items-center gap-2">
+        <UserPlus className="h-4 w-4" />
+        Invite User
+      </Button>
+    );
+    if (setHeaderActions) {
+      setHeaderActions(inviteButton);
+    }
 
     return () => {
-      setPrimaryAction(null);
+      if (setHeaderActions) {
+        setHeaderActions(null);
+      }
     };
-  }, [setPrimaryAction]); // Removed setShowInviteMemberModal from dependencies as it's stable
+  }, [setHeaderActions, setShowInviteMemberModal]);
 
   const handleInviteMember = async () => {
     // Removed currentTeam dependency for this action.
     if (inviteEmail.trim()) {
       setIsLoading(true);
-      console.log(`Attempting to invite ${inviteEmail} with role ${inviteRole}. Backend logic TBD.`);
-      // The actual invitation logic needs to be implemented based on the new user model (e.g., direct profile invitation).
-      // The old 'invite-user-to-tenant' Supabase function was removed.
-      // try {
-      //   // TODO: Implement new invitation logic here if applicable
-      //   // Example: await supabase.functions.invoke('invite-user-to-profile', { body: { email: inviteEmail, role: inviteRole } });
-      //   console.log('Placeholder for new invite logic.');
-      //   // TODO: Show success toast
-      //   // TODO: Refresh user list if applicable
-      //   setInviteEmail('');
-      //   setInviteRole('member');
-      //   setShowInviteMemberModal(false);
-      // } catch (error) {
-      //   console.error("Failed to invite member:", error);
-      //   // TODO: Show error toast
-      // } finally {
-      //   setIsLoading(false);
-      // }
-      // For now, just simulate closing and resetting
-      setTimeout(() => {
-        setInviteEmail('');
-        setInviteRole('member');
-        setShowInviteMemberModal(false);
+      console.log(`Attempting to invite ${inviteEmail} with role ${inviteRole}.`);
+      try {
+        const { data, error } = await supabase.functions.invoke('invite-user', {
+          body: { email: inviteEmail, role: inviteRole },
+        });
+
+        if (error) {
+          console.error('Error inviting user:', error);
+          toast({
+            title: 'Invitation Failed',
+            description: error.message || 'An unexpected error occurred.',
+            variant: 'destructive',
+          });
+        } else {
+          console.log('Invitation successful:', data);
+          toast({
+            title: 'Invitation Sent',
+            description: `An invitation has been sent to ${inviteEmail}.`,
+          });
+          setInviteEmail('');
+          setInviteRole('member');
+          setShowInviteMemberModal(false);
+          // Optionally, refresh the user list here if it's displayed on this page
+          // queryClient.invalidateQueries(['users']); // Example if using react-query
+        }
+      } catch (error: unknown) {
+        console.error('Failed to invoke invite-user function:', error);
+        let errorMessage = 'An unexpected error occurred while sending the invitation.';
+        if (error instanceof Error) {
+          errorMessage = error.message;
+        } else if (typeof error === 'object' && error !== null && 'message' in error && typeof (error as { message?: unknown }).message === 'string') {
+          // Safely access message property
+          const errObj = error as { message: string };
+          errorMessage = errObj.message;
+        }
+        // Ensure toast is called correctly
+        toast({
+          title: 'Invitation Failed',
+          description: errorMessage,
+          variant: 'destructive',
+        });
+      } finally {
         setIsLoading(false);
-        console.log('Simulated invite completion.');
-      }, 1000);
+      }
     }
   };
   

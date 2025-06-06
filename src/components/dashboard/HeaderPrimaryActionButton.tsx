@@ -19,6 +19,8 @@ export const HeaderPrimaryActionButton: React.FC = () => {
       showButton = true;
     } else if (path.startsWith("/dashboard/contacts") && primaryAction.id === 'create-contact') { // Added condition for Contacts page
       showButton = true;
+    } else if (path.startsWith("/dashboard/settings/users") && primaryAction.id === 'invite-user') { // Condition for Users settings page
+      showButton = true;
     }
     // Add other pages and action IDs here if needed
   }

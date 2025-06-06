@@ -56,6 +56,7 @@ const DashboardHeaderContent: React.FC<{
   isIntegrationsSettingsPage?: boolean;
   integrationsTab?: IntegrationsTabValue;
   setIntegrationsTab?: React.Dispatch<React.SetStateAction<IntegrationsTabValue>>;
+  isUsersSettingsPage?: boolean; // New prop for Users settings page
 }> = ({
   pageTitle,
   isKnowledgeBasePage,
@@ -71,12 +72,46 @@ const DashboardHeaderContent: React.FC<{
   isIntegrationsSettingsPage, // Added
   integrationsTab, // Added
   setIntegrationsTab, // Added
+  isUsersSettingsPage, // Added
 }) => {
   const { headerNavNode, setIsBatchDateRangeDialogOpen } = usePageActionContext(); // Now called within a child of PageActionProvider
 
   const tabCommonClass = "inline-flex h-[calc(100%-1px)] flex-1 items-center justify-center gap-1.5 rounded-md border border-transparent px-2 py-1 text-sm font-medium whitespace-nowrap transition-[color,box-shadow] focus-visible:ring-[3px] focus-visible:outline-1 disabled:pointer-events-none disabled:opacity-50 data-[state=active]:shadow-sm [&_svg]:pointer-events-none [&_svg]:shrink-0 [&_svg:not([class*='size-'])]:size-4";
   const activeTabClass = "data-[state=active]:bg-background dark:data-[state=active]:text-foreground focus-visible:border-ring focus-visible:ring-ring/50 focus-visible:outline-ring dark:data-[state=active]:border-input dark:data-[state=active]:bg-input/30 text-foreground";
   const inactiveTabClass = "text-foreground dark:text-muted-foreground";
+
+  if (isUsersSettingsPage) {
+    return (
+      <header className="flex h-14 items-center gap-4 border-b bg-background px-4 lg:h-[60px] lg:px-6">
+        <Button
+          variant="outline"
+          size="icon"
+          className="inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-10 w-10 shrink-0 sm:hidden"
+          onClick={toggleSidebar}
+        >
+          <MenuIcon className="h-5 w-5" />
+          <span className="sr-only">Toggle navigation menu</span>
+        </Button>
+        <Button
+          variant="outline"
+          size="icon"
+          className="items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium ring-offset-background transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 border border-input bg-background hover:bg-accent hover:text-accent-foreground h-10 w-10 hidden shrink-0 sm:inline-flex"
+          onClick={toggleSidebar}
+        >
+          <PanelLeft className={cn("h-5 w-5", sidebarState === "collapsed" && "rotate-180")} />
+          <span className="sr-only">Toggle sidebar</span>
+        </Button>
+        <h1 className="text-xl font-semibold hidden sm:inline-flex">Users</h1>
+        <div className="ml-auto flex items-center gap-4 md:gap-2 lg:gap-4">
+          <HeaderSettingsSearchInput />
+          <HeaderSecondaryActionSlot />
+          {/* headerActions will now contain the "Invite User" button from UsersPage */}
+          {/* No longer need HeaderPrimaryActionButton here as UsersPage provides its action button directly */}
+          {headerActions} 
+        </div>
+      </header>
+    );
+  }
 
   return (
     <header className="flex h-14 items-center gap-4 border-b bg-background px-4 lg:h-[60px] lg:px-6">
@@ -100,11 +135,11 @@ const DashboardHeaderContent: React.FC<{
         <PanelLeft className={cn("h-5 w-5", sidebarState === "collapsed" && "rotate-180")} />
         <span className="sr-only">Toggle sidebar</span>
       </Button>
-  <HeaderBreadcrumbSlot />
-  <ConditionalPageTitle pageTitle={pageTitle} />
-  {headerNavNode && <div className="flex items-center gap-2 ml-4">{headerNavNode}</div>}
+      <HeaderBreadcrumbSlot />
+      <ConditionalPageTitle pageTitle={pageTitle} />
+      {headerNavNode && <div className="flex items-center gap-2 ml-4">{headerNavNode}</div>}
 
-  {/* Tab Bar - Conditionally rendered for /dashboard path */}
+      {/* Tab Bar - Conditionally rendered for /dashboard path */}
   {isDashboardPage && (
     <div className="flex items-center ml-4"> {/* Added flex items-center and margin */}
       <div
@@ -180,7 +215,8 @@ const DashboardHeaderContent: React.FC<{
           </Button>
         )}
         <HeaderSecondaryActionSlot />
-        <HeaderPrimaryActionButton />
+        {/* Conditionally render HeaderPrimaryActionButton only if not UsersSettingsPage, as it's handled in the specific header */}
+        {!isUsersSettingsPage && <HeaderPrimaryActionButton />} 
         {isKnowledgeBasePage && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -248,9 +284,13 @@ export function DashboardLayout() {
   };
 
   const isKnowledgeBasePage = location.pathname.startsWith("/dashboard/knowledge");
-  const isStatsPage = location.pathname === "/dashboard/stats"; 
+  const isStatsPage = location.pathname === "/dashboard/stats";
   const isDashboardPage = location.pathname === "/dashboard" || location.pathname === "/dashboard/"; // Check if it's the main dashboard page
   const isIntegrationsSettingsPage = location.pathname === "/dashboard/settings/integrations"; // Check for integrations settings page
+  // Robust check for users settings page, handling potential trailing slash
+  const normalizedPath = location.pathname.endsWith('/') ? location.pathname.slice(0, -1) : location.pathname;
+  const isUsersSettingsPage = normalizedPath === "/dashboard/settings/users";
+
 
   const getCurrentTitle = () => {
     const { pathname } = location;
@@ -340,6 +380,7 @@ export function DashboardLayout() {
             isIntegrationsSettingsPage={isIntegrationsSettingsPage}
             integrationsTab={integrationsTab}
             setIntegrationsTab={setIntegrationsTab}
+            isUsersSettingsPage={isUsersSettingsPage} // Pass isUsersSettingsPage
           />
           <main className="flex flex-1 flex-col overflow-auto py-4 pr-4 pl-2 lg:py-6 lg:pr-6 lg:pl-3">
             <Outlet context={{ setHeaderActions, activeTab, setActiveTab, integrationsTab, setIntegrationsTab } satisfies PageHeaderContextType} />
