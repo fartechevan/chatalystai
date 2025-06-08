@@ -55,15 +55,61 @@ export const useDashboardData = (
   const { data: messages = [], isLoading: isMessagesLoading } = useQuery({
     queryKey: ["messages", timeFilter, userFilter],
     queryFn: async () => {
-      const query = supabase
+      const { data, error } = await supabase
         .from("messages")
         .select("*")
         .gte("created_at", startDate.toISOString())
         .lte("created_at", endDate.toISOString());
 
-      const { data, error } = await query;
       if (error) {
         console.error("Error fetching messages:", error);
+        return [];
+      }
+      return data || [];
+    },
+  });
+
+  const { data: broadcasts = [], isLoading: isBroadcastsLoading } = useQuery({
+    queryKey: ["broadcasts", timeFilter, userFilter],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("broadcasts")
+        .select("*")
+        .gte("created_at", startDate.toISOString())
+        .lte("created_at", endDate.toISOString());
+
+      if (error) {
+        console.error("Error fetching broadcasts:", error);
+        return [];
+      }
+      return data || [];
+    },
+  });
+
+  const { data: broadcastRecipients = [], isLoading: isBroadcastRecipientsLoading } = useQuery({
+    queryKey: ["broadcastRecipients", timeFilter, userFilter],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("broadcast_recipients")
+        .select("*")
+        .gte("created_at", startDate.toISOString())
+        .lte("created_at", endDate.toISOString());
+
+      if (error) {
+        console.error("Error fetching broadcast recipients:", error);
+        return [];
+      }
+      return data || [];
+    },
+  });
+
+  const { data: integrations = [], isLoading: isIntegrationsLoading } = useQuery({
+    queryKey: ["integrations"],
+    queryFn: async () => {
+      // Assuming 'name' is the column to identify 'WhatsApp Web'
+      const { data, error } = await supabase.from("integrations").select("id, name");
+      if (error) {
+        console.error("Error fetching integrations:", error);
         return [];
       }
       return data || [];
@@ -172,14 +218,43 @@ export const useDashboardData = (
     subscriptionPlan, // Contains plan name and limits (messages_per_month, token_allocation)
     tokenUsage: tokenUsageData?.tokensUsed ?? 0, // Actual tokens used in the period
     planLimits, // Extracted limits for convenience
-    isLoading: 
-      isLeadsLoading || 
-      isConversationsLoading || 
-      isMessagesLoading || 
-      isTasksLoading || 
-      isAuthUserLoading || 
+    broadcasts,
+    broadcastRecipients,
+    // Derived state for WhatsApp Web messages
+    whatsappWebMessages: (() => {
+      if (isMessagesLoading || isConversationsLoading || isIntegrationsLoading || !messages || !conversations || !integrations) {
+        return [];
+      }
+      // Find the WhatsApp Web integration ID. Adjust 'WhatsApp Web' string if needed.
+      const whatsAppWebIntegration = integrations.find(
+        (integ) => integ.name?.toLowerCase() === 'whatsapp web' || integ.name?.toLowerCase() === 'whatsapp'
+      );
+
+      if (!whatsAppWebIntegration || !whatsAppWebIntegration.id) {
+        return []; // WhatsApp Web integration not found or has no ID
+      }
+
+      // Get conversation IDs linked to WhatsApp Web
+      const whatsAppWebConversationIds = new Set(
+        conversations
+          .filter(conv => conv.integrations_id === whatsAppWebIntegration.id)
+          .map(conv => conv.conversation_id)
+      );
+
+      // Filter messages belonging to these conversations
+      return messages.filter(msg => msg.conversation_id && whatsAppWebConversationIds.has(msg.conversation_id));
+    })(),
+    isLoading:
+      isLeadsLoading ||
+      isConversationsLoading ||
+      isMessagesLoading ||
+      isBroadcastsLoading ||
+      isBroadcastRecipientsLoading ||
+      isIntegrationsLoading || // Added
+      isTasksLoading ||
+      isAuthUserLoading ||
       isSubscriptionPlanLoading ||
       isTokenUsageLoading ||
-      isTokenAllocationLoading, // Added loading state
+      isTokenAllocationLoading,
   };
 };

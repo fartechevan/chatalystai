@@ -16,7 +16,7 @@ export function DashboardAnalytics({
   onTimeChange,
   onUserChange,
 }: DashboardAnalyticsProps) {
-  const { leads, conversations, messages, tasks, isLoading } = useDashboardData(timeFilter, userFilter);
+  const { leads, conversations, messages, tasks, broadcasts, broadcastRecipients, whatsappWebMessages, isLoading } = useDashboardData(timeFilter, userFilter);
 
   return (
     <div className="h-full flex flex-col gap-6">
@@ -34,8 +34,11 @@ export function DashboardAnalytics({
           userFilter={userFilter}
           leads={leads}
           conversations={conversations}
-          messages={messages}
+          // messages={messages} // Keep original 'messages' for other potential uses if any
           tasks={tasks}
+          broadcasts={broadcasts}
+          broadcastRecipients={broadcastRecipients}
+          whatsappWebMessages={whatsappWebMessages} // Pass filtered WhatsApp Web messages with a distinct prop
           isLoading={isLoading}
         />
       </div>
