@@ -259,6 +259,45 @@ export type Database = {
         }
         Relationships: []
       }
+      appointments: {
+        Row: {
+          contact_identifier: string | null
+          created_at: string
+          end_time: string | null
+          id: string
+          notes: string | null
+          source_channel: string | null
+          start_time: string | null
+          status: string | null
+          title: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          contact_identifier?: string | null
+          created_at?: string
+          end_time?: string | null
+          id?: string
+          notes?: string | null
+          source_channel?: string | null
+          start_time?: string | null
+          status?: string | null
+          title?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          contact_identifier?: string | null
+          created_at?: string
+          end_time?: string | null
+          id?: string
+          notes?: string | null
+          source_channel?: string | null
+          start_time?: string | null
+          status?: string | null
+          title?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       batch_sentiment_analysis: {
         Row: {
           conversation_ids: string[] | null
@@ -395,6 +434,7 @@ export type Database = {
           instance_id: string | null
           integration_id: string | null
           message_text: string
+          segment_id: string | null
         }
         Insert: {
           created_at?: string
@@ -402,6 +442,7 @@ export type Database = {
           instance_id?: string | null
           integration_id?: string | null
           message_text: string
+          segment_id?: string | null
         }
         Update: {
           created_at?: string
@@ -409,6 +450,7 @@ export type Database = {
           instance_id?: string | null
           integration_id?: string | null
           message_text?: string
+          segment_id?: string | null
         }
         Relationships: [
           {
@@ -416,6 +458,13 @@ export type Database = {
             columns: ["integration_id"]
             isOneToOne: false
             referencedRelation: "integrations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_broadcasts_segment_id"
+            columns: ["segment_id"]
+            isOneToOne: false
+            referencedRelation: "segments"
             referencedColumns: ["id"]
           },
         ]
@@ -1398,41 +1447,34 @@ export type Database = {
           },
         ]
       }
-      token_usage: {
+      whatsapp_blast_limits: {
         Row: {
-          conversation_id: string | null
-          created_at: string | null
+          blast_limit: number
+          count: number
+          date: string
           id: string
-          tokens_used: number
-          user_id: string
+          integration_id: string
         }
         Insert: {
-          conversation_id?: string | null
-          created_at?: string | null
+          blast_limit: number
+          count?: number
+          date: string
           id?: string
-          tokens_used: number
-          user_id: string
+          integration_id: string
         }
         Update: {
-          conversation_id?: string | null
-          created_at?: string | null
+          blast_limit?: number
+          count?: number
+          date?: string
           id?: string
-          tokens_used?: number
-          user_id?: string
+          integration_id?: string
         }
         Relationships: [
           {
-            foreignKeyName: "token_usage_conversation_id_fkey"
-            columns: ["conversation_id"]
+            foreignKeyName: "whatsapp_blast_limits_integration_id_fkey"
+            columns: ["integration_id"]
             isOneToOne: false
-            referencedRelation: "conversations"
-            referencedColumns: ["conversation_id"]
-          },
-          {
-            foreignKeyName: "token_usage_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
+            referencedRelation: "integrations"
             referencedColumns: ["id"]
           },
         ]
@@ -1499,6 +1541,14 @@ export type Database = {
       hnswhandler: {
         Args: { "": unknown }
         Returns: unknown
+      }
+      is_user_team_admin_or_owner: {
+        Args: { p_user_id: string; p_team_id: string }
+        Returns: boolean
+      }
+      is_user_team_member: {
+        Args: { p_user_id: string; p_team_id: string }
+        Returns: boolean
       }
       ivfflat_bit_support: {
         Args: { "": unknown }
@@ -1683,6 +1733,7 @@ export type Database = {
         | "unpaid"
       sync_status: "pending" | "completed" | "failed"
       task_status: "follow-up" | "meeting"
+      team_role: "owner" | "admin" | "member"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1828,6 +1879,7 @@ export const Constants = {
       ],
       sync_status: ["pending", "completed", "failed"],
       task_status: ["follow-up", "meeting"],
+      team_role: ["owner", "admin", "member"],
     },
   },
 } as const
