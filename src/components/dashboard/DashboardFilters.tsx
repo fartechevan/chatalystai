@@ -37,81 +37,54 @@ export function DashboardFilters({
 
   return (
     <div className="max-w-full mx-auto mt-4">
-      <div className="flex flex-col sm:flex-row gap-2 justify-center">
-        <div className="flex bg-blue-800/80 backdrop-blur-sm rounded-full overflow-hidden">
-          <Tabs defaultValue={selectedTime} onValueChange={(value) => onTimeChange(value as any)} className="flex-1">
-            <TabsList className="w-full bg-transparent h-10 rounded-none">
-              <TabsTrigger 
-                value="today" 
-                className="flex-1 rounded-none border-0 text-white/90 h-10 data-[state=active]:bg-blue-600 data-[state=active]:text-white"
-              >
-                Today
-              </TabsTrigger>
-              <TabsTrigger 
-                value="yesterday" 
-                className="flex-1 rounded-none border-0 text-white/90 h-10 data-[state=active]:bg-blue-600 data-[state=active]:text-white"
-              >
-                Yesterday
-              </TabsTrigger>
-              <TabsTrigger 
-                value="week" 
-                className="flex-1 rounded-none border-0 text-white/90 h-10 data-[state=active]:bg-blue-600 data-[state=active]:text-white"
-              >
-                Week
-              </TabsTrigger>
-              <TabsTrigger 
-                value="month" 
-                className="flex-1 rounded-none border-0 text-white/90 h-10 data-[state=active]:bg-blue-600 data-[state=active]:text-white"
-              >
-                Month
-              </TabsTrigger>
-            </TabsList>
-          </Tabs>
-          
-          <Button 
-            variant="ghost"
-            className="rounded-none border-0 text-white/90 h-10 gap-2 hover:bg-blue-700"
-          >
-            <Clock className="h-4 w-4" />
-            Time
-          </Button>
-        </div>
+      <div className="flex flex-col sm:flex-row gap-2 justify-center items-center"> {/* Added items-center */}
+        {/* Time Period Tabs */}
+        <Tabs defaultValue={selectedTime} onValueChange={(value) => onTimeChange(value as 'today' | 'yesterday' | 'week' | 'month')} className="w-auto">
+          {/* Apply card background and border to TabsList, make it rounded */}
+          <TabsList className="bg-card border rounded-full p-1 h-auto"> 
+            {/* Remove individual styling from Triggers, rely on shadcn defaults and active state */}
+            <TabsTrigger value="today" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-3 py-1 text-sm">Today</TabsTrigger>
+            <TabsTrigger value="yesterday" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-3 py-1 text-sm">Yesterday</TabsTrigger>
+            <TabsTrigger value="week" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-3 py-1 text-sm">Week</TabsTrigger>
+            <TabsTrigger value="month" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-3 py-1 text-sm">Month</TabsTrigger>
+          </TabsList>
+        </Tabs>
         
-        <div className="flex bg-blue-800/80 backdrop-blur-sm rounded-full overflow-hidden">
-          <Select
-            defaultValue={selectedUser}
-            onValueChange={onUserChange}
-          >
-            <SelectTrigger className="min-w-[180px] border-0 bg-transparent text-white/90 h-10 focus:ring-0 rounded-full">
-              <SelectValue placeholder="Select user">
-                {selectedUser === 'all' ? (
-                  'All'
-                ) : (
-                  <div className="flex items-center">
-                    <User className="h-4 w-4 mr-2" />
-                    {profiles?.find(p => p.id === selectedUser)?.name || 'User'}
-                  </div>
-                )}
-              </SelectValue>
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All</SelectItem>
-              {profiles?.map((profile) => (
-                <SelectItem key={profile.id} value={profile.id}>
-                  <div className="flex items-center">
-                    <User className="h-4 w-4 mr-2" />
-                    {profile.name || profile.email}
-                  </div>
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
+        {/* The "Time" button with Clock icon seems redundant if Tabs are used for time selection. Removing it. */}
+        {/* If it was intended for a date range picker, that would be a different implementation. */}
         
-        <Button 
-          variant="ghost"
-          className="rounded-full border-0 text-white/90 h-10 bg-blue-800/80 backdrop-blur-sm hover:bg-blue-700"
-        >
+        {/* User Select */}
+        <Select defaultValue={selectedUser} onValueChange={onUserChange}>
+          {/* Apply card background and border to SelectTrigger, make it rounded */}
+          <SelectTrigger className="min-w-[180px] h-10 rounded-full bg-card border text-foreground data-[placeholder]:text-muted-foreground">
+            <SelectValue placeholder="Select user">
+              {selectedUser === 'all' ? (
+                'All Users'
+              ) : (
+                <div className="flex items-center">
+                  <User className="h-4 w-4 mr-2 flex-shrink-0" />
+                  <span className="truncate">
+                    {profiles?.find(p => p.id === selectedUser)?.name || profiles?.find(p => p.id === selectedUser)?.email || 'User'}
+                  </span>
+                </div>
+              )}
+            </SelectValue>
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">All Users</SelectItem>
+            {profiles?.map((profile) => (
+              <SelectItem key={profile.id} value={profile.id}>
+                <div className="flex items-center">
+                  <User className="h-4 w-4 mr-2 flex-shrink-0" />
+                  <span className="truncate">{profile.name || profile.email}</span>
+                </div>
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        
+        {/* Setup Button */}
+        <Button variant="outline" className="h-10 rounded-full bg-card border"> {/* Use outline variant with card background and border */}
           <Settings className="h-4 w-4 mr-2" />
           Setup
         </Button>
