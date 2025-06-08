@@ -63,9 +63,24 @@ export const sendBroadcastService = async (params: SendBroadcastParams): Promise
   let validRecipients: RecipientInfo[] = [];
   try {
     // Create Broadcast Record - Store the actual instanceId (UUID)
+    const insertPayload: { 
+      message_text: string; 
+      integration_id: string; 
+      instance_id: string; 
+      segment_id?: string; // Make segment_id optional in the payload type
+    } = { 
+      message_text: messageText, 
+      integration_id: integrationId, 
+      instance_id: instanceId 
+    };
+
+    if (targetMode === 'segment' && segmentId) {
+      insertPayload.segment_id = segmentId;
+    }
+
     const { data: broadcastData, error: broadcastInsertError } = await supabase
       .from('broadcasts')
-      .insert({ message_text: messageText, integration_id: integrationId, instance_id: instanceId }) // Store the actual instanceId
+      .insert(insertPayload)
       .select('id')
       .single();
     if (broadcastInsertError) throw broadcastInsertError;
