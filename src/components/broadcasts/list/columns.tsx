@@ -95,21 +95,6 @@ export const getBroadcastColumns = (actions: Omit<BroadcastColumnActionsProps, '
     enableHiding: false,
   },
   {
-    accessorKey: "name",
-    header: ({ column }) => {
-      return (
-        <Button
-          variant="ghost"
-          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-        >
-          Name
-          <ArrowUpDown className="ml-2 h-4 w-4" />
-        </Button>
-      );
-    },
-    cell: ({ row }) => <div className="font-medium">{row.getValue("name") || `Broadcast ${row.original.id.substring(0,4)}`}</div>,
-  },
-  {
     accessorKey: "message_text",
     header: "Message Preview",
     cell: ({ row }) => {

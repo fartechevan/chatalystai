@@ -156,13 +156,10 @@ export async function handleMessageEvent(supabaseClient: SupabaseClient, data: W
     // Validate necessary IDs before upserting
     if (!wamid) {
         console.error("[MessageHandler] Missing WhatsApp message ID (wamid) in webhook data. Cannot upsert.");
-        // Decide if this is a critical failure or should be skipped
-        // For now, returning an error to highlight the issue.
         return "Missing WhatsApp message ID";
     }
      if (!participantId) {
          console.error("[MessageHandler] Cannot upsert message without a valid sender_participant_id.");
-         // This indicates a failure in identifying the sender, likely the 'admin' for fromMe:true
          return "Failed to identify message sender (check user_reference_id config)";
     }
      if (!appConversationId) {
@@ -170,7 +167,9 @@ export async function handleMessageEvent(supabaseClient: SupabaseClient, data: W
          return "Failed to identify conversation";
     }
 
-    const { error: upsertError } = await supabaseClient
+    console.log(`[MessageHandler] PRE-UPSERT CHECK: wamid='${wamid}', appConversationId='${appConversationId}', participantId='${participantId}', messageText='${messageText}'`);
+
+    const { data: upsertedMessage, error: upsertError } = await supabaseClient
       .from('messages')
       .upsert({
         wamid: wamid, // The unique WhatsApp message ID
@@ -182,18 +181,17 @@ export async function handleMessageEvent(supabaseClient: SupabaseClient, data: W
       }, {
         onConflict: 'wamid', // Specify the unique column for conflict resolution
         // ignoreDuplicates: false // Default is false, ensures updates happen on conflict
-      });
+      })
+      .select(); // Added select() to get the result of the upsert/update
 
     if (upsertError) {
-      const errorMsg = `[MessageHandler] Error upserting message in DB (wamid: ${wamid}): ${upsertError.message}`;
-      console.error(errorMsg);
-      // Depending on the error (e.g., constraint violation vs. connection error),
-      // you might still want to proceed with AI logic or return the error.
-      // Returning error for now.
+      const errorMsg = `[MessageHandler] Error upserting message in DB (wamid: ${wamid}, convId: ${appConversationId}, partId: ${participantId}): ${upsertError.message}. Details: ${JSON.stringify(upsertError)}`;
+      console.error(errorMsg, upsertError); // Log the full error object
       return errorMsg;
     }
 
-    console.log(`[MessageHandler] Successfully upserted message (wamid: ${wamid}) in conversation ${appConversationId} from participant ${participantId}`);
+    console.log(`[MessageHandler] Successfully upserted/updated message (wamid: ${wamid}). Result: ${JSON.stringify(upsertedMessage)}`);
+    // console.log(`[MessageHandler] Successfully upserted message (wamid: ${wamid}) in conversation ${appConversationId} from participant ${participantId}`); // Original log replaced
 
     // --- New AI Agent Session & Interaction Logic ---
     // Only trigger AI logic for non-empty messages coming *from* the contact
