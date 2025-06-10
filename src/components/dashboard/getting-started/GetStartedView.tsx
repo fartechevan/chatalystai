@@ -24,7 +24,7 @@ export function GetStartedView({ userData }: GetStartedViewProps) {
     isLoading: isLoadingDashboardData, 
     messages, 
     subscriptionPlan, 
-    tokenUsage, 
+    // tokenUsage, 
     planLimits 
   } = useDashboardData('month', 'all');
 
@@ -36,10 +36,10 @@ export function GetStartedView({ userData }: GetStartedViewProps) {
         <CardContent className="p-6">
           <h1 className="text-2xl font-semibold mb-4">Hello, {userData?.email?.split('@')[0] || 'User'}!</h1>
           <div className="flex flex-wrap gap-x-4 gap-y-2 text-sm text-muted-foreground">
-            {isLoadingIntegrations ? (
+            {isLoadingIntegrations || isLoadingDashboardData ? (
               <Skeleton className="h-4 w-20" />
             ) : (
-              <span>{integrationsCount} Channels</span>
+              <span>Channels: {integrationsCount} / {planLimits.integrationsAllowed ?? '∞'}</span>
             )}
             <span>•</span>
             {isLoadingCustomers ? (
@@ -62,10 +62,11 @@ export function GetStartedView({ userData }: GetStartedViewProps) {
                 <span>
                   Messages: {messages.length} / {planLimits.messagesPerMonth ?? '∞'}
                 </span>
-                <span>•</span>
+                {/* Tokens display temporarily removed due to issues with tokenUsage data */}
+                {/* <span>•</span>
                 <span>
                   Tokens: {tokenUsage} / {planLimits.tokenAllocation ?? '∞'}
-                </span>
+                </span> */}
               </>
             ) : !isLoadingDashboardData ? ( // Only show if not loading and no plan
               <>

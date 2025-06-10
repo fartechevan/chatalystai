@@ -202,7 +202,7 @@ export function IntegrationsView({ isActive, activeTab, setActiveTab }: Integrat
   }, [processedIntegrations, searchQuery, activeTab]);
 
   const isLoading = isLoadingIntegrationTypes || isLoadingUserConfigs || isLoadingPlan;
-  const userConnectedCount = userIntegrationConfigs.filter(conf => conf.status && conf.status !== 'close' && conf.status !== 'unknown').length;
+  const userConnectedCount = userIntegrationConfigs.filter(conf => conf.status && conf.status !== 'close').length; // Include 'unknown' for this count
   
   const userMaxAllowed = useMemo(() => {
     let maxAllowed = '...';
