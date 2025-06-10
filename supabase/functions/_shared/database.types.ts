@@ -9,7 +9,6 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
-      // Adding missing tables and ensuring all definitions are consistent
       agent_conversations: {
         Row: {
           added_to_knowledge_base: boolean | null
@@ -122,6 +121,39 @@ export type Database = {
           },
         ]
       }
+      ai_agent_knowledge_documents: {
+        Row: {
+          agent_id: string
+          created_at: string
+          document_id: string
+        }
+        Insert: {
+          agent_id: string
+          created_at?: string
+          document_id: string
+        }
+        Update: {
+          agent_id?: string
+          created_at?: string
+          document_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ai_agent_knowledge_documents_agent_id_fkey"
+            columns: ["agent_id"]
+            isOneToOne: false
+            referencedRelation: "ai_agents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ai_agent_knowledge_documents_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "knowledge_documents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ai_agent_sessions: {
         Row: {
           agent_id: string | null
@@ -178,9 +210,14 @@ export type Database = {
       }
       ai_agents: {
         Row: {
+          activation_mode:
+            | Database["public"]["Enums"]["agent_activation_mode"]
+            | null
+          agent_type: string
           created_at: string
+          custom_agent_config: Json | null
           id: string
-          is_enabled: boolean | null // Added based on src/types/supabase.ts
+          is_enabled: boolean | null
           keyword_trigger: string | null
           knowledge_document_ids: string[] | null
           name: string
@@ -189,9 +226,14 @@ export type Database = {
           user_id: string
         }
         Insert: {
+          activation_mode?:
+            | Database["public"]["Enums"]["agent_activation_mode"]
+            | null
+          agent_type?: string
           created_at?: string
+          custom_agent_config?: Json | null
           id?: string
-          is_enabled?: boolean | null // Added based on src/types/supabase.ts
+          is_enabled?: boolean | null
           keyword_trigger?: string | null
           knowledge_document_ids?: string[] | null
           name: string
@@ -200,9 +242,14 @@ export type Database = {
           user_id: string
         }
         Update: {
+          activation_mode?:
+            | Database["public"]["Enums"]["agent_activation_mode"]
+            | null
+          agent_type?: string
           created_at?: string
+          custom_agent_config?: Json | null
           id?: string
-          is_enabled?: boolean | null // Added based on src/types/supabase.ts
+          is_enabled?: boolean | null
           keyword_trigger?: string | null
           knowledge_document_ids?: string[] | null
           name?: string
@@ -211,6 +258,126 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      appointments: {
+        Row: {
+          contact_identifier: string | null
+          created_at: string
+          end_time: string | null
+          id: string
+          notes: string | null
+          source_channel: string | null
+          start_time: string | null
+          status: string | null
+          title: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          contact_identifier?: string | null
+          created_at?: string
+          end_time?: string | null
+          id?: string
+          notes?: string | null
+          source_channel?: string | null
+          start_time?: string | null
+          status?: string | null
+          title?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          contact_identifier?: string | null
+          created_at?: string
+          end_time?: string | null
+          id?: string
+          notes?: string | null
+          source_channel?: string | null
+          start_time?: string | null
+          status?: string | null
+          title?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      batch_sentiment_analysis: {
+        Row: {
+          conversation_ids: string[] | null
+          created_at: string | null
+          end_date: string
+          id: string
+          negative_count: number | null
+          neutral_count: number | null
+          overall_sentiment: string | null
+          positive_count: number | null
+          start_date: string
+          summary: string | null
+        }
+        Insert: {
+          conversation_ids?: string[] | null
+          created_at?: string | null
+          end_date: string
+          id?: string
+          negative_count?: number | null
+          neutral_count?: number | null
+          overall_sentiment?: string | null
+          positive_count?: number | null
+          start_date: string
+          summary?: string | null
+        }
+        Update: {
+          conversation_ids?: string[] | null
+          created_at?: string | null
+          end_date?: string
+          id?: string
+          negative_count?: number | null
+          neutral_count?: number | null
+          overall_sentiment?: string | null
+          positive_count?: number | null
+          start_date?: string
+          summary?: string | null
+        }
+        Relationships: []
+      }
+      batch_sentiment_analysis_details: {
+        Row: {
+          batch_analysis_id: string
+          conversation_id: string
+          created_at: string
+          description: string | null
+          id: number
+          sentiment: Database["public"]["Enums"]["sentiment_enum"]
+        }
+        Insert: {
+          batch_analysis_id: string
+          conversation_id: string
+          created_at?: string
+          description?: string | null
+          id?: never
+          sentiment: Database["public"]["Enums"]["sentiment_enum"]
+        }
+        Update: {
+          batch_analysis_id?: string
+          conversation_id?: string
+          created_at?: string
+          description?: string | null
+          id?: never
+          sentiment?: Database["public"]["Enums"]["sentiment_enum"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "batch_sentiment_analysis_details_batch_analysis_id_fkey"
+            columns: ["batch_analysis_id"]
+            isOneToOne: false
+            referencedRelation: "batch_sentiment_analysis"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "batch_sentiment_analysis_details_conversation_id_fkey"
+            columns: ["conversation_id"]
+            isOneToOne: false
+            referencedRelation: "conversations"
+            referencedColumns: ["conversation_id"]
+          },
+        ]
       }
       broadcast_recipients: {
         Row: {
@@ -267,6 +434,7 @@ export type Database = {
           instance_id: string | null
           integration_id: string | null
           message_text: string
+          segment_id: string | null
         }
         Insert: {
           created_at?: string
@@ -274,6 +442,7 @@ export type Database = {
           instance_id?: string | null
           integration_id?: string | null
           message_text: string
+          segment_id?: string | null
         }
         Update: {
           created_at?: string
@@ -281,6 +450,7 @@ export type Database = {
           instance_id?: string | null
           integration_id?: string | null
           message_text?: string
+          segment_id?: string | null
         }
         Relationships: [
           {
@@ -288,6 +458,13 @@ export type Database = {
             columns: ["integration_id"]
             isOneToOne: false
             referencedRelation: "integrations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_broadcasts_segment_id"
+            columns: ["segment_id"]
+            isOneToOne: false
+            referencedRelation: "segments"
             referencedColumns: ["id"]
           },
         ]
@@ -441,6 +618,63 @@ export type Database = {
         }
         Relationships: []
       }
+      document_chunks: {
+        Row: {
+          content: string
+          created_at: string | null
+          embedding: string | null
+          filename: string | null
+          id: number
+          image_summary: string | null
+          metadata: Json | null
+          source: string | null
+          total_images: number | null
+        }
+        Insert: {
+          content: string
+          created_at?: string | null
+          embedding?: string | null
+          filename?: string | null
+          id?: number
+          image_summary?: string | null
+          metadata?: Json | null
+          source?: string | null
+          total_images?: number | null
+        }
+        Update: {
+          content?: string
+          created_at?: string | null
+          embedding?: string | null
+          filename?: string | null
+          id?: number
+          image_summary?: string | null
+          metadata?: Json | null
+          source?: string | null
+          total_images?: number | null
+        }
+        Relationships: []
+      }
+      documents: {
+        Row: {
+          content: string | null
+          embedding: string | null
+          id: string
+          metadata: Json | null
+        }
+        Insert: {
+          content?: string | null
+          embedding?: string | null
+          id: string
+          metadata?: Json | null
+        }
+        Update: {
+          content?: string | null
+          embedding?: string | null
+          id?: string
+          metadata?: Json | null
+        }
+        Relationships: []
+      }
       evolution_webhook_events: {
         Row: {
           created_at: string | null
@@ -480,8 +714,8 @@ export type Database = {
           name: string
           status: Database["public"]["Enums"]["integration_status"]
           updated_at: string | null
-          webhook_events: Json | null // Added
-          webhook_url: string | null // Added
+          webhook_events: Json | null
+          webhook_url: string | null
         }
         Insert: {
           api_key?: string | null
@@ -494,8 +728,8 @@ export type Database = {
           name: string
           status?: Database["public"]["Enums"]["integration_status"]
           updated_at?: string | null
-          webhook_events?: Json | null // Added
-          webhook_url?: string | null // Added
+          webhook_events?: Json | null
+          webhook_url?: string | null
         }
         Update: {
           api_key?: string | null
@@ -508,8 +742,8 @@ export type Database = {
           name?: string
           status?: Database["public"]["Enums"]["integration_status"]
           updated_at?: string | null
-          webhook_events?: Json | null // Added
-          webhook_url?: string | null // Added
+          webhook_events?: Json | null
+          webhook_url?: string | null
         }
         Relationships: []
       }
@@ -521,12 +755,11 @@ export type Database = {
           instance_id: string | null
           integration_id: string
           owner_id: string | null
+          pipeline_id: string | null
           status: string | null
           token: string | null
           updated_at: string
           user_reference_id: string | null
-          // webhook_events removed
-          // webhook_url removed
         }
         Insert: {
           created_at?: string
@@ -535,12 +768,11 @@ export type Database = {
           instance_id?: string | null
           integration_id: string
           owner_id?: string | null
+          pipeline_id?: string | null
           status?: string | null
           token?: string | null
           updated_at?: string
           user_reference_id?: string | null
-          // webhook_events removed
-          // webhook_url removed
         }
         Update: {
           created_at?: string
@@ -549,19 +781,25 @@ export type Database = {
           instance_id?: string | null
           integration_id?: string
           owner_id?: string | null
+          pipeline_id?: string | null
           status?: string | null
           token?: string | null
           updated_at?: string
           user_reference_id?: string | null
-          // webhook_events removed
-          // webhook_url removed
         }
         Relationships: [
           {
             foreignKeyName: "integrations_config_integration_id_fkey"
             columns: ["integration_id"]
-            isOneToOne: true
+            isOneToOne: false
             referencedRelation: "integrations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "integrations_config_pipeline_id_fkey"
+            columns: ["pipeline_id"]
+            isOneToOne: false
+            referencedRelation: "pipelines"
             referencedColumns: ["id"]
           },
         ]
@@ -790,7 +1028,7 @@ export type Database = {
           is_read: boolean
           message_id: string
           sender_participant_id: string
-          wamid: string | null // Added based on src/types/supabase.ts
+          wamid: string | null
         }
         Insert: {
           content: string
@@ -799,7 +1037,7 @@ export type Database = {
           is_read?: boolean
           message_id?: string
           sender_participant_id: string
-          wamid?: string | null // Added based on src/types/supabase.ts
+          wamid?: string | null
         }
         Update: {
           content?: string
@@ -808,7 +1046,7 @@ export type Database = {
           is_read?: boolean
           message_id?: string
           sender_participant_id?: string
-          wamid?: string | null // Added based on src/types/supabase.ts
+          wamid?: string | null
         }
         Relationships: [
           {
@@ -888,6 +1126,50 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      plans: {
+        Row: {
+          created_at: string
+          features: Json | null
+          id: string
+          integrations_allowed: number | null
+          messages_per_month: number | null
+          name: string
+          owner_id: string | null
+          price: number
+          token_allocation: number | null
+        }
+        Insert: {
+          created_at?: string
+          features?: Json | null
+          id?: string
+          integrations_allowed?: number | null
+          messages_per_month?: number | null
+          name: string
+          owner_id?: string | null
+          price: number
+          token_allocation?: number | null
+        }
+        Update: {
+          created_at?: string
+          features?: Json | null
+          id?: string
+          integrations_allowed?: number | null
+          messages_per_month?: number | null
+          name?: string
+          owner_id?: string | null
+          price?: number
+          token_allocation?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "plans_owner_id_fkey"
+            columns: ["owner_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       profile_integration_access: {
         Row: {
@@ -1043,6 +1325,66 @@ export type Database = {
         }
         Relationships: []
       }
+      subscriptions: {
+        Row: {
+          cancel_at_period_end: boolean | null
+          canceled_at: string | null
+          created_at: string
+          current_period_end: string
+          current_period_start: string
+          ended_at: string | null
+          id: string
+          plan_id: string
+          profile_id: string
+          status: Database["public"]["Enums"]["subscription_status"]
+          subscribed_at: string
+          updated_at: string
+        }
+        Insert: {
+          cancel_at_period_end?: boolean | null
+          canceled_at?: string | null
+          created_at?: string
+          current_period_end: string
+          current_period_start: string
+          ended_at?: string | null
+          id?: string
+          plan_id: string
+          profile_id: string
+          status: Database["public"]["Enums"]["subscription_status"]
+          subscribed_at?: string
+          updated_at?: string
+        }
+        Update: {
+          cancel_at_period_end?: boolean | null
+          canceled_at?: string | null
+          created_at?: string
+          current_period_end?: string
+          current_period_start?: string
+          ended_at?: string | null
+          id?: string
+          plan_id?: string
+          profile_id?: string
+          status?: Database["public"]["Enums"]["subscription_status"]
+          subscribed_at?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "subscriptions_plan_id_fkey"
+            columns: ["plan_id"]
+            isOneToOne: false
+            referencedRelation: "plans"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "subscriptions_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       tags: {
         Row: {
           created_at: string
@@ -1141,41 +1483,34 @@ export type Database = {
           },
         ]
       }
-      token_usage: {
+      whatsapp_blast_limits: {
         Row: {
-          conversation_id: string | null
-          created_at: string | null
+          blast_limit: number
+          count: number
+          date: string
           id: string
-          tokens_used: number
-          user_id: string
+          integration_id: string
         }
         Insert: {
-          conversation_id?: string | null
-          created_at?: string | null
+          blast_limit: number
+          count?: number
+          date: string
           id?: string
-          tokens_used: number
-          user_id: string
+          integration_id: string
         }
         Update: {
-          conversation_id?: string | null
-          created_at?: string | null
+          blast_limit?: number
+          count?: number
+          date?: string
           id?: string
-          tokens_used?: number
-          user_id?: string
+          integration_id?: string
         }
         Relationships: [
           {
-            foreignKeyName: "token_usage_conversation_id_fkey"
-            columns: ["conversation_id"]
+            foreignKeyName: "whatsapp_blast_limits_integration_id_fkey"
+            columns: ["integration_id"]
             isOneToOne: false
-            referencedRelation: "conversations"
-            referencedColumns: ["conversation_id"]
-          },
-          {
-            foreignKeyName: "token_usage_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
+            referencedRelation: "integrations"
             referencedColumns: ["id"]
           },
         ]
@@ -1243,6 +1578,14 @@ export type Database = {
         Args: { "": unknown }
         Returns: unknown
       }
+      is_user_team_admin_or_owner: {
+        Args: { p_user_id: string; p_team_id: string }
+        Returns: boolean
+      }
+      is_user_team_member: {
+        Args: { p_user_id: string; p_team_id: string }
+        Returns: boolean
+      }
       ivfflat_bit_support: {
         Args: { "": unknown }
         Returns: unknown
@@ -1264,15 +1607,43 @@ export type Database = {
         Returns: string
       }
       match_chunks: {
-        Args: {
-          query_embedding: string
-          match_threshold: number
-          match_count: number
-        }
+        Args:
+          | {
+              query_embedding: string
+              match_threshold: number
+              match_count: number
+            }
+          | {
+              query_embedding: string
+              match_threshold: number
+              match_count: number
+              filter_document_ids?: string[]
+            }
         Returns: {
           id: string
           document_id: string
           content: string
+          similarity: number
+        }[]
+      }
+      match_documents: {
+        Args:
+          | { query_embedding: string; match_count?: number; filter?: Json }
+          | {
+              query_embedding: string
+              match_threshold?: number
+              match_count?: number
+              filter_source?: string
+              fetch_k?: number
+            }
+        Returns: {
+          id: number
+          content: string
+          metadata: Json
+          source: string
+          filename: string
+          total_images: number
+          image_summary: string
           similarity: number
         }[]
       }
@@ -1304,6 +1675,18 @@ export type Database = {
           similarity: number
         }[]
       }
+      n8n_match_knowledge_chunks_test: {
+        Args: {
+          p_filter: string
+          p_match_count: number
+          p_query_embedding: string
+        }
+        Returns: {
+          id: string
+          content: string
+          similarity: number
+        }[]
+      }
       profile_has_integration_access: {
         Args: { _profile_id: string; _integration_config_id: string }
         Returns: boolean
@@ -1319,6 +1702,30 @@ export type Database = {
       sparsevec_typmod_in: {
         Args: { "": unknown[] }
         Returns: number
+      }
+      update_pipeline_name: {
+        Args: { pipeline_id: string; new_name: string }
+        Returns: {
+          created_at: string
+          id: string
+          is_default: boolean | null
+          name: string
+          updated_at: string
+          user_id: string
+        }[]
+      }
+      upsert_integration_config: {
+        Args: {
+          p_integration_id: string
+          p_instance_id: string
+          p_instance_display_name: string
+          p_token: string
+          p_owner_id: string
+          p_user_reference_id: string
+          p_pipeline_id: string
+          p_status: string
+        }
+        Returns: undefined
       }
       vector_avg: {
         Args: { "": number[] }
@@ -1345,17 +1752,36 @@ export type Database = {
         Returns: number
       }
     }
-    Enums: { // Corrected Enums block
+    Enums: {
+      agent_activation_mode: "keyword" | "always_on"
       ai_session_status: "active" | "closed" | "error"
       app_role: "admin" | "user" | "customer"
+      day_of_week:
+        | "monday"
+        | "tuesday"
+        | "wednesday"
+        | "thursday"
+        | "friday"
+        | "saturday"
+        | "sunday"
       integration_status: "available" | "coming_soon"
       new_app_role: "user" | "admin"
       role_enum: "admin" | "member"
       sender_type: "user" | "ai"
+      sentiment_enum: "good" | "moderate" | "bad" | "unknown"
       sentiment_level: "bad" | "moderate" | "good"
       sentiment_type: "bad" | "moderate" | "good"
+      subscription_status:
+        | "active"
+        | "trialing"
+        | "past_due"
+        | "canceled"
+        | "incomplete"
+        | "incomplete_expired"
+        | "unpaid"
       sync_status: "pending" | "completed" | "failed"
       task_status: "follow-up" | "meeting"
+      team_role: "owner" | "admin" | "member"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1470,17 +1896,38 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: { // Corrected Enums block
+    Enums: {
+      agent_activation_mode: ["keyword", "always_on"],
       ai_session_status: ["active", "closed", "error"],
       app_role: ["admin", "user", "customer"],
+      day_of_week: [
+        "monday",
+        "tuesday",
+        "wednesday",
+        "thursday",
+        "friday",
+        "saturday",
+        "sunday",
+      ],
       integration_status: ["available", "coming_soon"],
       new_app_role: ["user", "admin"],
       role_enum: ["admin", "member"],
       sender_type: ["user", "ai"],
+      sentiment_enum: ["good", "moderate", "bad", "unknown"],
       sentiment_level: ["bad", "moderate", "good"],
       sentiment_type: ["bad", "moderate", "good"],
+      subscription_status: [
+        "active",
+        "trialing",
+        "past_due",
+        "canceled",
+        "incomplete",
+        "incomplete_expired",
+        "unpaid",
+      ],
       sync_status: ["pending", "completed", "failed"],
       task_status: ["follow-up", "meeting"],
+      team_role: ["owner", "admin", "member"],
     },
   },
 } as const

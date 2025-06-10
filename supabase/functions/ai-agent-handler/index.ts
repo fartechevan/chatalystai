@@ -9,14 +9,14 @@ type AIAgentDbRow = Database['public']['Tables']['ai_agents']['Row'];
 
 interface NewAgentPayload {
   name: string;
-  prompt: string; 
+  prompt?: string; // Prompt is optional for CustomAgent
   keyword_trigger?: string | null;
   knowledge_document_ids?: string[];
   integration_ids?: string[];
   is_enabled?: boolean;
   activation_mode?: 'keyword' | 'always_on';
-  agent_type?: 'chattalyst' | 'n8n';
-  n8n_webhook_url?: string | null;
+  agent_type?: 'chattalyst' | 'CustomAgent'; // Updated agent_type
+  custom_agent_config?: { webhook_url?: string; [key: string]: unknown; } | null; // New field, using unknown
 }
 
 interface UpdateAgentPayload {
@@ -27,8 +27,8 @@ interface UpdateAgentPayload {
   integration_ids?: string[];
   is_enabled?: boolean;
   activation_mode?: 'keyword' | 'always_on';
-  agent_type?: 'chattalyst' | 'n8n';
-  n8n_webhook_url?: string | null;
+  agent_type?: 'chattalyst' | 'CustomAgent'; // Updated agent_type
+  custom_agent_config?: { webhook_url?: string; [key: string]: unknown; } | null; // New field, using unknown
 }
 
 interface AgentWithDetails extends AIAgentDbRow { 
@@ -39,12 +39,12 @@ interface AgentWithDetails extends AIAgentDbRow {
 // Explicit type for data to be inserted into ai_agents table
 interface AgentForCreate {
   name: string;
-  prompt: string;
+  prompt: string; // Will be empty for CustomAgent
   keyword_trigger: string | null;
   is_enabled: boolean;
-  activation_mode: 'keyword' | 'always_on';
-  agent_type: 'chattalyst' | 'n8n';
-  n8n_webhook_url: string | null;
+  activation_mode: Database["public"]["Enums"]["agent_activation_mode"]; // Match DB type
+  agent_type: string; // Match DB type, will be 'chattalyst' or 'CustomAgent'
+  custom_agent_config: { webhook_url?: string; [key: string]: unknown; } | null;
   user_id: string;
 }
 // Explicit type for data to be used in updating ai_agents table
@@ -53,9 +53,9 @@ interface AgentForUpdate {
   prompt?: string;
   keyword_trigger?: string | null;
   is_enabled?: boolean;
-  activation_mode?: 'keyword' | 'always_on';
-  agent_type?: 'chattalyst' | 'n8n';
-  n8n_webhook_url?: string | null;
+  activation_mode?: Database["public"]["Enums"]["agent_activation_mode"]; // Match DB type
+  agent_type?: string; // Match DB type
+  custom_agent_config?: { webhook_url?: string; [key: string]: unknown; } | null;
 }
 
 
@@ -121,11 +121,11 @@ serve(async (req: Request) => {
       let payload: NewAgentPayload;
       try {
         payload = await req.json();
-        if (!payload.name || 
-            (payload.agent_type === 'chattalyst' && (payload.prompt === undefined || payload.prompt.trim() === '')) || 
-            (payload.agent_type === 'n8n' && !payload.n8n_webhook_url) // Simplified check for n8n_webhook_url
+        if (!payload.name ||
+            (payload.agent_type === 'chattalyst' && (payload.prompt === undefined || payload.prompt.trim() === '')) ||
+            (payload.agent_type === 'CustomAgent' && (!payload.custom_agent_config || !payload.custom_agent_config.webhook_url))
            ) {
-          throw new Error("Missing required fields: name, and prompt (for chattalyst) or n8n_webhook_url (for n8n)");
+          throw new Error("Missing required fields: name, and prompt (for chattalyst) or custom_agent_config.webhook_url (for CustomAgent)");
         }
       } catch (jsonError) {
         return createJsonResponse({ error: 'Invalid payload for agent creation', details: (jsonError as Error).message }, 400);
@@ -133,19 +133,19 @@ serve(async (req: Request) => {
 
       const { knowledge_document_ids: knowledgeIdsToLink, integration_ids: integrationIdsToLink, ...agentCorePayload } = payload;
       
-      const agentToCreateData: AgentForCreate = { // Use explicit AgentForCreate type
+      const agentToCreateData: AgentForCreate = {
         name: agentCorePayload.name,
         prompt: (agentCorePayload.agent_type === 'chattalyst' && agentCorePayload.prompt) ? agentCorePayload.prompt : '',
         keyword_trigger: agentCorePayload.keyword_trigger || null,
         is_enabled: agentCorePayload.is_enabled ?? true,
         activation_mode: agentCorePayload.activation_mode || 'keyword',
-        agent_type: agentCorePayload.agent_type || 'chattalyst',
-        n8n_webhook_url: (agentCorePayload.agent_type === 'n8n' && agentCorePayload.n8n_webhook_url) ? agentCorePayload.n8n_webhook_url : null,
-        user_id: userId!, 
+        agent_type: agentCorePayload.agent_type || 'chattalyst', // Will be 'chattalyst' or 'CustomAgent'
+        custom_agent_config: (agentCorePayload.agent_type === 'CustomAgent' && agentCorePayload.custom_agent_config) ? agentCorePayload.custom_agent_config : null,
+        user_id: userId!,
       };
 
       const { data: newAgent, error: agentInsertError } = await supabase
-        .from('ai_agents').insert(agentToCreateData).select().single<AIAgentDbRow>(); // Removed 'as any'
+        .from('ai_agents').insert(agentToCreateData).select().single<AIAgentDbRow>();
       if (agentInsertError) {
         console.error("DB Insert Error:", agentInsertError); 
         return createJsonResponse({ error: 'Failed to create agent in database', details: agentInsertError.message }, 500);
@@ -267,27 +267,45 @@ serve(async (req: Request) => {
       if (agentCorePayload.is_enabled !== undefined) agentToUpdateData.is_enabled = agentCorePayload.is_enabled;
       if (agentCorePayload.activation_mode !== undefined) agentToUpdateData.activation_mode = agentCorePayload.activation_mode;
       
-      const agentTypeFromPayload = agentCorePayload.agent_type;
+      const agentTypeFromPayload = agentCorePayload.agent_type; // This is 'chattalyst' | 'CustomAgent' | undefined
 
-      if (agentTypeFromPayload) {
+      if (agentTypeFromPayload) { // If agent_type is being explicitly set
         agentToUpdateData.agent_type = agentTypeFromPayload;
         if (agentTypeFromPayload === 'chattalyst') {
-          agentToUpdateData.n8n_webhook_url = null;
-          if (agentCorePayload.prompt !== undefined) agentToUpdateData.prompt = agentCorePayload.prompt;
-        } else if (agentTypeFromPayload === 'n8n') {
-          agentToUpdateData.prompt = ''; 
-          if (agentCorePayload.n8n_webhook_url !== undefined) agentToUpdateData.n8n_webhook_url = agentCorePayload.n8n_webhook_url;
-          else agentToUpdateData.n8n_webhook_url = null; 
+          agentToUpdateData.custom_agent_config = null;
+          if (agentCorePayload.prompt !== undefined) {
+            agentToUpdateData.prompt = agentCorePayload.prompt;
+          }
+        } else if (agentTypeFromPayload === 'CustomAgent') {
+          agentToUpdateData.prompt = ''; // Custom agents don't use our prompt field
+          if (agentCorePayload.custom_agent_config !== undefined) { 
+            agentToUpdateData.custom_agent_config = agentCorePayload.custom_agent_config;
+          } else {
+            agentToUpdateData.custom_agent_config = null; 
+          }
         }
-      } else { 
-        // If agent_type is not in payload, only update prompt/webhook if they are explicitly provided
-        if (agentCorePayload.prompt !== undefined) agentToUpdateData.prompt = agentCorePayload.prompt;
-        if (agentCorePayload.n8n_webhook_url !== undefined) agentToUpdateData.n8n_webhook_url = agentCorePayload.n8n_webhook_url;
+      } else {
+        // If agent_type is NOT in payload, update prompt and custom_agent_config only if they are explicitly provided
+        if (agentCorePayload.prompt !== undefined) {
+          agentToUpdateData.prompt = agentCorePayload.prompt;
+          if (agentCorePayload.custom_agent_config === undefined) { // If prompt is set, and no custom_config, nullify custom_config
+             agentToUpdateData.custom_agent_config = null;
+          }
+        }
+        if (agentCorePayload.custom_agent_config !== undefined) {
+          agentToUpdateData.custom_agent_config = agentCorePayload.custom_agent_config;
+          if (agentCorePayload.prompt === undefined || agentCorePayload.prompt === '') { // If custom_config is set, and no prompt, empty prompt
+            agentToUpdateData.prompt = '';
+          }
+        }
       }
 
+      console.log(`[${requestStartTime}] Update Agent: User ID for update: ${userId}`);
+      console.log(`[${requestStartTime}] Update Agent: Data to be updated for agent ${agentIdFromPath}:`, JSON.stringify(agentToUpdateData, null, 2));
+
       let updatedAgent: AIAgentDbRow | null = null;
-      if (Object.keys(agentToUpdateData).length > 0) {
-        const { data, error } = await supabase.from('ai_agents').update(agentToUpdateData)  // Removed 'as any'
+      if (Object.keys(agentToUpdateData).length > 0) { // Check if there's anything to update
+        const { data, error } = await supabase.from('ai_agents').update(agentToUpdateData)
           .eq('id', agentIdFromPath).eq('user_id', userId!).select().single<AIAgentDbRow>();
         if (error) {
           console.error("DB Update Error:", error); 

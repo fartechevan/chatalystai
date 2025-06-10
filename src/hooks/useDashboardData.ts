@@ -243,6 +243,7 @@ export const useDashboardData = (
     messagesPerMonth: subscriptionPlan?.plans?.messages_per_month ?? null,
     // Token allocation now comes from userTokenAllocation
     tokenAllocation: userTokenAllocation?.monthly_tokens ?? null, 
+    integrationsAllowed: subscriptionPlan?.plans?.integrations_allowed ?? null,
   };
 
   const dailyActivityData = (() => {
