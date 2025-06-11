@@ -32,6 +32,9 @@ export function ConversationView() {
     conversations,
     messages,
     isLoading: isLoadingConversationData,
+    isFetchingNextPage, // Added
+    hasNextPage, // Added
+    fetchNextPage, // Added
     summary,
     summaryTimestamp,
     sendMessageMutation,
@@ -69,25 +72,48 @@ export function ConversationView() {
     }
   };
 
-  const handleSendMessage = () => {
-    if (!newMessage.trim() || !selectedConversation) return;
+  const handleSendMessage = (messageText: string, file?: File) => { // Updated signature
+    if ((!messageText.trim() && !file) || !selectedConversation) return; // Check for text or file
+    
     const customerParticipant = selectedConversation.participants?.find(p => p.customer_id);
     const recipientCustomer = customerParticipant?.customer_id
       ? customersData?.[customerParticipant.customer_id]
       : null;
-    const recipientPhone = recipientCustomer?.phone_number;
+    const recipientPhone = recipientCustomer?.phone_number; // This is the plain phone number
 
-    if (!recipientPhone) {
-      console.error("Could not determine recipient phone number for conversation:", selectedConversation.conversation_id);
-      return;
+    // Attempt to get the JID (chatId for Evolution API) from the customer participant
+    const customerJid = customerParticipant?.external_user_identifier;
+
+    if (!customerJid) {
+      console.error("Could not determine recipient JID (external_user_identifier) for conversation:", selectedConversation.conversation_id);
+      // Fallback or error handling if JID is not found
+      // For now, let's try to construct it if only phone is available, though this might not always be correct for groups
+      if (recipientPhone && selectedConversation.integrations_id) { // Assuming WhatsApp if integrations_id exists
+        // This is a guess, actual JID format might vary or be directly available
+        // console.warn(`Attempting to construct JID from phone number: ${recipientPhone}@c.us`);
+        // customerJid = `${recipientPhone}@c.us`; 
+        // It's safer to ensure external_user_identifier is populated correctly.
+        // For now, if external_user_identifier is missing, we cannot reliably send.
+         console.error("Critical: external_user_identifier (JID) for the customer participant is missing.");
+        return;
+      } else {
+        return;
+      }
     }
-    const instanceId = selectedConversation.integrations_id;
+    
+    const instanceId = selectedConversation.integrations_id; // This is the Evolution instance name/ID
     if (!instanceId) {
-      console.error("Could not determine instance ID for conversation:", selectedConversation.conversation_id);
+      console.error("Could not determine instance ID (integrations_id) for conversation:", selectedConversation.conversation_id);
       return;
     }
-    sendMessageMutation.mutate(newMessage.trim());
-    setNewMessage("");
+
+    sendMessageMutation.mutate({
+      // instanceId: instanceId, // This is passed to useEvolutionAPI, so it should be available in its context
+      chatId: customerJid, // Use the JID from external_user_identifier
+      message: messageText.trim(), // Use the passed messageText
+      file: file, // Pass the file
+    });
+    setNewMessage(""); // Clear input after attempting to send
   };
 
   const conversationListPanelContent = (
@@ -181,8 +207,11 @@ export function ConversationView() {
           key={selectedConversation?.conversation_id || 'empty'}
           onOpenLeadDetails={() => setIsLeadDetailsDrawerOpen(prev => !prev)} // Changed to toggle
           selectedConversation={selectedConversation}
-          isLoading={isLoading}
+          isLoading={isLoadingConversationData} // Use specific loading state for initial data
           messages={messages}
+          isFetchingNextPage={isFetchingNextPage} // Pass down
+          hasNextPage={hasNextPage} // Pass down
+          fetchNextPage={fetchNextPage} // Pass down
             newMessage={newMessage}
             setNewMessage={setNewMessage}
             handleSendMessage={handleSendMessage}

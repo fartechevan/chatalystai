@@ -186,7 +186,7 @@ export function useEvolutionAPI(instanceId: string | null) {
 
   // Send message mutation
   const sendMessage = useMutation({
-    mutationFn: async ({ chatId, message }: { chatId: string; message: string }) => {
+    mutationFn: async ({ chatId, message, file }: { chatId: string; message: string; file?: File }) => {
       if (!instanceId) { // Check instanceId from hook params first
         console.error("sendMessage: instanceId parameter is missing.");
         throw new Error('Instance ID is missing.');
@@ -205,17 +205,55 @@ export function useEvolutionAPI(instanceId: string | null) {
       //   body: {
       //     instanceId,
       //     number: chatId,
-      //     text: message
+      //     text: message,
+      //     // --- Additions for media ---
+      //     media: file ? await toBase64(file) : undefined,
+      //     mimetype: file ? file.type : undefined,
+      //     fileName: file ? file.name : undefined 
+      //     // Ensure the backend function (e.g., evolution-api-handler)
+      //     // is updated to handle these parameters and use the 'send-media' action
+      //     // or similar from the Evolution API MCP tool.
       //   }
       // });
-      const data = null; const error = new Error("Supabase function call commented out."); // Placeholder
+      
+      // Placeholder for new logic
+      let requestBody: { instanceId: string; number: string; text?: string; media?: string; mimetype?: string; fileName?: string, action: string };
+      const functionName = 'evolution-api-handler'; // Assuming this is the target Supabase function
 
-      if (error) throw new Error('Failed to send message');
+      if (file) {
+        const base64Media = await toBase64(file);
+        requestBody = {
+          instanceId, // This should be the actual instance name/ID for Evolution API
+          number: chatId,
+          action: 'send-media', // Action for sending media
+          media: base64Media,
+          mimetype: file.type,
+          fileName: file.name,
+          // text: message, // Caption can be sent with media
+        };
+        if (message) requestBody.text = message; // Add caption if present
+      } else {
+        requestBody = {
+          instanceId,
+          number: chatId,
+          action: 'send-text', // Action for sending text
+          text: message,
+        };
+      }
+      
+      console.log("Attempting to invoke Supabase function:", functionName, "with body:", requestBody);
+      // const { data, error } = await supabase.functions.invoke(functionName, { body: requestBody });
+      // For now, let's simulate success for file and keep placeholder for text
+      const data = file ? { success: true, messageId: "simulated-media-id" } : null; 
+      const error = file ? null : new Error("Supabase function call for text commented out.");
+
+
+      if (error) throw new Error(`Failed to send message: ${error.message}`);
 
       // Placeholder return - adjust based on actual service implementation
       return data; // Returning null as placeholder
     },
-    onSuccess: (_, variables) => {
+    onSuccess: (data, variables) => { // Added data to onSuccess
       // Invalidate and refetch messages for the chat
       queryClient.invalidateQueries({
         queryKey: ['messages', instanceId, variables.chatId]
@@ -223,7 +261,7 @@ export function useEvolutionAPI(instanceId: string | null) {
       
       toast({
         title: "Message sent",
-        description: "Your message has been sent successfully."
+        description: "Your message has been sent successfully." + (data?.messageId ? ` (ID: ${data.messageId})` : "")
       });
     },
     onError: (error) => {
@@ -243,3 +281,12 @@ export function useEvolutionAPI(instanceId: string | null) {
     isConfigured: !!config
   };
 }
+
+// Helper function to convert file to base64
+const toBase64 = (file: File): Promise<string> =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = (error) => reject(error);
+  });

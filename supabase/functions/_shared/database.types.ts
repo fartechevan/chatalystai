@@ -1022,31 +1022,37 @@ export type Database = {
       }
       messages: {
         Row: {
-          content: string
+          content: string | null
           conversation_id: string
           created_at: string
           is_read: boolean
           message_id: string
           sender_participant_id: string
           wamid: string | null
+          media_type: string | null
+          media_data: Json | null
         }
         Insert: {
-          content: string
+          content?: string | null
           conversation_id: string
           created_at?: string
           is_read?: boolean
           message_id?: string
           sender_participant_id: string
           wamid?: string | null
+          media_type?: string | null
+          media_data?: Json | null
         }
         Update: {
-          content?: string
+          content?: string | null
           conversation_id?: string
           created_at?: string
           is_read?: boolean
           message_id?: string
           sender_participant_id?: string
           wamid?: string | null
+          media_type?: string | null
+          media_data?: Json | null
         }
         Relationships: [
           {

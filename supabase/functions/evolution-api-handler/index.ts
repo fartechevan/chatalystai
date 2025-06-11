@@ -424,6 +424,127 @@ serve(async (req: Request) => { // Add Request type
         });
     }
 
+    // Action: Send Media Message via Evolution API
+    else if (action === 'send-media') {
+      console.log('Action: send-media - Entering block.');
+      const { 
+        instanceId, // This is the DB ID of the 'integrations' table row
+        recipientJid, 
+        mediaData, 
+        mimeType, 
+        filename, 
+        caption 
+      } = body as { 
+        instanceId?: string; 
+        recipientJid?: string; 
+        mediaData?: string; 
+        mimeType?: string; 
+        filename?: string; 
+        caption?: string; 
+      };
+
+      if (!instanceId || !recipientJid || !mediaData || !mimeType || !filename) {
+        return new Response(JSON.stringify({ error: 'Missing required parameters for send-media: instanceId (DB ID), recipientJid, mediaData, mimeType, or filename' }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 400
+        });
+      }
+
+      // Fetch credentials and Evolution instance name (instance_display_name from config)
+      const { data: instanceData, error: instanceError } = await supabaseClient
+        .from('integrations')
+        .select(`
+          api_key,
+          base_url,
+          integrations_config ( instance_display_name )
+        `)
+        .eq('id', instanceId)
+        .single();
+      
+      const rawIntegrationsConfig = instanceData?.integrations_config;
+      let configFirstElement: { instance_display_name: string } | undefined = undefined;
+
+      if (rawIntegrationsConfig) {
+        if (Array.isArray(rawIntegrationsConfig) && rawIntegrationsConfig.length > 0) {
+          configFirstElement = rawIntegrationsConfig[0] as { instance_display_name: string };
+        } else if (typeof rawIntegrationsConfig === 'object' && !Array.isArray(rawIntegrationsConfig) && rawIntegrationsConfig !== null) {
+          configFirstElement = rawIntegrationsConfig as { instance_display_name: string };
+        }
+      }
+      const evolutionInstanceName = configFirstElement?.instance_display_name;
+      const apiKey = instanceData?.api_key;
+      const baseUrl = instanceData?.base_url;
+
+      if (instanceError || !instanceData || !apiKey || !baseUrl || !evolutionInstanceName) {
+        const errorMsg = instanceError?.message || "Instance not found or missing required fields (instance_display_name from config, api_key, base_url).";
+        console.error(`Action: send-media - Failed to get instance details for DB ID ${instanceId}: ${errorMsg}`);
+        return new Response(JSON.stringify({ error: `Failed to get instance details: ${errorMsg}` }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: instanceError?.code === 'PGRST116' ? 404 : 500
+        });
+      }
+      
+      console.log(`Action: send-media - Sending to ${recipientJid} via Evolution instance "${evolutionInstanceName}" (DB ID: ${instanceId}) using ${baseUrl}`);
+
+      const evolutionApiUrl = `${baseUrl}/message/sendMedia/${evolutionInstanceName}`;
+      // Restructure payload to match common Evolution API patterns for sendMedia,
+      // similar to the MCP tool's arguments.
+      const determinedMediatype = mimeType.startsWith('image') ? 'image' 
+                                : mimeType.startsWith('video') ? 'video' 
+                                : mimeType.startsWith('audio') ? 'audio' 
+                                : 'document';
+
+      const mediaApiPayload = {
+        number: recipientJid,
+        mediatype: determinedMediatype, // Moved to root
+        media: mediaData.startsWith('data:') ? mediaData.substring(mediaData.indexOf(',') + 1) : mediaData, // Strip data URI prefix if present
+        mimetype: mimeType,         // Keep mimetype for clarity
+        fileName: filename,
+        caption: caption || undefined,
+        // The 'mediaMessage' object might not be needed if fields are at root.
+        // If API still expects nesting, this will need adjustment.
+        // For now, trying with flat structure based on error.
+      };
+      
+      console.log(`Action: send-media - Calling Evolution API: ${evolutionApiUrl} with payload:`, JSON.stringify(mediaApiPayload).substring(0, 300) + "..."); // Log truncated payload
+
+      try {
+        const response = await fetch(evolutionApiUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': apiKey
+          },
+          body: JSON.stringify(mediaApiPayload)
+        });
+
+        const resultText = await response.text(); // Read response text first
+        let resultJson = {};
+        try {
+          resultJson = JSON.parse(resultText);
+        } catch (e) {
+          console.warn("Evolution API sendMedia response was not valid JSON:", resultText);
+        }
+
+
+        if (!response.ok) {
+          console.error(`Evolution API sendMedia error response (Status: ${response.status}):`, resultText);
+          throw new Error(`Evolution API error (${response.status}): ${resultText}`);
+        }
+        
+        console.log(`Evolution API sendMedia response for instance "${evolutionInstanceName}":`, resultJson);
+        return new Response(JSON.stringify({ success: true, message: 'Media message sent successfully via Evolution API', data: resultJson }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200
+        });
+
+      } catch (apiError) {
+        console.error(`Action: send-media - Evolution API call failed (Evolution Instance: "${evolutionInstanceName}", DB ID: ${instanceId}). Error:`, apiError);
+        return new Response(JSON.stringify({ error: `Evolution API call failed: ${apiError instanceof Error ? apiError.message : String(apiError)}` }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 502
+        });
+      }
+    }
+
     // Action: Sync Instance Config (Fetch/Create & Store in DB)
     else if (action === 'sync-instance-config') {
       console.log('Action: sync-instance-config');

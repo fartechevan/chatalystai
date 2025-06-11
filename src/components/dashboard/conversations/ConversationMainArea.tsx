@@ -11,12 +11,15 @@ import { MessageInput } from "./components/MessageInput";
 
 interface ConversationMainAreaProps {
   selectedConversation: Conversation | null;
-  isLoading: boolean;
+  isLoading: boolean; // Overall loading for initial load
   messages: MessageType[];
+  isFetchingNextPage?: boolean; // For loading more messages
+  hasNextPage?: boolean; // To know if there are more messages to load
+  fetchNextPage?: () => void; // Function to fetch next page
   newMessage: string;
   setNewMessage: (message: string) => void;
-  handleSendMessage: () => void;
-  sendMessageMutation: UseMutationResult<unknown, Error, string, unknown>; // Changed any to unknown
+  handleSendMessage: (messageText: string, file?: File) => void; // Updated signature
+  sendMessageMutation: UseMutationResult<unknown, Error, { chatId: string; message: string; file?: File }, unknown>; // Updated to match expected payload
   summarizeMutation: UseMutationResult<unknown, Error, unknown, unknown>; // Changed any to unknown
   summary: string | undefined;
   summaryTimestamp: string | undefined;
@@ -27,8 +30,11 @@ interface ConversationMainAreaProps {
 
 export function ConversationMainArea({
   selectedConversation,
-  isLoading,
+  isLoading, // This is the general loading state
   messages,
+  isFetchingNextPage,
+  hasNextPage,
+  fetchNextPage,
   newMessage,
   setNewMessage,
   handleSendMessage,
@@ -65,7 +71,10 @@ export function ConversationMainArea({
           
           <MessageList 
             messages={messages} 
-            isLoading={isLoading} 
+            isLoading={isLoading && messages.length === 0} // Show main loader only if no messages yet
+            isFetchingNextPage={isFetchingNextPage}
+            hasNextPage={hasNextPage}
+            fetchNextPage={fetchNextPage}
             conversation={selectedConversation}
           />
 
