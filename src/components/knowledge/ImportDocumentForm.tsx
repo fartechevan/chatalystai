@@ -68,6 +68,11 @@ export function ImportDocumentForm({ onCancel, onSuccess }: ImportDocumentFormPr
   const [deletingImageIndex, setDeletingImageIndex] = useState<number | null>(null)
 
   const [isTextEdited, setIsTextEdited] = useState(false);
+
+  const [isChunked, setIsChunked] = useState(false);
+  const [currentDocumentName, setCurrentDocumentName] = useState<string>('');
+
+  const [isConfirmingUpload, setIsConfirmingUpload] = useState(false);
   
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -78,137 +83,138 @@ export function ImportDocumentForm({ onCancel, onSuccess }: ImportDocumentFormPr
   });
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-  const files = Array.from(e.target.files || []);
-  if (files.length === 0) return;
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
 
-  // Track successful uploads
-  let successCount = 0;
-  let failCount = 0;
-  
-  // Set upload state
-  setIsUploadingToEndpoint(true);
-  
-  // Create a function to process a single file
-  const uploadFile = async (file: File) => {
-    // Validate file type
-    if (file.type !== "application/pdf") {
-      toast({
-        variant: "destructive",
-        title: "Invalid file type",
-        description: `${file.name} is not a PDF file.`,
-      });
-      failCount++;
-      return;
-    }
-
-    // Validate file size
-    if (file.size > MAX_FILE_SIZE) {
-      toast({
-        variant: "destructive",
-        title: "File too large",
-        description: `${file.name} exceeds 16MB limit.`,
-      });
-      failCount++;
-      return;
-    }
-
-    // For the first file, update title and preview
-    if (successCount === 0) {
-      setPdfFile(file);
-      form.setValue("title", file.name.replace(/\.pdf$/, ""));
-      
-      // Generate preview URL for the first file
-      const previewUrl = URL.createObjectURL(file);
-      setPdfPreviewUrl(previewUrl);
-    }
-
-    // Upload to the specified endpoint
-    try {
-      const uploadEndpoint = "http://127.0.0.1:5000/upload";
-      const response = await apiServiceInstance.uploadPdfFile(file, uploadEndpoint);
-      
-      if (successCount === 0) {
-        setUploadResponse(response);
+    // Track successful uploads
+    let successCount = 0;
+    let failCount = 0;
+    
+    // Set upload state
+    setIsUploadingToEndpoint(true);
+    
+    // Create a function to process a single file
+    const uploadFile = async (file: File) => {
+      // Validate file type
+      if (file.type !== "application/pdf") {
+        toast({
+          variant: "destructive",
+          title: "Invalid file type",
+          description: `${file.name} is not a PDF file.`,
+        });
+        failCount++;
+        return;
       }
-      
-      if (response?.success) {
-        successCount++;
+
+      // Validate file size
+      if (file.size > MAX_FILE_SIZE) {
+        toast({
+          variant: "destructive",
+          title: "File too large",
+          description: `${file.name} exceeds 16MB limit.`,
+        });
+        failCount++;
+        return;
+      }
+
+      // For the first file, update title and preview
+      if (successCount === 0) {
+        setPdfFile(file);
+        form.setValue("title", file.name.replace(/\.pdf$/, ""));
         
-        // Store the session_id in localStorage (for the first successful file)
-        if (successCount === 1 && response?.session_id && typeof window !== undefined) {
-          localStorage.setItem("upload_session_id", response.session_id);
-          console.log("Session ID stored in localStorage:", response.session_id);
+        // Generate preview URL for the first file
+        const previewUrl = URL.createObjectURL(file);
+        setPdfPreviewUrl(previewUrl);
+      }
+
+      // Upload to the specified endpoint
+      try {
+        const uploadEndpoint = "http://127.0.0.1:5000/upload_v2";
+        const response = await apiServiceInstance.uploadPdfFile(file, uploadEndpoint);
+        
+        if (successCount === 0) {
+          setUploadResponse(response);
         }
         
-        // Check if the response contains extracted text content and use it
-        if (response.text_content) {
-          // For first file, set the content directly
-          if (successCount === 1) {
-            setPdfText(response.text_content);
-            setExtractedImages(response.image_urls)
-            form.setValue("content", response.text_content);
-          } else {
-            // For subsequent files, append with a separator
-            const currentText = form.getValues("content");
-            const newText = currentText + "\n\n--- New Document ---\n\n" + response.text_content;
-            setPdfText(newText);
-            form.setValue("content", newText);
+        if (response?.success) {
+          successCount++;
+          
+          // Store the session_id in localStorage (for the first successful file)
+          if (successCount === 1 && response?.session_id && response?.document_name &&typeof window !== undefined) {
+            localStorage.setItem("upload_session_id", response.session_id);
+            setCurrentDocumentName(response.document_name)
+            console.log("Session ID stored in localStorage:", response.session_id);
           }
           
-          // If this is the first successful file, switch to the 'Paste Text' tab
-          if (successCount === 1) {
-            const pasteTextTab = document.querySelector('[data-value="paste"]') as HTMLElement;
-            if (pasteTextTab) {
-              pasteTextTab.click();
+          // Check if the response contains extracted text content and use it
+          if (response.text_content) {
+            // For first file, set the content directly
+            if (successCount === 1) {
+              setPdfText(response.text_content);
+              setExtractedImages(response.image_urls)
+              form.setValue("content", response.text_content);
+            } else {
+              // For subsequent files, append with a separator
+              const currentText = form.getValues("content");
+              const newText = currentText + "\n\n--- New Document ---\n\n" + response.text_content;
+              setPdfText(newText);
+              form.setValue("content", newText);
             }
+            
+            // If this is the first successful file, switch to the 'Paste Text' tab
+            if (successCount === 1) {
+              const pasteTextTab = document.querySelector('[data-value="paste"]') as HTMLElement;
+              if (pasteTextTab) {
+                pasteTextTab.click();
+              }
+            }
+          } else {
+            // No text content in response
+            toast({
+              variant: "destructive",
+              title: "No text extracted",
+              description: `File ${file.name} was uploaded but no text content was returned.`,
+            });
           }
         } else {
-          // No text content in response
+          failCount++;
           toast({
             variant: "destructive",
-            title: "No text extracted",
-            description: `File ${file.name} was uploaded but no text content was returned.`,
+            title: "Upload failed",
+            description: `Failed to upload ${file.name}: ${response.error || "Unknown error"}`,
           });
         }
-      } else {
+      } catch (error) {
         failCount++;
+        console.error(`Error uploading ${file.name}:`, error);
         toast({
           variant: "destructive",
           title: "Upload failed",
-          description: `Failed to upload ${file.name}: ${response.error || "Unknown error"}`,
+          description: `Failed to upload ${file.name}: ${error instanceof Error ? error.message : "Unknown error"}`,
         });
       }
-    } catch (error) {
-      failCount++;
-      console.error(`Error uploading ${file.name}:`, error);
+    };
+
+    // Upload all files sequentially
+    for (const file of files) {
+      await uploadFile(file);
+    }
+    
+    setIsUploadingToEndpoint(false);
+    
+    // Show summary toast
+    if (successCount > 0) {
+      toast({
+        title: "PDF upload complete",
+        description: `Successfully uploaded ${successCount} file${successCount !== 1 ? 's' : ''}${failCount > 0 ? `, ${failCount} failed` : ''}.`,
+      });
+    } else if (failCount > 0) {
       toast({
         variant: "destructive",
-        title: "Upload failed",
-        description: `Failed to upload ${file.name}: ${error instanceof Error ? error.message : "Unknown error"}`,
+        title: "PDF upload failed",
+        description: `Failed to upload all ${failCount} file${failCount !== 1 ? 's' : ''}.`,
       });
     }
-  };
-
-  // Upload all files sequentially
-  for (const file of files) {
-    await uploadFile(file);
-  }
-  
-  setIsUploadingToEndpoint(false);
-  
-  // Show summary toast
-  if (successCount > 0) {
-    toast({
-      title: "PDF upload complete",
-      description: `Successfully uploaded ${successCount} file${successCount !== 1 ? 's' : ''}${failCount > 0 ? `, ${failCount} failed` : ''}.`,
-    });
-  } else if (failCount > 0) {
-    toast({
-      variant: "destructive",
-      title: "PDF upload failed",
-      description: `Failed to upload all ${failCount} file${failCount !== 1 ? 's' : ''}.`,
-    });
-  }
   };
 
   const handleManualUpload = () => {
@@ -238,6 +244,7 @@ export function ImportDocumentForm({ onCancel, onSuccess }: ImportDocumentFormPr
 
       
     try {
+      setIsChunked(false);      // so that they can't import during upload
       // Get the session_id from localStorage
       let session_id : any
       if(typeof window !== undefined){
@@ -270,13 +277,19 @@ export function ImportDocumentForm({ onCancel, onSuccess }: ImportDocumentFormPr
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ "session_id": session_id, "text": pdfText, "text_edited": isTextEdited }),
+        body: JSON.stringify({
+            "session_id": session_id,
+            "text": pdfText,
+            "text_edited": isTextEdited,
+            "document_name": currentDocumentName,
+        }),
         logRequests: true, // Enable logging for this request
       });
           
       if (data.chunks && Array.isArray(data.chunks)) {
         setChunks(data.chunks[0]);      // data.chunks[1] is the images metadata
         setShowChunks(true);
+        setIsChunked(true);
       } else {
         // Fallback to paragraph chunking if API response doesn't contain chunks
         const options: ChunkingOptions = {
@@ -310,6 +323,94 @@ export function ImportDocumentForm({ onCancel, onSuccess }: ImportDocumentFormPr
       });
     } finally {
       setIsProcessingChunks(false);
+    }
+  };
+
+  const confirmUpload = async () => {
+    try {
+      setIsConfirmingUpload(true)
+      toast({
+        variant: "default",
+        title: "Note",
+        description: "This might take a minute, thank you for your patience 😊",
+      })
+      interface ConfirmUpload {
+        success: boolean,
+        message: string,
+      }
+
+      let session_id : any
+      if(typeof window !== undefined){
+        session_id = localStorage.getItem("upload_session_id");
+      }
+
+      const data = await apiServiceInstance.request<ConfirmUpload>('http://127.0.0.1:5000/confirm_upload', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          "session_id": session_id,
+          "document_name": currentDocumentName,
+        })
+      })
+
+      if(data.success){
+        console.log(data.message);
+        setIsConfirmingUpload(false);
+        updateVectorTable()
+          .then(() => {
+            toast({
+              variant: "default",
+              title: "Document Import successfully",
+              description: "Added the document to the knowledge base",
+            })
+          })
+          .catch((error) => {
+            console.log(error)
+          })
+        
+      }
+    } catch (error) {
+      console.log('Failed to confirm the upload');
+    } finally {
+      setIsConfirmingUpload(true);
+    }
+  };
+
+  const updateVectorTable = async () => {
+    try {
+      interface UpdateVectorTable {
+        success: boolean,
+        message: string,
+      }
+
+      let session_id : any
+      if(typeof window !== undefined){
+        session_id = localStorage.getItem("upload_session_id");
+      }
+
+      const data = await apiServiceInstance.request<UpdateVectorTable>('http://127.0.0.1:5000/create_vector_table', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          "company_name": session_id,
+        })
+      })
+
+      if(data.success){
+        console.log(data.message);
+        toast({
+          variant: "default",
+          title: "Document Import successful",
+          description: "Added the document to the knowledge base",
+        })
+      }
+
+    } catch (error) {
+      console.log("Failed to add chunks to vector table");
     }
   };
 
@@ -838,8 +939,8 @@ export function ImportDocumentForm({ onCancel, onSuccess }: ImportDocumentFormPr
               
               <div className="flex justify-between pt-2">
                 <Button 
-                  type="button" 
-                  variant="outline" 
+                  type="button"
+                  variant="outline"
                   onClick={handlePreviewChunks_v2}
                   disabled={isSubmitting || isProcessingChunks || !form.getValues("content")}
                 >
@@ -849,7 +950,7 @@ export function ImportDocumentForm({ onCancel, onSuccess }: ImportDocumentFormPr
                       Processing...
                     </>
                   ) : (
-                    "Preview AI Chunks"
+                    "Create AI Chunks"
                   )}
                 </Button>
                 
@@ -862,13 +963,17 @@ export function ImportDocumentForm({ onCancel, onSuccess }: ImportDocumentFormPr
                   >
                     Cancel
                   </Button>
-                  <Button 
+                  {/* <Button 
                     type="submit" 
-                    disabled={isSubmitting || !form.getValues("content")}
+                    disabled={
+                      !isChunked
+                        ? true
+                        : isSubmitting || !form.getValues("content")
+                    }
                   >
                     {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                     Import Document
-                  </Button>
+                  </Button> */}
                 </div>
               </div>
             </form>
@@ -886,12 +991,16 @@ export function ImportDocumentForm({ onCancel, onSuccess }: ImportDocumentFormPr
           </Button>
           <Button 
             onClick={() => {
-              setShowChunks(false);
-              form.handleSubmit(onSubmit)();
-            }} 
-            disabled={isSubmitting}
+              confirmUpload().then(() => {
+                setShowChunks(false);
+                form.handleSubmit(onSubmit)();
+              }).catch((err) => {
+                  console.error('Upload confirmation failed', err);
+              });
+            }}
+            disabled={isSubmitting || isConfirmingUpload}
           >
-            {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            {(isSubmitting || isConfirmingUpload) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             Confirm & Import
           </Button>
         </CardFooter>
