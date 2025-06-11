@@ -10,6 +10,7 @@ interface FileUploadResponse {
   text_content?: string;
   session_id?: string;
   image_urls?: string[];
+  document_name?: string;
 }
 
 interface ApiServiceConfig {
