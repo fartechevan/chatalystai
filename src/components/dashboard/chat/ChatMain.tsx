@@ -2,8 +2,8 @@
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Send } from "lucide-react";
-import { useState, useRef, useEffect } from "react";
+import { Send } from "lucide-react"; // Reverted: Removed ImagePlus
+import { useState, useRef, useEffect } from "react"; // Reverted: Removed ChangeEvent
 
 interface Message {
   key: string;
@@ -22,13 +22,15 @@ interface Chat {
 interface ChatMainProps {
   selectedChat: Chat | undefined;
   messages: Message[];
-  onSendMessage: (message: string) => void;
+  onSendMessage: (message: string) => void; // Reverted: Removed file parameter
   isLoading?: boolean;
 }
 
 export function ChatMain({ selectedChat, messages, onSendMessage, isLoading }: ChatMainProps) {
   const [newMessage, setNewMessage] = useState("");
+  // Removed selectedFile state
   const scrollAreaRef = useRef<HTMLDivElement>(null);
+  // Removed fileInputRef
 
   useEffect(() => {
     // Scroll to bottom when messages change
@@ -39,10 +41,14 @@ export function ChatMain({ selectedChat, messages, onSendMessage, isLoading }: C
   }, [messages]);
 
   const handleSend = () => {
-    if (!newMessage.trim()) return;
-    onSendMessage(newMessage);
+    if (!newMessage.trim()) return; // Reverted
+    onSendMessage(newMessage); // Reverted
     setNewMessage("");
+    // Removed file handling logic
   };
+
+  // Removed handleFileChange
+  // Removed handleAttachmentClick
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -87,8 +93,12 @@ export function ChatMain({ selectedChat, messages, onSendMessage, isLoading }: C
                     : 'bg-muted'
                 }`}
               >
-                <p className="text-sm">{message.content}</p>
-                <span className="text-xs opacity-70">
+                {message.content.startsWith('data:image') ? (
+                  <img src={message.content} alt="Sent image" className="max-w-xs max-h-xs rounded-md" />
+                ) : (
+                  <p className="text-sm">{message.content}</p>
+                )}
+                <span className="text-xs opacity-70 block mt-1">
                   {new Date(message.timestamp * 1000).toLocaleTimeString()}
                 </span>
               </div>
@@ -98,12 +108,15 @@ export function ChatMain({ selectedChat, messages, onSendMessage, isLoading }: C
       </ScrollArea>
       
       <div className="border-t p-4">
+        {/* Removed selectedFile display */}
         <div className="flex gap-2">
+          {/* Removed file input and attachment button */}
           <Input
-            placeholder="Type a message..."
+            placeholder="Type a message..." // Reverted placeholder
             value={newMessage}
             onChange={(e) => setNewMessage(e.target.value)}
             onKeyPress={handleKeyPress}
+            // Removed disabled attribute
           />
           <Button onClick={handleSend} size="icon">
             <Send className="h-4 w-4" />

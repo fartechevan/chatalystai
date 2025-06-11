@@ -4,6 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { LoginForm } from "./components/auth/LoginForm";
+// import { LicensedSignupForm } from "./components/auth/LicensedSignupForm"; // No longer needed
 // Dashboard component is likely no longer needed here if Main handles the index route
 // import Dashboard from "./pages/Dashboard"; 
 import Main from "./pages/Main";
@@ -57,6 +58,7 @@ const App = () => {
                 <Routes>
                   <Route path="/" element={<Navigate to="/dashboard" replace />} />
                   <Route path="/login" element={<LoginForm />} />
+                  {/* <Route path="/signup" element={<LicensedSignupForm />} /> */} {/* Removed separate signup route */}
                   <Route path="/auth/confirm-invite" element={<ConfirmInvitePage />} /> {/* Add route for ConfirmInvitePage */}
                   <Route
                     path="/dashboard"
