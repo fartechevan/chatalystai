@@ -139,33 +139,45 @@ export async function handleMessageEvent(supabaseClient: SupabaseClient, data: W
   console.log(`[MessageHandler] Processing for DB: mediaType="${mediaType}", messageContentForDB="${messageContentForDB}", mediaData:`, mediaData ? JSON.stringify(mediaData).substring(0,100) + "..." : "null");
   console.log(`[MessageHandler] Text for AI: "${messageText}"`);
 
-
-  // --- Hardcoded Integration ID ---
-  const hardcodedIntegrationId = '1fe47f4b-3b22-43cf-acf2-6bd3eeb0a96d';
-
+  // Use the instanceId (Evolution API instance name) passed to this function
+  // to find the correct integration configuration.
+  console.log(`[MessageHandler] Fetching integration_config using instance_display_name: "${instanceId}"`);
   const { data: fetchedConfig, error: configError } = await supabaseClient
     .from('integrations_config')
-    .select('id, user_reference_id') 
-    .eq('integration_id', hardcodedIntegrationId)
+    .select('id, user_reference_id, integration_id') // Select integration_id to link to the main integrations table
+    .eq('instance_display_name', instanceId) // Match with the Evolution instance name
     .maybeSingle();
 
   if (configError) {
-    const errorMsg = `Error fetching integration config for hardcoded ID ${hardcodedIntegrationId}: ${configError.message}`;
+    const errorMsg = `Error fetching integration config for instance_display_name "${instanceId}": ${configError.message}`;
     console.error(errorMsg);
     return errorMsg;
   }
 
   if (!fetchedConfig) {
-    const errorMsg = `No integration config found for hardcoded integration ID: ${hardcodedIntegrationId}`;
+    const errorMsg = `No integration config found for instance_display_name: "${instanceId}"`;
     console.error(errorMsg);
     return errorMsg;
   }
 
+  // Now, fetchedConfig.integration_id is the ID for the 'integrations' table.
+  // And fetchedConfig.id is the ID for the 'integrations_config' table row itself.
   const config = {
-    id: fetchedConfig.id, 
-    integration_id: hardcodedIntegrationId,
+    id: fetchedConfig.id, // This is the integrations_config.id
+    integration_id: fetchedConfig.integration_id, // This is the integrations.id
     user_reference_id: fetchedConfig.user_reference_id,
   };
+  
+  // The 'hardcodedIntegrationId' is now replaced by 'config.integration_id' for subsequent logic.
+  // For example, when fetching agent settings:
+  // .eq('integration_id', config.integration_id)
+  // When creating agent sessions:
+  // integration_id: config.integration_id,
+  // When invoking evolution-api-handler for AI response:
+  // instanceId: config.integration_id, (if evolution-api-handler expects the main integration_id)
+  // OR, if evolution-api-handler needs the integrations_config.id, then pass config.id.
+  // Based on evolution-api-handler, it seems to expect the main 'integrations' table ID.
+  // So, 'config.integration_id' should be used where 'hardcodedIntegrationId' was used.
 
   const phoneNumber = remoteJid.split('@')[0];
   let customerId: string | null = null;
@@ -243,12 +255,12 @@ export async function handleMessageEvent(supabaseClient: SupabaseClient, data: W
             integration_id,
             ai_agents ( keyword_trigger, is_enabled, activation_mode )`
           )
-          .eq('integration_id', hardcodedIntegrationId)
+          .eq('integration_id', config.integration_id) // Use dynamic integration_id
           .maybeSingle(); 
 
         if (settingsError) throw new Error(`Error fetching agent settings: ${settingsError.message}`);
         if (!agentSettingsData) {
-          console.log(`[MessageHandler] No AI agent linked to integration ${hardcodedIntegrationId}. Skipping AI logic.`);
+          console.log(`[MessageHandler] No AI agent linked to integration ${config.integration_id}. Skipping AI logic.`);
           return true; 
         }
 
@@ -268,7 +280,7 @@ export async function handleMessageEvent(supabaseClient: SupabaseClient, data: W
           .select('id, status, last_interaction_timestamp, conversation_history')
           .eq('contact_identifier', remoteJid)
           .eq('agent_id', agentId)
-          .eq('integration_id', hardcodedIntegrationId)
+          .eq('integration_id', config.integration_id) // Use dynamic integration_id
           .maybeSingle();
 
         if (sessionFetchError) throw new Error(`Error fetching agent session: ${sessionFetchError.message}`);
@@ -307,7 +319,7 @@ export async function handleMessageEvent(supabaseClient: SupabaseClient, data: W
                 last_interaction_timestamp: now.toISOString(),
                 contact_identifier: remoteJid,
                 agent_id: agentId,
-                integration_id: hardcodedIntegrationId,
+                integration_id: config.integration_id, // Use dynamic integration_id
             };
             const { data: newSession, error: createError } = await supabaseClient
                 .from('ai_agent_sessions')
@@ -377,7 +389,7 @@ export async function handleMessageEvent(supabaseClient: SupabaseClient, data: W
               supabaseClient.functions.invoke('evolution-api-handler', { 
                 body: {
                   action: 'send-text', 
-                  instanceId: hardcodedIntegrationId, 
+                  instanceId: config.integration_id, // Use dynamic integration_id
                   number: remoteJid, 
                   text: aiResponseContent,
                 },

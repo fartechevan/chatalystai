@@ -10,19 +10,19 @@
     --card-foreground: 240 10% 3.9%; /* Dark Gray Card Text */
     --popover: 0 0% 100%; /* White Popover Background */
     --popover-foreground: 240 10% 3.9%; /* Dark Gray Popover Text */
-    --primary: 174 100% 27%; /* Dark Teal Buttons/Interactive */
+    --primary: 174 100% 27%; /* User Specified Green Buttons/Interactive */
     --primary-foreground: 0 0% 98%; /* White Text on Primary */
-    --secondary: 174 33% 80%; /* Lighter Teal Secondary Elements */
-    --secondary-foreground: 174 100% 27%; /* Dark Teal Text on Secondary */
+    --secondary: 174 100% 27%; /* User Specified Green Secondary Elements */
+    --secondary-foreground: 174 100% 27%; /* User Specified Green Text on Secondary */
     --muted: 174 33% 80%; /* Lighter Teal Muted Elements */
-    --muted-foreground: 174 100% 27%; /* Dark Teal Text on Muted */
+    --muted-foreground: 174 100% 27%; /* User Specified Green Text on Muted */
     --accent: 174 33% 80%; /* Lighter Teal Accent Elements */
-    --accent-foreground: 174 100% 27%; /* Dark Teal Text on Accent */
+    --accent-foreground: 174 100% 27%; /* User Specified Green Text on Accent */
     --destructive: 0 84.2% 60.2%; /* Keep original */
     --destructive-foreground: 0 0% 98%; /* Keep original */
     --border: 240 5.9% 90%; /* Light Gray Border */
     --input: 240 5.9% 90%; /* Light Gray Input Background */
-    --ring: 174 100% 27%; /* Dark Teal Focus Ring */
+    --ring: 174 100% 27%; /* User Specified Green Focus Ring */
     --radius: 0.75rem;
     --success: 142 76% 36%; /* Keep original */
     --success-foreground: 0 0% 98%;
