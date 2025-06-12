@@ -136,7 +136,7 @@ export const LoginForm = () => {
                 Don't have an account?{' '}
                 <button 
                     onClick={() => setAuthView('signUp')} 
-                    className="font-medium text-primary hover:text-primary/80 focus:outline-none"
+                    className="font-bold text-primary hover:text-primary/80 focus:outline-none"
                 >
                     Create account with license
                 </button>
@@ -144,7 +144,7 @@ export const LoginForm = () => {
               <p>
                 <button 
                     onClick={() => setAuthView('forgotPassword')} 
-                    className="font-medium text-primary hover:text-primary/80 focus:outline-none"
+                    className="font-bold text-primary hover:text-primary/80 focus:outline-none"
                 >
                     Forgot your password?
                 </button>
@@ -156,18 +156,18 @@ export const LoginForm = () => {
               Already have an account?{' '}
               <button 
                   onClick={() => setAuthView('signIn')} 
-                  className="font-medium text-primary hover:text-primary/80 focus:outline-none"
+                  className="font-bold text-primary hover:text-primary/80 focus:outline-none"
               >
                   Sign In
               </button>
             </p>
           )}
           {authView === 'forgotPassword' && (
-             <p>
+            <p>
               Remembered your password?{' '}
               <button 
                   onClick={() => setAuthView('signIn')} 
-                  className="font-medium text-primary hover:text-primary/80 focus:outline-none"
+                  className="font-bold text-primary hover:text-primary/80 focus:outline-none"
               >
                   Sign In
               </button>
@@ -203,10 +203,10 @@ export const LoginForm = () => {
             <button 
               type="submit" 
               disabled={isLoadingSignup}
-              className="w-full flex justify-center py-2 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary disabled:opacity-50"
+              className="w-full flex justify-center py-2 px-4 border border-transparent rounded-lg shadow-sm text-sm font-medium bg-primary hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary disabled:opacity-50"
               style={{
-                backgroundColor: 'rgb(var(--primary))',
-                color: 'rgb(var(--primary-foreground))'
+                // backgroundColor removed to rely on bg-primary class
+                color: 'white'
               }}
             >
               {isLoadingSignup ? "Creating Account..." : "Create Account"}
@@ -223,12 +223,12 @@ export const LoginForm = () => {
     <>
       <Auth
         supabaseClient={supabase}
-        showLinks={authView === 'forgotPassword'} // Show links only for forgot password view, hide for sign_in
+        showLinks={false} // We manage all links manually now
         appearance={{
           theme: ThemeSupa,
           variables: {
             default: {
-              colors: { brand: 'rgb(var(--primary))', brandAccent: 'rgb(var(--primary))', inputBackground: 'transparent' },
+              colors: { brand: 'hsl(var(--primary))', brandAccent: 'hsl(var(--primary))', brandButtonText: 'hsl(0, 0%, 98%)', inputBackground: 'transparent' },
               borderWidths: { buttonBorderWidth: '1px', inputBorderWidth: '1px' },
               radii: { borderRadiusButton: '0.5rem', buttonBorderRadius: '0.5rem', inputBorderRadius: '0.5rem' },
             },
@@ -238,12 +238,13 @@ export const LoginForm = () => {
               border: '1px solid transparent', 
               fontSize: '14px', 
               padding: '8px 16px',
+              // fontWeight: 'bold', // Reverted: Main buttons should not be bold by default via theme
               // Ensure text color matches the custom button by using --primary-foreground
-              color: 'rgb(var(--primary-foreground))', 
+              color: 'hsl(var(--primary-foreground))', 
               // Background is already set by variables.default.colors.brand to rgb(var(--primary))
             },
             input: { fontSize: '14px', color: 'inherit', background: 'transparent', border: '1px solid hsl(var(--input))' },
-            anchor: { color: 'rgb(var(--primary))', fontSize: '14px' },
+            anchor: { color: 'hsl(var(--primary))', fontSize: '14px' },
             message: { fontSize: '14px' },
             container: { color: 'inherit' },
           },
