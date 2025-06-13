@@ -13,7 +13,7 @@
     --primary: 174 100% 27%; /* User Specified Green Buttons/Interactive */
     --primary-foreground: 0 0% 98%; /* White Text on Primary */
     --secondary: 174 100% 27%; /* User Specified Green Secondary Elements */
-    --secondary-foreground: 174 100% 27%; /* User Specified Green Text on Secondary */
+    --secondary-foreground: 0 0% 98%; /* White Text on Secondary */
     --muted: 174 33% 80%; /* Lighter Teal Muted Elements */
     --muted-foreground: 174 100% 27%; /* User Specified Green Text on Muted */
     --accent: 174 33% 80%; /* Lighter Teal Accent Elements */
@@ -46,4 +46,9 @@
 
 .animate-enter {
   @apply animate-fade-up;
+}
+
+/* Hide the default close button in shadcn/ui DialogContent when a specific class is present */
+.hide-default-dialog-close > button.absolute.right-4.top-4 {
+  display: none !important;
 }

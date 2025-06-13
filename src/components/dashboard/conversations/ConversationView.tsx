@@ -1,8 +1,10 @@
 import { useState, useMemo, useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import type { Conversation } from "./types";
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet"; // Added SheetHeader, SheetTitle
+import type { Conversation, Message as MessageType } from "./types"; // Added MessageType
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
+import { supabase } from "@/integrations/supabase/client"; // Added Supabase client
+import { MediaPreviewPopup } from "./components/MediaPreviewPopup"; // Added MediaPreviewPopup
 import { UserCog, PanelLeft, PanelRightOpen } from "lucide-react"; // Added PanelRightOpen
 import { cn } from "@/lib/utils";
 import { useMediaQuery } from "@/hooks/use-media-query";
@@ -15,14 +17,31 @@ import { useParticipantsData } from "./hooks/useParticipantsData";
 import { useCustomersData } from "./hooks/useCustomersData";
 import {
   processConversationsWithCustomerNames,
-  filterConversations
+  // filterConversations // filterConversations is not used here anymore
 } from "./utils/conversationProcessing";
 
+// For the response from get-media-base64 function
+interface MediaBase64Response {
+  base64?: string;
+  message?: { // Evolution API sometimes nests the base64 in a message object
+    body?: string; 
+  };
+  mimetype?: string;
+  error?: string; // Include error in response type if function can return it
+}
+
+
 export function ConversationView() {
-  // const [searchQuery, setSearchQuery] = useState(""); // Moved to ConversationLeftPanel
   const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
   const [isMobileConvoListDrawerOpen, setIsMobileConvoListDrawerOpen] = useState(false);
-  const [isLeadDetailsDrawerOpen, setIsLeadDetailsDrawerOpen] = useState(false); // Renamed
+  const [isLeadDetailsDrawerOpen, setIsLeadDetailsDrawerOpen] = useState(false);
+
+  // State for Media Preview Popup
+  const [isMediaPopupOpen, setIsMediaPopupOpen] = useState(false);
+  const [popupMediaSrc, setPopupMediaSrc] = useState<string | null>(null);
+  const [popupMediaType, setPopupMediaType] = useState<'image' | 'video' | null>(null);
+  const [isPopupMediaLoading, setIsPopupMediaLoading] = useState(false);
+  const [popupMediaError, setPopupMediaError] = useState<string | null>(null);
 
   const [newMessage, setNewMessage] = useState("");
   const queryClient = useQueryClient();
@@ -63,6 +82,65 @@ export function ConversationView() {
       setIsMobileConvoListDrawerOpen(false);
     }
   }, [selectedConversation, isDesktop]);
+
+
+  const handleMediaPreviewRequest = async (message: MessageType) => {
+    if (!message.wamid || !selectedConversation?.integrations_id || !message.media_type) {
+      console.error("Missing wamid, integrations_id, or media_type for media preview.");
+      setPopupMediaError("Cannot load media: missing required information.");
+      setPopupMediaSrc(null);
+      setPopupMediaType(null);
+      setIsMediaPopupOpen(true);
+      return;
+    }
+
+    setIsPopupMediaLoading(true);
+    setPopupMediaError(null);
+    setPopupMediaSrc(null);
+    setPopupMediaType(message.media_type as 'image' | 'video'); // Set type early
+    setIsMediaPopupOpen(true);
+
+    try {
+      console.log(
+        "[MediaPreview] Requesting for wamid:", message.wamid, 
+        "using integrationId from conversation:", selectedConversation.integrations_id
+      );
+      const { data: funcResponse, error: funcError } = await supabase.functions.invoke('get-media-base64', {
+        body: { 
+          messageId: message.wamid,
+          integrationId: selectedConversation.integrations_id // Corrected key to integrationId
+        }
+      });
+
+      if (funcError) {
+        throw new Error(funcError.message || "Function invocation failed");
+      }
+      
+      const responsePayload = funcResponse as MediaBase64Response | null | undefined;
+
+      if (responsePayload?.error) {
+        throw new Error(responsePayload.error);
+      }
+
+      const base64Data = responsePayload?.base64 || responsePayload?.message?.body;
+      // Try to get mimetype from response, fallback to message.media_data, then default
+      const mediaInfoFromMessage = message.media_data as { mimetype?: string } | null;
+      const mimetype = responsePayload?.mimetype || mediaInfoFromMessage?.mimetype || (message.media_type === 'image' ? 'image/jpeg' : 'video/mp4');
+
+      if (typeof base64Data === 'string') {
+        setPopupMediaSrc(`data:${mimetype};base64,${base64Data}`);
+      } else {
+        throw new Error('Invalid or missing base64 data in response.');
+      }
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : "An unknown error occurred";
+      console.error('Error fetching/processing media for preview:', errorMessage, err);
+      setPopupMediaError(`Failed to load media: ${errorMessage}`);
+      setPopupMediaSrc(null); // Clear src on error
+    } finally {
+      setIsPopupMediaLoading(false);
+    }
+  };
 
   const handleSelectConversation = (conversation: Conversation | null) => {
     setSelectedConversation(conversation);
@@ -221,8 +299,24 @@ export function ConversationView() {
             summaryTimestamp={summaryTimestamp}
             isDesktop={isDesktop}
             partnerName={currentChatPartnerName}
+            onMediaPreviewRequest={handleMediaPreviewRequest} // Pass down the handler
           />
       </div> {/* This closes the main conversation area wrapper */}
+
+      <MediaPreviewPopup
+        isOpen={isMediaPopupOpen}
+        mediaSrc={popupMediaSrc}
+        mediaType={popupMediaType}
+        isLoading={isPopupMediaLoading}
+        error={popupMediaError}
+        onClose={() => {
+          setIsMediaPopupOpen(false);
+          setPopupMediaSrc(null);
+          setPopupMediaType(null);
+          setPopupMediaError(null);
+          setIsPopupMediaLoading(false);
+        }}
+      />
 
       {/* Lead Details Panel - Drawer on mobile, "Push" panel on desktop */}
       {selectedConversation && (

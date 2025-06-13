@@ -13,6 +13,7 @@ interface MessageListProps {
   hasNextPage?: boolean;
   fetchNextPage?: () => void;
   conversation: Conversation | null;
+  onMediaPreviewRequest: (message: MessageType) => void; // Added for media preview
 }
 
 export function MessageList({ 
@@ -21,7 +22,8 @@ export function MessageList({
   isFetchingNextPage,
   hasNextPage,
   fetchNextPage,
-  conversation 
+  conversation,
+  onMediaPreviewRequest, // Destructured new prop
 }: MessageListProps) {
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null); 
@@ -104,7 +106,8 @@ export function MessageList({
           <MessageItem 
             key={message.message_id} 
             message={message} 
-            conversation={conversation} 
+            conversation={conversation}
+            onMediaPreviewRequest={onMediaPreviewRequest} // Pass down the handler
           />
         ))}
         <div ref={messagesEndRef} /> {/* Element to scroll to for new messages */}
