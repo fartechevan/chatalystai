@@ -1,103 +1,62 @@
 import { Avatar } from "@/components/ui/avatar";
 import type { Conversation, Message as MessageType } from "../types";
-import { useState, useEffect } from "react";
-import { supabase } from "@/integrations/supabase/client"; // Import supabase client
+// import { useState, useEffect } from "react"; // useEffect and some useState hooks removed
+// import { supabase } from "@/integrations/supabase/client"; // supabase client will be used in parent
 
-interface MediaBase64Response {
-  base64?: string;
-  message?: { // Evolution API sometimes nests the base64 in a message object
-    body?: string; 
-  };
-  mimetype?: string;
-}
+// interface MediaBase64Response { // This will be handled by the parent component
+//   base64?: string;
+//   message?: { 
+//     body?: string; 
+//   };
+//   mimetype?: string;
+// }
 
 interface MessageItemProps {
   message: MessageType;
   conversation: Conversation | null;
+  onMediaPreviewRequest: (message: MessageType) => void; // New prop for click handling
 }
 
-export function MessageItem({ message, conversation }: MessageItemProps) {
+export function MessageItem({ message, conversation, onMediaPreviewRequest }: MessageItemProps) {
   const isAdmin = message.sender?.role === 'admin';
-  const [fullImageSrc, setFullImageSrc] = useState<string | null>(null);
-  const [isLoadingFullImage, setIsLoadingFullImage] = useState(false);
-  const [errorLoadingFullImage, setErrorLoadingFullImage] = useState(false);
-
-  useEffect(() => {
-    let isMounted = true;
-    setFullImageSrc(null);
-    setIsLoadingFullImage(false);
-    setErrorLoadingFullImage(false);
-
-    if (message.media_type === 'image' && message.wamid && message.media_data) {
-      if (!conversation || !conversation.integrations_id) {
-        console.warn("MessageItem: Conversation or integrations_id missing, cannot fetch full image for wamid:", message.wamid);
-        setErrorLoadingFullImage(true);
-        return;
-      }
-      setIsLoadingFullImage(true);
-      supabase.functions.invoke('get-media-base64', {
-        body: { 
-          messageId: message.wamid,
-          integrationsConfigId: conversation.integrations_id // Use dynamic integrations_id
-        }
-      })
-      .then(({ data: funcResponse, error: funcError }) => {
-        if (!isMounted) return;
-        setIsLoadingFullImage(false);
-        if (funcError) {
-          console.error('Error invoking get-media-base64 function:', funcError);
-          setErrorLoadingFullImage(true);
-          return;
-        }
-        
-        const responsePayload = funcResponse as MediaBase64Response | null | undefined; 
-        const base64Data = responsePayload?.base64 || responsePayload?.message?.body; 
-        const mimetype = responsePayload?.mimetype || (message.media_data as { mimetype?: string })?.mimetype || 'image/jpeg';
-
-        if (typeof base64Data === 'string') {
-          setFullImageSrc(`data:${mimetype};base64,${base64Data}`);
-        } else {
-          console.error('Failed to get valid base64 data from function response:', funcResponse);
-          setErrorLoadingFullImage(true);
-        }
-      })
-      .catch(err => {
-        if (!isMounted) return;
-        setIsLoadingFullImage(false);
-        setErrorLoadingFullImage(true);
-        console.error('Exception calling get-media-base64 function:', err);
-      });
-    }
-    return () => {
-      isMounted = false;
-    };
-  }, [message.wamid, message.media_type, message.media_data, conversation?.integrations_id]);
   
   const isImageMessage = message.media_type === 'image' && message.media_data;
+  const isVideoMessage = message.media_type === 'video' && message.media_data;
   const hasCaption = !!message.content;
 
-  let imageToDisplay: string | undefined = undefined;
-  let currentAltText = "Image";
+  let mediaThumbnailSrc: string | undefined = undefined;
+  let mediaAltText = "Media content";
 
   if (isImageMessage) {
-    const mediaInfo = message.media_data as { url?: string; jpegThumbnail?: string; mimetype?: string };
-    if (fullImageSrc) {
-      imageToDisplay = fullImageSrc;
-      currentAltText = "Full image";
-    } else if (mediaInfo.jpegThumbnail) {
-      imageToDisplay = `data:${mediaInfo.mimetype || 'image/jpeg'};base64,${mediaInfo.jpegThumbnail}`;
-      currentAltText = "Image thumbnail";
-    } else if (mediaInfo.url && !errorLoadingFullImage) { 
-      // Only use URL if not actively loading/failed full image, as it's likely encrypted
-      // This branch might be removed if URL is always encrypted and never displayable directly
-      // imageToDisplay = mediaInfo.url; 
-      // currentAltText = "Image content (direct URL)";
+    const mediaInfo = message.media_data as { jpegThumbnail?: string; mimetype?: string };
+    if (mediaInfo.jpegThumbnail) {
+      mediaThumbnailSrc = `data:${mediaInfo.mimetype || 'image/jpeg'};base64,${mediaInfo.jpegThumbnail}`;
+      mediaAltText = "Image thumbnail";
+    }
+  } else if (isVideoMessage) {
+    // For videos, we might show a play icon or a generic video thumbnail if available
+    // For now, let's just make a clickable area.
+    // Thumbnails for videos might also be in `jpegThumbnail` if provided by Evolution API.
+    const mediaInfo = message.media_data as { jpegThumbnail?: string; mimetype?: string };
+     if (mediaInfo.jpegThumbnail) {
+      mediaThumbnailSrc = `data:${mediaInfo.mimetype || 'image/jpeg'};base64,${mediaInfo.jpegThumbnail}`;
+      mediaAltText = "Video thumbnail";
     }
   } else if (message.content && message.content.startsWith('data:image')) {
-    // Fallback for old base64 content stored directly in message.content
-    imageToDisplay = message.content;
-    currentAltText = "Sent image";
+    // Fallback for old base64 content stored directly in message.content (likely images)
+    mediaThumbnailSrc = message.content;
+    mediaAltText = "Sent image";
   }
+
+  const handleMediaClick = () => {
+    if ((isImageMessage || isVideoMessage) && message.wamid) {
+      onMediaPreviewRequest(message);
+    }
+  };
+
+  const mediaContainerClass = `rounded-lg ${
+    (isImageMessage || isVideoMessage) && !hasCaption && mediaThumbnailSrc ? 'p-0' : 'p-3'
+  } ${isAdmin ? "bg-primary text-primary-foreground" : "bg-muted"}`;
 
   return (
     <div className={`flex ${isAdmin ? "justify-end" : "justify-start"}`}>
@@ -116,27 +75,59 @@ export function MessageItem({ message, conversation }: MessageItemProps) {
               {new Date(message.created_at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}
             </span>
           </div>
-          <div
-            className={`rounded-lg ${isImageMessage && !hasCaption && imageToDisplay ? 'p-0' : 'p-3'} ${
-              isAdmin ? "bg-primary text-primary-foreground" : "bg-muted"
-            }`}
-          >
-            {isLoadingFullImage && !fullImageSrc && !imageToDisplay && <div className="text-sm p-2">Loading image...</div>}
-            {errorLoadingFullImage && !imageToDisplay && <div className="text-sm p-2 text-red-500">Error loading image.</div>}
-            
-            {imageToDisplay ? (
+          <div className={mediaContainerClass}>
+            {(isImageMessage && mediaThumbnailSrc) && (
               <img 
-                src={imageToDisplay} 
-                alt={currentAltText} 
-                className={`w-full max-h-[36rem] rounded-md object-contain ${hasCaption && imageToDisplay ? 'mb-1' : ''}`}
+                src={mediaThumbnailSrc} 
+                alt={mediaAltText} 
+                className={`w-full max-h-60 md:max-h-96 rounded-md object-contain cursor-pointer ${hasCaption ? 'mb-1' : ''}`}
+                onClick={handleMediaClick}
               />
-            ) : null}
+            )}
+            {(isVideoMessage) && (
+              <div 
+                className={`relative w-full max-h-60 md:max-h-96 rounded-md bg-black flex items-center justify-center cursor-pointer ${hasCaption ? 'mb-1' : ''}`}
+                onClick={handleMediaClick}
+                role="button"
+                tabIndex={0}
+                onKeyPress={(e) => e.key === 'Enter' && handleMediaClick()}
+              >
+                {mediaThumbnailSrc ? (
+                  <img 
+                    src={mediaThumbnailSrc} 
+                    alt={mediaAltText} 
+                    className="w-full h-full object-contain rounded-md opacity-70"
+                  />
+                ) : (
+                  <div className="absolute inset-0 flex items-center justify-center">
+                     {/* Play Icon Placeholder - Consider using an SVG icon */}
+                    <svg className="w-16 h-16 text-white" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clipRule="evenodd" />
+                    </svg>
+                  </div>
+                )}
+                 {!mediaThumbnailSrc && <span className="absolute text-white text-sm bottom-2 left-2">Video</span>}
+              </div>
+            )}
             
             {hasCaption && (
-              <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+              <p className="text-sm whitespace-pre-wrap mt-1">{message.content}</p>
             )}
-            {!imageToDisplay && !hasCaption && (
+            {/* Fallback for non-media text messages or media without thumbnail/caption */}
+            {!(isImageMessage || isVideoMessage) && !hasCaption && (
                  <p className="text-sm whitespace-pre-wrap">{message.content || "[Empty message]"}</p>
+            )}
+             {/* If it's media but no thumbnail and no caption, show media type */}
+            {(isImageMessage || isVideoMessage) && !mediaThumbnailSrc && !hasCaption && (
+              <div 
+                className="text-sm p-2 cursor-pointer"
+                onClick={handleMediaClick}
+                role="button"
+                tabIndex={0}
+                onKeyPress={(e) => e.key === 'Enter' && handleMediaClick()}
+              >
+                Click to view {message.media_type || 'media'}
+              </div>
             )}
           </div>
         </div>

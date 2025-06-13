@@ -26,6 +26,7 @@ interface ConversationMainAreaProps {
   isDesktop?: boolean; // Added isDesktop prop
   partnerName?: string; // Added partnerName prop
   onOpenLeadDetails?: () => void; // Added prop to trigger lead details drawer
+  onMediaPreviewRequest: (message: MessageType) => void; // Added for media preview
 }
 
 export function ConversationMainArea({
@@ -45,6 +46,7 @@ export function ConversationMainArea({
   isDesktop, // Destructured isDesktop
   partnerName, // Destructured partnerName
   onOpenLeadDetails, // Destructured prop
+  onMediaPreviewRequest, // Destructured new prop
 }: ConversationMainAreaProps) {
   // Removed derivedCustomerId state, queryClient, useEffect for customer ID,
   // createLeadMutation, and handleCreateLead function.
@@ -76,6 +78,7 @@ export function ConversationMainArea({
             hasNextPage={hasNextPage}
             fetchNextPage={fetchNextPage}
             conversation={selectedConversation}
+            onMediaPreviewRequest={onMediaPreviewRequest} // Pass down the handler
           />
 
           {/* Removed Create Lead Button Area */}
