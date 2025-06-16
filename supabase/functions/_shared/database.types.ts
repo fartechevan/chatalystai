@@ -1117,33 +1117,6 @@ export type Database = {
           },
         ]
       }
-      monthly_user_message_counts: {
-        Row: {
-          created_at: string
-          id: string
-          message_count: number
-          period: string
-          updated_at: string
-          user_id: string
-        }
-        Insert: {
-          created_at?: string
-          id?: string
-          message_count?: number
-          period: string
-          updated_at?: string
-          user_id: string
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          message_count?: number
-          period?: string
-          updated_at?: string
-          user_id?: string
-        }
-        Relationships: []
-      }
       pipeline_stages: {
         Row: {
           created_at: string
