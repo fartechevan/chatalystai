@@ -92,7 +92,7 @@ export function useConversationData(selectedConversation?: Conversation | null) 
           // Get instance_id from integrations_config table
           const { data: integrationConfigData, error: integrationConfigError } = await supabase
             .from('integrations_config') // TODO: Should this table name also change? Assuming not for now.
-            .select('instance_id')
+            .select('id, instance_id') // Select both 'id' (PK) and 'instance_id'
             .eq('integration_id', selectedConversation.integrations_id) // Assuming the column to match on integrations_config is integration_id
             .single();
 
@@ -112,6 +112,12 @@ export function useConversationData(selectedConversation?: Conversation | null) 
           }
 
           const instanceId = integrationConfigData.instance_id;
+          const actualIntegrationConfigId = integrationConfigData.id; // This is the PK of integrations_config
+
+          if (!actualIntegrationConfigId) {
+            console.error(`Integration config found for integration_id ${selectedConversation.integrations_id}, but its own 'id' (PK) is missing:`, integrationConfigData);
+            throw new Error("Primary key 'id' is missing from the fetched integration configuration record.");
+          }
 
           let customerPhoneNumber: string | undefined;
 
@@ -150,7 +156,7 @@ export function useConversationData(selectedConversation?: Conversation | null) 
             instanceId, // This is the Evolution Instance Name
             chatId, // This is the recipient JID (formerly customerPhoneNumber)
             content,
-            selectedConversation.integrations_id, // This is the DB integration_config.integration_id
+            actualIntegrationConfigId, // Pass the correct integrations_config.id (PK)
             file // Pass the file
           );
 
@@ -206,9 +212,21 @@ export function useConversationData(selectedConversation?: Conversation | null) 
 
         } catch (err) {
           console.error('Failed to send WhatsApp message:', err);
+          let toastTitle = "WhatsApp message failed";
+          let toastDescription = (err instanceof Error ? err.message : "An error occurred sending the WhatsApp message");
+
+          if (err instanceof Error && err.message.includes("Monthly message quota exceeded")) {
+            toastTitle = "Message Quota Exceeded";
+            toastDescription = "You have reached your monthly message limit. Please upgrade your plan or wait until the next billing cycle to send more messages.";
+          } else if (err instanceof Error && err.message.includes("Integration configuration not found")) {
+            toastTitle = "Configuration Error";
+            toastDescription = "There's an issue with the WhatsApp integration setup. Please contact support.";
+          }
+          // Add more specific error checks here if needed
+
           toast({
-            title: "WhatsApp message failed",
-            description: err.message || "An error occurred sending the WhatsApp message",
+            title: toastTitle,
+            description: toastDescription,
             variant: "destructive"
           });
           return null;

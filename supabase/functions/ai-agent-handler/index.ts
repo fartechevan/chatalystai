@@ -1,6 +1,6 @@
 import { serve } from 'std/http/server.ts'; // Use import map
 import { corsHeaders } from '../_shared/cors.ts';
-import { createSupabaseClient } from '../_shared/supabaseClient.ts';
+import { createSupabaseClient, createSupabaseServiceRoleClient } from '../_shared/supabaseClient.ts';
 import { Database } from '../_shared/database.types.ts';
 import OpenAI from "openai"; // Use mapped import from import_map.json
 
@@ -12,7 +12,7 @@ interface NewAgentPayload {
   prompt?: string; // Prompt is optional for CustomAgent
   keyword_trigger?: string | null;
   knowledge_document_ids?: string[];
-  integration_ids?: string[];
+  integrations_config_ids?: string[]; // Changed from integration_ids
   is_enabled?: boolean;
   activation_mode?: 'keyword' | 'always_on';
   agent_type?: 'chattalyst' | 'CustomAgent'; // Updated agent_type
@@ -24,7 +24,7 @@ interface UpdateAgentPayload {
   prompt?: string;
   keyword_trigger?: string | null;
   knowledge_document_ids?: string[];
-  integration_ids?: string[];
+  integrations_config_ids?: string[]; // Changed from integration_ids
   is_enabled?: boolean;
   activation_mode?: 'keyword' | 'always_on';
   agent_type?: 'chattalyst' | 'CustomAgent'; // Updated agent_type
@@ -32,7 +32,7 @@ interface UpdateAgentPayload {
 }
 
 interface AgentWithDetails extends AIAgentDbRow { 
-  integration_ids: string[]; 
+  integrations_config_ids: string[]; // Changed from integration_ids
   knowledge_document_ids: string[];
 }
 
@@ -101,9 +101,15 @@ serve(async (req: Request) => {
   console.log(`[${requestStartTime}] Handling ${req.method} request for ${req.url}`);
 
   try {
-    const supabase = createSupabaseClient(req);
-    const { data: { user } } = await supabase.auth.getUser();
-    const userId = user?.id;
+    const isInternalCall = req.headers.get('X-Internal-Call') === 'true';
+    // Use service role client for internal calls, otherwise standard client
+    const supabase = isInternalCall ? createSupabaseServiceRoleClient() : createSupabaseClient(req);
+    
+    let userId: string | undefined;
+    if (!isInternalCall) {
+      const { data: { user } } = await supabase.auth.getUser();
+      userId = user?.id;
+    }
 
     const url = new URL(req.url);
     const pathSegments = url.pathname.split('/').filter(Boolean);
@@ -111,10 +117,146 @@ serve(async (req: Request) => {
     const relevantPathSegments = functionNameIndex !== -1 ? pathSegments.slice(functionNameIndex + 1) : [];
     const agentIdFromPath = relevantPathSegments.length === 1 ? relevantPathSegments[0] : null;
 
+    // --- Internal Agent Query Handling (from whatsapp-webhook) ---
+    if (req.method === 'POST' && isInternalCall && !agentIdFromPath) {
+      console.log(`[${requestStartTime}] Routing to: Internal Agent Query`);
+      try {
+        const body = await req.json();
+        const { agentId, query, sessionId, contactIdentifier } = body;
+
+        if (!agentId || !query || !sessionId || !contactIdentifier) {
+          return createJsonResponse({ error: 'Missing required fields for internal agent query (agentId, query, sessionId, contactIdentifier)' }, 400);
+        }
+
+        // Fetch agent details using the service role client
+        const { data: agentData, error: agentFetchError } = await supabase
+          .from('ai_agents')
+          .select('*')
+          .eq('id', agentId)
+          .single<AIAgentDbRow>();
+
+        if (agentFetchError || !agentData) {
+          console.error(`[${requestStartTime}] Internal Query: Agent ${agentId} not found. Error:`, agentFetchError?.message);
+          return createJsonResponse({ error: `Agent not found: ${agentId}`, details: agentFetchError?.message }, 404);
+        }
+        
+        console.log(`[${requestStartTime}] Internal Query: Processing for agent ${agentData.name} (ID: ${agentId}), Type: ${agentData.agent_type}`);
+
+        let responseText: string | null = null;
+        let knowledgeUsed: unknown = null;
+
+        if (agentData.agent_type === 'chattalyst') {
+          // Simplified logic for Chattalyst agent - direct OpenAI call or knowledge base query
+          // This part needs to be fleshed out based on how 'chattalyst' agents are supposed to work.
+          // For now, let's assume a direct OpenAI call with the agent's prompt and user query.
+          
+          const apiKey = Deno.env.get("OPENAI_API_KEY");
+          if (!apiKey) throw new Error("OPENAI_API_KEY environment variable not set for internal query.");
+          const openai = new OpenAI({ apiKey });
+
+          // Fetch knowledge documents if any
+          const { data: knowledgeLinks } = await supabase
+            .from('ai_agent_knowledge_documents')
+            .select('document_id')
+            .eq('agent_id', agentId);
+
+          let contextText = "";
+          if (knowledgeLinks && knowledgeLinks.length > 0) {
+            const documentIds = knowledgeLinks.map(link => link.document_id);
+            const queryEmbedding = await generateEmbedding(query);
+
+            const { data: matchedChunks, error: matchError } = await supabase.rpc('match_document_chunks', {
+              query_embedding: queryEmbedding,
+              match_threshold: 0.75, // Example threshold
+              match_count: 5,       // Example count
+              document_ids_filter: documentIds
+            });
+
+            if (matchError) {
+              console.error(`[${requestStartTime}] Internal Query: Error matching document chunks for agent ${agentId}:`, matchError.message);
+            } else if (matchedChunks && matchedChunks.length > 0) {
+              contextText = matchedChunks.map(chunk => chunk.content).join("\n\n");
+              knowledgeUsed = matchedChunks.map(chunk => ({ id: chunk.id, title: chunk.document_title, similarity: chunk.similarity }));
+            }
+          }
+
+          const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
+            { role: "system", content: agentData.prompt || "You are a helpful assistant." },
+          ];
+          if (contextText) {
+            messages.push({ role: "system", content: `Use the following context to answer the user's query:\n${contextText}` });
+          }
+          messages.push({ role: "user", content: query });
+          
+          const completion = await openai.chat.completions.create({
+            model: "gpt-3.5-turbo",
+            messages: messages,
+          });
+          responseText = completion.choices[0]?.message?.content?.trim() || null;
+
+        } else if (agentData.agent_type === 'CustomAgent' && agentData.custom_agent_config?.webhook_url) {
+          const webhookUrl = agentData.custom_agent_config.webhook_url;
+          console.log(`[${requestStartTime}] Internal Query: Forwarding to Custom Agent webhook: ${webhookUrl} for agent ${agentId}`);
+          
+          // Construct payload for custom agent. Ensure it matches what the custom agent expects.
+          // This might need adjustment based on the custom agent's API.
+          const customAgentPayload = {
+            message: query, // Changed key from query
+            sessionId: sessionId,
+            phone_number: contactIdentifier, 
+            // Potentially add other relevant info from agentData.custom_agent_config
+            ...(agentData.custom_agent_config.payload_template || {}) 
+          };
+
+          const customAgentResponse = await fetch(webhookUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(customAgentPayload),
+          });
+
+          if (!customAgentResponse.ok) {
+            const errorText = await customAgentResponse.text();
+            console.error(`[${requestStartTime}] Internal Query: Custom Agent webhook for agent ${agentId} returned error ${customAgentResponse.status}: ${errorText}`);
+            // Fallback to a generic error or agent's configured error message if available
+            responseText = agentData.error_message || "Sorry, I encountered an issue with the custom service.";
+          } else {
+            const responseBodyText = await customAgentResponse.text();
+            console.log(`[${requestStartTime}] Internal Query: Custom Agent webhook for agent ${agentId} returned status ${customAgentResponse.status}. Raw response body: "${responseBodyText}"`);
+            if (responseBodyText && responseBodyText.trim() !== "") {
+              try {
+                console.log(`[${requestStartTime}] Internal Query: Attempting to parse non-empty response body for agent ${agentId}.`);
+                const responseJson = JSON.parse(responseBodyText);
+                responseText = responseJson.output || responseJson.response || null; 
+                knowledgeUsed = responseJson.knowledge_used || null;
+                console.log(`[${requestStartTime}] Internal Query: Successfully parsed response for agent ${agentId}. Response text: ${responseText}`);
+              } catch (parseError) {
+                console.error(`[${requestStartTime}] Internal Query: Failed to parse JSON response from Custom Agent webhook for agent ${agentId}. Body: "${responseBodyText.substring(0, 500)}"... Error: ${(parseError as Error).message}`);
+                responseText = agentData.error_message || "Sorry, the custom service returned an invalid JSON response.";
+              }
+            } else {
+              console.warn(`[${requestStartTime}] Internal Query: Custom Agent webhook for agent ${agentId} returned an empty or whitespace-only response body.`);
+              responseText = agentData.error_message || "Sorry, the custom service returned an empty response.";
+            }
+          }
+        } else {
+          console.warn(`[${requestStartTime}] Internal Query: Agent ${agentId} type ${agentData.agent_type} not supported or webhook_url missing.`);
+          responseText = agentData.error_message || "Sorry, this agent is not configured correctly.";
+        }
+
+        return createJsonResponse({ response: responseText, knowledge_used: knowledgeUsed }, 200);
+
+      } catch (e) {
+        console.error(`[${requestStartTime}] Internal Query: Error processing internal agent query. Error: ${(e as Error).message}`);
+        return createJsonResponse({ error: 'Failed to process internal agent query', details: (e as Error).message }, 500);
+      }
+    }
+    // --- END Internal Agent Query Handling ---
+
     // --- REST API Calls ---
     
     // --- CREATE AGENT (POST /) ---
-    if (req.method === 'POST' && !agentIdFromPath) {
+    // Ensure this condition does not overlap with the internal call check
+    if (req.method === 'POST' && !agentIdFromPath && !isInternalCall) {
       if (!userId) return createJsonResponse({ error: 'User authentication required for creating an agent' }, 401);
       console.log(`[${requestStartTime}] Routing to: Create Agent (REST)`);
       
@@ -131,7 +273,7 @@ serve(async (req: Request) => {
         return createJsonResponse({ error: 'Invalid payload for agent creation', details: (jsonError as Error).message }, 400);
       }
 
-      const { knowledge_document_ids: knowledgeIdsToLink, integration_ids: integrationIdsToLink, ...agentCorePayload } = payload;
+      const { knowledge_document_ids: knowledgeIdsToLink, integrations_config_ids: integrationsConfigIdsToLink, ...agentCorePayload } = payload; // Changed
       
       const agentToCreateData: AgentForCreate = {
         name: agentCorePayload.name,
@@ -156,14 +298,17 @@ serve(async (req: Request) => {
         const links = knowledgeIdsToLink.map(docId => ({ agent_id: newAgent.id, document_id: docId }));
         await supabase.from('ai_agent_knowledge_documents').insert(links);
       }
-      if (integrationIdsToLink && integrationIdsToLink.length > 0) {
-        const links = integrationIdsToLink.map(intId => ({ agent_id: newAgent.id, integration_id: intId }));
+      if (integrationsConfigIdsToLink && integrationsConfigIdsToLink.length > 0) {
+        const links = integrationsConfigIdsToLink.map(configId => ({ 
+          agent_id: newAgent.id, 
+          integrations_config_id: configId
+        }));
         await supabase.from('ai_agent_integrations').insert(links);
       }
       
       const responseAgent: AgentWithDetails = {
         ...newAgent,
-        integration_ids: integrationIdsToLink || [],
+        integrations_config_ids: integrationsConfigIdsToLink || [],
         knowledge_document_ids: knowledgeIdsToLink || [],
       };
       return createJsonResponse({ agent: responseAgent }, 201);
@@ -185,22 +330,27 @@ serve(async (req: Request) => {
       
       console.log(`[${requestStartTime}] Routing to: List Agents (REST) - User ${userId} has a profile.`);
       const { data: agentsData, error: fetchAgentsError } = await supabase
-        .from('ai_agents').select('*').order('created_at', { ascending: false }); // Removed .eq('user_id', userId)
+        .from('ai_agents').select('*').order('created_at', { ascending: false });
       if (fetchAgentsError) return createJsonResponse({ error: 'Failed to fetch agents', details: fetchAgentsError.message }, 500);
       if (!agentsData) return createJsonResponse({ agents: [] }, 200);
 
       const agentIds = agentsData.map(a => a.id);
-      const { data: integrationsData } = await supabase.from('ai_agent_integrations').select('agent_id, integration_id').in('agent_id', agentIds);
+      // Fetch using the new integrations_config_id
+      const { data: integrationsData } = await supabase.from('ai_agent_integrations').select('agent_id, integrations_config_id').in('agent_id', agentIds);
       const { data: knowledgeLinksData } = await supabase.from('ai_agent_knowledge_documents').select('agent_id, document_id').in('agent_id', agentIds);
       
       const integrationsMap = new Map<string, string[]>();
-      if (integrationsData) integrationsData.forEach(link => integrationsMap.set(link.agent_id, [...(integrationsMap.get(link.agent_id) || []), link.integration_id]));
+      if (integrationsData) integrationsData.forEach(link => {
+        if (link.integrations_config_id) { // Ensure it's not null
+          integrationsMap.set(link.agent_id, [...(integrationsMap.get(link.agent_id) || []), link.integrations_config_id])
+        }
+      });
       const knowledgeLinksMap = new Map<string, string[]>();
       if (knowledgeLinksData) knowledgeLinksData.forEach(link => knowledgeLinksMap.set(link.agent_id, [...(knowledgeLinksMap.get(link.agent_id) || []), link.document_id]));
 
       const agentsWithDetails: AgentWithDetails[] = agentsData.map(agent => ({
         ...agent,
-        integration_ids: integrationsMap.get(agent.id) || [],
+        integrations_config_ids: integrationsMap.get(agent.id) || [],
         knowledge_document_ids: knowledgeLinksMap.get(agent.id) || [],
       }));
       return createJsonResponse({ agents: agentsWithDetails }, 200);
@@ -223,16 +373,17 @@ serve(async (req: Request) => {
       
       console.log(`[${requestStartTime}] Routing to: Get Agent (REST - ID: ${agentIdFromPath}) - User ${userId} has a profile.`);
       const { data: agentData, error: agentFetchError } = await supabase
-        .from('ai_agents').select('*').eq('id', agentIdFromPath).single<AIAgentDbRow>(); // Removed .eq('user_id', userId)
+        .from('ai_agents').select('*').eq('id', agentIdFromPath).single<AIAgentDbRow>();
       if (agentFetchError) return createJsonResponse({ error: 'Agent not found', details: agentFetchError.message }, agentFetchError.code === 'PGRST116' ? 404 : 500);
       if (!agentData) return createJsonResponse({ error: 'Agent not found' }, 404);
 
-      const { data: integrationsData } = await supabase.from('ai_agent_integrations').select('integration_id').eq('agent_id', agentIdFromPath);
+      // Fetch using the new integrations_config_id
+      const { data: integrationsData } = await supabase.from('ai_agent_integrations').select('integrations_config_id').eq('agent_id', agentIdFromPath);
       const { data: knowledgeLinksData } = await supabase.from('ai_agent_knowledge_documents').select('document_id').eq('agent_id', agentIdFromPath);
       
       const agentWithDetails: AgentWithDetails = {
         ...agentData,
-        integration_ids: integrationsData?.map(link => link.integration_id) || [],
+        integrations_config_ids: integrationsData?.map(link => link.integrations_config_id).filter(id => id !== null) as string[] || [],
         knowledge_document_ids: knowledgeLinksData?.map(link => link.document_id) || [],
       };
       return createJsonResponse({ agent: agentWithDetails }, 200);
@@ -258,7 +409,7 @@ serve(async (req: Request) => {
       }
       console.log(`[${requestStartTime}] Update Agent: Successfully parsed JSON payload for ID ${agentIdFromPath}`);
 
-      const { knowledge_document_ids: knowledgeIdsToUpdate, integration_ids: integrationIdsToUpdate, ...agentCorePayload } = payload;
+      const { knowledge_document_ids: knowledgeIdsToUpdate, integrations_config_ids: integrationsConfigIdsToUpdate, ...agentCorePayload } = payload; // Changed
       
       const agentToUpdateData: AgentForUpdate = {}; // Using the explicitly defined interface
 
@@ -327,21 +478,23 @@ serve(async (req: Request) => {
           await supabase.from('ai_agent_knowledge_documents').insert(links);
         }
       }
-      if (integrationIdsToUpdate !== undefined) { // This means the key was present in the payload
+      if (integrationsConfigIdsToUpdate !== undefined) { // This means the key was present in the payload
         await supabase.from('ai_agent_integrations').delete().eq('agent_id', agentIdFromPath);
-        // Check if integrationIdsToUpdate is not null AND has items before trying to map/insert
-        if (integrationIdsToUpdate && integrationIdsToUpdate.length > 0) {
-          const links = integrationIdsToUpdate.map(id => ({ agent_id: agentIdFromPath, integration_id: id }));
+        if (integrationsConfigIdsToUpdate && integrationsConfigIdsToUpdate.length > 0) {
+          const links = integrationsConfigIdsToUpdate.map(configId => ({ 
+            agent_id: agentIdFromPath, 
+            integrations_config_id: configId
+          }));
           await supabase.from('ai_agent_integrations').insert(links);
         }
       }
       
-      const { data: finalIntegrations } = await supabase.from('ai_agent_integrations').select('integration_id').eq('agent_id', agentIdFromPath);
+      const { data: finalIntegrations } = await supabase.from('ai_agent_integrations').select('integrations_config_id').eq('agent_id', agentIdFromPath);
       const { data: finalKnowledge } = await supabase.from('ai_agent_knowledge_documents').select('document_id').eq('agent_id', agentIdFromPath);
 
       const responseAgent: AgentWithDetails = {
         ...updatedAgent, 
-        integration_ids: finalIntegrations?.map(l => l.integration_id) || [],
+        integrations_config_ids: finalIntegrations?.map(l => l.integrations_config_id).filter(id => id !== null) as string[] || [],
         knowledge_document_ids: finalKnowledge?.map(l => l.document_id) || []
       };
       return createJsonResponse({ agent: responseAgent }, 200);

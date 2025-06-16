@@ -44,16 +44,18 @@ export const sendTextService = async (params: SendTextParams): Promise<SendTextR
 
   // Construct the payload for the Edge Function
   const functionPayload = {
-    action: 'send-text',
-    instanceId: integrationId, // Pass the DB integration ID
-    number: number, // Pass the raw number, let Edge Function handle formatting if needed
-    text: text,
-    // Pass optional data if the Edge Function is designed to handle it
-    // ...optionalData
+    integration_config_id: integrationId, // This 'integrationId' from params is the correct value
+    recipient_identifier: number,
+    message_type: 'text' as const, // Explicitly 'text'
+    message_content: text,
+    // Optional parameters from SendTextParams can be added here if send-message-handler supports them
+    // delay: params.delay,
+    // linkPreview: params.linkPreview,
+    // etc.
   };
 
   // Invoke the Supabase Edge Function
-  const { data, error } = await supabase.functions.invoke<SendTextResponse>('evolution-api-handler', {
+  const { data, error } = await supabase.functions.invoke<SendTextResponse>('send-message-handler', { // Target correct function
     body: functionPayload,
   });
 
@@ -89,7 +91,7 @@ export const sendTextService = async (params: SendTextParams): Promise<SendTextR
     detailedErrorMessage += ` | Status: ${responseStatus} | Response: ${functionResponseBody}`;
     // Log the original error object, the status, and the processed response body
     console.error(
-      'Error invoking evolution-api-handler Edge Function. Original error object:', error, 
+      'Error invoking send-message-handler Edge Function. Original error object:', error, 
       `Response Status: ${responseStatus}`, 
       `Processed Response Body: ${functionResponseBody}`
     );
@@ -104,7 +106,7 @@ export const sendTextService = async (params: SendTextParams): Promise<SendTextR
 
   // Handle potential errors returned in the Edge Function's response body
   if (data.error) {
-    console.error('Error returned from evolution-api-handler Edge Function:', data.error);
+    console.error('Error returned from send-message-handler Edge Function:', data.error);
     throw new Error(`Edge Function execution failed: ${data.error}`);
   }
 
