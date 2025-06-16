@@ -1,9 +1,9 @@
 {
   "imports": {
-    "std/": "https://deno.land/std@0.177.0/",
+    "std/": "https://deno.land/std@0.192.0/",
     "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@2.43.4",
     "uuid": "https://esm.sh/uuid@9.0.0",
     "openai": "https://deno.land/x/openai@v4.24.1/mod.ts",
-    "csv": "https://deno.land/std@0.177.0/csv/mod.ts"
+    "csv": "https://deno.land/std@0.192.0/csv/mod.ts"
   }
 }

@@ -79,7 +79,7 @@ export type Database = {
           agent_id: string
           created_at: string
           error_message: string | null
-          integration_id: string
+          integrations_config_id: string | null
           session_timeout_minutes: number | null
           stop_keywords: string[] | null
           updated_at: string
@@ -89,7 +89,7 @@ export type Database = {
           agent_id: string
           created_at?: string
           error_message?: string | null
-          integration_id: string
+          integrations_config_id?: string | null
           session_timeout_minutes?: number | null
           stop_keywords?: string[] | null
           updated_at?: string
@@ -99,7 +99,7 @@ export type Database = {
           agent_id?: string
           created_at?: string
           error_message?: string | null
-          integration_id?: string
+          integrations_config_id?: string | null
           session_timeout_minutes?: number | null
           stop_keywords?: string[] | null
           updated_at?: string
@@ -113,10 +113,10 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "ai_agent_integrations_integration_id_fkey"
-            columns: ["integration_id"]
+            foreignKeyName: "ai_agent_integrations_integrations_config_id_fkey"
+            columns: ["integrations_config_id"]
             isOneToOne: false
-            referencedRelation: "integrations"
+            referencedRelation: "integrations_config"
             referencedColumns: ["id"]
           },
         ]
@@ -161,7 +161,7 @@ export type Database = {
           conversation_history: Json | null
           created_at: string | null
           id: string
-          integration_id: string | null
+          integrations_config_id: string | null
           is_active: boolean | null
           last_interaction_timestamp: string | null
           status: Database["public"]["Enums"]["ai_session_status"]
@@ -173,7 +173,7 @@ export type Database = {
           conversation_history?: Json | null
           created_at?: string | null
           id?: string
-          integration_id?: string | null
+          integrations_config_id?: string | null
           is_active?: boolean | null
           last_interaction_timestamp?: string | null
           status?: Database["public"]["Enums"]["ai_session_status"]
@@ -185,7 +185,7 @@ export type Database = {
           conversation_history?: Json | null
           created_at?: string | null
           id?: string
-          integration_id?: string | null
+          integrations_config_id?: string | null
           is_active?: boolean | null
           last_interaction_timestamp?: string | null
           status?: Database["public"]["Enums"]["ai_session_status"]
@@ -200,10 +200,10 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "ai_agent_sessions_integration_id_fkey"
-            columns: ["integration_id"]
+            foreignKeyName: "ai_agent_sessions_integrations_config_id_fkey"
+            columns: ["integrations_config_id"]
             isOneToOne: false
-            referencedRelation: "integrations"
+            referencedRelation: "integrations_config"
             referencedColumns: ["id"]
           },
         ]
@@ -432,27 +432,43 @@ export type Database = {
           created_at: string
           id: string
           instance_id: string | null
+          integration_config_id: string | null
           integration_id: string | null
           message_text: string
           segment_id: string | null
+          status: string | null
+          updated_at: string | null
         }
         Insert: {
           created_at?: string
           id?: string
           instance_id?: string | null
+          integration_config_id?: string | null
           integration_id?: string | null
           message_text: string
           segment_id?: string | null
+          status?: string | null
+          updated_at?: string | null
         }
         Update: {
           created_at?: string
           id?: string
           instance_id?: string | null
+          integration_config_id?: string | null
           integration_id?: string | null
           message_text?: string
           segment_id?: string | null
+          status?: string | null
+          updated_at?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "broadcasts_integration_config_id_fkey"
+            columns: ["integration_config_id"]
+            isOneToOne: false
+            referencedRelation: "integrations_config"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "broadcasts_integration_id_fkey"
             columns: ["integration_id"]
@@ -618,42 +634,6 @@ export type Database = {
         }
         Relationships: []
       }
-      document_chunks: {
-        Row: {
-          content: string
-          created_at: string | null
-          embedding: string | null
-          filename: string | null
-          id: number
-          image_summary: string | null
-          metadata: Json | null
-          source: string | null
-          total_images: number | null
-        }
-        Insert: {
-          content: string
-          created_at?: string | null
-          embedding?: string | null
-          filename?: string | null
-          id?: number
-          image_summary?: string | null
-          metadata?: Json | null
-          source?: string | null
-          total_images?: number | null
-        }
-        Update: {
-          content?: string
-          created_at?: string | null
-          embedding?: string | null
-          filename?: string | null
-          id?: number
-          image_summary?: string | null
-          metadata?: Json | null
-          source?: string | null
-          total_images?: number | null
-        }
-        Relationships: []
-      }
       documents: {
         Row: {
           content: string | null
@@ -791,7 +771,7 @@ export type Database = {
           {
             foreignKeyName: "integrations_config_integration_id_fkey"
             columns: ["integration_id"]
-            isOneToOne: false
+            isOneToOne: true
             referencedRelation: "integrations"
             referencedColumns: ["id"]
           },
@@ -1020,39 +1000,105 @@ export type Database = {
           },
         ]
       }
+      message_logs: {
+        Row: {
+          created_at: string
+          direction: string
+          error_message: string | null
+          id: string
+          integration_config_id: string | null
+          media_details: Json | null
+          message_content: string | null
+          message_type: Database["public"]["Enums"]["message_log_type"]
+          profile_id: string | null
+          provider_message_id: string | null
+          recipient_identifier: string
+          sent_at: string | null
+          status: Database["public"]["Enums"]["message_log_status"]
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          direction?: string
+          error_message?: string | null
+          id?: string
+          integration_config_id?: string | null
+          media_details?: Json | null
+          message_content?: string | null
+          message_type?: Database["public"]["Enums"]["message_log_type"]
+          profile_id?: string | null
+          provider_message_id?: string | null
+          recipient_identifier: string
+          sent_at?: string | null
+          status?: Database["public"]["Enums"]["message_log_status"]
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          direction?: string
+          error_message?: string | null
+          id?: string
+          integration_config_id?: string | null
+          media_details?: Json | null
+          message_content?: string | null
+          message_type?: Database["public"]["Enums"]["message_log_type"]
+          profile_id?: string | null
+          provider_message_id?: string | null
+          recipient_identifier?: string
+          sent_at?: string | null
+          status?: Database["public"]["Enums"]["message_log_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "message_logs_integration_config_id_fkey"
+            columns: ["integration_config_id"]
+            isOneToOne: false
+            referencedRelation: "integrations_config"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "message_logs_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       messages: {
         Row: {
           content: string | null
           conversation_id: string
           created_at: string
           is_read: boolean
+          media_data: Json | null
+          media_type: string | null
           message_id: string
           sender_participant_id: string
           wamid: string | null
-          media_type: string | null
-          media_data: Json | null
         }
         Insert: {
           content?: string | null
           conversation_id: string
           created_at?: string
           is_read?: boolean
+          media_data?: Json | null
+          media_type?: string | null
           message_id?: string
           sender_participant_id: string
           wamid?: string | null
-          media_type?: string | null
-          media_data?: Json | null
         }
         Update: {
           content?: string | null
           conversation_id?: string
           created_at?: string
           is_read?: boolean
+          media_data?: Json | null
+          media_type?: string | null
           message_id?: string
           sender_participant_id?: string
           wamid?: string | null
-          media_type?: string | null
-          media_data?: Json | null
         }
         Relationships: [
           {
@@ -1070,6 +1116,33 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      monthly_user_message_counts: {
+        Row: {
+          created_at: string
+          id: string
+          message_count: number
+          period: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          message_count?: number
+          period: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          message_count?: number
+          period?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       pipeline_stages: {
         Row: {
@@ -1132,6 +1205,47 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      plan_message_usage: {
+        Row: {
+          billing_cycle_month: number
+          billing_cycle_year: number
+          created_at: string
+          id: string
+          last_counted_at: string
+          messages_sent_this_cycle: number
+          subscription_id: string
+          updated_at: string
+        }
+        Insert: {
+          billing_cycle_month: number
+          billing_cycle_year: number
+          created_at?: string
+          id?: string
+          last_counted_at?: string
+          messages_sent_this_cycle?: number
+          subscription_id: string
+          updated_at?: string
+        }
+        Update: {
+          billing_cycle_month?: number
+          billing_cycle_year?: number
+          created_at?: string
+          id?: string
+          last_counted_at?: string
+          messages_sent_this_cycle?: number
+          subscription_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "plan_message_usage_subscription_id_fkey"
+            columns: ["subscription_id"]
+            isOneToOne: false
+            referencedRelation: "subscriptions"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       plans: {
         Row: {
@@ -1489,6 +1603,27 @@ export type Database = {
           },
         ]
       }
+      vector_db_v1: {
+        Row: {
+          content: string | null
+          embedding: string | null
+          id: string
+          metadata: Json | null
+        }
+        Insert: {
+          content?: string | null
+          embedding?: string | null
+          id?: string
+          metadata?: Json | null
+        }
+        Update: {
+          content?: string | null
+          embedding?: string | null
+          id?: string
+          metadata?: Json | null
+        }
+        Relationships: []
+      }
       whatsapp_blast_limits: {
         Row: {
           blast_limit: number
@@ -1552,6 +1687,19 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: string
       }
+      get_or_create_conversation_and_participants: {
+        Args: {
+          p_integration_id: string
+          p_customer_id: string
+          p_profile_id: string
+          p_customer_external_id: string
+        }
+        Returns: {
+          conversation_id: string
+          sender_participant_id: string
+          recipient_participant_id: string
+        }[]
+      }
       halfvec_avg: {
         Args: { "": number[] }
         Returns: unknown
@@ -1583,6 +1731,10 @@ export type Database = {
       hnswhandler: {
         Args: { "": unknown }
         Returns: unknown
+      }
+      increment_message_usage: {
+        Args: { p_subscription_id: string; p_year: number; p_month: number }
+        Returns: undefined
       }
       is_user_team_admin_or_owner: {
         Args: { p_user_id: string; p_team_id: string }
@@ -1633,23 +1785,11 @@ export type Database = {
         }[]
       }
       match_documents: {
-        Args:
-          | { query_embedding: string; match_count?: number; filter?: Json }
-          | {
-              query_embedding: string
-              match_threshold?: number
-              match_count?: number
-              filter_source?: string
-              fetch_k?: number
-            }
+        Args: { query_embedding: string; match_count?: number; filter?: Json }
         Returns: {
           id: number
           content: string
           metadata: Json
-          source: string
-          filename: string
-          total_images: number
-          image_summary: string
           similarity: number
         }[]
       }
@@ -1678,6 +1818,16 @@ export type Database = {
           table_name: string
           column_name: string
           description: string
+          similarity: number
+        }[]
+      }
+      match_vector_db_v1: {
+        Args: { query_embedding: string; match_count?: number; filter?: Json }
+        Returns: {
+          id: string
+          content: string
+          metadata: Json
+          embedding: Json
           similarity: number
         }[]
       }
@@ -1771,6 +1921,27 @@ export type Database = {
         | "saturday"
         | "sunday"
       integration_status: "available" | "coming_soon"
+      message_log_status:
+        | "pending"
+        | "sent"
+        | "delivered"
+        | "read"
+        | "failed"
+        | "blocked_quota"
+        | "blocked_rule"
+      message_log_type:
+        | "text"
+        | "image"
+        | "video"
+        | "audio"
+        | "document"
+        | "template"
+        | "interactive_buttons"
+        | "interactive_list"
+        | "location"
+        | "contact"
+        | "sticker"
+        | "unknown"
       new_app_role: "user" | "admin"
       role_enum: "admin" | "member"
       sender_type: "user" | "ai"
@@ -1916,6 +2087,29 @@ export const Constants = {
         "sunday",
       ],
       integration_status: ["available", "coming_soon"],
+      message_log_status: [
+        "pending",
+        "sent",
+        "delivered",
+        "read",
+        "failed",
+        "blocked_quota",
+        "blocked_rule",
+      ],
+      message_log_type: [
+        "text",
+        "image",
+        "video",
+        "audio",
+        "document",
+        "template",
+        "interactive_buttons",
+        "interactive_list",
+        "location",
+        "contact",
+        "sticker",
+        "unknown",
+      ],
       new_app_role: ["user", "admin"],
       role_enum: ["admin", "member"],
       sender_type: ["user", "ai"],

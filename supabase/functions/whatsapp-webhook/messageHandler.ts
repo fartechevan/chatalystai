@@ -12,7 +12,7 @@ interface AgentIntegrationSettings {
   stop_keywords: string[];
   session_timeout_minutes: number;
   error_message: string;
-  integration_id: string; 
+  // integration_id: string; // Removed
 }
 
 interface AgentSession {
@@ -252,15 +252,24 @@ export async function handleMessageEvent(supabaseClient: SupabaseClient, data: W
             stop_keywords,
             session_timeout_minutes,
             error_message,
-            integration_id,
+            integrations_config_id,
             ai_agents ( keyword_trigger, is_enabled, activation_mode )`
           )
-          .eq('integration_id', config.integration_id) // Use dynamic integration_id
-          .maybeSingle(); 
+          // Query by the new foreign key column
+          .eq('integrations_config_id', config.id) // config.id is integrations_config.id
+          .limit(1) 
+          .single();
 
-        if (settingsError) throw new Error(`Error fetching agent settings: ${settingsError.message}`);
+        if (settingsError) {
+          console.error(`[MessageHandler] DB error fetching agent settings for integrations_config_id ${config.id}. Code: ${settingsError.code}, Message: ${settingsError.message}, Details: ${JSON.stringify(settingsError.details)}`);
+          if (settingsError.code !== 'PGRST116') { // PGRST116 means no rows, which should be handled by !agentSettingsData
+            throw new Error(`Error fetching agent settings: ${settingsError.message}`);
+          }
+          // If code IS PGRST116, we let it fall through to the !agentSettingsData check
+        }
+        
         if (!agentSettingsData) {
-          console.log(`[MessageHandler] No AI agent linked to integration ${config.integration_id}. Skipping AI logic.`);
+          console.log(`[MessageHandler] No AI agent linked to integrations_config_id ${config.id}. Skipping AI logic.`);
           return true; 
         }
 
@@ -280,10 +289,11 @@ export async function handleMessageEvent(supabaseClient: SupabaseClient, data: W
           .select('id, status, last_interaction_timestamp, conversation_history')
           .eq('contact_identifier', remoteJid)
           .eq('agent_id', agentId)
-          .eq('integration_id', config.integration_id) // Use dynamic integration_id
+          // Session should also be linked via the specific integrations_config_id
+          .eq('integrations_config_id', config.id) 
           .maybeSingle();
 
-        if (sessionFetchError) throw new Error(`Error fetching agent session: ${sessionFetchError.message}`);
+        if (sessionFetchError) throw new Error(`Error fetching agent session for integrations_config_id ${config.id}: ${sessionFetchError.message}`);
 
         let sessionId: string | null = session?.id || null;
         const currentStatus: 'active' | 'closed' | 'error' = session?.status || 'closed';
@@ -319,7 +329,7 @@ export async function handleMessageEvent(supabaseClient: SupabaseClient, data: W
                 last_interaction_timestamp: now.toISOString(),
                 contact_identifier: remoteJid,
                 agent_id: agentId,
-                integration_id: config.integration_id, // Use dynamic integration_id
+                integrations_config_id: config.id, // Use new FK for session
             };
             const { data: newSession, error: createError } = await supabaseClient
                 .from('ai_agent_sessions')
@@ -388,8 +398,9 @@ export async function handleMessageEvent(supabaseClient: SupabaseClient, data: W
             if (aiResponseContent) {
               supabaseClient.functions.invoke('evolution-api-handler', { 
                 body: {
-                  action: 'send-text', 
-                  instanceId: config.integration_id, // Use dynamic integration_id
+                  action: 'sendText',  // Corrected action name
+                  // evolution-api-handler expects integrationConfigId which is integrations_config.id
+                  integrationConfigId: config.id, 
                   number: remoteJid, 
                   text: aiResponseContent,
                 },

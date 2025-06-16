@@ -133,7 +133,7 @@ const AgentDetailsPanel: React.FC<AgentDetailsPanelProps> = ({ selectedAgentId, 
       setPromptText(selectedAgent.prompt || '');
       setKeywordTrigger(selectedAgent.keyword_trigger || '');
       setSelectedDocumentIds(selectedAgent.knowledge_document_ids || []);
-      setSelectedIntegrationIds(selectedAgent.integration_ids || []);
+      setSelectedIntegrationIds(selectedAgent.integrations_config_ids || []);
       setIsEnabled(selectedAgent.is_enabled ?? true);
       setActivationMode(selectedAgent.activation_mode || 'keyword');
       setAgentType(selectedAgent.agent_type || 'chattalyst'); // DB migration already handled 'n8n' to 'CustomAgent'
@@ -313,7 +313,7 @@ const AgentDetailsPanel: React.FC<AgentDetailsPanelProps> = ({ selectedAgentId, 
         prompt: agentType === 'chattalyst' ? promptText : '', // Only save prompt for chattalyst
         knowledge_document_ids: agentType === 'chattalyst' && selectedDocumentIds.length > 0 ? selectedDocumentIds : null,
         keyword_trigger: keywordTrigger?.trim() || null,
-        integration_ids: selectedIntegrationIds.length > 0 ? selectedIntegrationIds : [],
+        integrations_config_ids: selectedIntegrationIds.length > 0 ? selectedIntegrationIds : [],
         is_enabled: isEnabled,
         activation_mode: activationMode,
         agent_type: agentType, // Will be 'chattalyst' or 'CustomAgent'
@@ -342,7 +342,7 @@ const AgentDetailsPanel: React.FC<AgentDetailsPanelProps> = ({ selectedAgentId, 
         prompt: agentType === 'chattalyst' ? promptText : '', // Only save prompt for chattalyst
         knowledge_document_ids: agentType === 'chattalyst' && selectedDocumentIds.length > 0 ? selectedDocumentIds : null,
         keyword_trigger: keywordTrigger?.trim() || null,
-        integration_ids: selectedIntegrationIds.length > 0 ? selectedIntegrationIds : [],
+        integrations_config_ids: selectedIntegrationIds.length > 0 ? selectedIntegrationIds : [],
         is_enabled: isEnabled,
         activation_mode: activationMode,
         agent_type: agentType, // Will be 'chattalyst' or 'CustomAgent'
@@ -600,22 +600,22 @@ const AgentDetailsPanel: React.FC<AgentDetailsPanelProps> = ({ selectedAgentId, 
            <div className="space-y-2 rounded-md border p-4">
              {/* Replace with actual multi-select component later */}
              {availableIntegrations.map((integration) => (
-               // Use base_integration_id as the key and value for selection
-               <div key={integration.base_integration_id} className="flex items-center space-x-2">
+               // Use integration.id (integrations_config.id) as the key and value for selection
+               <div key={integration.id} className="flex items-center space-x-2">
                  <input
                    type="checkbox"
-                   id={`integration-${integration.base_integration_id}`} // Use base ID for unique ID
-                   checked={selectedIntegrationIds.includes(integration.base_integration_id)} // Check against base ID
+                   id={`integration-${integration.id}`} // Use config ID for unique ID
+                   checked={selectedIntegrationIds.includes(integration.id)} // Check against config ID
                    onChange={(e) => {
-                     const id = integration.base_integration_id; // Use base ID
+                     const id = integration.id; // Use config ID
                      setSelectedIntegrationIds(prev =>
                        e.target.checked ? [...prev, id] : prev.filter(i => i !== id)
                      );
                    }}
                    disabled={isCreating || updateMutation.isPending || isLoadingAgent}
                  />
-                 {/* Use base ID for label association */}
-                 <Label htmlFor={`integration-${integration.base_integration_id}`} className="font-normal">
+                 {/* Use config ID for label association */}
+                 <Label htmlFor={`integration-${integration.id}`} className="font-normal">
                    {/* Display instance name if available, otherwise base name */}
                    {integration.instance_display_name || integration.name}
                  </Label>
@@ -749,22 +749,22 @@ const AgentDetailsPanel: React.FC<AgentDetailsPanelProps> = ({ selectedAgentId, 
             <div className="space-y-2 rounded-md border p-4">
               {/* Replace with actual multi-select component later */}
               {availableIntegrations.map((integration) => (
-                 // Use base_integration_id as the key and value for selection
-                <div key={integration.base_integration_id} className="flex items-center space-x-2">
+                 // Use integration.id (integrations_config.id) as the key and value for selection
+                <div key={integration.id} className="flex items-center space-x-2">
                   <input
                     type="checkbox"
-                    id={`integration-create-${integration.base_integration_id}`} // Use base ID for unique ID
-                    checked={selectedIntegrationIds.includes(integration.base_integration_id)} // Check against base ID
+                    id={`integration-create-${integration.id}`} // Use config ID for unique ID
+                    checked={selectedIntegrationIds.includes(integration.id)} // Check against config ID
                     onChange={(e) => {
-                      const id = integration.base_integration_id; // Use base ID
+                      const id = integration.id; // Use config ID
                       setSelectedIntegrationIds(prev =>
                         e.target.checked ? [...prev, id] : prev.filter(i => i !== id)
                       );
                     }}
                     disabled={createMutation.isPending}
                   />
-                   {/* Use base ID for label association */}
-                  <Label htmlFor={`integration-create-${integration.base_integration_id}`} className="font-normal">
+                   {/* Use config ID for label association */}
+                  <Label htmlFor={`integration-create-${integration.id}`} className="font-normal">
                      {/* Display instance name if available, otherwise base name */}
                     {integration.instance_display_name || integration.name}
                   </Label>

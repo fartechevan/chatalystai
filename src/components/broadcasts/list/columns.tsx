@@ -103,6 +103,14 @@ export const getBroadcastColumns = (actions: Omit<BroadcastColumnActionsProps, '
     },
   },
   {
+    accessorKey: "senderDisplayName",
+    header: "Sender (Display Name)",
+    cell: ({ row }) => {
+      const senderName = row.getValue("senderDisplayName") as string;
+      return <div>{senderName || 'N/A'}</div>;
+    },
+  },
+  {
     accessorKey: "status",
     header: ({ column }) => (
       <Button

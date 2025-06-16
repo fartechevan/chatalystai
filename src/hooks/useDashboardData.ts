@@ -169,11 +169,11 @@ export const useDashboardData = (
         .from("token_allocations")
         .select("monthly_tokens")
         .eq("user_id", currentUserId)
-        .single(); // Assuming one allocation record per user
+        .maybeSingle(); // Allow zero or one allocation record
 
       if (error) {
         console.error("Error fetching token allocation:", error);
-        return null; // Or a default like { monthly_tokens: 0 }
+        return null; 
       }
       return data;
     },

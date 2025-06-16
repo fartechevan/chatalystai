@@ -1,5 +1,5 @@
 
-import { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { SupabaseClient } from "@supabase/supabase-js";
 
 /**
  * Finds an existing customer or creates a new one
@@ -10,34 +10,42 @@ export async function findOrCreateCustomer(supabaseClient: SupabaseClient, phone
   // Use the phone number as provided
   const formattedPhoneNumber = phoneNumber;
   
-  // Try to find existing customer
-  const { data: existingCustomer, error: customerError } = await supabaseClient
+  // Try to find existing customer(s)
+  const { data: existingCustomers, error: customerFetchError } = await supabaseClient
     .from('customers')
     .select('id, name')
-    .eq('phone_number', formattedPhoneNumber)
-    .maybeSingle();
+    .eq('phone_number', formattedPhoneNumber); // Fetches all matches
   
-  if (customerError) {
-    console.error('Error finding existing customer:', customerError);
+  if (customerFetchError) {
+    console.error('Error fetching existing customer(s):', customerFetchError);
     return null;
+  }
+
+  let customerToProcess: { id: string; name: string | null } | null = null;
+
+  if (existingCustomers && existingCustomers.length > 0) {
+    if (existingCustomers.length > 1) {
+      console.warn(`[customerHandler] Duplicate customers found for phone ${formattedPhoneNumber}. Using the first one (ID: ${existingCustomers[0].id}). Consider data cleanup.`);
+    }
+    customerToProcess = existingCustomers[0]; // Use the first customer found
   }
   
   // If customer exists
-  if (existingCustomer) {
-    console.log(`Found existing customer with ID: ${existingCustomer.id}`);
+  if (customerToProcess) {
+    console.log(`Found existing customer with ID: ${customerToProcess.id}`);
     
     // Only update name if message is from customer (not from Me) AND we have a contact name AND 
     // either the existing customer has no name or the name is the phone number
     if (!fromMe && contactName && 
-        (!existingCustomer.name || existingCustomer.name === formattedPhoneNumber)) {
-      console.log(`Updating existing customer name from ${existingCustomer.name} to ${contactName}`);
+        (!customerToProcess.name || customerToProcess.name === formattedPhoneNumber)) {
+      console.log(`Updating existing customer name from ${customerToProcess.name} to ${contactName}`);
       await supabaseClient
         .from('customers')
         .update({ name: contactName })
-        .eq('id', existingCustomer.id);
+        .eq('id', customerToProcess.id);
     }
     
-    return existingCustomer.id;
+    return customerToProcess.id;
   }
   
   // Otherwise create new customer
@@ -76,31 +84,39 @@ export async function addOrUpdateCustomerContact(supabaseClient: SupabaseClient,
   // Use the phone number as provided
   const formattedPhoneNumber = phoneNumber;
 
-  // Try to find existing customer
-  const { data: existingCustomer, error: customerError } = await supabaseClient
+  // Try to find existing customer(s)
+  const { data: existingCustomers, error: customerFetchError } = await supabaseClient
     .from('customers')
     .select('id')
-    .eq('phone_number', formattedPhoneNumber)
-    .maybeSingle();
+    .eq('phone_number', formattedPhoneNumber); // Fetches all matches
 
-  if (customerError) {
-    console.error('Error finding existing customer during add/update:', customerError);
+  if (customerFetchError) {
+    console.error('Error fetching existing customer(s) during add/update:', customerFetchError);
     return null;
   }
 
+  let customerToUpdate: { id: string } | null = null;
+
+  if (existingCustomers && existingCustomers.length > 0) {
+    if (existingCustomers.length > 1) {
+      console.warn(`[customerHandler - addOrUpdate] Duplicate customers found for phone ${formattedPhoneNumber}. Updating the first one (ID: ${existingCustomers[0].id}). Consider data cleanup.`);
+    }
+    customerToUpdate = existingCustomers[0]; // Use the first customer found
+  }
+
   // If customer exists, update their name
-  if (existingCustomer) {
-    console.log(`Found existing customer with ID: ${existingCustomer.id}. Updating name to ${name}`);
+  if (customerToUpdate) {
+    console.log(`Found existing customer with ID: ${customerToUpdate.id}. Updating name to ${name}`);
     const { error: updateError } = await supabaseClient
       .from('customers')
       .update({ name: name })
-      .eq('id', existingCustomer.id);
+      .eq('id', customerToUpdate.id);
 
     if (updateError) {
       console.error('Error updating customer name:', updateError);
       return null;
     }
-    return existingCustomer.id;
+    return customerToUpdate.id;
   }
 
   // Otherwise, create a new customer

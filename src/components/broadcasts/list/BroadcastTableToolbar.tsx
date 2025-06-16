@@ -35,9 +35,9 @@ export function BroadcastTableToolbar<TData>({
       <div className="flex flex-1 items-center space-x-2">
         <Input
           placeholder="Filter broadcasts..."
-          value={(table.getColumn("name")?.getFilterValue() as string) ?? ""} // Example: filtering by name column
+          value={(table.getColumn("message_text")?.getFilterValue() as string) ?? ""}
           onChange={(event) =>
-            table.getColumn("name")?.setFilterValue(event.target.value) // Or use a global filter
+            table.getColumn("message_text")?.setFilterValue(event.target.value)
           }
           className="h-8 w-[150px] lg:w-[250px]"
         />
