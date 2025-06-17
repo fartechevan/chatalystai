@@ -111,11 +111,11 @@ export function MessageItem({ message, conversation, onMediaPreviewRequest }: Me
             )}
             
             {hasCaption && (
-              <p className="text-sm whitespace-pre-wrap mt-1">{message.content}</p>
+              <p className="text-sm whitespace-pre-wrap mt-1 break-words">{message.content}</p>
             )}
             {/* Fallback for non-media text messages or media without thumbnail/caption */}
             {!(isImageMessage || isVideoMessage) && !hasCaption && (
-                 <p className="text-sm whitespace-pre-wrap">{message.content || "[Empty message]"}</p>
+                 <p className="text-sm whitespace-pre-wrap break-words">{message.content || "[Empty message]"}</p>
             )}
              {/* If it's media but no thumbnail and no caption, show media type */}
             {(isImageMessage || isVideoMessage) && !mediaThumbnailSrc && !hasCaption && (
