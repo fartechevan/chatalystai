@@ -60,22 +60,23 @@ export function MessageItem({ message, conversation, onMediaPreviewRequest }: Me
 
   return (
     <div className={`flex ${isAdmin ? "justify-end" : "justify-start"}`}>
-      <div className={`flex max-w-[70%] items-start gap-2 ${isAdmin ? "flex-row-reverse" : "flex-row"}`}>
-        <Avatar className="h-8 w-8">
-          <div className="h-full w-full bg-primary/10 flex items-center justify-center text-primary font-medium">
-            {isAdmin ? 'A' : 'U'}
-          </div>
-        </Avatar>
-        <div>
-          <div className="flex items-center gap-2 mb-1">
-            <span className="text-sm font-medium">
+      <div className="max-w-[70%]"> {/* Apply max-width to a simpler block container */}
+        <div className={`flex items-start gap-2 ${isAdmin ? "flex-row-reverse" : "flex-row"}`}> {/* Inner flex container */}
+          <Avatar className="h-8 w-8">
+            <div className="h-full w-full bg-primary/10 flex items-center justify-center text-primary font-medium">
+              {isAdmin ? 'A' : 'U'}
+            </div>
+          </Avatar>
+          <div className="min-w-0 flex-1">
+            <div className="flex items-center gap-2 mb-1">
+              <span className="text-sm font-medium">
               {isAdmin ? 'Admin' : conversation?.customer_name || 'User'}
             </span>
             <span className="text-xs text-muted-foreground">
               {new Date(message.created_at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}
             </span>
           </div>
-          <div className={mediaContainerClass}>
+          <div className={`${mediaContainerClass} w-full`}>
             {(isImageMessage && mediaThumbnailSrc) && (
               <img 
                 src={mediaThumbnailSrc} 
@@ -111,11 +112,11 @@ export function MessageItem({ message, conversation, onMediaPreviewRequest }: Me
             )}
             
             {hasCaption && (
-              <p className="text-sm whitespace-pre-wrap mt-1 break-words">{message.content}</p>
+              <p className="text-sm whitespace-pre-wrap mt-1 break-all">{message.content}</p>
             )}
             {/* Fallback for non-media text messages or media without thumbnail/caption */}
             {!(isImageMessage || isVideoMessage) && !hasCaption && (
-                 <p className="text-sm whitespace-pre-wrap break-words">{message.content || "[Empty message]"}</p>
+                 <p className="text-sm whitespace-pre-wrap break-all">{message.content || "[Empty message]"}</p>
             )}
              {/* If it's media but no thumbnail and no caption, show media type */}
             {(isImageMessage || isVideoMessage) && !mediaThumbnailSrc && !hasCaption && (
@@ -131,7 +132,8 @@ export function MessageItem({ message, conversation, onMediaPreviewRequest }: Me
             )}
           </div>
         </div>
-      </div>
+        </div> {/* Closing tag for the new inner flex container */}
+      </div> {/* Closing tag for the max-w-[70%] container */}
     </div>
   );
 }
