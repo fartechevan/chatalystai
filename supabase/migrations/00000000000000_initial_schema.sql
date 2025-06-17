@@ -1708,6 +1708,36 @@ ALTER TABLE ONLY "public"."token_usage"
     ADD CONSTRAINT "token_usage_pkey" PRIMARY KEY ("id");
 
 
+-- Moved message_logs table definition and its constraints here
+CREATE TABLE IF NOT EXISTS "public"."message_logs" (
+    "id" uuid DEFAULT gen_random_uuid() NOT NULL PRIMARY KEY,
+    "profile_id" uuid REFERENCES "public"."profiles"("id") ON DELETE SET NULL,
+    "integration_config_id" uuid REFERENCES "public"."integrations_config"("id") ON DELETE SET NULL,
+    "recipient_identifier" TEXT,
+    "message_content" TEXT,
+    "media_url" TEXT,
+    "media_details" JSONB,
+    "message_type" TEXT, -- Consider creating an ENUM type if values are fixed e.g. public.message_log_type
+    "status" TEXT DEFAULT 'pending',
+    "direction" TEXT, -- e.g., 'outgoing', 'incoming'
+    "provider_message_id" TEXT,
+    "sent_at" TIMESTAMP WITH TIME ZONE,
+    "error_message" TEXT,
+    "created_at" TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL,
+    "updated_at" TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
+);
+
+COMMENT ON TABLE "public"."message_logs" IS 'Logs all messages sent or received through integrations.';
+COMMENT ON COLUMN "public"."message_logs"."profile_id" IS 'User profile associated with the message.';
+COMMENT ON COLUMN "public"."message_logs"."integration_config_id" IS 'Configuration of the integration used for the message.';
+COMMENT ON COLUMN "public"."message_logs"."media_url" IS 'URL of the media sent, if applicable.';
+
+-- Trigger for updated_at on message_logs
+CREATE OR REPLACE TRIGGER set_message_logs_updated_at
+BEFORE UPDATE ON "public"."message_logs"
+FOR EACH ROW
+EXECUTE FUNCTION public.trigger_set_timestamp();
+
 
 ALTER TABLE ONLY "public"."batch_sentiment_analysis_details"
     ADD CONSTRAINT "unique_batch_conversation" UNIQUE ("batch_analysis_id", "conversation_id");

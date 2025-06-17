@@ -26,7 +26,7 @@ export async function sendMediaService(params: SendMediaParams): Promise<SendMed
   // to take these parameters and use the Evolution API MCP tool's 'send_media' function.
   const body = {
     action: 'send-media',
-    instanceId: integrationId, // Pass the DB integration ID
+    integrationConfigId: integrationId, // Corrected from instanceId to match evolution-api-handler
     recipientJid: number,
     mediaData: media,
     mimeType: mimetype,

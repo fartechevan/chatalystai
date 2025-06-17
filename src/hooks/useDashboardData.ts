@@ -14,6 +14,7 @@ export const useDashboardData = (
 
   // Log the date range being used
   console.log(`useDashboardData - timeFilter: ${timeFilter}, startDate: ${startDate.toISOString()}, endDate: ${endDate.toISOString()}`);
+  console.log("useDashboardData - currentUserId:", currentUserId);
 
   const { data: leads = [], isLoading: isLeadsLoading } = useQuery({
     queryKey: ["leads", timeFilter, userFilter],
@@ -159,6 +160,45 @@ export const useDashboardData = (
       return data;
     },
     enabled: !!currentUserId,
+  });
+
+  // Log subscriptionPlan after its query
+  console.log("useDashboardData - subscriptionPlan object:", subscriptionPlan);
+
+  const { data: planMessageUsage, isLoading: isPlanMessageUsageLoading } = useQuery({
+    queryKey: ["planMessageUsage", subscriptionPlan?.id], 
+    queryFn: async () => {
+      console.log("planMessageUsage queryFn - subscriptionPlan?.id:", subscriptionPlan?.id);
+      if (!subscriptionPlan?.id) {
+        console.log("planMessageUsage queryFn: No subscriptionPlan.id, returning null.");
+        return null;
+      }
+
+      const currentDate = new Date();
+      const currentMonth = currentDate.getMonth() + 1; // JavaScript months are 0-indexed
+      const currentYear = currentDate.getFullYear();
+      
+      console.log(`planMessageUsage queryFn - Querying with: subscription_id=${subscriptionPlan.id}, month=${currentMonth}, year=${currentYear}`);
+
+      const { data, error } = await supabase
+        .from("plan_message_usage")
+        .select("messages_sent_this_cycle")
+        .eq("subscription_id", subscriptionPlan.id)
+        .eq("billing_cycle_month", currentMonth)
+        .eq("billing_cycle_year", currentYear)
+        .maybeSingle();
+
+      console.log("planMessageUsage queryFn - Supabase response: data:", data, "error:", error);
+
+      if (error) {
+        console.error("Error fetching plan message usage:", error);
+        return { messages_sent_this_cycle: 0 }; // Return a default or handle error appropriately
+      }
+      const result = data ?? { messages_sent_this_cycle: 0 };
+      console.log("planMessageUsage queryFn - Returning:", result);
+      return result; // Ensure a value is returned
+    },
+    enabled: !!subscriptionPlan?.id, 
   });
 
   const { data: userTokenAllocation, isLoading: isTokenAllocationLoading } = useQuery({
@@ -361,9 +401,10 @@ export const useDashboardData = (
   return {
     leads,
     conversations,
-    messages, // messages.length will be used for count
+    messages, // messages.length will be used for count (retained for other potential uses or if needed)
     tasks,
     subscriptionPlan, // Contains plan name and limits (messages_per_month, token_allocation)
+    planMessageUsage, // Contains messages_sent_this_cycle
     // tokenUsage: tokenUsageData?.tokensUsed ?? 0, // Actual tokens used in the period
     planLimits, // Extracted limits for convenience
     broadcasts,
@@ -406,6 +447,7 @@ export const useDashboardData = (
       isTasksLoading ||
       isAuthUserLoading ||
       isSubscriptionPlanLoading ||
+      isPlanMessageUsageLoading || // Added loading state for planMessageUsage
       // isTokenUsageLoading ||
       isTokenAllocationLoading ||
       isAppointmentsLoading ||

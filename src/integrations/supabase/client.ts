@@ -1,6 +1,7 @@
 import { createClient } from '@supabase/supabase-js';
 // Ensure this path correctly points to your generated types
-import type { Database } from '@/types/supabase';
+// import type { Database } from '@/types/supabase'; // Old import
+import type { Database } from './types'; // Corrected import to use the regenerated types
 
 // Hardcoded Production URL and Key (Original State)
 const SUPABASE_URL = "https://vezdxxqzzcjkunoaxcxc.supabase.co";

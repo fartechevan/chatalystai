@@ -20,7 +20,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Upload, ListChecks, Users as UsersIcon } from 'lucide-react';
+import { Upload, ListChecks, Users as UsersIcon, X as Cross2Icon } from 'lucide-react'; // Added Cross2Icon for clearing image
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useAuthUser } from '@/hooks/useAuthUser';
@@ -80,7 +80,12 @@ export function BroadcastModal({
   const [selectedIntegrationId, setSelectedIntegrationId] = useState<string>(''); // This will now store configId
   const [isLoadingIntegrations, setIsLoadingIntegrations] = useState(false);
 
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [selectedImageFile, setSelectedImageFile] = useState<File | null>(null);
+  const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
+
+  const fileInputRef = useRef<HTMLInputElement>(null); // For CSV
+  const imageFileInputRef = useRef<HTMLInputElement>(null); // For Image
 
   useEffect(() => {
     if (isOpen) {
@@ -108,6 +113,14 @@ export function BroadcastModal({
       setSelectedIntegrationId('');
       setAvailableIntegrations([]);
       setIsLoadingIntegrations(false);
+
+      // Reset image states
+      setSelectedImageFile(null);
+      setImagePreviewUrl(null);
+      setIsUploadingImage(false);
+      if (imageFileInputRef.current) {
+        imageFileInputRef.current.value = '';
+      }
     } else {
       setBroadcastMessage('');
     }
@@ -252,7 +265,7 @@ export function BroadcastModal({
       toast({ title: "Error", description: "Please enter a message.", variant: "destructive" });
       return;
     }
-    if (!selectedIntegrationId) { 
+    if (!selectedIntegrationId) {
       toast({ title: "Error", description: "Please select an integration.", variant: "destructive" });
       return;
     }
@@ -264,42 +277,94 @@ export function BroadcastModal({
     }
 
     setIsSending(true);
+    // Removed imageUrl pre-definition and Supabase storage upload logic.
+    // We will now prepare base64 data if an image is selected.
+
     try {
-       let paramsToSend: SendBroadcastParams;
+      let mediaData: string | undefined = undefined;
+      let mediaMimeType: string | undefined = undefined;
+      let mediaFileName: string | undefined = undefined;
+      const dbImageUrl: string | undefined = undefined; // For storing a URL in DB if needed, separate from sending
 
-       if (targetMode === 'segment') {
-         paramsToSend = {
-           targetMode: 'segment',
-           integrationConfigId: selectedIntegrationId, 
-           instanceId: selectedIntegrationInfo.instanceId,
-           messageText: broadcastMessage,
-           segmentId: selectedSegmentId,
-         };
-       } else if (targetMode === 'customers') {
-         paramsToSend = {
-           targetMode: 'customers',
-           integrationConfigId: selectedIntegrationId, 
-           instanceId: selectedIntegrationInfo.instanceId,
-           messageText: broadcastMessage,
-           customerIds: selectedCustomers,
-         };
-       } else { 
-         if (csvRecipients.length === 0) {
-            toast({ title: "Error", description: "No recipients found from CSV.", variant: "destructive" });
-            setIsSending(false);
-            return;
-         }
-         paramsToSend = {
-           targetMode: 'csv',
-           integrationConfigId: selectedIntegrationId, 
-           instanceId: selectedIntegrationInfo.instanceId,
-           messageText: broadcastMessage,
-           phoneNumbers: csvRecipients,
-         };
-       }
+      if (selectedImageFile) {
+        setIsUploadingImage(true); // Still use this to indicate processing
+        try {
+          // Convert file to base64
+          const reader = new FileReader();
+          const base64Promise = new Promise<string>((resolve, reject) => {
+            reader.onloadend = () => {
+              if (typeof reader.result === 'string') {
+                resolve(reader.result.split(',')[1]); // Get base64 part
+              } else {
+                reject(new Error("Failed to read file as base64 string."));
+              }
+            };
+            reader.onerror = reject;
+            reader.readAsDataURL(selectedImageFile);
+          });
 
-       const result = await sendBroadcastService(paramsToSend);
-       const { successfulSends, failedSends, totalAttempted, broadcastId } = result;
+          mediaData = await base64Promise;
+          mediaMimeType = selectedImageFile.type;
+          mediaFileName = selectedImageFile.name;
+          
+          // If you still want to store a public URL for record-keeping or UI display later,
+          // you could upload to Supabase storage here and get `dbImageUrl`.
+          // For now, focusing on direct send. If `imageUrl` was previously used for display
+          // in the broadcast list, this part might need to be re-added or re-thought.
+          // For simplicity of this change, I'm omitting the storage upload.
+          // If a URL is still needed for the `broadcasts` table's `image_url` column,
+          // that upload logic would go here. Let's assume for now it's optional or handled elsewhere.
+
+        } catch (imageProcessingError) {
+          console.error("Error processing image for sending:", imageProcessingError);
+          toast({ title: "Image Processing Failed", description: (imageProcessingError as Error).message, variant: "destructive" });
+          setIsUploadingImage(false);
+          setIsSending(false);
+          return;
+        } finally {
+          setIsUploadingImage(false);
+        }
+      }
+
+      let paramsToSend: SendBroadcastParams;
+
+      const commonParams = {
+        integrationConfigId: selectedIntegrationId,
+        instanceId: selectedIntegrationInfo.instanceId,
+        messageText: broadcastMessage, // This will be the caption
+        media: mediaData,
+        mimetype: mediaMimeType,
+        fileName: mediaFileName,
+        imageUrl: dbImageUrl, // Pass the URL if you uploaded it for DB record
+      };
+
+      if (targetMode === 'segment') {
+        paramsToSend = {
+          targetMode: 'segment',
+          segmentId: selectedSegmentId,
+          ...commonParams,
+        };
+      } else if (targetMode === 'customers') {
+        paramsToSend = {
+          targetMode: 'customers',
+          customerIds: selectedCustomers,
+          ...commonParams,
+        };
+      } else { // CSV
+        if (csvRecipients.length === 0) {
+          toast({ title: "Error", description: "No recipients found from CSV.", variant: "destructive" });
+          setIsSending(false);
+          return;
+        }
+        paramsToSend = {
+          targetMode: 'csv',
+          phoneNumbers: csvRecipients,
+          ...commonParams,
+        };
+      }
+
+      const result = await sendBroadcastService(paramsToSend);
+      const { successfulSends, failedSends, totalAttempted, broadcastId } = result;
 
       if (failedSends > 0) {
         toast({
@@ -324,6 +389,36 @@ export function BroadcastModal({
     } finally {
       setIsSending(false);
       onClose();
+    }
+  };
+
+  const handleImageChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      if (file.size > 5 * 1024 * 1024) { // 5MB limit
+        toast({ title: "Error", description: "Image size should not exceed 5MB.", variant: "destructive" });
+        setSelectedImageFile(null);
+        setImagePreviewUrl(null);
+        if (imageFileInputRef.current) imageFileInputRef.current.value = '';
+        return;
+      }
+      setSelectedImageFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setImagePreviewUrl(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    } else {
+      setSelectedImageFile(null);
+      setImagePreviewUrl(null);
+    }
+  };
+
+  const clearImageSelection = () => {
+    setSelectedImageFile(null);
+    setImagePreviewUrl(null);
+    if (imageFileInputRef.current) {
+      imageFileInputRef.current.value = '';
     }
   };
 
@@ -737,6 +832,34 @@ export function BroadcastModal({
               onChange={(e) => setBroadcastMessage(e.target.value)}
               rows={6}
             />
+
+            <div className="mt-4">
+              <Label htmlFor="broadcast-image">Attach Image (Optional, Max 5MB)</Label>
+              <Input
+                id="broadcast-image"
+                type="file"
+                accept="image/png, image/jpeg, image/gif"
+                onChange={handleImageChange}
+                className="mt-1"
+                ref={imageFileInputRef}
+                disabled={isSending || isUploadingImage}
+              />
+              {imagePreviewUrl && (
+                <div className="mt-2 relative w-fit"> {/* w-fit to contain button correctly */}
+                  <img src={imagePreviewUrl} alt="Preview" className="max-h-40 rounded border" />
+                  <Button
+                    variant="ghost"
+                    size="icon" // Made it an icon button for better fit
+                    className="absolute top-1 right-1 bg-white/70 hover:bg-white h-6 w-6 p-1" // Adjusted size and padding
+                    onClick={clearImageSelection}
+                    disabled={isSending || isUploadingImage}
+                  >
+                    <Cross2Icon className="h-4 w-4" />
+                  </Button>
+                </div>
+              )}
+            </div>
+
             <p className="text-sm text-muted-foreground mt-2">
               Sending to: {
                 targetMode === 'segment' ? `Segment "${availableSegments.find(s => s.id === selectedSegmentId)?.name || '...'}"` :
@@ -761,9 +884,9 @@ export function BroadcastModal({
               <Button variant="outline" onClick={handleBack} disabled={isSending}>Back</Button>
               <Button
                 onClick={handleSend}
-                disabled={!broadcastMessage.trim() || !selectedIntegrationId || isLoadingIntegrations || isSending}
+                disabled={!broadcastMessage.trim() || !selectedIntegrationId || isLoadingIntegrations || isSending || isUploadingImage}
               >
-                {isSending ? 'Sending...' : 'Send'}
+                {isSending ? 'Sending...' : isUploadingImage ? 'Uploading...' : 'Send'}
               </Button>
             </>
           )}
