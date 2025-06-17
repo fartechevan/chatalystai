@@ -2,10 +2,12 @@
 import { supabase } from '@/integrations/supabase/client'; // Keep Supabase client import
 
 export interface SendTextParams {
-  instance: string; // Instance ID from the frontend selection
-  integrationId: string; // Integration ID to fetch credentials and config
+  instance: string; // Instance ID from the frontend selection (Note: This is likely the Evolution API instance name, not a DB ID)
+  integrationId: string; // This is integrations_config.id (PK of the integrations_config table)
   number: string; // Recipient's phone number
   text: string; // The message text
+  mediaUrl?: string; // Optional URL for media
+  mediaType?: 'image' | 'video' | 'audio' | 'document'; // Optional type of media
   // Optional parameters
   delay?: number;
   linkPreview?: boolean;
@@ -32,8 +34,8 @@ export interface SendTextResponse {
  * @throws If fetching credentials, display name, or the API request fails.
  */
 export const sendTextService = async (params: SendTextParams): Promise<SendTextResponse> => {
-  // Destructure params - instance is now the DB integration ID
-  const { integrationId, number, text } = params; // Removed instance, added integrationId
+  // Destructure params
+  const { integrationId, number, text, mediaUrl, mediaType } = params; // Added mediaUrl, mediaType
 
   // Explicitly check for an active session before invoking the function
   const { data: { session } } = await supabase.auth.getSession();
@@ -43,16 +45,28 @@ export const sendTextService = async (params: SendTextParams): Promise<SendTextR
   }
 
   // Construct the payload for the Edge Function
-  const functionPayload = {
-    integration_config_id: integrationId, // This 'integrationId' from params is the correct value
+  const functionPayload: {
+    integration_config_id: string;
+    recipient_identifier: string;
+    message_type: 'text' | 'image' | 'video' | 'audio' | 'document'; // Updated message_type
+    message_content: string; // For text messages or captions
+    media_url?: string; // For media messages
+    // delay?: number; // Example of other optional params
+  } = {
+    integration_config_id: integrationId,
     recipient_identifier: number,
-    message_type: 'text' as const, // Explicitly 'text'
-    message_content: text,
+    message_type: mediaUrl && mediaType ? mediaType : 'text',
+    message_content: text, // Text content or caption for media
     // Optional parameters from SendTextParams can be added here if send-message-handler supports them
     // delay: params.delay,
     // linkPreview: params.linkPreview,
     // etc.
   };
+
+  if (mediaUrl && mediaType) {
+    functionPayload.media_url = mediaUrl;
+    // The message_content (text) will serve as the caption if the handler supports it.
+  }
 
   // Invoke the Supabase Edge Function
   const { data, error } = await supabase.functions.invoke<SendTextResponse>('send-message-handler', { // Target correct function

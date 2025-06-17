@@ -136,14 +136,6 @@ export const getBroadcastColumns = (actions: Omit<BroadcastColumnActionsProps, '
     cell: ({ row }) => row.getValue("recipient_count") ?? 0,
   },
   {
-    accessorKey: "scheduled_at",
-    header: "Scheduled At",
-    cell: ({ row }) => {
-      const scheduledAt = row.getValue("scheduled_at") as string | null;
-      return scheduledAt ? format(new Date(scheduledAt), "PPpp") : <span className="text-muted-foreground">Not scheduled</span>;
-    },
-  },
-  {
     accessorKey: "created_at",
     header: "Created At",
     cell: ({ row }) => format(new Date(row.getValue("created_at")), "PPpp"),

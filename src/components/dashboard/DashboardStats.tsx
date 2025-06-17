@@ -17,6 +17,7 @@ interface DashboardStatsProps {
   broadcasts: Tables<'broadcasts'>[];
   broadcastRecipients: Tables<'broadcast_recipients'>[];
   whatsappWebMessages?: Tables<'messages'>[]; // Added new prop
+  planMessageUsage?: { messages_sent_this_cycle: number } | null; // Added new prop
   isLoading?: boolean;
 }
 
@@ -30,6 +31,7 @@ export function DashboardStats({
   broadcasts = [],
   broadcastRecipients = [],
   whatsappWebMessages = [], // Added default for new prop
+  planMessageUsage = null, // Added default for new prop
   isLoading = false
 }: DashboardStatsProps) {
   if (isLoading) {
@@ -136,6 +138,7 @@ export function DashboardStats({
       <MessagesSection
         messages={whatsappWebMessages} // Use the new prop here
         timeFilter={timeFilter} // Pass timeFilter for context
+        planMessageUsage={planMessageUsage} // Pass the new prop
         className="col-span-1 lg:col-span-3 lg:row-span-1"
       />
 

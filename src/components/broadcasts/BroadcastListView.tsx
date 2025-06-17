@@ -35,18 +35,15 @@ export interface Broadcast {
   message_text: string;
   created_at: string;
   status?: 'draft' | 'scheduled' | 'sent' | 'failed' | 'cancelled' | 'pending' | 'completed' | 'partial_completion'; // Updated status types
-  scheduled_at?: string | null;
   recipient_count?: number; // recipient_count might not exist
   // Add other relevant fields from your actual 'broadcasts' table schema
-  instance_id?: string; 
+  instance_id?: string;
   integration_id?: string; 
   senderDisplayName?: string; // To store instance_display_name
 }
 
 interface BroadcastFilters {
   status?: string[];
-  scheduled_at_start?: string;
-  scheduled_at_end?: string;
   // Add other filter properties as needed
 }
 
@@ -73,12 +70,6 @@ const fetchBroadcastsFromAPI = async (page: number, pageSize: number, searchTerm
     query = query.in('status', filters.status);
   }
   
-  // Apply date range filter if present (example, needs date-fns or similar for actual date comparison)
-  // if (filters.scheduled_at_start && filters.scheduled_at_end) {
-  //   query = query.gte('scheduled_at', filters.scheduled_at_start);
-  //   query = query.lte('scheduled_at', filters.scheduled_at_end);
-  // }
-
   // Type the response from Supabase more accurately
   // Define the type for items directly from Supabase based on selectColumns
   type ExactSupabaseDataItem = {
@@ -88,8 +79,8 @@ const fetchBroadcastsFromAPI = async (page: number, pageSize: number, searchTerm
     integration_id?: string | null;
     instance_id?: string | null;
     status?: string | null; // Added status here
-    // scheduled_at, recipient_count are not direct columns.
-    // These will be defaulted or derived later if needed.
+    // recipient_count is not a direct column.
+    // It will be defaulted or derived later if needed.
   };
 
   // Define an interface for the expected shape of the Supabase query response
@@ -104,7 +95,6 @@ const fetchBroadcastsFromAPI = async (page: number, pageSize: number, searchTerm
   // Let Supabase infer the types from the query as much as possible.
   // The .select() method in Supabase client is generic and should provide good inference.
   // Using @ts-expect-error to suppress persistent "Type instantiation is excessively deep" error from Supabase query.
-  // @ts-expect-error - Supabase query type complexity leads to excessively deep type instantiation.
   const queryResponse: SupabaseQueryResponse<ExactSupabaseDataItem> = await query.range((page - 1) * pageSize, page * pageSize - 1);
 
   // Access parts from the explicitly typed queryResponse
@@ -165,7 +155,6 @@ const fetchBroadcastsFromAPI = async (page: number, pageSize: number, searchTerm
       name: `Broadcast ${item.id.substring(0, 4)}`, // Default name, consider removing if not used
       status: (item.status || 'pending') as NonNullable<Broadcast['status']>, // Use actual status, ensure it fits the updated Broadcast['status'] type
       recipient_count: 0, // This likely needs to be calculated or fetched differently if required
-      scheduled_at: null, // This likely needs to be fetched if required
       instance_id: item.instance_id || undefined,
       integration_id: item.integration_id || undefined,
       senderDisplayName: displayName,

@@ -22,9 +22,11 @@ interface SendMessageRequestBody {
   integration_config_id: string; // This is now the PK of integrations_config
   recipient_identifier: string;
   message_type: MessageLogType;
-  message_content: string;
+  message_content: string; // Text content or caption for media
+  media_url?: string; // URL for media, if applicable
+  // media_details is kept for potential future use or other integrations, but media_url will be prioritized for Evolution
   media_details?: {
-    url: string;
+    url: string; // This might be redundant if media_url is used
     mimetype: string;
     fileName?: string;
   };
@@ -99,13 +101,22 @@ serve(async (req: Request) => {
       recipient_identifier,
       message_type,
       message_content,
+      media_url, // Added media_url
       media_details,
       conversation_id: request_conversation_id,
       sender_participant_id: request_sender_participant_id,
     } = requestBody;
 
-    if (!integration_config_id || !recipient_identifier || !message_type || (!message_content && message_type === 'text')) {
-      return new Response(JSON.stringify({ error: "Missing required fields: integration_config_id, recipient_identifier, message_type, or message_content for text messages." }), {
+    // Updated validation: message_content is required for text, optional for media (as caption)
+    // media_url is required if message_type indicates media
+    if (
+      !integration_config_id ||
+      !recipient_identifier ||
+      !message_type ||
+      (message_type === 'text' && !message_content) ||
+      (['image', 'video', 'audio', 'document'].includes(message_type) && !media_url)
+    ) {
+      return new Response(JSON.stringify({ error: "Missing required fields. Check integration_config_id, recipient_identifier, message_type, message_content (for text), or media_url (for media)." }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: 400,
       });
@@ -210,10 +221,11 @@ serve(async (req: Request) => {
       .from("message_logs")
       .insert({
         profile_id: authUserId,
-        integration_config_id: actualIntegrationConfigId, 
+        integration_config_id: actualIntegrationConfigId,
         recipient_identifier: recipient_identifier,
-        message_content: message_type === 'text' ? message_content : (media_details?.fileName || 'Media'),
-        media_details: media_details || null,
+        message_content: message_content, // Log the caption or text
+        media_url: media_url || null, // Log the media_url
+        media_details: media_details || null, // Keep for now, might be useful for other integrations
         message_type: message_type,
         status: "pending",
         direction: "outgoing",
@@ -261,27 +273,44 @@ serve(async (req: Request) => {
           number: recipient_identifier,
           text: message_content,
         };
-      } else if (media_details) {
+      } else if (['image', 'video', 'audio', 'document'].includes(message_type) && media_url) {
+        // Determine mimetype based on message_type if not explicitly provided in media_details
+        // This is a basic mapping and might need to be more robust
+        let mimeType = media_details?.mimetype;
+        if (!mimeType) {
+          if (message_type === 'image') mimeType = media_url.endsWith('.png') ? 'image/png' : 'image/jpeg'; // Basic assumption
+          else if (message_type === 'video') mimeType = 'video/mp4';
+          else if (message_type === 'audio') mimeType = 'audio/mp3'; // or ogg, etc.
+          else if (message_type === 'document') mimeType = 'application/pdf'; // or other doc types
+          // Add more specific mimetype detection if needed
+        }
+        if (!mimeType) {
+           console.error(`Cannot determine mimetype for ${message_type} with URL ${media_url}`);
+           providerResponse = { success: false, error_message: `Cannot determine mimetype for ${message_type}.` };
+           await supabaseClient.from('message_logs').update({ status: 'failed', error_message: `Cannot determine mimetype for ${message_type}.` }).eq('id', messageLogId);
+           return new Response(JSON.stringify(providerResponse), { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 400 });
+        }
+
         evolutionPayload = {
           action: 'sendMedia',
           integrationConfigId: actualIntegrationConfigId,
           recipientJid: recipient_identifier,
-          mediaData: media_details.url,
-          mimeType: media_details.mimetype,
-          filename: media_details.fileName || `${message_type}_file`,
-          caption: message_content,
+          mediaData: media_url, // Use the direct media_url
+          mimeType: mimeType,
+          filename: media_details?.fileName || `${message_type}_${Date.now()}`, // Generate a filename if not provided
+          caption: message_content, // Use message_content as caption
         };
       } else {
-        console.error("Cannot determine payload for non-text message without media_details");
-        providerResponse = { success: false, error_message: "Invalid message data for media type." };
-        await supabaseClient.from('message_logs').update({ status: 'failed', error_message: 'Invalid message data for media type.' }).eq('id', messageLogId);
+        console.error(`Invalid message_type (${message_type}) or missing media_url for media message.`);
+        providerResponse = { success: false, error_message: "Invalid message data for media type or missing media URL." };
+        await supabaseClient.from('message_logs').update({ status: 'failed', error_message: 'Invalid message data for media type or missing media URL.' }).eq('id', messageLogId);
         return new Response(JSON.stringify(providerResponse), {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
-          status: 400, 
+          status: 400,
         });
       }
-      
-      console.log("Calling evolution-api-handler with payload:", evolutionPayload);
+
+      console.log("Calling evolution-api-handler with payload:", JSON.stringify(evolutionPayload, null, 2));
       const { data: evoFunctionResponse, error: evoFunctionError } = await supabaseClient.functions.invoke(
         'evolution-api-handler', 
         { body: evolutionPayload }
@@ -400,7 +429,40 @@ serve(async (req: Request) => {
                 .single();
 
               if (senderError || !senderParticipantData) {
-                console.warn(`[send-message-handler] Sender participant not found for profile ${callingProfileId} in conversation ${conversationIdToLog}. Skipping message log in public.messages. Error:`, senderError);
+                console.warn(`[send-message-handler] Sender participant not found for profile ${callingProfileId} in conversation ${conversationIdToLog}. Attempting to create one. Original find error:`, senderError);
+                
+                const { data: newSenderParticipant, error: createSenderError } = await supabaseClient
+                  .from('conversation_participants')
+                  .insert({
+                    conversation_id: conversationIdToLog,
+                    external_user_identifier: callingProfileId,
+                    // customer_id is implicitly null for a non-customer participant
+                  })
+                  .select('id')
+                  .single();
+
+                if (createSenderError || !newSenderParticipant) {
+                  console.error(`[send-message-handler] Failed to create sender participant for profile ${callingProfileId} in conversation ${conversationIdToLog}. Skipping message log in public.messages. Create error:`, createSenderError);
+                } else {
+                  const senderParticipantIdToLog = newSenderParticipant.id;
+                  console.log(`[send-message-handler] Created and using new Sender Participant ID: ${senderParticipantIdToLog}`);
+                  
+                  const { error: messageInsertError } = await supabaseClient
+                    .from('messages')
+                    .insert({
+                      conversation_id: conversationIdToLog,
+                      sender_participant_id: senderParticipantIdToLog,
+                      content: message_content, // Ensure message_content is defined in this scope
+                      is_read: true, 
+                      wamid: providerResponse.provider_message_id // Ensure providerResponse is defined
+                    });
+
+                  if (messageInsertError) {
+                    console.error('[send-message-handler] Error inserting into public.messages after creating sender participant:', messageInsertError);
+                  } else {
+                    console.log('[send-message-handler] Message successfully logged in public.messages table after creating sender participant.');
+                  }
+                }
               } else {
                 const senderParticipantIdToLog = senderParticipantData.id;
                 console.log(`[send-message-handler] Found Sender Participant ID: ${senderParticipantIdToLog}`);
@@ -410,15 +472,15 @@ serve(async (req: Request) => {
                   .insert({
                     conversation_id: conversationIdToLog,
                     sender_participant_id: senderParticipantIdToLog,
-                    content: message_content,
+                    content: message_content, // Ensure message_content is defined
                     is_read: true, 
-                    wamid: providerResponse.provider_message_id
+                    wamid: providerResponse.provider_message_id // Ensure providerResponse is defined
                   });
 
                 if (messageInsertError) {
-                  console.error('[send-message-handler] Error inserting into public.messages (fallback logic):', messageInsertError);
+                  console.error('[send-message-handler] Error inserting into public.messages (fallback logic - found existing participant):', messageInsertError);
                 } else {
-                  console.log('[send-message-handler] Message successfully logged in public.messages table (fallback logic).');
+                  console.log('[send-message-handler] Message successfully logged in public.messages table (fallback logic - found existing participant).');
                 }
               }
             }

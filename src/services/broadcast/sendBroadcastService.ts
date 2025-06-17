@@ -1,5 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
 import { sendTextService } from '@/integrations/evolution-api/services/sendTextService';
+import { sendMediaService, SendMediaParams } from '@/integrations/evolution-api/services/sendMediaService';
 // Removed TablesUpdate import as it's not resolving the type issue for the update call as expected.
 
 interface CustomerInfo {
@@ -16,9 +17,13 @@ export interface SendBroadcastParams {
   customerIds?: string[];
   segmentId?: string;
   phoneNumbers?: string[];
-  messageText: string;
+  messageText: string; // Will be caption if media is present
   integrationConfigId: string; // This is integrations_config.id
   instanceId: string;
+  media?: string; // Base64 encoded media
+  mimetype?: string; // e.g., image/jpeg
+  fileName?: string; // e.g., image.jpg
+  imageUrl?: string; // Optional image URL (for DB record / UI display)
 }
 
 export interface SendBroadcastResult {
@@ -29,7 +34,19 @@ export interface SendBroadcastResult {
 }
 
 export const sendBroadcastService = async (params: SendBroadcastParams): Promise<SendBroadcastResult> => {
-  const { targetMode, customerIds, segmentId, phoneNumbers, messageText, integrationConfigId, instanceId } = params;
+  const { 
+    targetMode, 
+    customerIds, 
+    segmentId, 
+    phoneNumbers, 
+    messageText, 
+    integrationConfigId, 
+    instanceId, 
+    media,
+    mimetype,
+    fileName,
+    imageUrl 
+  } = params;
 
   if (targetMode === 'customers' && (!customerIds || customerIds.length === 0)) {
     throw new Error("customerIds must be provided for 'customers' target mode.");
@@ -48,14 +65,16 @@ export const sendBroadcastService = async (params: SendBroadcastParams): Promise
     // The 'integrationConfigId' received in params is the PK of 'integrations_config' table.
     // This will be inserted into the new 'integration_config_id' column in the 'broadcasts' table.
     const insertPayload: { 
-      message_text: string; 
+      message_text: string;
       integration_config_id: string; // Column in 'broadcasts' table
-      instance_id: string; 
-      segment_id?: string; 
-    } = { 
-      message_text: messageText, 
+      instance_id: string;
+      segment_id?: string;
+      image_url?: string; // Added image_url
+    } = {
+      message_text: messageText,
       integration_config_id: integrationConfigId, // Use the received PK of integrations_config
-      instance_id: instanceId 
+      instance_id: instanceId,
+      image_url: imageUrl, // Added image_url
     };
 
     if (targetMode === 'segment' && segmentId) {
@@ -136,14 +155,28 @@ export const sendBroadcastService = async (params: SendBroadcastParams): Promise
     let updatePayload: { status: string; error_message?: string | null; sent_at?: string | null } = { status: 'failed', error_message: null, sent_at: null };
 
     try {
-      // Pass integrationConfigId (which is integrations_config.id) to sendTextService
-      // sendTextService expects its 'integrationId' param to be integrations_config.id
-      await sendTextService({
-          integrationId: integrationConfigId, 
+      if (media && mimetype && fileName) {
+        await sendMediaService({
           instance: instanceId,
+          integrationId: integrationConfigId,
           number: number,
-          text: messageText,
-      });
+          media: media,
+          mimetype: mimetype,
+          fileName: fileName,
+          caption: messageText, // Use messageText as caption
+        });
+      } else {
+        // Pass integrationConfigId (which is integrations_config.id) to sendTextService
+        // sendTextService expects its 'integrationId' param to be integrations_config.id
+        await sendTextService({
+            integrationId: integrationConfigId,
+            instance: instanceId,
+            number: number,
+            text: messageText,
+            // imageUrl is not directly used by sendTextService for sending.
+            // If only imageUrl is provided without base64, it won't be sent as media by this logic.
+        });
+      }
       successfulSends++;
       updatePayload = { status: 'sent', sent_at: new Date().toISOString(), error_message: null };
     } catch (error: unknown) {

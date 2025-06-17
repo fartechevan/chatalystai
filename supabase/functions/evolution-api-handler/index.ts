@@ -1,4 +1,4 @@
-import { serve } from "std/http/server.ts";
+import { serve } from "https://deno.land/std@0.192.0/http/server.ts"; // Corrected Deno std import
 import { corsHeaders } from "../_shared/cors.ts";
 import { createSupabaseServiceRoleClient } from "../_shared/supabaseClient.ts";
 import { fetchIntegrationCredentialsById } from "../_shared/integrationUtils.ts";
@@ -10,6 +10,11 @@ interface EvolutionFetchInstance {
   connectionStatus: string;
   ownerJid: string | null;
   token: string;
+}
+
+// Type guard for Error
+function isError(e: unknown): e is Error {
+  return e instanceof Error && typeof e.message === 'string';
 }
 
 interface EvolutionCreateInstanceResponse {
@@ -44,13 +49,19 @@ async function _handleEvolutionApiCall(
   body?: Record<string, unknown>
 ): Promise<ProviderResponse> {
   try {
+    const stringifiedBody = body ? JSON.stringify(body) : undefined;
+    if (body) { // Log the object before stringifying for clarity, and the string itself
+      console.log(`_handleEvolutionApiCall: Body object being sent to ${apiUrl}:`, JSON.stringify(body, null, 2));
+      console.log(`_handleEvolutionApiCall: Stringified body for fetch to ${apiUrl}:`, stringifiedBody);
+    }
+
     const response = await fetch(apiUrl, {
       method: method,
       headers: {
         'Content-Type': 'application/json',
         'apikey': apiKey,
       },
-      body: body ? JSON.stringify(body) : undefined,
+      body: stringifiedBody,
     });
 
     let responseData: Record<string, unknown> = {};
@@ -123,9 +134,25 @@ serve(async (req: Request) => {
   }
 
   const actionFromBody = (bodyParsed as { action?: string })?.action;
-  const action = actionFromBody || actionFromPath;
+  let action = actionFromBody || actionFromPath;
 
-  console.log(`Determined action: ${action} (from body: ${!!actionFromBody}, from path: ${!!actionFromPath})`);
+  if (typeof action === 'string') {
+    action = action.trim(); // Trim whitespace just in case
+  }
+
+  console.log(`Determined action: '${action}' (from body: ${!!actionFromBody}, from path: ${!!actionFromPath}) - Trimmed`);
+  
+  if (typeof action === 'string') {
+    const charCodes: number[] = [];
+    for (let i = 0; i < action.length; i++) {
+      charCodes.push(action.charCodeAt(i));
+    }
+    console.log(`Action string character codes: [${charCodes.join(', ')}]`);
+  }
+
+  // Explicitly log the comparison result
+  const isSendTextOrMedia = (action === 'sendText' || action === 'send-media'); // Corrected case for 'send-media'
+  console.log(`Comparison (action === 'sendText' || action === 'send-media'): ${isSendTextOrMedia}`);
 
   try {
     if (action === 'list-instances') {
@@ -177,10 +204,28 @@ serve(async (req: Request) => {
             statusMessage = `Successfully fetched live status: ${liveStatus}`;
           } catch (apiError) {
             console.error(`Evolution API call failed for get-status (Name: "${instanceNameForApi}", ID: ${instance.id}):`, apiError);
-            statusMessage = `Evolution API call failed: ${apiError instanceof Error ? apiError.message : String(apiError)}`;
+            if (isError(apiError)) {
+              statusMessage = `Evolution API call failed: ${apiError.message}`;
+            } else if (typeof apiError === 'string') {
+              statusMessage = `Evolution API call failed: ${apiError}`;
+            } else {
+              statusMessage = `Evolution API call failed: ${JSON.stringify(apiError ?? "Unknown API error details for get-status")}`;
+            }
           }
         } else {
-          statusMessage = `Failed to get credentials: ${credError?.message || 'API key or Base URL missing'}`;
+          let errorMessageDetail = 'API key or Base URL missing';
+          if (credError) {
+            if (isError(credError)) { // Check for Error instance first
+              errorMessageDetail = credError.message;
+            } else if (typeof credError === 'string') { // Check for string
+              errorMessageDetail = credError;
+            } else {
+              // Fallback for any other truthy type of credError (e.g., an object that's not an Error instance)
+              // or if credError was null but somehow passed the `if (credError)` (should not happen).
+              errorMessageDetail = `Unexpected error format: ${JSON.stringify(credError)}`;
+            }
+          }
+          statusMessage = `Failed to get credentials: ${errorMessageDetail}`;
           console.error(`Skipping live status fetch for instance ID ${instance.id}: ${statusMessage}`);
         }
         return {
@@ -197,18 +242,38 @@ serve(async (req: Request) => {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 200
       });
-    }
-    else if (action === 'sendText') {
-      console.log("evolution-api-handler: 'sendText' action received. Body parsed:", JSON.stringify(bodyParsed, null, 2)); // Added logging
-      const { integrationConfigId, number, text } = bodyParsed as { integrationConfigId?: string; number?: string; text?: string };
+    } else if (action === 'sendText' || action === 'send-media') { 
+      console.log(`evolution-api-handler: '${action}' action received. Body parsed:`, JSON.stringify(bodyParsed, null, 2));
+      const {
+        integrationConfigId,
+        number, // For sendText
+        text,   // For sendText or caption for sendMedia
+        recipientJid, // For sendMedia
+        mediaData,    // For sendMedia (URL or base64)
+        mimeType,     // For sendMedia
+        filename,     // For sendMedia
+        caption       // For sendMedia (alternative to text)
+      } = bodyParsed as {
+        integrationConfigId?: string;
+        number?: string;
+        text?: string;
+        recipientJid?: string;
+        mediaData?: string;
+        mimeType?: string;
+        filename?: string;
+        caption?: string;
+      };
 
-      if (!integrationConfigId || !number || !text) {
-        console.error("evolution-api-handler: 'send-text' missing parameters. integrationConfigId:", integrationConfigId, "number:", number, "text:", text); // Added logging
-        return new Response(JSON.stringify({ error: 'Missing required parameters: integrationConfigId, number, or text' }), {
+      if (!integrationConfigId ||
+          (action === 'sendText' && (!number || !text)) ||
+          (action === 'send-media' && (!recipientJid || !mediaData || !mimeType || !filename))
+      ) {
+        console.error(`evolution-api-handler: '${action}' missing parameters. Body:`, bodyParsed);
+        return new Response(JSON.stringify({ error: `Missing required parameters for ${action}` }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400
         });
       }
-      
+
       const { data: config, error: configErr } = await supabaseClient
         .from('integrations_config')
         .select(`instance_id, instance_display_name, integration:integrations (api_key, base_url)`)
@@ -223,12 +288,63 @@ serve(async (req: Request) => {
         });
       }
 
-      const recipientNumber = number.includes('@') ? number : `${number}@c.us`;
-      // Use instance_display_name (which is the Evolution API's instanceName) in the URL
-      const evolutionApiUrl = `${config.integration.base_url}/message/sendText/${config.instance_display_name}`;
-      const payload = { number: recipientNumber, text: text };
-      
-      console.log(`Action: send-text to ${recipientNumber} via instance name: ${config.instance_display_name} (DB instance_id: ${config.instance_id})`);
+      // Log the fetched config values before using them
+      console.log(`Fetched config for integrationConfigId '${integrationConfigId}': instance_display_name='${config.instance_display_name}', instance_id='${config.instance_id}'`);
+
+      let evolutionApiUrl: string;
+      let payload: Record<string, unknown>;
+      // Reverting to use instance_display_name as per user feedback and successful single send logs.
+      // The user must ensure this field contains the correct Evolution API instance name.
+      const evolutionInstanceName = config.instance_display_name; 
+
+      if (!evolutionInstanceName) {
+        console.error(`Critical: Evolution API instance_display_name is missing from config for integration_config_id ${integrationConfigId}`);
+        return new Response(JSON.stringify({ error: "Configuration error: Evolution API instance_display_name is missing." }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500
+        });
+      }
+
+      if (action === 'sendText') {
+        const recipientNumber = number!.includes('@') ? number : `${number}@c.us`;
+        evolutionApiUrl = `${config.integration.base_url}/message/sendText/${evolutionInstanceName}`;
+        payload = { number: recipientNumber, options: { presence: "composing", delay: 1200}, textMessage: {text: text!} };
+        console.log(`Action: sendText to ${recipientNumber} via instance name: ${evolutionInstanceName} (DB config ID: ${integrationConfigId})`);
+      } else if (action === 'send-media') { // Explicitly check for 'send-media'
+        console.log(`send-media action: Received body keys: ${Object.keys(bodyParsed).join(', ')}`);
+        console.log(`send-media action: Values - integrationConfigId: ${integrationConfigId}, recipientJid: ${recipientJid}, mimeType: ${mimeType}, filename: ${filename}, mediaData (present): ${!!mediaData}, caption: ${caption}, text: ${text}`);
+
+        evolutionApiUrl = `${config.integration.base_url}/message/sendMedia/${evolutionInstanceName}`;
+        const determinedMediatype = mimeType!.startsWith('image') ? 'image'
+                                  : mimeType!.startsWith('video') ? 'video'
+                                  : mimeType!.startsWith('audio') ? 'audio'
+                                  : 'document';
+        console.log(`send-media action: Determined mediatype: '${determinedMediatype}' from mimeType: '${mimeType}'`);
+
+        let finalMediaData = mediaData!;
+        // Check if mediaData is a data URL and strip the prefix
+        if (mediaData && mediaData.startsWith('data:') && mediaData.includes(';base64,')) {
+          finalMediaData = mediaData.substring(mediaData.indexOf(';base64,') + ';base64,'.length);
+          console.log(`send-media action: Stripped data URL prefix. Media data is now raw base64.`);
+        }
+
+        payload = {
+          number: recipientJid!,
+          options: { presence: "composing", delay: 1200 },
+          mediatype: determinedMediatype, 
+          media: finalMediaData,          // Use potentially stripped base64 data
+          mimetype: mimeType!,            
+          fileName: filename!,            
+          caption: caption || text || undefined, 
+        };
+        console.log(`Action: sendMedia to ${recipientJid} via instance name: ${evolutionInstanceName} (DB config ID: ${integrationConfigId}) Final Payload for API:`, JSON.stringify(payload, null, 2));
+      } else {
+        // This case should ideally not be reached if the outer 'if/else if' is correct for 'sendText' or 'send-media'
+        console.error(`Internal logic error: Action '${action}' was expected to be 'sendText' or 'send-media' but was not handled.`);
+        return new Response(JSON.stringify({ error: "Internal server error: Unhandled message action." }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500
+        });
+      }
+
       const providerResponse = await _handleEvolutionApiCall(evolutionApiUrl, 'POST', config.integration.api_key, payload);
 
       return new Response(JSON.stringify(providerResponse), {
@@ -236,58 +352,9 @@ serve(async (req: Request) => {
         status: providerResponse.success ? 200 : 502,
       });
     }
-    else if (action === 'send-media') {
-      console.log("evolution-api-handler: 'send-media' action received. Body parsed:", JSON.stringify(bodyParsed, null, 2)); // Added logging
-      const { integrationConfigId, recipientJid, mediaData, mimeType, filename, caption } = bodyParsed as { 
-        integrationConfigId?: string; recipientJid?: string; mediaData?: string; mimeType?: string; filename?: string; caption?: string; 
-      };
-
-      if (!integrationConfigId || !recipientJid || !mediaData || !mimeType || !filename) {
-        console.error("evolution-api-handler: 'send-media' missing parameters. Check integrationConfigId, recipientJid, mediaData, mimeType, filename."); // Added logging
-        return new Response(JSON.stringify({ error: 'Missing required parameters for send-media' }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400
-        });
-      }
-
-      const { data: config, error: configErr } = await supabaseClient
-        .from('integrations_config')
-        .select(`instance_id, integration:integrations (api_key, base_url)`)
-        .eq('id', integrationConfigId)
-        .single();
-
-      if (configErr || !config || !config.integration || !config.instance_id || !config.integration.api_key || !config.integration.base_url) {
-        const errorMsg = configErr?.message || "Instance config not found or missing critical details for media sending.";
-        console.error(`Failed to get instance details for integration_config_id ${integrationConfigId} (send-media): ${errorMsg}`);
-        return new Response(JSON.stringify({ error: `Configuration error: ${errorMsg}` }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500
-        });
-      }
-      
-      const evolutionApiUrl = `${config.integration.base_url}/message/sendMedia/${config.instance_id}`;
-      const determinedMediatype = mimeType.startsWith('image') ? 'image' 
-                                : mimeType.startsWith('video') ? 'video' 
-                                : mimeType.startsWith('audio') ? 'audio' 
-                                : 'document';
-      const mediaApiPayload = {
-        number: recipientJid,
-        mediatype: determinedMediatype,
-        media: mediaData.startsWith('data:') ? mediaData.substring(mediaData.indexOf(',') + 1) : mediaData,
-        mimetype: mimeType,
-        fileName: filename,
-        caption: caption || undefined,
-      };
-      
-      console.log(`Action: send-media to ${recipientJid} via ${config.instance_id}`);
-      const providerResponse = await _handleEvolutionApiCall(evolutionApiUrl, 'POST', config.integration.api_key, mediaApiPayload);
-      
-      return new Response(JSON.stringify(providerResponse), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: providerResponse.success ? 200 : 502,
-      });
-    }
     else if (action === 'get-status') {
         console.log('Action: get-status');
-        const instanceId = url.searchParams.get('instanceId') || (bodyParsed as { instanceId?: string }).instanceId; 
+        const instanceId = url.searchParams.get('instanceId') || (bodyParsed as { instanceId?: string }).instanceId;
         if (!instanceId) {
             return new Response(JSON.stringify({ error: 'Missing required parameter: instanceId (DB ID)' }), {
                 headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 });
@@ -407,8 +474,10 @@ serve(async (req: Request) => {
         let errorMessageString: string;
         if (apiError instanceof Error) {
           errorMessageString = apiError.message;
+        } else if (typeof apiError === 'string') {
+          errorMessageString = apiError;
         } else {
-          errorMessageString = String(apiError);
+          errorMessageString = JSON.stringify(apiError ?? "Unknown API error details during sync");
         }
         return new Response(JSON.stringify({ error: `Evolution API call failed: ${errorMessageString}` }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 502 });
