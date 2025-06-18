@@ -376,14 +376,19 @@ export async function handleMessageEvent(supabaseClient: SupabaseClient, data: W
           }).then(async ({ data: handlerResponse, error: handlerError }) => {
             let aiResponseContent: string | null = null;
             let knowledgeUsed: unknown = null; 
-            const logSenderType = 'ai' as const; 
+            const logSenderType = 'ai' as const;
+
+            console.log(`[MessageHandler] ai-agent-handler response received. handlerResponse:`, JSON.stringify(handlerResponse, null, 2), `handlerError:`, handlerError);
 
             if (handlerError || handlerResponse?.error) {
               console.error(`[MessageHandler] ai-agent-handler failed/errored for session ${sessionId}:`, handlerError || handlerResponse?.error);
               aiResponseContent = agentSettings.error_message; 
             } else {
+              // Ensure handlerResponse and handlerResponse.response are what we expect
+              console.log(`[MessageHandler] ai-agent-handler successful response data:`, JSON.stringify(handlerResponse, null, 2));
               aiResponseContent = handlerResponse?.response || agentSettings.error_message; 
               knowledgeUsed = handlerResponse?.knowledge_used; 
+              console.log(`[MessageHandler] Extracted aiResponseContent: "${aiResponseContent}"`);
             }
 
             await supabaseClient
@@ -395,7 +400,9 @@ export async function handleMessageEvent(supabaseClient: SupabaseClient, data: W
                 knowledge_used: knowledgeUsed,
               });
             
-            if (aiResponseContent) {
+            console.log(`[MessageHandler] Before invoking evolution-api-handler. aiResponseContent: "${aiResponseContent}" (Type: ${typeof aiResponseContent})`);
+            if (aiResponseContent && typeof aiResponseContent === 'string' && aiResponseContent.trim() !== "") {
+              console.log(`[MessageHandler] Invoking evolution-api-handler with text: "${aiResponseContent}"`);
               supabaseClient.functions.invoke('evolution-api-handler', { 
                 body: {
                   action: 'sendText',  // Corrected action name
@@ -404,9 +411,17 @@ export async function handleMessageEvent(supabaseClient: SupabaseClient, data: W
                   number: remoteJid, 
                   text: aiResponseContent,
                 },
+              }).then(({ data: evoData, error: evoError }) => {
+                if (evoError) {
+                  console.error(`[MessageHandler] evolution-api-handler invocation resulted in an error:`, evoError);
+                } else {
+                  console.log(`[MessageHandler] evolution-api-handler invocation successful. Response:`, JSON.stringify(evoData, null, 2));
+                }
               }).catch(invokeError => {
-                 console.error(`[MessageHandler] Error invoking evolution-api-handler function:`, invokeError);
+                 console.error(`[MessageHandler] Error invoking evolution-api-handler function (outer catch):`, invokeError);
               });
+            } else {
+              console.log(`[MessageHandler] Skipped invoking evolution-api-handler because aiResponseContent was empty or not a string. Content: "${aiResponseContent}"`);
             }
           }).catch(handlerInvokeError => {
              console.error(`[MessageHandler] Error invoking ai-agent-handler function:`, handlerInvokeError);
