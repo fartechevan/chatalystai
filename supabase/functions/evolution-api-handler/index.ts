@@ -1,4 +1,4 @@
-import { serve } from "https://deno.land/std@0.192.0/http/server.ts"; // Corrected Deno std import
+import { serve } from "std/http/server.ts"; // Use import map alias
 import { corsHeaders } from "../_shared/cors.ts";
 import { createSupabaseServiceRoleClient } from "../_shared/supabaseClient.ts";
 import { fetchIntegrationCredentialsById } from "../_shared/integrationUtils.ts";
@@ -307,7 +307,8 @@ serve(async (req: Request) => {
       if (action === 'sendText') {
         const recipientNumber = number!.includes('@') ? number : `${number}@c.us`;
         evolutionApiUrl = `${config.integration.base_url}/message/sendText/${evolutionInstanceName}`;
-        payload = { number: recipientNumber, options: { presence: "composing", delay: 1200}, textMessage: {text: text!} };
+        // Corrected payload: 'text' should be a top-level property, not nested in textMessage
+        payload = { number: recipientNumber, options: { presence: "composing", delay: 1200}, text: text! };
         console.log(`Action: sendText to ${recipientNumber} via instance name: ${evolutionInstanceName} (DB config ID: ${integrationConfigId})`);
       } else if (action === 'send-media') { // Explicitly check for 'send-media'
         console.log(`send-media action: Received body keys: ${Object.keys(bodyParsed).join(', ')}`);

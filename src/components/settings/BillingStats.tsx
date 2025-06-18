@@ -36,7 +36,7 @@ interface Plan {
   integrations_allowed: number | null; // Added this line
   features: Json | null; 
   owner_id: string | null;
-  team_id: string | null;
+  team_id?: string | null; // Made team_id optional
   created_at: string;
 }
 
@@ -47,7 +47,7 @@ interface SubscriptionWithPlan {
   id: string;
   profile_id: string;
   plan_id: string;
-  team_id: string | null;
+  team_id?: string | null; // Made team_id optional
   status: SubscriptionStatus;
   subscribed_at: string;
   current_period_start: string;
@@ -299,6 +299,11 @@ export function BillingStats() {
             {userSubscriptionData?.status === 'trialing' && userSubscriptionData.trial_end_date && (
               <p>
                 Tokens: {currentPlan.token_allocation ? `${currentPlan.token_allocation.toLocaleString()} / trial period` : 'Unlimited'}
+              </p>
+            )}
+            {userSubscriptionData?.current_period_end && userSubscriptionData.status !== 'trialing' && (
+              <p>
+                Renews at: {new Date(userSubscriptionData.current_period_end).toLocaleDateString()}
               </p>
             )}
              {/* Consider adding a button to "Manage Subscription" if applicable */}

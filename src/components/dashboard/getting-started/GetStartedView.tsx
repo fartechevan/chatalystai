@@ -24,6 +24,7 @@ export function GetStartedView({ userData }: GetStartedViewProps) {
     isLoading: isLoadingDashboardData, 
     messages, 
     subscriptionPlan, 
+    planMessageUsage, // Added planMessageUsage
     // tokenUsage, 
     planLimits 
   } = useDashboardData('month', 'all');
@@ -60,7 +61,7 @@ export function GetStartedView({ userData }: GetStartedViewProps) {
                 <span>Plan: {subscriptionPlan.plans.name}</span>
                 <span>•</span>
                 <span>
-                  Messages: {messages.length} / {planLimits.messagesPerMonth ?? '∞'}
+                  Messages: {planMessageUsage?.messages_sent_this_cycle ?? 0} / {planLimits.messagesPerMonth ?? '∞'}
                 </span>
                 {/* Tokens display temporarily removed due to issues with tokenUsage data */}
                 {/* <span>•</span>
