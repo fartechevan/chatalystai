@@ -1,4 +1,4 @@
-import { serve } from 'std/http/server.ts'; // Use import map
+import { serve } from 'https://deno.land/std@0.192.0/http/server.ts'; // Changed to direct URL import
 import { corsHeaders } from '../_shared/cors.ts';
 import { createSupabaseClient, createSupabaseServiceRoleClient } from '../_shared/supabaseClient.ts';
 import { Database } from '../_shared/database.types.ts';
@@ -200,10 +200,16 @@ serve(async (req: Request) => {
           
           // Construct payload for custom agent. Ensure it matches what the custom agent expects.
           // This might need adjustment based on the custom agent's API.
+          let processedContactIdentifier = contactIdentifier;
+          if (contactIdentifier && contactIdentifier.endsWith('@s.whatsapp.net')) {
+            processedContactIdentifier = contactIdentifier.substring(0, contactIdentifier.lastIndexOf('@s.whatsapp.net'));
+            console.log(`[${requestStartTime}] Internal Query: Modified contactIdentifier from ${contactIdentifier} to ${processedContactIdentifier} for CustomAgent webhook.`);
+          }
+
           const customAgentPayload = {
             message: query, // Changed key from query
             sessionId: sessionId,
-            phone_number: contactIdentifier, 
+            phone_number: processedContactIdentifier, 
             // Potentially add other relevant info from agentData.custom_agent_config
             ...(agentData.custom_agent_config.payload_template || {}) 
           };
