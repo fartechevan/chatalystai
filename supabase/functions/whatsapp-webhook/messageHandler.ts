@@ -258,7 +258,7 @@ export async function handleMessageEvent(supabaseClient: SupabaseClient, data: W
           // Query by the new foreign key column
           .eq('integrations_config_id', config.id) // config.id is integrations_config.id
           .limit(1) 
-          .single();
+          .maybeSingle();
 
         if (settingsError) {
           console.error(`[MessageHandler] DB error fetching agent settings for integrations_config_id ${config.id}. Code: ${settingsError.code}, Message: ${settingsError.message}, Details: ${JSON.stringify(settingsError.details)}`);
