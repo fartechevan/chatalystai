@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import AIAgentsLayout from '@/components/ai-agents/AIAgentsLayout';
 import { usePageActionContext } from '@/context/PageActionContext';
 import { Button } from '@/components/ui/button';
@@ -16,31 +16,31 @@ const AIAgentsPage = () => {
 
 
   // Navigation handlers lifted from AIAgentsLayout
-  const handleNavigateToDetail = (agentId: string) => {
+  const handleNavigateToDetail = useCallback((agentId: string) => {
     setSelectedAgentId(agentId);
     setAgentSubView('detail');
     setCurrentView('detail');
-  };
+  }, [setSelectedAgentId, setAgentSubView, setCurrentView]);
 
-  const handleNavigateToCreate = () => {
+  const handleNavigateToCreate = useCallback(() => {
     setSelectedAgentId(null);
     setAgentSubView('create');
     setCurrentView('create');
-  };
+  }, [setSelectedAgentId, setAgentSubView, setCurrentView]);
 
-  const handleNavigateBackToAgentList = () => {
+  const handleNavigateBackToAgentList = useCallback(() => {
     setSelectedAgentId(null);
     setAgentSubView('list');
     setCurrentView('list');
-  };
+  }, [setSelectedAgentId, setAgentSubView, setCurrentView]);
 
-  const handleNavigateToLogs = () => {
+  const handleNavigateToLogs = useCallback(() => {
     // Assumes selectedAgentId is already set because the button is only visible then
     setSelectedSessionId(null); // Reset to show list of sessions for the agent
     setCurrentView('logs');
-  };
+  }, [setSelectedSessionId, setCurrentView]);
 
-  const handleNavigateToAgents = () => {
+  const handleNavigateToAgents = useCallback(() => {
     // Assumes selectedAgentId is already set
     if (selectedAgentId) {
       setCurrentView('detail');
@@ -49,7 +49,7 @@ const AIAgentsPage = () => {
       // Fallback, though tabs shouldn't be visible if no agent is selected
       handleNavigateBackToAgentList();
     }
-  };
+  }, [selectedAgentId, setCurrentView, setAgentSubView, handleNavigateBackToAgentList]);
 
   useEffect(() => {
     let mainNavButtons = null;

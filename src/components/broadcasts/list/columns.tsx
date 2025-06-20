@@ -95,26 +95,19 @@ export const getBroadcastColumns = (actions: Omit<BroadcastColumnActionsProps, '
     enableHiding: false,
   },
   {
-    accessorKey: "name",
-    header: ({ column }) => {
-      return (
-        <Button
-          variant="ghost"
-          onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-        >
-          Name
-          <ArrowUpDown className="ml-2 h-4 w-4" />
-        </Button>
-      );
-    },
-    cell: ({ row }) => <div className="font-medium">{row.getValue("name") || `Broadcast ${row.original.id.substring(0,4)}`}</div>,
-  },
-  {
     accessorKey: "message_text",
     header: "Message Preview",
     cell: ({ row }) => {
       const message = row.getValue("message_text") as string;
       return <div className="truncate max-w-xs">{message}</div>;
+    },
+  },
+  {
+    accessorKey: "senderDisplayName",
+    header: "Sender (Display Name)",
+    cell: ({ row }) => {
+      const senderName = row.getValue("senderDisplayName") as string;
+      return <div>{senderName || 'N/A'}</div>;
     },
   },
   {
@@ -141,14 +134,6 @@ export const getBroadcastColumns = (actions: Omit<BroadcastColumnActionsProps, '
     accessorKey: "recipient_count",
     header: "Recipients",
     cell: ({ row }) => row.getValue("recipient_count") ?? 0,
-  },
-  {
-    accessorKey: "scheduled_at",
-    header: "Scheduled At",
-    cell: ({ row }) => {
-      const scheduledAt = row.getValue("scheduled_at") as string | null;
-      return scheduledAt ? format(new Date(scheduledAt), "PPpp") : <span className="text-muted-foreground">Not scheduled</span>;
-    },
   },
   {
     accessorKey: "created_at",

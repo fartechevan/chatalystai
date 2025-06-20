@@ -4,15 +4,12 @@ import { Progress } from "@/components/ui/progress";
 
 export function OnboardingSection() {
   const completedTasks = 0;
-  const totalTasks = 7;
+  const totalTasks = 3;
 
   return (
     <Card>
-      <CardHeader className="flex flex-row items-center justify-between">
+      <CardHeader>
         <CardTitle>Onboarding Steps</CardTitle>
-        <button className="text-sm text-blue-500 hover:text-blue-600">
-          Show Onboarding Steps →
-        </button>
       </CardHeader>
       <CardContent>
         <Progress value={(completedTasks / totalTasks) * 100} className="h-2" />

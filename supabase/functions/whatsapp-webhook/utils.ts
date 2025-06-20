@@ -26,6 +26,32 @@ export function extractMessageContent(data: unknown): string {
       if ('extendedTextMessage' in message && typeof message.extendedTextMessage === 'object' && message.extendedTextMessage !== null && 'text' in message.extendedTextMessage && typeof message.extendedTextMessage.text === 'string') {
         return message.extendedTextMessage.text;
       }
+      // Add logic to extract image caption or a placeholder for images
+      if ('imageMessage' in message && typeof message.imageMessage === 'object' && message.imageMessage !== null) {
+        const imageMessage = message.imageMessage as { 
+          caption?: string; 
+          mimetype?: string; 
+          url?: string; 
+          jpegThumbnail?: string; // Common for thumbnails
+          // Potentially other fields if Evolution API sends full base64 for 'fromMe' messages
+          media?: string; // If full base64 is sent under a 'media' key in imageMessage
+        };
+
+        // If 'media' field exists and looks like a data URI, prioritize it (for fromMe messages sent with base64)
+        if (imageMessage.media && typeof imageMessage.media === 'string' && imageMessage.media.startsWith('data:image')) {
+          return imageMessage.media;
+        }
+        // If 'url' field exists and looks like a data URI, use it
+        if (imageMessage.url && typeof imageMessage.url === 'string' && imageMessage.url.startsWith('data:image')) {
+          return imageMessage.url;
+        }
+        // If there's a caption, return that (even if it's an image, caption takes precedence for text content)
+        if (imageMessage.caption && typeof imageMessage.caption === 'string') {
+          return imageMessage.caption;
+        }
+        // Fallback for other image types or if no direct base64/caption is found
+        return '[Image]'; // Placeholder indicating an image was received
+      }
     }
   }
   return 'Media or unknown message type'; // Fallback

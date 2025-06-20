@@ -34,18 +34,16 @@ export interface Broadcast {
   name?: string; // Name might not exist directly on the table
   message_text: string;
   created_at: string;
-  status?: 'draft' | 'scheduled' | 'sent' | 'failed' | 'cancelled'; // Status might not exist or have different values
-  scheduled_at?: string | null;
+  status?: 'draft' | 'scheduled' | 'sent' | 'failed' | 'cancelled' | 'pending' | 'completed' | 'partial_completion'; // Updated status types
   recipient_count?: number; // recipient_count might not exist
   // Add other relevant fields from your actual 'broadcasts' table schema
-  instance_id?: string; // Example: if your table has this
-  integration_id?: string; // Example: if your table has this
+  instance_id?: string;
+  integration_id?: string; 
+  senderDisplayName?: string; // To store instance_display_name
 }
 
 interface BroadcastFilters {
   status?: string[];
-  scheduled_at_start?: string;
-  scheduled_at_end?: string;
   // Add other filter properties as needed
 }
 
@@ -55,9 +53,9 @@ const fetchBroadcastsFromAPI = async (page: number, pageSize: number, searchTerm
   console.log(`Fetching broadcasts: page=${page}, pageSize=${pageSize}, search=${searchTerm}, filters=`, filters);
   
   // Basic Supabase query (will need to be enhanced for actual pagination and filtering)
-  // Select only columns that are known to exist or are essential.
-  // All other fields in the `Broadcast` interface will be populated with defaults.
-  const selectColumns = 'id, message_text, created_at'; 
+  // Select necessary columns including those for linking to integration_config
+  // and the actual status from the broadcasts table.
+  const selectColumns = 'id, message_text, created_at, integration_id, instance_id, status'; 
   let query = supabase
     .from('broadcasts')
     .select(selectColumns, { count: 'exact' }) // Request total count
@@ -72,19 +70,17 @@ const fetchBroadcastsFromAPI = async (page: number, pageSize: number, searchTerm
     query = query.in('status', filters.status);
   }
   
-  // Apply date range filter if present (example, needs date-fns or similar for actual date comparison)
-  // if (filters.scheduled_at_start && filters.scheduled_at_end) {
-  //   query = query.gte('scheduled_at', filters.scheduled_at_start);
-  //   query = query.lte('scheduled_at', filters.scheduled_at_end);
-  // }
-
   // Type the response from Supabase more accurately
-  // Define the type for items directly from Supabase based *only* on selectColumns
+  // Define the type for items directly from Supabase based on selectColumns
   type ExactSupabaseDataItem = {
     id: string;
     message_text: string;
     created_at: string;
-    // No other fields are expected from this specific select query
+    integration_id?: string | null;
+    instance_id?: string | null;
+    status?: string | null; // Added status here
+    // recipient_count is not a direct column.
+    // It will be defaulted or derived later if needed.
   };
 
   // Define an interface for the expected shape of the Supabase query response
@@ -99,7 +95,6 @@ const fetchBroadcastsFromAPI = async (page: number, pageSize: number, searchTerm
   // Let Supabase infer the types from the query as much as possible.
   // The .select() method in Supabase client is generic and should provide good inference.
   // Using @ts-expect-error to suppress persistent "Type instantiation is excessively deep" error from Supabase query.
-  // @ts-expect-error - Supabase query type complexity leads to excessively deep type instantiation.
   const queryResponse: SupabaseQueryResponse<ExactSupabaseDataItem> = await query.range((page - 1) * pageSize, page * pageSize - 1);
 
   // Access parts from the explicitly typed queryResponse
@@ -117,23 +112,52 @@ const fetchBroadcastsFromAPI = async (page: number, pageSize: number, searchTerm
 
   // Explicitly cast the data to the expected raw type.
   // supabaseDataResult is already typed as ExactSupabaseDataItem[] | null
-  const rawItems = supabaseDataResult; 
+  const rawItems = supabaseDataResult;
 
-  const formattedData = (rawItems || []).map((item: ExactSupabaseDataItem): Broadcast => {
-    // Construct the full Broadcast object, providing defaults for fields.
+  if (!rawItems) {
+    return { data: [], totalCount: 0 };
+  }
+
+  // Fetch all integration_config entries to map instance_display_name
+  const { data: integrationConfigs, error: integrationConfigsError } = await supabase
+    .from('integrations_config')
+    .select('instance_id, instance_display_name');
+
+  if (integrationConfigsError) {
+    console.error("Error fetching integration configs:", integrationConfigsError);
+    // Proceed without display names or handle error more gracefully
+  }
+
+  const configMap = new Map<string, string>();
+  if (integrationConfigs) {
+    integrationConfigs.forEach(config => {
+      if (config.instance_id && config.instance_display_name) {
+        configMap.set(config.instance_id, config.instance_display_name);
+      }
+    });
+  }
+
+  const formattedData = rawItems.map((item: ExactSupabaseDataItem): Broadcast => {
+    let displayName = 'Unknown Sender (no instance_id from broadcast)';
+    if (item.instance_id) {
+      const mappedName = configMap.get(item.instance_id);
+      if (mappedName) {
+        displayName = mappedName; // Successfully mapped from integrations_config.instance_display_name
+      } else {
+        displayName = `Unmapped Instance ID: ${item.instance_id}`; // instance_id from broadcast not found in integrations_config
+      }
+    }
+
     return {
       id: item.id,
       message_text: item.message_text,
       created_at: item.created_at,
-      name: `Broadcast ${item.id.substring(0, 4)}`, // Default name
-      status: 'draft', // Default status
-      recipient_count: 0, // Default recipient_count
-      scheduled_at: null, // Default scheduled_at
-      instance_id: undefined, // Default instance_id
-      integration_id: undefined, // Default integration_id
-      // If 'item' could potentially have more fields from a less strict DB response,
-      // you could spread item here: ...item, and then override with defaults.
-      // However, with a strict select, this is cleaner.
+      name: `Broadcast ${item.id.substring(0, 4)}`, // Default name, consider removing if not used
+      status: (item.status || 'pending') as NonNullable<Broadcast['status']>, // Use actual status, ensure it fits the updated Broadcast['status'] type
+      recipient_count: 0, // This likely needs to be calculated or fetched differently if required
+      instance_id: item.instance_id || undefined,
+      integration_id: item.integration_id || undefined,
+      senderDisplayName: displayName,
     };
   });
 

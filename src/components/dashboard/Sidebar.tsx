@@ -73,8 +73,8 @@ export const menuItems: MenuItem[] = [
   // }, // "Lists" item removed
   { id: "knowledge", title: "Knowledge", icon: BookOpen, path: "/dashboard/knowledge" },
   { id: "ai-agents", title: "AI Agents", icon: Bot, path: "/dashboard/ai-agents" },
-  { id: "multi-ai-agents", title: "Multi AI Agents", icon: Bot, path: "/dashboard/multi-ai-agents" }, // New Menu Item
-  { id: "teams", title: "Teams", icon: Users, path: "/dashboard/teams" },
+  // { id: "automation", title: "Reply Configuration", icon: RadioTower, path: "/dashboard/automation" }, // Removed Reply Configuration link
+  // { id: "teams", title: "Teams", icon: Users, path: "/dashboard/teams" }, // Removed Teams link
   {
     id: "management",
     title: "Management",
@@ -93,7 +93,7 @@ export const menuItems: MenuItem[] = [
     subItems: [
       { title: "Billing", icon: DollarSign, path: "/dashboard/settings/billing" },
       { title: "Users", icon: Users, path: "/dashboard/settings/users" },
-      { title: "Access Control", icon: ShieldCheck, path: "/dashboard/settings/access-control" },
+      // { title: "Access Control", icon: ShieldCheck, path: "/dashboard/settings/access-control" }, // Removed Access Control
       { title: "Integrations", icon: LinkIcon, path: "/dashboard/settings/integrations" },
       { title: "Database", icon: Database, path: "/dashboard/settings/database" },
     ],

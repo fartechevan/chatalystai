@@ -27,18 +27,18 @@ import { WebhookSetupForm } from "./components/WebhookSetupForm";
 // Assuming PlanDetails might be needed by the dialog or its children for validation/display
 interface IntegrationDialogProps {
   open: boolean;
-  onOpenChange: (open: boolean) => void; // Changed signature back
+  onOpenChange: (open: boolean) => void;
   selectedIntegration: Integration | null;
-  currentPlan?: PlanDetails | null; // Add currentPlan prop
-  tenantId?: string | null; // Add tenantId prop
+  currentPlan?: PlanDetails | null;
+  profileId?: string | null; // Changed tenantId to profileId
 }
 
 export function IntegrationDialog({
   open,
   onOpenChange,
   selectedIntegration,
-  currentPlan, // Destructure currentPlan
-  tenantId, // Destructure tenantId
+  currentPlan,
+  profileId, // Changed tenantId to profileId
 }: IntegrationDialogProps) {
   const { handleConnectWithFacebook } = useFacebookSDK();
 
@@ -74,7 +74,7 @@ export function IntegrationDialog({
             open={open} // Pass open state if needed by the hook inside IntegrationTabs
             onOpenChange={onOpenChange} // Pass onOpenChange if needed by the hook inside IntegrationTabs
             currentPlan={currentPlan} // Pass currentPlan to IntegrationTabs
-            tenantId={tenantId} // Pass tenantId to IntegrationTabs
+            profileId={profileId} // Pass profileId to IntegrationTabs instead of tenantId
           />
         </div>
 

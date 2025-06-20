@@ -68,7 +68,7 @@ export const CreateContactDialog: React.FC<CreateContactDialogProps> = ({
           email: formData.email || null, // Ensure empty string becomes null
           company_name: formData.company_name || null,
           company_address: formData.company_address || null,
-          // team_id: currentTeamId, // TODO: Get current team_id if required by RLS for insert
+          // profile_id is no longer needed here
         },
       ]);
 

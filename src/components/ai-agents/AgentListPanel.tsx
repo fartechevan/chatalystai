@@ -1,10 +1,13 @@
 import React from 'react';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
-import { Card, CardTitle, CardContent } from '@/components/ui/card';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { Card, CardTitle, CardContent, CardDescription } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
 import { listAIAgents, updateAIAgent } from '@/services/aiAgents/agentService';
+import { listIntegrations } from '@/services/integrations/integrationService';
 import { AIAgent, UpdateAIAgent } from '@/types/aiAgents';
+import { ConfiguredIntegration } from '@/services/integrations/integrationService';
 import { cn } from '@/lib/utils';
 import { useToast } from '@/hooks/use-toast';
 import DataListView from '@/components/shared/DataListView'; // Import the reusable component
@@ -22,6 +25,11 @@ interface AgentListPanelProps {
 const AgentListPanel: React.FC<AgentListPanelProps> = ({ selectedAgentId, onSelectAgent, onInitiateCreate }) => {
   const queryClient = useQueryClient();
   const { toast } = useToast();
+
+  const { data: integrations, isLoading: isLoadingIntegrations } = useQuery<ConfiguredIntegration[], Error>({
+    queryKey: ['configuredIntegrations'],
+    queryFn: listIntegrations,
+  });
 
   // Mutation for updating agent status (remains here as it's tied to item rendering)
   const updateMutation = useMutation({
@@ -62,6 +70,28 @@ const AgentListPanel: React.FC<AgentListPanelProps> = ({ selectedAgentId, onSele
       }}
     >
       <CardTitle className="text-base text-center break-words mt-2">{agent.name}</CardTitle>
+      
+      {agent.integration_ids && agent.integration_ids.length > 0 && integrations && !isLoadingIntegrations && (
+        <div className="mt-1 flex flex-wrap justify-center gap-1 px-1 max-h-16 overflow-y-auto"> {/* Added max-h and overflow */}
+          {agent.integration_ids.flatMap(agentIntegrationId => {
+            const matchingConfiguredIntegrations = integrations.filter(
+              cfgInteg => cfgInteg.base_integration_id === agentIntegrationId
+            );
+            if (matchingConfiguredIntegrations.length === 0) {
+              // Optionally, find the base integration name if no configured instances are found but ID exists
+              // This case might indicate an agent linked to a base integration type that has no configured instances yet.
+              // For now, we'll only show configured ones.
+              return []; // Return empty array if no configured instances match this base_integration_id
+            }
+            return matchingConfiguredIntegrations.map(cfgInteg => (
+              <Badge key={cfgInteg.id} variant="secondary" className="text-xs">
+                {cfgInteg.instance_display_name || cfgInteg.name}
+              </Badge>
+            ));
+          })}
+        </div>
+      )}
+      
       <div
         className="flex items-center space-x-2 mt-auto mb-2"
         data-agent-switch
