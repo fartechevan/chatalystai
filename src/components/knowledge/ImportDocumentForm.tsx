@@ -2,7 +2,7 @@
 /* eslint-disable valid-typeof */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -47,6 +47,7 @@ interface ImportDocumentFormProps {
 
 export function ImportDocumentForm({ onCancel, onSuccess }: ImportDocumentFormProps) {
   const { toast } = useToast();
+  const [userId, setUserId] = useState<string | null>(null);
   const queryClient = useQueryClient();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [chunks, setChunks] = useState<string[]>([]);
@@ -70,9 +71,10 @@ export function ImportDocumentForm({ onCancel, onSuccess }: ImportDocumentFormPr
   const [isTextEdited, setIsTextEdited] = useState(false);
 
   const [isChunked, setIsChunked] = useState(false);
-  const [currentDocumentName, setCurrentDocumentName] = useState<string>('');
+  const [currentDocumentID, setCurrentDocumentID] = useState<string>('');
 
-  const [isConfirmingUpload, setIsConfirmingUpload] = useState(false);
+  const [isConfirmingUpload, setIsConfirmingUpload] = useState<boolean>(false);
+
   
   const form = useForm<FormValues>({
     resolver: zodResolver(formSchema),
@@ -142,7 +144,7 @@ export function ImportDocumentForm({ onCancel, onSuccess }: ImportDocumentFormPr
           // Store the session_id in localStorage (for the first successful file)
           if (successCount === 1 && response?.session_id && response?.document_name &&typeof window !== undefined) {
             localStorage.setItem("upload_session_id", response.session_id);
-            setCurrentDocumentName(response.document_name)
+            setCurrentDocumentID(response.document_name)
             console.log("Session ID stored in localStorage:", response.session_id);
           }
           
@@ -281,7 +283,7 @@ export function ImportDocumentForm({ onCancel, onSuccess }: ImportDocumentFormPr
             "session_id": session_id,
             "text": pdfText,
             "text_edited": isTextEdited,
-            "document_name": currentDocumentName,
+            "document_name": currentDocumentID,
         }),
         logRequests: true, // Enable logging for this request
       });
@@ -351,7 +353,7 @@ export function ImportDocumentForm({ onCancel, onSuccess }: ImportDocumentFormPr
         },
         body: JSON.stringify({
           "session_id": session_id,
-          "document_name": currentDocumentName,
+          "document_name": currentDocumentID,
         })
       })
 
@@ -396,7 +398,7 @@ export function ImportDocumentForm({ onCancel, onSuccess }: ImportDocumentFormPr
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          "company_name": session_id,
+          "document_id": currentDocumentID,
         })
       })
 
@@ -521,8 +523,10 @@ export function ImportDocumentForm({ onCancel, onSuccess }: ImportDocumentFormPr
       const { data: documentData, error: documentError } = await supabase
         .from("knowledge_documents")
         .insert({
+          id: currentDocumentID,
           title: values.title,
           content: values.content || "",
+          user_id: userId,
           chunking_method: "openai",
           file_type: pdfFile ? 'pdf' : 'text'
         })
@@ -535,7 +539,7 @@ export function ImportDocumentForm({ onCancel, onSuccess }: ImportDocumentFormPr
       }
       
       console.log("Document created with ID:", documentData.id);
-      
+
       // Insert chunks
       if (documentChunks.length > 0) {
         const chunksToInsert = documentChunks.map((chunk, index) => ({
@@ -656,6 +660,28 @@ export function ImportDocumentForm({ onCancel, onSuccess }: ImportDocumentFormPr
   const closePreview = () => {
     setIsPreviewOpen(false)
   }
+
+  useEffect(() => {
+    // this effect runs only once, on the initial render
+    if (typeof window !== "undefined") {
+      const raw = localStorage.getItem("sb-vezdxxqzzcjkunoaxcxc-auth-token");
+      if (raw) {
+        try {
+          const token = JSON.parse(raw);
+          const id = token.user?.id ?? null;
+          setUserId(id);
+          // console.log("Supabase user.id:", id);
+        } catch (err) {
+          console.error("Failed to parse auth token JSON:", err);
+        }
+      } else {
+        console.warn("No Supabase auth token found in localStorage");
+      }
+    }
+  }, []);
+
+
+
 
   return (
     <Card className="w-full">
@@ -990,13 +1016,23 @@ export function ImportDocumentForm({ onCancel, onSuccess }: ImportDocumentFormPr
             Back to Edit
           </Button>
           <Button 
-            onClick={() => {
-              confirmUpload().then(() => {
-                setShowChunks(false);
-                form.handleSubmit(onSubmit)();
-              }).catch((err) => {
-                  console.error('Upload confirmation failed', err);
-              });
+            onClick={async () => {
+              try {
+                // Run form submit handler first
+                await form.handleSubmit(async (data) => {
+                  // Run the actual submission logic
+                  await onSubmit(data);
+                  
+                  // Then confirm upload
+                  await confirmUpload().then(() => {
+                    setShowChunks(false);
+                  })
+
+                  
+                })();
+              } catch (err) {
+                console.error('Submit or upload confirmation failed', err);
+              }
             }}
             disabled={isSubmitting || isConfirmingUpload}
           >
