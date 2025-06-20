@@ -36,7 +36,7 @@ interface Plan {
   integrations_allowed: number | null; // Added this line
   features: Json | null; 
   owner_id: string | null;
-  team_id: string | null;
+  team_id?: string | null; // Made team_id optional
   created_at: string;
 }
 
@@ -47,7 +47,7 @@ interface SubscriptionWithPlan {
   id: string;
   profile_id: string;
   plan_id: string;
-  team_id: string | null;
+  team_id?: string | null; // Made team_id optional
   status: SubscriptionStatus;
   subscribed_at: string;
   current_period_start: string;
@@ -277,130 +277,188 @@ export function BillingStats() {
   }
 
   return (
-    <div className="space-y-8"> {/* Increased spacing */}
+    <div className="space-y-8 p-4 md:p-6"> {/* Added padding to the main container */}
       {/* Display Current Subscription */}
       {currentPlan && (
-        <Card className="mb-8 bg-blue-50 border-blue-200">
+        <Card className="shadow-lg"> {/* Added shadow for better visual separation */}
           <CardHeader>
-            <CardTitle className="text-xl text-blue-800">Your Current Plan: {currentPlan.name}</CardTitle>
-            <CardDescription className="text-blue-700">
+            <CardTitle className="text-xl font-semibold">Your Current Plan: {currentPlan.name}</CardTitle>
+            <CardDescription>
               Status: <span className="font-semibold capitalize">{currentSubscriptionStatus?.replace("_", " ")}</span>
               {userSubscriptionData?.status === 'trialing' && userSubscriptionData.trial_end_date && (
-                <span className="ml-2 text-sm">
+                <span className="ml-2 text-sm text-muted-foreground">
                   (Trial ends on: {new Date(userSubscriptionData.trial_end_date).toLocaleDateString()})
                 </span>
               )}
             </CardDescription>
           </CardHeader>
-          <CardContent>
-            <p className="text-sm text-blue-600">
+          <CardContent className="space-y-2">
+            <p>
               Messages: {currentPlan.messages_per_month ? `${currentPlan.messages_per_month.toLocaleString()} / month` : 'Unlimited'}
             </p>
             {userSubscriptionData?.status === 'trialing' && userSubscriptionData.trial_end_date && (
-              <p className="text-sm text-blue-600 mt-1">
+              <p>
                 Tokens: {currentPlan.token_allocation ? `${currentPlan.token_allocation.toLocaleString()} / trial period` : 'Unlimited'}
               </p>
             )}
-            {/* Add more details or a link to manage subscription if needed */}
+            {userSubscriptionData?.current_period_end && userSubscriptionData.status !== 'trialing' && (
+              <p>
+                Renews at: {new Date(userSubscriptionData.current_period_end).toLocaleDateString()}
+              </p>
+            )}
+             {/* Consider adding a button to "Manage Subscription" if applicable */}
           </CardContent>
         </Card>
       )}
 
-      <div>
-        <h2 className="text-2xl font-semibold mb-1">
-          {currentPlan ? 'Change Your Plan' : 'Choose Your Plan'}
-        </h2>
-        <p className="text-muted-foreground mb-6">Select the perfect plan for your business needs. No hidden fees.</p>
-        {plansData && plansData.length > 0 ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {plansData.map((plan) => (
-              <Card key={plan.id} className={`flex flex-col ${currentPlan?.id === plan.id ? 'border-2 border-primary' : ''}`}>
-                <CardHeader>
-                  <CardTitle>
-                    {plan.name}
-                    {currentPlan?.id === plan.id && <span className="text-sm text-primary font-normal ml-2">(Current)</span>}
-                    {plan.name === 'Trial' && <span className="text-sm text-yellow-600 font-normal ml-2">(Trial Plan)</span>}
-                  </CardTitle>
-                  <CardDescription>
-                    {plan.name === 'Starter' ? 'Perfect for small businesses getting started' :
-                     plan.name === 'Professional' ? 'Best for growing businesses' :
-                     plan.name === 'Enterprise' ? 'For large organizations' : 
-                     plan.name === 'Trial' ? 'Get a taste of our features' : ''}
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-3 flex-grow"> {/* Added flex-grow */}
-                  <div className="text-3xl font-bold">
-                    {plan.name === 'Enterprise' ? 'Call Now!' : 
-                     plan.name === 'Trial' ? 'Free Trial' : `RM ${plan.price} /month`}
-                  </div>
-                  <ul className="space-y-1 text-sm text-muted-foreground">
-                    {plan.messages_per_month && <li>Up to {plan.messages_per_month.toLocaleString()} messages/month</li>}
-                    {plan.token_allocation && <li>{plan.token_allocation.toLocaleString()} tokens/month</li>}
-                    {plan.name === 'Trial' && <li>1 Integration</li>}
-                    {plan.name === 'Starter' && <li>3 Integrations</li>}
-                    {plan.name === 'Professional' && <li>10 Integrations</li>}
-                    {plan.features && Array.isArray(plan.features) && plan.features.map((feature, index) => (
-                      <li key={index} className="flex items-center">
-                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-2 text-green-500"><polyline points="20 6 9 17 4 12"></polyline></svg>
-                        {String(feature)} {/* Ensure feature is treated as a string for rendering */}
-                      </li>
-                    ))}
-                  </ul>
-                </CardContent>
-                <CardFooter>
-                  {plan.name === 'Enterprise' ? (
-                    <Button className="w-full" variant="outline" disabled>Contact Sales</Button>
-                  ) : (
-                    <Button
-                      className="w-full"
-                      onClick={() => handleSubscribeToPlan(plan)}
-                      disabled={currentPlan?.id === plan.id || !!isSubscribing || plan.name === 'Trial'}
-                      variant={currentPlan?.id === plan.id ? "outline" : "default"}
-                    >
-                      {isSubscribing === plan.id ? 'Processing...' : 
-                       plan.name === 'Trial' ? 'Active During Trial' :
-                       (currentPlan?.id === plan.id ? 'Current Plan' : 'Choose Plan')}
-                    </Button>
-                  )}
-                </CardFooter>
-              </Card>
-            ))}
-          </div>
-        ) : (
-          <p className="text-muted-foreground text-center py-8">No plans available at the moment. Please check back later.</p>
-        )}
-      </div>
+      {/* Plan Selection Section */}
+      <Card className="shadow-lg">
+        <CardHeader>
+          <CardTitle className="text-2xl font-semibold">
+            {currentPlan ? 'Change Your Plan' : 'Choose Your Plan'}
+          </CardTitle>
+          <CardDescription>Select the perfect plan for your business needs. No hidden fees.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {plansData && plansData.length > 0 ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {plansData.map((plan) => (
+                <Card key={plan.id} className={`flex flex-col hover:shadow-xl transition-shadow ${currentPlan?.id === plan.id ? 'border-2 border-primary ring-2 ring-primary' : 'border'}`}>
+                  <CardHeader className="pb-4"> {/* Adjusted padding */}
+                    <CardTitle className="text-lg font-medium"> {/* Adjusted font size */}
+                      {plan.name}
+                      {currentPlan?.id === plan.id && <span className="text-xs text-primary font-normal ml-2 py-0.5 px-1.5 rounded-full bg-primary/10">(Current)</span>}
+                      {plan.name === 'Trial' && <span className="text-xs text-yellow-600 font-normal ml-2 py-0.5 px-1.5 rounded-full bg-yellow-500/10">(Trial Plan)</span>}
+                    </CardTitle>
+                    <CardDescription className="text-sm"> {/* Adjusted font size */}
+                      {plan.name === 'Starter' ? 'Perfect for small businesses getting started.' :
+                       plan.name === 'Professional' ? 'Best for growing businesses.' :
+                       plan.name === 'Enterprise' ? 'For large organizations with custom needs.' : 
+                       plan.name === 'Trial' ? 'Get a taste of our features.' : 'Comprehensive features for your needs.'}
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="space-y-3 flex-grow pt-0"> {/* Adjusted padding and flex-grow */}
+                    <div className="text-3xl font-bold my-2"> {/* Added margin */}
+                      {plan.name === 'Enterprise' ? 'Contact Us' : 
+                       plan.name === 'Trial' ? 'Free' : `RM ${plan.price} /month`}
+                    </div>
+                    <ul className="space-y-1.5 text-sm text-muted-foreground"> {/* Adjusted spacing */}
+                      {plan.messages_per_month && <li className="flex items-center"><CheckIcon className="mr-2 h-4 w-4 text-green-500" /> Up to {plan.messages_per_month.toLocaleString()} messages/month</li>}
+                      {plan.token_allocation && <li className="flex items-center"><CheckIcon className="mr-2 h-4 w-4 text-green-500" /> {plan.token_allocation.toLocaleString()} tokens/month</li>}
+                      {plan.name === 'Trial' && <li className="flex items-center"><CheckIcon className="mr-2 h-4 w-4 text-green-500" /> 1 Integration</li>}
+                      {plan.name === 'Starter' && <li className="flex items-center"><CheckIcon className="mr-2 h-4 w-4 text-green-500" /> 3 Integrations</li>}
+                      {plan.name === 'Professional' && <li className="flex items-center"><CheckIcon className="mr-2 h-4 w-4 text-green-500" /> 10 Integrations</li>}
+                      {plan.features && Array.isArray(plan.features) && plan.features.map((feature, index) => (
+                        <li key={index} className="flex items-center">
+                          <CheckIcon className="mr-2 h-4 w-4 text-green-500" />
+                          {String(feature)}
+                        </li>
+                      ))}
+                    </ul>
+                  </CardContent>
+                  <CardFooter className="mt-auto pt-4"> {/* Ensure footer is at the bottom, added padding */}
+                    {plan.name === 'Enterprise' ? (
+                      <Button className="w-full" variant="outline">Contact Sales</Button>
+                    ) : (
+                      <Button
+                        className="w-full"
+                        onClick={() => handleSubscribeToPlan(plan)}
+                        disabled={currentPlan?.id === plan.id || !!isSubscribing || plan.name === 'Trial'}
+                        variant={currentPlan?.id === plan.id ? "secondary" : "default"} // Changed variant for current plan
+                      >
+                        {isSubscribing === plan.id ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                        {isSubscribing === plan.id ? 'Processing...' : 
+                         plan.name === 'Trial' ? (currentPlan?.id === plan.id ? 'Current Trial' : 'Start Trial') :
+                         (currentPlan?.id === plan.id ? 'Current Plan' : 'Choose Plan')}
+                      </Button>
+                    )}
+                  </CardFooter>
+                </Card>
+              ))}
+            </div>
+          ) : (
+            <p className="text-muted-foreground text-center py-8">No plans available at the moment. Please check back later.</p>
+          )}
+        </CardContent>
+      </Card>
 
-      {/* Usage Overview - Now only Monthly Billing History, full width */}
-      <div>
-        <h2 className="text-2xl font-semibold mb-6">Usage Overview</h2>
-        <div className="w-full space-y-4"> {/* Removed flex, md:w-2/3 becomes w-full */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Monthly Billing History</CardTitle>
-                <CardDescription>Your token usage history by month.</CardDescription>
-              </CardHeader>
-              <CardContent>
-                {isLoadingTokenStats ? (
-                  <Skeleton className="h-[200px] w-full" />
-                ) : tokenStats?.monthlyBills && tokenStats.monthlyBills.length > 0 ? (
-                  <ul className="space-y-2">
-                    {tokenStats.monthlyBills.map(bill => (
-                      <li key={bill.month} className="flex justify-between items-center p-3 border-b last:border-b-0">
-                        <span>{new Date(bill.month + '-01').toLocaleString('default', { month: 'long', year: 'numeric' })}</span>
-                        <span className="font-medium">{bill.tokens_used.toLocaleString()} tokens</span>
-                        <span className="font-medium">RM {bill.subscriptionCost.toLocaleString()}</span>
-                      </li>
-                    ))}
-                  </ul>
-                ) : (
-                  <p className="text-muted-foreground">No billing history found.</p>
-                )}
-              </CardContent>
-            </Card>
-          {/* Removed the right side containing Token Allocation and Current Month Usage */}
-        </div>
-      </div>
+      {/* Usage Overview Section */}
+      <Card className="shadow-lg">
+        <CardHeader>
+          <CardTitle className="text-2xl font-semibold">Usage Overview</CardTitle>
+          <CardDescription>Review your token usage and billing history.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {isLoadingTokenStats ? (
+            <div className="space-y-4">
+              <Skeleton className="h-8 w-1/3" />
+              <Skeleton className="h-24 w-full" />
+            </div>
+          ) : tokenStats?.monthlyBills && tokenStats.monthlyBills.length > 0 ? (
+            <div className="overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Month</th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Tokens Used</th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Subscription Cost</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {tokenStats.monthlyBills.map(bill => (
+                    <tr key={bill.month}>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{new Date(bill.month + '-01').toLocaleString('default', { month: 'long', year: 'numeric' })}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{bill.tokens_used.toLocaleString()}</td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">RM {bill.subscriptionCost.toLocaleString()}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <p className="text-muted-foreground">No billing history found.</p>
+          )}
+        </CardContent>
+      </Card>
     </div>
+  );
+}
+
+// Helper Icon (can be moved to a separate icons file)
+function CheckIcon(props: React.SVGProps<SVGSVGElement>) {
+  return (
+    <svg
+      {...props}
+      xmlns="http://www.w3.org/2000/svg"
+      width="24"
+      height="24"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <polyline points="20 6 9 17 4 12" />
+    </svg>
+  );
+}
+
+function Loader2(props: React.SVGProps<SVGSVGElement>) { // Added Loader2 definition
+  return (
+    <svg
+      {...props}
+      xmlns="http://www.w3.org/2000/svg"
+      width="24"
+      height="24"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+    >
+      <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+    </svg>
   );
 }

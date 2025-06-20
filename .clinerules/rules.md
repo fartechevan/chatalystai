@@ -1,0 +1,1 @@
+the supabase project id is : vezdxxqzzcjkunoaxcxc

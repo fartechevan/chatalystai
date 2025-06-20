@@ -1,4 +1,4 @@
-
+import { Json } from "../_shared/database.types.ts";
 import { SupabaseClient } from "@supabase/supabase-js";
 import { extractMessageContent } from "./utils.ts";
 import { findOrCreateCustomer } from "./customerHandler.ts";
@@ -9,32 +9,29 @@ import { PostgrestError } from "@supabase/supabase-js";
 // Define types for cleaner code
 interface AgentIntegrationSettings {
   agent_id: string;
-  // activation_mode: 'keyword' | 'always_on'; // This will come from the nested ai_agents object
-  // keyword_trigger: string | null; // This will come from the nested ai_agents object
   stop_keywords: string[];
   session_timeout_minutes: number;
   error_message: string;
-  integration_id: string; // Added integration_id
+  // integration_id: string; // Removed
 }
 
 interface AgentSession {
   id: string;
-  // is_active: boolean; // Replaced by status
-  status: 'active' | 'closed' | 'error'; // Use the new status enum
+  status: 'active' | 'closed' | 'error'; 
   last_interaction_timestamp: string;
-  conversation_history: unknown; // Use unknown instead of any
+  conversation_history: unknown; 
 }
 
-// Define a minimal interface for the expected message data structure
-export interface WhatsAppMessageData { // Added export
+export interface WhatsAppMessageData { 
   key: {
     remoteJid: string;
     fromMe?: boolean;
-    id: string; // Assuming message ID is also present
+    id: string; 
   };
   pushName?: string;
-  message?: Record<string, unknown>; // Use a more specific type than any
-  // Add other expected fields if known
+  message?: Record<string, unknown>; // Corrected from 'any' to 'unknown'
+  messageType?: string; 
+  messageTimestamp?: number; 
 }
 
 /**
@@ -53,75 +50,151 @@ export async function handleMessageEvent(supabaseClient: SupabaseClient, data: W
   const remoteJid = data.key.remoteJid;
   const fromMe = data.key.fromMe || false;
   const contactName = data.pushName || remoteJid.split('@')[0];
-  const messageText = extractMessageContent(data);
+  let messageText = extractMessageContent(data); 
   
+  let mediaType: string | null = null;
+  let mediaData: Json | null = null;
+  let messageContentForDB: string | null = messageText; 
+
+  console.log(`[MessageHandler] Initial extracted messageText: "${messageText}"`);
+  console.log(`[MessageHandler] Webhook data.messageType: "${data.messageType}"`);
+  console.log(`[MessageHandler] Webhook data.message object:`, data.message);
+
+
+  if (data.messageType && data.message) {
+    switch (data.messageType) {
+      case 'imageMessage':
+        if (data.message.imageMessage && typeof data.message.imageMessage === 'object') {
+          console.log('[MessageHandler] Detected imageMessage:', data.message.imageMessage);
+          mediaType = 'image';
+          mediaData = data.message.imageMessage as Json;
+          const imageMsg = data.message.imageMessage as { caption?: string };
+          messageContentForDB = imageMsg.caption || null;
+          if (imageMsg.caption && messageText !== imageMsg.caption) {
+            messageText = imageMsg.caption;
+          }
+        } else {
+          console.warn('[MessageHandler] messageType is imageMessage, but data.message.imageMessage is missing or not an object.');
+        }
+        break;
+      case 'videoMessage':
+        if (data.message.videoMessage && typeof data.message.videoMessage === 'object') {
+          console.log('[MessageHandler] Detected videoMessage:', data.message.videoMessage);
+          mediaType = 'video';
+          mediaData = data.message.videoMessage as Json;
+          const videoMsg = data.message.videoMessage as { caption?: string };
+          messageContentForDB = videoMsg.caption || null;
+          if (videoMsg.caption && messageText !== videoMsg.caption) {
+            messageText = videoMsg.caption;
+          }
+        } else {
+          console.warn('[MessageHandler] messageType is videoMessage, but data.message.videoMessage is missing or not an object.');
+        }
+        break;
+      case 'audioMessage':
+        if (data.message.audioMessage && typeof data.message.audioMessage === 'object') {
+          console.log('[MessageHandler] Detected audioMessage:', data.message.audioMessage);
+          mediaType = 'audio';
+          mediaData = data.message.audioMessage as Json;
+          messageContentForDB = null; 
+        } else {
+          console.warn('[MessageHandler] messageType is audioMessage, but data.message.audioMessage is missing or not an object.');
+        }
+        break;
+      case 'documentMessage':
+        if (data.message.documentMessage && typeof data.message.documentMessage === 'object') {
+          console.log('[MessageHandler] Detected documentMessage:', data.message.documentMessage);
+          mediaType = 'document';
+          mediaData = data.message.documentMessage as Json;
+          const docMsg = data.message.documentMessage as { caption?: string; title?: string; fileName?: string };
+          messageContentForDB = docMsg.caption || docMsg.title || docMsg.fileName || null;
+          if (messageContentForDB && messageText !== messageContentForDB) {
+             messageText = messageContentForDB;
+          }
+        } else {
+          console.warn('[MessageHandler] messageType is documentMessage, but data.message.documentMessage is missing or not an object.');
+        }
+        break;
+      default:
+        console.log(`[MessageHandler] Unhandled data.messageType: "${data.messageType}" or no specific media object found.`);
+        break;
+    }
+  } else {
+    console.log('[MessageHandler] No data.messageType or data.message found in webhook.');
+  }
+
+  if (mediaType && (messageContentForDB === '[Image]' || messageContentForDB === 'Media or unknown message type')) {
+     messageContentForDB = null;
+  } else if (!mediaType && messageText === 'Media or unknown message type') {
+    messageContentForDB = null; 
+  }
+
+
   // Skip group chats (messages with @g.us)
   if (remoteJid.includes('@g.us')) {
     console.log(`Skipping group chat message from ${remoteJid}`);
-    return true; // Return true to acknowledge receipt, but don't process it
+    return true; 
   }
   
-  console.log(`Processing message from ${fromMe ? 'owner' : 'customer'} ${contactName} (${remoteJid}): ${messageText}`);
+  console.log(`[MessageHandler] Processing for DB: mediaType="${mediaType}", messageContentForDB="${messageContentForDB}", mediaData:`, mediaData ? JSON.stringify(mediaData).substring(0,100) + "..." : "null");
+  console.log(`[MessageHandler] Text for AI: "${messageText}"`);
 
-  // --- Hardcoded Integration ID ---
-  const hardcodedIntegrationId = '1fe47f4b-3b22-43cf-acf2-6bd3eeb0a96d';
-  console.log(`Using hardcoded integration ID: ${hardcodedIntegrationId}`);
-
-  // Get the integration config using the hardcoded integration_id
-  console.log('[MessageHandler] Attempting to fetch integration config...');
+  // Use the instanceId (Evolution API instance name) passed to this function
+  // to find the correct integration configuration.
+  console.log(`[MessageHandler] Fetching integration_config using instance_display_name: "${instanceId}"`);
   const { data: fetchedConfig, error: configError } = await supabaseClient
     .from('integrations_config')
-    .select('id, user_reference_id') // Select necessary fields
-    .eq('integration_id', hardcodedIntegrationId)
+    .select('id, user_reference_id, integration_id') // Select integration_id to link to the main integrations table
+    .eq('instance_display_name', instanceId) // Match with the Evolution instance name
     .maybeSingle();
 
   if (configError) {
-    const errorMsg = `Error fetching integration config for hardcoded ID ${hardcodedIntegrationId}: ${configError.message}`;
+    const errorMsg = `Error fetching integration config for instance_display_name "${instanceId}": ${configError.message}`;
     console.error(errorMsg);
     return errorMsg;
   }
 
   if (!fetchedConfig) {
-    const errorMsg = `No integration config found for hardcoded integration ID: ${hardcodedIntegrationId}`;
+    const errorMsg = `No integration config found for instance_display_name: "${instanceId}"`;
     console.error(errorMsg);
     return errorMsg;
   }
 
-  // Construct the config object needed for downstream functions
+  // Now, fetchedConfig.integration_id is the ID for the 'integrations' table.
+  // And fetchedConfig.id is the ID for the 'integrations_config' table row itself.
   const config = {
-    id: fetchedConfig.id, // Keep original config ID if needed for logging/reference
-    integration_id: hardcodedIntegrationId,
+    id: fetchedConfig.id, // This is the integrations_config.id
+    integration_id: fetchedConfig.integration_id, // This is the integrations.id
     user_reference_id: fetchedConfig.user_reference_id,
   };
+  
+  // The 'hardcodedIntegrationId' is now replaced by 'config.integration_id' for subsequent logic.
+  // For example, when fetching agent settings:
+  // .eq('integration_id', config.integration_id)
+  // When creating agent sessions:
+  // integration_id: config.integration_id,
+  // When invoking evolution-api-handler for AI response:
+  // instanceId: config.integration_id, (if evolution-api-handler expects the main integration_id)
+  // OR, if evolution-api-handler needs the integrations_config.id, then pass config.id.
+  // Based on evolution-api-handler, it seems to expect the main 'integrations' table ID.
+  // So, 'config.integration_id' should be used where 'hardcodedIntegrationId' was used.
 
-  console.log('Constructed integration config:', config);
-  console.log(`[MessageHandler] User Reference ID from config: ${config.user_reference_id}`); // Log the crucial ID
-
-  // Extract phone number from remoteJid
   const phoneNumber = remoteJid.split('@')[0];
-  console.log(`Extracted phone number: ${phoneNumber}`);
-
-  // Customer handling
-  // Call findOrCreateCustomer regardless of fromMe value, but pass the fromMe flag
   let customerId: string | null = null;
   try {
-    console.log('[MessageHandler] Calling findOrCreateCustomer...');
     customerId = await findOrCreateCustomer(supabaseClient, phoneNumber, contactName, fromMe);
-    console.log(`[MessageHandler] findOrCreateCustomer returned Customer ID: ${customerId}`);
     if (!customerId) {
        const errorMsg = '[MessageHandler] findOrCreateCustomer returned null or undefined ID.';
        console.error(errorMsg);
        return errorMsg;
     }
   } catch (error) {
-    const errorMsg = `[MessageHandler] Error during findOrCreateCustomer call: ${error.message}`;
+    const errorMsg = `[MessageHandler] Error during findOrCreateCustomer call: ${(error as Error).message}`;
     console.error(errorMsg, error);
     return errorMsg;
   }
   
-  // Conversation handling
   try {
-    console.log(`[MessageHandler] Calling findOrCreateConversation with customerId: ${customerId}, fromMe: ${fromMe}`);
     const { appConversationId, participantId } = await findOrCreateConversation(
       supabaseClient,
       remoteJid,
@@ -130,190 +203,133 @@ export async function handleMessageEvent(supabaseClient: SupabaseClient, data: W
       customerId
     );
     
-    console.log(`[MessageHandler] findOrCreateConversation returned: appConversationId=${appConversationId}, participantId=${participantId}`);
-
-    if (!appConversationId) {
-      const errorMsg = '[MessageHandler] Failed to get appConversationId from findOrCreateConversation.';
+    if (!appConversationId || !participantId) {
+      const errorMsg = `[MessageHandler] Failed to get appConversationId (${appConversationId}) or participantId (${participantId}).`;
       console.error(errorMsg);
       return errorMsg;
-    }
-     if (!participantId) {
-      // This is a critical error for message insertion
-      const errorMsg = '[MessageHandler] Failed to get participantId from findOrCreateConversation. This likely means user_reference_id is missing for a message FROM ME.';
-      console.error(errorMsg);
-       if (fromMe) {
-         console.warn('[MessageHandler] Double-check user_reference_id in integrations_config for the hardcoded integration ID.');
-       }
-       return errorMsg; 
     }
     
-    console.log(`[MessageHandler] Proceeding to upsert message. Conversation: ${appConversationId}, Participant: ${participantId}`);
-
-    // Extract WhatsApp Message ID (wamid)
     const wamid = data.key.id;
 
-    // --- Upsert message in app ---
-    // Validate necessary IDs before upserting
     if (!wamid) {
         console.error("[MessageHandler] Missing WhatsApp message ID (wamid) in webhook data. Cannot upsert.");
-        // Decide if this is a critical failure or should be skipped
-        // For now, returning an error to highlight the issue.
         return "Missing WhatsApp message ID";
     }
-     if (!participantId) {
-         console.error("[MessageHandler] Cannot upsert message without a valid sender_participant_id.");
-         // This indicates a failure in identifying the sender, likely the 'admin' for fromMe:true
-         return "Failed to identify message sender (check user_reference_id config)";
-    }
-     if (!appConversationId) {
-         console.error("[MessageHandler] Cannot upsert message without a valid conversation_id.");
-         return "Failed to identify conversation";
-    }
+    
+    const upsertPayload = {
+      wamid: wamid,
+      conversation_id: appConversationId,
+      sender_participant_id: participantId,
+      content: messageContentForDB, 
+      media_type: mediaType,
+      media_data: mediaData,
+    };
 
-    const { error: upsertError } = await supabaseClient
+    console.log('[MessageHandler] Final upsertPayload:', JSON.stringify(upsertPayload, null, 2));
+
+    const { data: upsertedMessage, error: upsertError } = await supabaseClient
       .from('messages')
-      .upsert({
-        wamid: wamid, // The unique WhatsApp message ID
-        conversation_id: appConversationId,
-        content: messageText, // Ensure this is correctly extracted for all types
-        sender_participant_id: participantId,
-        // Optionally add/update other fields like status based on webhook data
-        // is_read: false, // Example: Set initial read status
-      }, {
-        onConflict: 'wamid', // Specify the unique column for conflict resolution
-        // ignoreDuplicates: false // Default is false, ensures updates happen on conflict
-      });
+      .upsert(upsertPayload, {
+        onConflict: 'wamid', 
+      })
+      .select(); 
 
     if (upsertError) {
-      const errorMsg = `[MessageHandler] Error upserting message in DB (wamid: ${wamid}): ${upsertError.message}`;
-      console.error(errorMsg);
-      // Depending on the error (e.g., constraint violation vs. connection error),
-      // you might still want to proceed with AI logic or return the error.
-      // Returning error for now.
+      const errorMsg = `[MessageHandler] Error upserting message in DB (wamid: ${wamid}, convId: ${appConversationId}, partId: ${participantId}): ${upsertError.message}. Details: ${JSON.stringify(upsertError)}`;
+      console.error(errorMsg, upsertError); 
       return errorMsg;
     }
 
-    console.log(`[MessageHandler] Successfully upserted message (wamid: ${wamid}) in conversation ${appConversationId} from participant ${participantId}`);
-
-    // --- New AI Agent Session & Interaction Logic ---
-    // Only trigger AI logic for non-empty messages coming *from* the contact
+    console.log(`[MessageHandler] Successfully upserted/updated message (wamid: ${wamid}). Result: ${JSON.stringify(upsertedMessage)}`);
+    
     if (!fromMe && messageText && messageText !== 'Media or unknown message type') {
       try {
-        // 1. Fetch Agent Integration Settings
-        console.log(`[MessageHandler] Fetching agent settings for integration: ${hardcodedIntegrationId}`);
         const { data: agentSettingsData, error: settingsError } = await supabaseClient
           .from('ai_agent_integrations')
-          .select(`
-            agent_id,
+          .select(
+            `agent_id,
             activation_mode,
             stop_keywords,
             session_timeout_minutes,
             error_message,
-            integration_id,
-            ai_agents ( keyword_trigger, is_enabled, activation_mode ) // Fetch activation_mode from ai_agents
-          `)
-          .eq('integration_id', hardcodedIntegrationId)
-          .maybeSingle(); // Assuming one agent per integration for now
+            integrations_config_id,
+            ai_agents ( keyword_trigger, is_enabled, activation_mode )`
+          )
+          // Query by the new foreign key column
+          .eq('integrations_config_id', config.id) // config.id is integrations_config.id
+          .limit(1) 
+          .maybeSingle();
 
-        if (settingsError) throw new Error(`Error fetching agent settings: ${settingsError.message}`);
+        if (settingsError) {
+          console.error(`[MessageHandler] DB error fetching agent settings for integrations_config_id ${config.id}. Code: ${settingsError.code}, Message: ${settingsError.message}, Details: ${JSON.stringify(settingsError.details)}`);
+          if (settingsError.code !== 'PGRST116') { // PGRST116 means no rows, which should be handled by !agentSettingsData
+            throw new Error(`Error fetching agent settings: ${settingsError.message}`);
+          }
+          // If code IS PGRST116, we let it fall through to the !agentSettingsData check
+        }
+        
         if (!agentSettingsData) {
-          console.log(`[MessageHandler] No AI agent linked to integration ${hardcodedIntegrationId}. Skipping AI logic.`);
-          return true; // No agent configured, but message stored successfully
+          console.log(`[MessageHandler] No AI agent linked to integrations_config_id ${config.id}. Skipping AI logic.`);
+          return true; 
         }
 
-        // Type assertion for cleaner access
         const agentSettings = agentSettingsData as unknown as AgentIntegrationSettings & { ai_agents: { keyword_trigger: string | null, is_enabled: boolean | null, activation_mode: 'keyword' | 'always_on' | null } | null };
         const agentId = agentSettings.agent_id;
         const triggerKeyword = agentSettings.ai_agents?.keyword_trigger;
-        const agentIsEnabled = agentSettings.ai_agents?.is_enabled ?? false; // Default to false if null/undefined
-        const agentActivationMode = agentSettings.ai_agents?.activation_mode || 'keyword'; // Get from ai_agents, default to 'keyword'
+        const agentIsEnabled = agentSettings.ai_agents?.is_enabled ?? false; 
+        const agentActivationMode = agentSettings.ai_agents?.activation_mode || 'keyword'; 
 
-        console.log(`[MessageHandler] Agent settings found for Agent ID: ${agentId}`, agentSettings);
-
-        // Check if the agent itself is enabled before proceeding
         if (!agentIsEnabled) {
             console.log(`[MessageHandler] Agent ${agentId} is disabled. Skipping AI logic.`);
-            return true; // Agent disabled, but message stored successfully
+            return true; 
         }
 
-        // 2. Fetch or Initialize Agent Session
-        console.log(`[MessageHandler] Fetching session for contact: ${remoteJid}, agent: ${agentId}, integration: ${hardcodedIntegrationId}`);
-        const { data: session, error: sessionFetchError } = await supabaseClient // Use const
+        const { data: session, error: sessionFetchError } = await supabaseClient 
           .from('ai_agent_sessions')
-          // Select the new 'status' column instead of 'is_active'
           .select('id, status, last_interaction_timestamp, conversation_history')
           .eq('contact_identifier', remoteJid)
           .eq('agent_id', agentId)
-          .eq('integration_id', hardcodedIntegrationId)
+          // Session should also be linked via the specific integrations_config_id
+          .eq('integrations_config_id', config.id) 
           .maybeSingle();
 
-        if (sessionFetchError) throw new Error(`Error fetching agent session: ${sessionFetchError.message}`);
+        if (sessionFetchError) throw new Error(`Error fetching agent session for integrations_config_id ${config.id}: ${sessionFetchError.message}`);
 
         let sessionId: string | null = session?.id || null;
-        // Get current status from the fetched session, default to 'closed' if no session
         const currentStatus: 'active' | 'closed' | 'error' = session?.status || 'closed';
         const lastInteraction = session?.last_interaction_timestamp ? new Date(session.last_interaction_timestamp) : null;
         const now = new Date();
-
-        // Use a variable to track the intended status after processing this message
         let nextStatus = currentStatus;
-
-        console.log(`[MessageHandler] Current session state: ID=${sessionId}, Status=${currentStatus}, LastInteraction=${lastInteraction}`);
-
-        // 4. Session State Logic
         let shouldAiRespond = false;
-        // let sessionNeedsUpdate = false; // Flag to indicate if DB needs update - will be handled by direct logic
 
-        // Check for timeout first if currently active
         if (currentStatus === 'active' && lastInteraction && agentSettings.session_timeout_minutes > 0) {
           const timeoutMillis = agentSettings.session_timeout_minutes * 60 * 1000;
           if (now.getTime() - lastInteraction.getTime() > timeoutMillis) {
-            console.log(`[MessageHandler] Session ${sessionId} timed out.`);
-            nextStatus = 'closed'; // Set intended status to closed
+            nextStatus = 'closed'; 
           }
         }
 
-        // Check for stop keywords if currently active
         if (nextStatus === 'active' && agentSettings.stop_keywords?.some(kw => messageText.toLowerCase() === kw.toLowerCase())) {
-          console.log(`[MessageHandler] Stop keyword detected in message. Closing session ${sessionId}.`);
-          nextStatus = 'closed'; // Set intended status to closed
-          // Optionally send a confirmation message here via Evolution API
+          nextStatus = 'closed'; 
         } else if (nextStatus === 'active') {
-          // Session is active and not stopped/timed out
-          console.log(`[MessageHandler] Session ${sessionId} is active. AI should respond.`);
           shouldAiRespond = true;
-          // No status change, but timestamp needs update
         } else if (nextStatus === 'closed' || nextStatus === 'error') {
-          // Session is inactive, check for activation
           if (agentActivationMode === 'always_on') {
-            console.log(`[MessageHandler] Activation mode is 'always_on' (from ai_agents). Activating session.`);
-            nextStatus = 'active'; // Set intended status to active
+            nextStatus = 'active'; 
             shouldAiRespond = true;
           } else if (agentActivationMode === 'keyword' && triggerKeyword && messageText.toLowerCase().startsWith(triggerKeyword.toLowerCase())) {
-            console.log(`[MessageHandler] Trigger keyword "${triggerKeyword}" matched (activation_mode: ${agentActivationMode} from ai_agents). Activating session.`);
-            nextStatus = 'active'; // Set intended status to active
+            nextStatus = 'active'; 
             shouldAiRespond = true;
-          } else {
-             console.log(`[MessageHandler] Session inactive and no activation condition met.`);
           }
         }
 
-        // Determine if DB update is needed
-        // Update if status changed OR if it's active (to update timestamp)
-        // sessionNeedsUpdate = (nextStatus !== currentStatus) || (nextStatus === 'active'); // Replaced by direct logic below
-
-        // 5. Update or Create Session in DB if needed
-
         if (!session && nextStatus === 'active') {
-            // Case 1: No session exists, and we need to create an active one.
-            console.log(`[MessageHandler] No existing session found. Creating new active session.`);
             const createPayload = {
                 status: 'active',
                 last_interaction_timestamp: now.toISOString(),
                 contact_identifier: remoteJid,
                 agent_id: agentId,
-                integration_id: hardcodedIntegrationId,
-                // conversation_history: {} // Initialize history for new session
+                integrations_config_id: config.id, // Use new FK for session
             };
             const { data: newSession, error: createError } = await supabaseClient
                 .from('ai_agent_sessions')
@@ -321,88 +337,61 @@ export async function handleMessageEvent(supabaseClient: SupabaseClient, data: W
                 .select('id')
                 .single();
             if (createError) throw new Error(`Error creating new session: ${createError.message}`);
-            sessionId = newSession.id; // Update sessionId to the new one
-            console.log(`[MessageHandler] New session created with ID: ${sessionId}`);
-
+            sessionId = newSession!.id; 
         } else if (session && (nextStatus !== currentStatus || nextStatus === 'active')) {
-            // Case 2: Session exists. Update its status and/or timestamp.
-            // This covers:
-            // - Activating a 'closed'/'error' session.
-            // - Continuing an 'active' session (timestamp update).
-            // - Deactivating an 'active' session to 'closed'/'error'.
-            console.log(`[MessageHandler] Existing session ${session.id} found. Current status: ${currentStatus}, Next status: ${nextStatus}. Updating session.`);
             const updatePayload: { last_interaction_timestamp: string; status?: 'active' | 'closed' | 'error'; conversation_history?: unknown } = {
                 last_interaction_timestamp: now.toISOString(),
             };
             if (nextStatus !== currentStatus) {
                 updatePayload.status = nextStatus;
             }
-            // If reactivating a closed/error session, consider resetting conversation_history
-            if ((currentStatus === 'closed' || currentStatus === 'error') && nextStatus === 'active') {
-                // updatePayload.conversation_history = {}; // Uncomment to clear history on reactivation
-                console.log(`[MessageHandler] Session ${session.id} reactivated. Consider if conversation history should be reset.`);
-            }
-
             const { error: updateError } = await supabaseClient
                 .from('ai_agent_sessions')
                 .update(updatePayload)
-                .eq('id', session.id); // Use session.id from the fetched session
+                .eq('id', session.id); 
             if (updateError) throw new Error(`Error updating session ${session.id}: ${updateError.message}`);
-            sessionId = session.id; // Ensure sessionId is correctly set to the existing session's ID
-            console.log(`[MessageHandler] Session ${sessionId} updated. New status (if changed): ${nextStatus}.`);
+            sessionId = session.id; 
         }
-        // If session exists but nextStatus is the same as currentStatus and not 'active' (e.g. remains 'closed'), no DB update needed.
-
-        // Log Incoming User Message to agent_conversations, now that session ID is definitively established
-        // Only log if the session is now active (either newly created or continued)
+        
         if (sessionId && nextStatus === 'active') {
-           console.log(`[MessageHandler] Logging user message to agent_conversations for active session ${sessionId}`);
            const { error: logUserMsgError } = await supabaseClient
              .from('agent_conversations')
              .insert({
-               session_id: sessionId, // This will be the new ID if a new session was created
+               session_id: sessionId, 
                sender_type: 'user',
                message_content: messageText,
              });
            if (logUserMsgError) console.error(`[MessageHandler] Error logging user message for session ${sessionId}: ${logUserMsgError.message}`);
         }
 
-        // 6. Invoke AI Agent Handler if required (sessionId here is the correct one for the active/newly active session)
         if (shouldAiRespond && sessionId) {
-          console.log(`[MessageHandler] Invoking ai-agent-handler for session ${sessionId}, agent ${agentId}`);
-          // Invoke asynchronously, adding a header to signal internal call
           supabaseClient.functions.invoke('ai-agent-handler', {
-            headers: {
-              'X-Internal-Call': 'true' // Custom header
-            },
+            headers: { 'X-Internal-Call': 'true' },
             body: {
               agentId: agentId,
-              query: messageText, // Pass the full message for now
-              sessionId: sessionId, // Pass session ID for context/logging
+              query: messageText, 
+              sessionId: sessionId, 
               contactIdentifier: remoteJid,
-              // Pass conversation_history if needed:
-              // conversationHistory: session?.conversation_history
             },
           }).then(async ({ data: handlerResponse, error: handlerError }) => {
             let aiResponseContent: string | null = null;
-            let knowledgeUsed: unknown = null; // Use unknown instead of any
-            const logSenderType = 'ai' as const; // Use const assertion
+            let knowledgeUsed: unknown = null; 
+            const logSenderType = 'ai' as const;
 
-            if (handlerError) {
-              console.error(`[MessageHandler] ai-agent-handler invocation failed for session ${sessionId}:`, handlerError);
-              aiResponseContent = agentSettings.error_message; // Use configured error message
-            } else if (handlerResponse?.error) {
-               console.error(`[MessageHandler] ai-agent-handler returned error for session ${sessionId}:`, handlerResponse.error);
-               aiResponseContent = agentSettings.error_message;
+            console.log(`[MessageHandler] ai-agent-handler response received. handlerResponse:`, JSON.stringify(handlerResponse, null, 2), `handlerError:`, handlerError);
+
+            if (handlerError || handlerResponse?.error) {
+              console.error(`[MessageHandler] ai-agent-handler failed/errored for session ${sessionId}:`, handlerError || handlerResponse?.error);
+              aiResponseContent = agentSettings.error_message; 
             } else {
-              console.log(`[MessageHandler] ai-agent-handler invocation succeeded for session ${sessionId}. Response:`, handlerResponse);
-              aiResponseContent = handlerResponse?.response || agentSettings.error_message; // Use response or fallback error message
-              knowledgeUsed = handlerResponse?.knowledge_used; // Capture knowledge used
+              // Ensure handlerResponse and handlerResponse.response are what we expect
+              console.log(`[MessageHandler] ai-agent-handler successful response data:`, JSON.stringify(handlerResponse, null, 2));
+              aiResponseContent = handlerResponse?.response || agentSettings.error_message; 
+              knowledgeUsed = handlerResponse?.knowledge_used; 
+              console.log(`[MessageHandler] Extracted aiResponseContent: "${aiResponseContent}"`);
             }
 
-            // Log AI response/error to agent_conversations
-            console.log(`[MessageHandler] Logging AI response/error to agent_conversations for session ${sessionId}`);
-            const { error: logAiMsgError } = await supabaseClient
+            await supabaseClient
               .from('agent_conversations')
               .insert({
                 session_id: sessionId,
@@ -410,51 +399,41 @@ export async function handleMessageEvent(supabaseClient: SupabaseClient, data: W
                 message_content: aiResponseContent,
                 knowledge_used: knowledgeUsed,
               });
-            if (logAiMsgError) console.error(`[MessageHandler] Error logging AI message: ${logAiMsgError.message}`);
-
-            // Send reply via WhatsApp API by invoking evolution-api-handler
-            if (aiResponseContent) {
-              console.log(`[MessageHandler] Invoking evolution-api-handler to send reply to ${remoteJid}`);
-              supabaseClient.functions.invoke('evolution-api-handler', { // Remove action from path
+            
+            console.log(`[MessageHandler] Before invoking evolution-api-handler. aiResponseContent: "${aiResponseContent}" (Type: ${typeof aiResponseContent})`);
+            if (aiResponseContent && typeof aiResponseContent === 'string' && aiResponseContent.trim() !== "") {
+              console.log(`[MessageHandler] Invoking evolution-api-handler with text: "${aiResponseContent}"`);
+              supabaseClient.functions.invoke('evolution-api-handler', { 
                 body: {
-                  action: 'send-text', // Add action to body
-                  instanceId: hardcodedIntegrationId, // Pass the DB ID of the integration/instance
-                  number: remoteJid, // The contact's JID
+                  action: 'sendText',  // Corrected action name
+                  // evolution-api-handler expects integrationConfigId which is integrations_config.id
+                  integrationConfigId: config.id, 
+                  number: remoteJid, 
                   text: aiResponseContent,
                 },
-              }).then(({ data: sendData, error: sendError }) => {
-                 if (sendError) {
-                    console.error(`[MessageHandler] Failed to send message via evolution-api-handler for session ${sessionId}:`, sendError);
-                 } else {
-                    console.log(`[MessageHandler] Successfully invoked evolution-api-handler to send message for session ${sessionId}. Response:`, sendData);
-                 }
+              }).then(({ data: evoData, error: evoError }) => {
+                if (evoError) {
+                  console.error(`[MessageHandler] evolution-api-handler invocation resulted in an error:`, evoError);
+                } else {
+                  console.log(`[MessageHandler] evolution-api-handler invocation successful. Response:`, JSON.stringify(evoData, null, 2));
+                }
               }).catch(invokeError => {
-                 // Catch errors related to the invocation itself (e.g., network issues)
-                 console.error(`[MessageHandler] Error invoking evolution-api-handler function:`, invokeError);
+                 console.error(`[MessageHandler] Error invoking evolution-api-handler function (outer catch):`, invokeError);
               });
             } else {
-               console.log(`[MessageHandler] No AI response content to send for session ${sessionId}.`);
+              console.log(`[MessageHandler] Skipped invoking evolution-api-handler because aiResponseContent was empty or not a string. Content: "${aiResponseContent}"`);
             }
-
           }).catch(handlerInvokeError => {
-             // Catch errors related to the ai-agent-handler invocation itself
              console.error(`[MessageHandler] Error invoking ai-agent-handler function:`, handlerInvokeError);
-             // Optionally log this failure to agent_conversations as well
-          }); // End async invocation .then() .catch()
+          }); 
         }
-        // --- End New AI Agent Session & Interaction Logic ---
-
       } catch (agentLogicError) {
-        console.error(`[MessageHandler] Error during AI agent logic: ${agentLogicError.message}`);
-        // Log error but don't fail the webhook response, as the message was stored.
+        console.error(`[MessageHandler] Error during AI agent logic: ${(agentLogicError as Error).message}`);
       }
-    } // End if (!fromMe && messageText)
-
-    return true; // Indicate success (webhook acknowledged, message stored)
-
+    } 
+    return true; 
   } catch (error) {
-    // This catches errors from findOrCreateCustomer, findOrCreateConversation, or message insertion
-    const errorMsg = `[MessageHandler] Critical error before AI logic: ${error.message}`;
+    const errorMsg = `[MessageHandler] Critical error: ${(error as Error).message}`;
     console.error(errorMsg, error);
     return errorMsg;
   }

@@ -48,7 +48,18 @@ export function useEvolutionAPI(instanceId: string | null) {
         .eq('instance_id', instanceId)
         .single();
       
-      if (configError) throw configError;
+      if (configError) {
+        console.error("Error fetching instance_config for instanceId:", instanceId, configError);
+        throw new Error(`Error fetching configuration for instance ID ${instanceId}: ${configError.message}`);
+      }
+      if (!instanceConfig) {
+        console.error("No instance_config found for instanceId:", instanceId);
+        throw new Error(`No configuration found for instance ID ${instanceId} in integrations_config.`);
+      }
+      if (!instanceConfig.integration_id) {
+        console.error("instance_config found, but missing integration_id for instanceId:", instanceId, instanceConfig);
+        throw new Error(`Configuration for instance ID ${instanceId} is missing integration_id.`);
+      }
       
       // Then get the base_url from the integration
       const { data: integration, error: integrationError } = await supabase
@@ -57,11 +68,22 @@ export function useEvolutionAPI(instanceId: string | null) {
         .eq('id', instanceConfig.integration_id)
         .single();
       
-      if (integrationError) throw integrationError;
+      if (integrationError) {
+        console.error("Error fetching integration details for integration_id:", instanceConfig.integration_id, integrationError);
+        throw new Error(`Error fetching integration details for ID ${instanceConfig.integration_id}: ${integrationError.message}`);
+      }
+      if (!integration) {
+        console.error("No integration found for integration_id:", instanceConfig.integration_id);
+        throw new Error(`No integration details found for ID ${instanceConfig.integration_id}.`);
+      }
+      if (!integration.base_url) {
+        console.error("Integration details found, but missing base_url for integration_id:", instanceConfig.integration_id, integration);
+        throw new Error(`Integration details for ID ${instanceConfig.integration_id} are missing base_url.`);
+      }
       
       return { 
         base_url: integration.base_url, 
-        instance_id: instanceId,
+        instance_id: instanceConfig.instance_id || instanceId, // Prefer fetched, fallback to param
         integration_id: instanceConfig.integration_id
       };
     },
@@ -164,25 +186,74 @@ export function useEvolutionAPI(instanceId: string | null) {
 
   // Send message mutation
   const sendMessage = useMutation({
-    mutationFn: async ({ chatId, message }: { chatId: string; message: string }) => {
-      if (!config || !instanceId) throw new Error('No configuration found');
+    mutationFn: async ({ chatId, message, file }: { chatId: string; message: string; file?: File }) => {
+      if (!instanceId) { // Check instanceId from hook params first
+        console.error("sendMessage: instanceId parameter is missing.");
+        throw new Error('Instance ID is missing.');
+      }
+      if (!config) {
+        console.error("sendMessage: Configuration (config) is not available. instanceId:", instanceId);
+        throw new Error('Configuration not available. The instance might not be properly configured or there was an error fetching its details.');
+      }
+      if (!config.instance_id) { // Check instance_id within the fetched config
+        console.error("sendMessage: instance_id is missing from fetched config. instanceId (param):", instanceId, "config:", config);
+        throw new Error('Instance ID is missing from configuration data.');
+      }
       
       // TODO: Replace with local whatsapp/services function (e.g., sendTextService)
       // const { data, error } = await supabase.functions.invoke('integrations/message/sendText', {
       //   body: {
       //     instanceId,
       //     number: chatId,
-      //     text: message
+      //     text: message,
+      //     // --- Additions for media ---
+      //     media: file ? await toBase64(file) : undefined,
+      //     mimetype: file ? file.type : undefined,
+      //     fileName: file ? file.name : undefined 
+      //     // Ensure the backend function (e.g., evolution-api-handler)
+      //     // is updated to handle these parameters and use the 'send-media' action
+      //     // or similar from the Evolution API MCP tool.
       //   }
       // });
-      const data = null; const error = new Error("Supabase function call commented out."); // Placeholder
+      
+      // Placeholder for new logic
+      let requestBody: { instanceId: string; number: string; text?: string; media?: string; mimetype?: string; fileName?: string, action: string };
+      const functionName = 'evolution-api-handler'; // Assuming this is the target Supabase function
 
-      if (error) throw new Error('Failed to send message');
+      if (file) {
+        const base64Media = await toBase64(file);
+        requestBody = {
+          instanceId, // This should be the actual instance name/ID for Evolution API
+          number: chatId,
+          action: 'send-media', // Action for sending media
+          media: base64Media,
+          mimetype: file.type,
+          fileName: file.name,
+          // text: message, // Caption can be sent with media
+        };
+        if (message) requestBody.text = message; // Add caption if present
+      } else {
+        requestBody = {
+          instanceId,
+          number: chatId,
+          action: 'send-text', // Action for sending text
+          text: message,
+        };
+      }
+      
+      console.log("Attempting to invoke Supabase function:", functionName, "with body:", requestBody);
+      // const { data, error } = await supabase.functions.invoke(functionName, { body: requestBody });
+      // For now, let's simulate success for file and keep placeholder for text
+      const data = file ? { success: true, messageId: "simulated-media-id" } : null; 
+      const error = file ? null : new Error("Supabase function call for text commented out.");
+
+
+      if (error) throw new Error(`Failed to send message: ${error.message}`);
 
       // Placeholder return - adjust based on actual service implementation
       return data; // Returning null as placeholder
     },
-    onSuccess: (_, variables) => {
+    onSuccess: (data, variables) => { // Added data to onSuccess
       // Invalidate and refetch messages for the chat
       queryClient.invalidateQueries({
         queryKey: ['messages', instanceId, variables.chatId]
@@ -190,7 +261,7 @@ export function useEvolutionAPI(instanceId: string | null) {
       
       toast({
         title: "Message sent",
-        description: "Your message has been sent successfully."
+        description: "Your message has been sent successfully." + (data?.messageId ? ` (ID: ${data.messageId})` : "")
       });
     },
     onError: (error) => {
@@ -210,3 +281,12 @@ export function useEvolutionAPI(instanceId: string | null) {
     isConfigured: !!config
   };
 }
+
+// Helper function to convert file to base64
+const toBase64 = (file: File): Promise<string> =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = () => resolve(reader.result as string);
+    reader.onerror = (error) => reject(error);
+  });

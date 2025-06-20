@@ -7,9 +7,11 @@ export interface AIAgent {
   prompt: string; // The system prompt defining the agent's behavior
   keyword_trigger?: string | null; // Optional keyword to trigger the agent in a channel
   knowledge_document_ids?: string[]; // Optional array of knowledge document IDs linked to this agent
-  integration_ids?: string[]; // Optional array of integration IDs linked to this agent
+  integrations_config_ids?: string[]; // Optional array of integration config IDs linked to this agent
   is_enabled?: boolean; // Added: Whether the agent is globally enabled
   activation_mode?: 'keyword' | 'always_on'; // Added: How the agent activates
+  agent_type: 'chattalyst' | 'CustomAgent'; // Updated: Type of agent
+  custom_agent_config?: { webhook_url?: string; [key: string]: string | number | boolean | null | undefined; } | null; // Added: Configuration for CustomAgent type
   created_at: string; // Timestamp of creation
   updated_at: string; // Timestamp of last update
   // Add any other relevant fields as needed, e.g., user_id, organization_id

@@ -1,6 +1,10 @@
 
 import { DashboardFilters } from "@/components/dashboard/DashboardFilters";
 import { DashboardStats } from "@/components/dashboard/DashboardStats";
+// import BroadcastsAppointmentsChart from "@/components/dashboard/chart/BroadcastsAppointmentsChart"; // Removed
+// import SegmentedBroadcastsAppointmentsChart from "@/components/dashboard/chart/SegmentedBroadcastsAppointmentsChart"; // To be replaced
+import SegmentPerformanceChart from "@/components/dashboard/chart/SegmentPerformanceChart"; // Added new chart
+import DailyActivityTrendChart from "@/components/dashboard/chart/DailyActivityTrendChart"; 
 import { useDashboardData } from "@/hooks/useDashboardData";
 
 interface DashboardAnalyticsProps {
@@ -16,7 +20,7 @@ export function DashboardAnalytics({
   onTimeChange,
   onUserChange,
 }: DashboardAnalyticsProps) {
-  const { leads, conversations, messages, tasks, isLoading } = useDashboardData(timeFilter, userFilter);
+  const { leads, conversations, messages, tasks, broadcasts, broadcastRecipients, whatsappWebMessages, isLoading } = useDashboardData(timeFilter, userFilter);
 
   return (
     <div className="h-full flex flex-col gap-6">
@@ -34,10 +38,22 @@ export function DashboardAnalytics({
           userFilter={userFilter}
           leads={leads}
           conversations={conversations}
-          messages={messages}
+          // messages={messages} // Keep original 'messages' for other potential uses if any
           tasks={tasks}
+          broadcasts={broadcasts}
+          broadcastRecipients={broadcastRecipients}
+          whatsappWebMessages={whatsappWebMessages} // Pass filtered WhatsApp Web messages with a distinct prop
           isLoading={isLoading}
         />
+        {/* <div className="mt-6"> // Removed BroadcastsAppointmentsChart
+          <BroadcastsAppointmentsChart timeFilter={timeFilter} userFilter={userFilter} />
+        </div> */}
+        <div className="mt-6"> {/* Replaced SegmentedBroadcastsAppointmentsChart with SegmentPerformanceChart */}
+          <SegmentPerformanceChart timeFilter={timeFilter} userFilter={userFilter} />
+        </div>
+        <div className="mt-6"> 
+          <DailyActivityTrendChart timeFilter={timeFilter} userFilter={userFilter} />
+        </div>
       </div>
     </div>
   );
