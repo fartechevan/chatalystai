@@ -229,11 +229,25 @@ export function BroadcastModal({
   }, [isOpen, step, availableIntegrations.length, toast]);
 
   const handleSelectCustomer = (customerId: string) => {
-    setSelectedCustomers(prevSelected =>
-      prevSelected.includes(customerId)
-        ? prevSelected.filter(id => id !== customerId)
-        : [...prevSelected, customerId]
-    );
+    setSelectedCustomers(prevSelected => {
+      // If customer is already selected, remove them
+      if (prevSelected.includes(customerId)) {
+        return prevSelected.filter(id => id !== customerId);
+      }
+      
+      // Check if limit is reached before adding
+      if (prevSelected.length >= 200) {
+        toast({ 
+          title: "Selection Limit Reached", 
+          description: "You can select a maximum of 200 customers for a broadcast.", 
+          variant: "destructive" 
+        });
+        return prevSelected;
+      }
+      
+      // Add the customer if under the limit
+      return [...prevSelected, customerId];
+    });
   };
 
   const handleNext = () => {
@@ -659,7 +673,7 @@ export function BroadcastModal({
 
             {targetMode === 'customers' && (
               <div className="space-y-2">
-                <Label>Select Customers ({selectedCustomers.length} selected)</Label>
+                <Label>Select Customers ({selectedCustomers.length} selected - max 200)</Label>
                 <ScrollArea className="h-[300px] border rounded-md">
                   {isLoadingCustomers ? (
                     <p className="p-4 text-sm text-muted-foreground">Loading customers...</p>

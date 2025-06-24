@@ -328,6 +328,8 @@ export function ImportDocumentForm({ onCancel, onSuccess }: ImportDocumentFormPr
     }
   };
 
+  // No need to use the confirm Upload anymore 
+  // it takes too much time and the workings now are mainly done in supabase with a permanent vector table
   const confirmUpload = async () => {
     try {
       setIsConfirmingUpload(true)
@@ -1023,10 +1025,23 @@ export function ImportDocumentForm({ onCancel, onSuccess }: ImportDocumentFormPr
                   // Run the actual submission logic
                   await onSubmit(data);
                   
-                  // Then confirm upload
-                  await confirmUpload().then(() => {
-                    setShowChunks(false);
-                  })
+                  // Then confirm upload, no need to confirm upload now
+                  // await confirmUpload().then(() => {
+                  //   setShowChunks(false);
+                  // })
+                  updateVectorTable()
+                    .then(() => {
+                      setShowChunks(false);
+                      toast({
+                        variant: "default",
+                        title: "Document Import successfully",
+                        description: "Added the document to the knowledge base",
+                      })
+                    })
+                    .catch((error) => {
+                      console.log(error)
+                    })
+                  
 
                   
                 })();

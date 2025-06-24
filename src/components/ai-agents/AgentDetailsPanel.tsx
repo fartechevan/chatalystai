@@ -54,7 +54,11 @@ const AgentDetailsPanel: React.FC<AgentDetailsPanelProps> = ({ selectedAgentId, 
   // Replace testResponse/testError with chat history state
   // const [testResponse, setTestResponse] = useState<string | null>(null);
   // const [testError, setTestError] = useState<string | null>(null);
-  const [chatHistory, setChatHistory] = useState<{ sender: 'user' | 'agent' | 'error'; message: string }[]>([]);
+  const [chatHistory, setChatHistory] = useState<{ 
+    sender: 'user' | 'agent' | 'error'; 
+    message: string;
+    image?: string; // Optional image URL
+  }[]>([]);
 
   // --- Data Fetching ---
   // Fetch available knowledge documents
@@ -396,27 +400,35 @@ const AgentDetailsPanel: React.FC<AgentDetailsPanelProps> = ({ selectedAgentId, 
         console.error("Error invoking query-agent function:", error);
         throw new Error(error.message || 'Failed to query agent.');
       }
-      // Assuming the function returns { response: "..." } on success
-      if (data && typeof data.response === 'string') {
-        return data.response;
-      } else {
-        throw new Error('Invalid response format from agent function.');
-      }
+      
+      // Return the full data object to handle in onSuccess
+      return data;
     },
     onMutate: (variables) => {
       // Add user query to chat history immediately
       setChatHistory(prev => [...prev, { sender: 'user', message: variables.query }]);
       setTestQuery(''); // Clear input field
     },
-    onSuccess: (response) => {
-      // Add agent response to chat history
-      setChatHistory(prev => [...prev, { sender: 'agent', message: response }]);
-      // toast({ title: "Test Complete", description: "Agent responded successfully." }); // Optional: remove toast for chat
+    onSuccess: (data) => {
+      // Check if data has the expected structure
+      if (data && typeof data.response === 'string') {
+        // Add agent response to chat history with image if available
+        setChatHistory(prev => [...prev, { 
+          sender: 'agent', 
+          message: data.response,
+          image: data.selected_image || undefined
+        }]);
+      } else {
+        // Handle unexpected response format
+        setChatHistory(prev => [...prev, { 
+          sender: 'error', 
+          message: 'Invalid response format from agent function.' 
+        }]);
+      }
     },
     onError: (error) => {
        // Add error message to chat history
       setChatHistory(prev => [...prev, { sender: 'error', message: `Error: ${error.message}` }]);
-      // toast({ variant: "destructive", title: "Test Error", description: `Agent query failed: ${error.message}` }); // Optional: remove toast for chat
     },
   });
 
@@ -789,8 +801,8 @@ const AgentDetailsPanel: React.FC<AgentDetailsPanelProps> = ({ selectedAgentId, 
           <div
             key={index}
             className={cn(
-              "flex",
-              entry.sender === 'user' ? 'justify-end' : 'justify-start'
+              "flex flex-col",
+              entry.sender === 'user' ? "items-end" : "items-start"
             )}
           >
             <div
@@ -803,6 +815,22 @@ const AgentDetailsPanel: React.FC<AgentDetailsPanelProps> = ({ selectedAgentId, 
             >
               {entry.message}
             </div>
+            
+            {/* Display image if available */}
+            {entry.image && (
+              <div className="mt-2 max-w-[75%]">
+                <img 
+                  src={entry.image} 
+                  alt="Agent response image" 
+                  className="rounded-lg border max-w-full h-auto"
+                  onError={(e) => {
+                    // Handle image loading errors
+                    console.error("Failed to load image:", entry.image);
+                    e.currentTarget.style.display = 'none';
+                  }}
+                />
+              </div>
+            )}
           </div>
         ))}
         {/* Loading indicator */}
