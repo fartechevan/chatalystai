@@ -6,7 +6,7 @@ import { decode as base64Decode } from "https://deno.land/std@0.168.0/encoding/b
 
 interface LicenseClaims {
   // Define expected claims in your license JWT
-  license_type?: string;
+  app_name?: string;
   expires_at?: string; // ISO 8601 date string
   // Add other claims as needed
   [key: string]: unknown;
@@ -35,8 +35,8 @@ serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
     );
 
-    const newJwtSecret = Deno.env.get("JWT_SECRET_NEW"); // Use the name set in Supabase dashboard
-    const oldJwtSecret = Deno.env.get("JWT_SECRET"); // Assuming old secret is JWT_SECRET
+    const newJwtSecret = Deno.env.get("JWT_SECRET_NEW") ?? "";
+    const oldJwtSecret = Deno.env.get("JWT_SECRET") ?? "";
 
     // Log the retrieved secrets to check their exact values
     console.log(`Retrieved JWT_SECRET_NEW for decoding: '${newJwtSecret}' (length: ${newJwtSecret?.length})`);
@@ -53,10 +53,10 @@ serve(async (req) => {
             console.log(`Attempting to prepare oldJwtSecret (primary due to new missing): '${oldJwtSecret}' for JWT verification.`);
             try {
                 console.log(`Received licenseKey for verification with old secret (primary): '${licenseKey}'`); // Log the licenseKey
-                const oldKeyData = base64Decode(oldJwtSecret.trim());
+                const oldKeyData = oldJwtSecret.trim();
                 const oldCryptoKey = await crypto.subtle.importKey(
                   "raw",
-                  oldKeyData,
+                  new TextEncoder().encode(oldKeyData),
                   { name: "HMAC", hash: "SHA-256" },
                   false, // extractable
                   ["verify"] // key usages
@@ -83,14 +83,14 @@ serve(async (req) => {
             }
             console.log(`Attempting to prepare newJwtSecret: '${newJwtSecret}' for JWT verification.`);
             console.log(`Received licenseKey for verification with new secret: '${licenseKey}'`); // Log the licenseKey
-            const newKeyData = base64Decode(newJwtSecret.trim());
-            const newCryptoKey = await crypto.subtle.importKey(
-              "raw",
-              newKeyData,
-              { name: "HMAC", hash: "SHA-256" },
-              false, // extractable
-              ["verify"] // key usages
-            );
+                    const newKeyData = newJwtSecret.trim();
+                    const newCryptoKey = await crypto.subtle.importKey(
+                      "raw",
+                      new TextEncoder().encode(newKeyData),
+                      { name: "HMAC", hash: "SHA-256" },
+                      false, // extractable
+                      ["verify"] // key usages
+                    );
             licenseClaims = await verify(licenseKey, newCryptoKey) as LicenseClaims; // djwt infers alg from CryptoKey
             isValidLicense = true;
             console.log("License verified with new JWT secret using CryptoKey.");
@@ -100,10 +100,10 @@ serve(async (req) => {
                 console.log(`Attempting to prepare oldJwtSecret (fallback): '${oldJwtSecret}' for JWT verification.`);
                 try {
                     console.log(`Received licenseKey for verification with old secret (fallback): '${licenseKey}'`); // Log the licenseKey
-                    const oldKeyDataFallback = base64Decode(oldJwtSecret.trim());
+                    const oldKeyDataFallback = oldJwtSecret.trim();
                     const oldCryptoKeyFallback = await crypto.subtle.importKey(
                       "raw",
-                      oldKeyDataFallback,
+                      new TextEncoder().encode(oldKeyDataFallback),
                       { name: "HMAC", hash: "SHA-256" },
                       false, // extractable
                       ["verify"] // key usages
@@ -133,12 +133,24 @@ serve(async (req) => {
 
     // Optional: Further validation of claims (e.g., check expires_at)
     if (licenseClaims.expires_at) {
-      if (new Date(licenseClaims.expires_at) < new Date()) {
+      try {
+        const expiresAt = new Date(licenseClaims.expires_at);
+        if (expiresAt < new Date()) {
+          return new Response(
+            JSON.stringify({ error: "License key has expired." }),
+            {
+              headers: { ...corsHeaders, "Content-Type": "application/json" },
+              status: 403,
+            }
+          );
+        }
+      } catch (e) {
+        console.error("Error parsing expires_at:", e);
         return new Response(
-          JSON.stringify({ error: "License key has expired." }),
+          JSON.stringify({ error: "Invalid expires_at format." }),
           {
             headers: { ...corsHeaders, "Content-Type": "application/json" },
-            status: 403,
+            status: 400,
           }
         );
       }
