@@ -131,7 +131,7 @@ export function ImportDocumentForm({ onCancel, onSuccess }: ImportDocumentFormPr
 
       // Upload to the specified endpoint
       try {
-        const uploadEndpoint = "http://127.0.0.1:5000/upload_v2";
+        const uploadEndpoint = "https://chunk-feature-chatalyst-dot-fartech-yvqj.et.r.appspot.com/upload_v2";
         const response = await apiServiceInstance.uploadPdfFile(file, uploadEndpoint);
         
         if (successCount === 0) {
@@ -274,7 +274,7 @@ export function ImportDocumentForm({ onCancel, onSuccess }: ImportDocumentFormPr
       }
       
       // Call the external chunking API endpoint using apiServiceInstance with session_id
-      const data = await apiServiceInstance.request<ChunkResponse>('http://127.0.0.1:5000/chunk-text', {
+      const data = await apiServiceInstance.request<ChunkResponse>('https://chunk-feature-chatalyst-dot-fartech-yvqj.et.r.appspot.com/chunk-text', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -348,7 +348,7 @@ export function ImportDocumentForm({ onCancel, onSuccess }: ImportDocumentFormPr
         session_id = localStorage.getItem("upload_session_id");
       }
 
-      const data = await apiServiceInstance.request<ConfirmUpload>('http://127.0.0.1:5000/confirm_upload', {
+      const data = await apiServiceInstance.request<ConfirmUpload>('https://chunk-feature-chatalyst-dot-fartech-yvqj.et.r.appspot.com/confirm_upload', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -394,7 +394,7 @@ export function ImportDocumentForm({ onCancel, onSuccess }: ImportDocumentFormPr
         session_id = localStorage.getItem("upload_session_id");
       }
 
-      const data = await apiServiceInstance.request<UpdateVectorTable>('http://127.0.0.1:5000/create_vector_table', {
+      const data = await apiServiceInstance.request<UpdateVectorTable>('https://chunk-feature-chatalyst-dot-fartech-yvqj.et.r.appspot.com/create_vector_table', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -626,7 +626,7 @@ export function ImportDocumentForm({ onCancel, onSuccess }: ImportDocumentFormPr
     }
 
     try {
-      const data = await apiServiceInstance.request<DeleteImageResponse>("http://127.0.0.1:5000/delete-image", {
+      const data = await apiServiceInstance.request<DeleteImageResponse>("https://chunk-feature-chatalyst-dot-fartech-yvqj.et.r.appspot.com/delete-image", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
