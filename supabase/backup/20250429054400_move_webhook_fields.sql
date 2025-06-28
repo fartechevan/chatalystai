@@ -1,0 +1,4 @@
+-- This migration is no longer needed as the webhook fields were correctly placed
+-- in the 'integrations' table initially, and the 'integrations_config' table
+-- did not contain these fields to begin with.
+-- Leaving this file empty ensures Supabase migration tracking remains consistent.
