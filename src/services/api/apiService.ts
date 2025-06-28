@@ -2,6 +2,17 @@ interface ApiRequestOptions extends RequestInit {
   logRequests?: boolean; // Flag to enable/disable logging for this specific request
 }
 
+interface FileUploadResponse {
+  success: boolean;
+  message?: string;
+  fileUrl?: string;
+  error?: string;
+  text_content?: string;
+  session_id?: string;
+  image_urls?: string[];
+  document_name?: string;
+}
+
 interface ApiServiceConfig {
   enableLoggingByDefault?: boolean; // Global flag to enable/disable logging
 }
@@ -107,6 +118,23 @@ class ApiService {
   setLogging(enable: boolean) {
     this.config.enableLoggingByDefault = enable;
     console.log(`ApiService logging ${enable ? 'enabled' : 'disabled'} by default.`); // Also uncomment the config change log
+  }
+
+  // Method to upload PDF files to a specific endpoint
+  async uploadPdfFile(file: File, endpoint: string): Promise<FileUploadResponse> {
+    if (!file || file.type !== "application/pdf") {
+      throw new Error("Invalid file type. Please provide a PDF file.");
+    }
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    return this.request<FileUploadResponse>(endpoint, {
+      method: 'POST',
+      body: formData,
+      // Don't set Content-Type header as it will be automatically set with the boundary parameter
+      logRequests: true, // Enable logging for file uploads
+    });
   }
 }
 
