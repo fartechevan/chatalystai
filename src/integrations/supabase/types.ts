@@ -1008,6 +1008,7 @@ export type Database = {
           id: string
           integration_config_id: string | null
           media_details: Json | null
+          media_url: string | null
           message_content: string | null
           message_type: Database["public"]["Enums"]["message_log_type"]
           profile_id: string | null
@@ -1024,6 +1025,7 @@ export type Database = {
           id?: string
           integration_config_id?: string | null
           media_details?: Json | null
+          media_url?: string | null
           message_content?: string | null
           message_type?: Database["public"]["Enums"]["message_log_type"]
           profile_id?: string | null
@@ -1040,6 +1042,7 @@ export type Database = {
           id?: string
           integration_config_id?: string | null
           media_details?: Json | null
+          media_url?: string | null
           message_content?: string | null
           message_type?: Database["public"]["Enums"]["message_log_type"]
           profile_id?: string | null
@@ -1578,24 +1581,38 @@ export type Database = {
       }
       vector_db_v1: {
         Row: {
+          chunk_type: string | null
           content: string | null
+          document_id: string
           embedding: string | null
           id: string
           metadata: Json | null
         }
         Insert: {
+          chunk_type?: string | null
           content?: string | null
+          document_id: string
           embedding?: string | null
           id?: string
           metadata?: Json | null
         }
         Update: {
+          chunk_type?: string | null
           content?: string | null
+          document_id?: string
           embedding?: string | null
           id?: string
           metadata?: Json | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "fk_vector_to_document"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "knowledge_documents"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       whatsapp_blast_limits: {
         Row: {
@@ -1603,31 +1620,20 @@ export type Database = {
           count: number
           date: string
           id: string
-          integration_id: string
         }
         Insert: {
           blast_limit: number
           count?: number
           date: string
           id?: string
-          integration_id: string
         }
         Update: {
           blast_limit?: number
           count?: number
           date?: string
           id?: string
-          integration_id?: string
         }
-        Relationships: [
-          {
-            foreignKeyName: "whatsapp_blast_limits_integration_id_fkey"
-            columns: ["integration_id"]
-            isOneToOne: false
-            referencedRelation: "integrations"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
     }
     Views: {
@@ -1668,6 +1674,16 @@ export type Database = {
       get_evolution_api_key: {
         Args: Record<PropertyKey, never>
         Returns: string
+      }
+      get_last_10_convo: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          customer_id: string
+          phone_number: string
+          name: string
+          conversation_id: string
+          content: string
+        }[]
       }
       get_or_create_conversation_and_participants: {
         Args: {
@@ -1811,6 +1827,35 @@ export type Database = {
           metadata: Json
           embedding: Json
           similarity: number
+        }[]
+      }
+      match_vector_db_v1_for_agent: {
+        Args: {
+          query_embedding: string
+          p_agent_id: string
+          match_count?: number
+          filter?: Json
+        }
+        Returns: {
+          id: string
+          content: string
+          metadata: Json
+          embedding: Json
+          similarity: number
+          document_id: string
+          chunk_type: string
+          image_url: string
+        }[]
+      }
+      mwtestt: {
+        Args: Record<PropertyKey, never>
+        Returns: {
+          recipient_identifier: string
+          customer_name: string
+          customer_email: string
+          message_content: string
+          direction: string
+          created_at: string
         }[]
       }
       n8n_match_knowledge_chunks_test: {
