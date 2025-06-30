@@ -27,20 +27,23 @@ export const LoginForm = () => {
   // State for login/general auth errors
   const [authError, setAuthError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const checkSessionAndLicense = async () => {
-      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-      if (sessionError) {
-        console.error("Error getting session:", sessionError);
-        return;
-      }
-      if (session?.user) {
-        const userMetaData = session.user.user_metadata;
-        // License check removed as per new requirement
-        console.log("User signed in, navigating to dashboard (license check skipped here). User:", session.user.id);
-        navigate("/dashboard");
-      }
-    };
+    useEffect(() => {
+        const checkSessionAndLicense = async () => {
+            const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+            if (sessionError) {
+                console.error("Error getting session:", sessionError);
+                if (sessionError.message.includes("Invalid Refresh Token")) {
+                    await supabase.auth.signOut();
+                }
+                return;
+            }
+            if (session?.user) {
+                const userMetaData = session.user.user_metadata;
+                // License check removed as per new requirement
+                console.log("User signed in, navigating to dashboard (license check skipped here). User:", session.user.id);
+                navigate("/dashboard");
+            }
+        };
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       setAuthError(null);

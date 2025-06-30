@@ -42,7 +42,8 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.ai-agent-handler]
-verify_jwt = false
+verify_jwt = true
+import_map = "supabase/functions/import_map.json"
 
 [functions.analyze-sentiment-batch]
 verify_jwt = false

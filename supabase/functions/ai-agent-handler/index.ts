@@ -1,4 +1,4 @@
-import { serve } from 'https://deno.land/std@0.192.0/http/server.ts'; // Changed to direct URL import
+import { serve } from 'std/http/server.ts';
 import { corsHeaders } from '../_shared/cors.ts';
 import { createSupabaseClient, createSupabaseServiceRoleClient } from '../_shared/supabaseClient.ts';
 import { Database } from '../_shared/database.types.ts';
@@ -336,7 +336,10 @@ serve(async (req: Request) => {
       
       console.log(`[${requestStartTime}] Routing to: List Agents (REST) - User ${userId} has a profile.`);
       const { data: agentsData, error: fetchAgentsError } = await supabase
-        .from('ai_agents').select('*').order('created_at', { ascending: false });
+        .from('ai_agents')
+        .select('*')
+        .eq('user_id', userId) // Filter by the authenticated user's ID
+        .order('created_at', { ascending: false });
       if (fetchAgentsError) return createJsonResponse({ error: 'Failed to fetch agents', details: fetchAgentsError.message }, 500);
       if (!agentsData) return createJsonResponse({ agents: [] }, 200);
 
