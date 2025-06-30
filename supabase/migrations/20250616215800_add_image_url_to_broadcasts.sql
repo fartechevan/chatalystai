@@ -1,5 +1,6 @@
+-- ALTER TABLE "public"."broadcasts"
+-- ADD COLUMN IF NOT EXISTS "image_url" TEXT NULL,
 ALTER TABLE "public"."broadcasts"
-ADD COLUMN IF NOT EXISTS "image_url" TEXT NULL,
 ADD COLUMN IF NOT EXISTS "status" TEXT NULL DEFAULT 'pending',
 ADD COLUMN IF NOT EXISTS "scheduled_at" TIMESTAMP WITH TIME ZONE NULL,
 ADD COLUMN IF NOT EXISTS "recipient_count" INTEGER NULL DEFAULT 0,
@@ -28,7 +29,7 @@ BEFORE UPDATE ON "public"."broadcasts"
 FOR EACH ROW
 EXECUTE FUNCTION public.trigger_set_timestamp();
 
-COMMENT ON COLUMN "public"."broadcasts"."image_url" IS 'URL of the image attached to the broadcast.';
+-- COMMENT ON COLUMN "public"."broadcasts"."image_url" IS 'URL of the image attached to the broadcast.';
 COMMENT ON COLUMN "public"."broadcasts"."status" IS 'Status of the broadcast (e.g., draft, scheduled, sent, failed).';
 COMMENT ON COLUMN "public"."broadcasts"."scheduled_at" IS 'Timestamp when the broadcast is scheduled to be sent.';
 COMMENT ON COLUMN "public"."broadcasts"."recipient_count" IS 'Estimated or actual number of recipients for the broadcast.';

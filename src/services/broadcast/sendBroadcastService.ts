@@ -1,6 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
 import { sendTextService } from '@/integrations/evolution-api/services/sendTextService';
-import { sendMediaService, SendMediaParams } from '@/integrations/evolution-api/services/sendMediaService';
+import { sendMediaService } from '@/integrations/evolution-api/services/sendMediaService';
 // Removed TablesUpdate import as it's not resolving the type issue for the update call as expected.
 
 interface CustomerInfo {
@@ -23,7 +23,6 @@ export interface SendBroadcastParams {
   media?: string; // Base64 encoded media
   mimetype?: string; // e.g., image/jpeg
   fileName?: string; // e.g., image.jpg
-  imageUrl?: string; // Optional image URL (for DB record / UI display)
 }
 
 export interface SendBroadcastResult {
@@ -44,8 +43,7 @@ export const sendBroadcastService = async (params: SendBroadcastParams): Promise
     instanceId, 
     media,
     mimetype,
-    fileName,
-    imageUrl 
+    fileName
   } = params;
 
   if (targetMode === 'customers' && (!customerIds || customerIds.length === 0)) {
@@ -100,12 +98,10 @@ export const sendBroadcastService = async (params: SendBroadcastParams): Promise
       integration_config_id: string; // Column in 'broadcasts' table
       instance_id: string;
       segment_id?: string;
-      image_url?: string; // Added image_url
     } = {
       message_text: messageText,
       integration_config_id: integrationConfigId, // Use the received PK of integrations_config
       instance_id: instanceId,
-      image_url: imageUrl, // Added image_url
     };
 
     if (targetMode === 'segment' && segmentId) {

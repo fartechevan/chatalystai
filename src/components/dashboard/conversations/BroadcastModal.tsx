@@ -397,7 +397,6 @@ export function BroadcastModal({
         media: mediaData,
         mimetype: mediaMimeType,
         fileName: mediaFileName,
-        imageUrl: dbImageUrl, // Pass the URL if you uploaded it for DB record
       };
 
       if (targetMode === 'segment') {
