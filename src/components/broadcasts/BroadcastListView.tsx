@@ -13,6 +13,8 @@ import { BroadcastTableToolbar } from "./list/BroadcastTableToolbar"; // Import 
 import { PlusCircle } from 'lucide-react'; // Icon for Create button
 import { DataTableFacetedFilter } from "@/components/ui/data-table-faceted-filter"; // Import Faceted Filter
 import { Cross2Icon } from "@radix-ui/react-icons"; // Import Reset Icon
+import { useWhatsAppBlastLimit } from '@/hooks/useWhatsAppBlastLimit'; // Import WhatsApp blast limit hook
+import { Alert, AlertDescription } from "@/components/ui/alert"; // Import Alert components
 import {
   useReactTable,
   getCoreRowModel,
@@ -165,12 +167,39 @@ const fetchBroadcastsFromAPI = async (page: number, pageSize: number, searchTerm
 };
 
 
+// WhatsApp Blast Limit Info component
+const WhatsAppBlastLimitInfo = () => {
+  const { blastLimitInfo, isLoading } = useWhatsAppBlastLimit();
+
+  if (isLoading) {
+    return <div className="text-sm text-muted-foreground">Loading blast limit...</div>;
+  }
+
+  if (!blastLimitInfo) {
+    return null;
+  }
+
+  return (
+    <Alert className="bg-blue-50 border-blue-200 py-2 px-3">
+      <AlertDescription className="text-sm flex items-center justify-between">
+        <span>WhatsApp Daily Limit:</span>
+        <span className="font-medium ml-2">
+          {blastLimitInfo.remaining} of {blastLimitInfo.limit} remaining
+        </span>
+      </AlertDescription>
+    </Alert>
+  );
+};
+
 const BroadcastListView = () => {
   const navigate = useNavigate();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [broadcasts, setBroadcasts] = useState<Broadcast[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  
+  // Use the WhatsApp blast limit hook
+  const { blastLimitInfo, refetchBlastLimit } = useWhatsAppBlastLimit();
   
   // Pagination state
   const [page, setPage] = useState(1);
@@ -297,6 +326,9 @@ const BroadcastListView = () => {
       const isFiltered = table.getState().columnFilters.length > 0;
       const actions = (
         <div className="flex items-center space-x-2">
+          {/* WhatsApp Blast Limit Info right now no need to show*/}
+          {/* <WhatsAppBlastLimitInfo /> */}
+          
           {/* BroadcastTableToolbar now only contains search and view options */}
           <BroadcastTableToolbar table={table as Table<Broadcast>} /> 
           
@@ -319,7 +351,11 @@ const BroadcastListView = () => {
             </Button>
           )}
 
-          <Button onClick={() => handleOpenModal()}>
+          <Button 
+            onClick={() => handleOpenModal()} 
+            disabled={blastLimitInfo && blastLimitInfo.remaining === 0}
+            title={blastLimitInfo && blastLimitInfo.remaining === 0 ? "Daily WhatsApp blast limit reached" : "Create new broadcast"}
+          >
             <PlusCircle className="mr-2 h-4 w-4" /> Create Broadcast
           </Button>
         </div>
@@ -356,6 +392,7 @@ const BroadcastListView = () => {
         isOpen={isModalOpen}
         onClose={handleCloseModal}
         initialMessage={messageToDuplicate ?? undefined}
+        onBroadcastSent={refetchBlastLimit} // Refresh blast limit when a broadcast is sent
       />
     </div>
   );

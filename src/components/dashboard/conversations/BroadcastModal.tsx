@@ -7,6 +7,7 @@ import {
   DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
@@ -26,6 +27,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuthUser } from '@/hooks/useAuthUser';
 import type { Database } from "@/integrations/supabase/types";
 import { sendBroadcastService, type SendBroadcastParams } from '@/services/broadcast/sendBroadcastService';
+import { useWhatsAppBlastLimit } from '@/hooks/useWhatsAppBlastLimit';
 
 type Customer = Database['public']['Tables']['customers']['Row'];
 type Segment = Database['public']['Tables']['segments']['Row'];
@@ -42,12 +44,14 @@ interface BroadcastModalProps {
   isOpen: boolean;
   onClose: () => void;
   initialMessage?: string;
+  onBroadcastSent?: () => void; // Callback for when a broadcast is successfully sent
 }
 
 export function BroadcastModal({
   isOpen,
   onClose,
-  initialMessage
+  initialMessage,
+  onBroadcastSent
 }: BroadcastModalProps) {
   const { toast } = useToast();
   const { userData } = useAuthUser();
@@ -83,6 +87,9 @@ export function BroadcastModal({
   const [selectedImageFile, setSelectedImageFile] = useState<File | null>(null);
   const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
+  
+  // Use the WhatsApp blast limit hook
+  const { blastLimitInfo, isLoading: isLoadingBlastLimit, refetchBlastLimit } = useWhatsAppBlastLimit();
 
   const fileInputRef = useRef<HTMLInputElement>(null); // For CSV
   const imageFileInputRef = useRef<HTMLInputElement>(null); // For Image
@@ -167,6 +174,7 @@ export function BroadcastModal({
     }
   }, [isOpen, step, targetMode, toast]);
 
+
   useEffect(() => {
     if (isOpen && step === 'composeMessage' && availableIntegrations.length === 0) {
        const fetchIntegrations = async () => {
@@ -229,13 +237,23 @@ export function BroadcastModal({
   }, [isOpen, step, availableIntegrations.length, toast]);
 
   const handleSelectCustomer = (customerId: string) => {
+    // If blast limit is reached (remaining = 0), don't allow any selection
+    if (blastLimitInfo && blastLimitInfo.remaining <= 0) {
+      toast({ 
+        title: "WhatsApp Blast Limit Reached", 
+        description: `You've reached the daily limit of ${blastLimitInfo.limit} messages. Try again tomorrow.`, 
+        variant: "destructive" 
+      });
+      return;
+    }
+    
     setSelectedCustomers(prevSelected => {
       // If customer is already selected, remove them
       if (prevSelected.includes(customerId)) {
         return prevSelected.filter(id => id !== customerId);
       }
       
-      // Check if limit is reached before adding
+      // Check if customer selection limit is reached before adding
       if (prevSelected.length >= 200) {
         toast({ 
           title: "Selection Limit Reached", 
@@ -245,12 +263,32 @@ export function BroadcastModal({
         return prevSelected;
       }
       
-      // Add the customer if under the limit
+      // Check if WhatsApp blast limit would be exceeded
+      if (blastLimitInfo && prevSelected.length + 1 > blastLimitInfo.remaining) {
+        toast({ 
+          title: "WhatsApp Blast Limit Reached", 
+          description: `You can only send ${blastLimitInfo.remaining} more messages today. You've already selected ${prevSelected.length} customers.`, 
+          variant: "destructive" 
+        });
+        return prevSelected;
+      }
+      
+      // Add the customer if under both limits
       return [...prevSelected, customerId];
     });
   };
 
   const handleNext = () => {
+    // Check if blast limit is reached
+    if (blastLimitInfo && blastLimitInfo.remaining <= 0) {
+      toast({ 
+        title: "WhatsApp Blast Limit Reached", 
+        description: `You've reached the daily limit of ${blastLimitInfo.limit} messages. Try again tomorrow.`, 
+        variant: "destructive" 
+      });
+      return;
+    }
+    
     if (targetMode === 'customers' && selectedCustomers.length === 0) {
        toast({ title: "Error", description: "Please select at least one customer or import a CSV.", variant: "destructive" });
        return;
@@ -267,6 +305,16 @@ export function BroadcastModal({
   };
 
   const handleSend = async () => {
+    // Check if blast limit is reached
+    if (blastLimitInfo && blastLimitInfo.remaining <= 0) {
+      toast({ 
+        title: "WhatsApp Blast Limit Reached", 
+        description: `You've reached the daily limit of ${blastLimitInfo.limit} messages. Try again tomorrow.`, 
+        variant: "destructive" 
+      });
+      return;
+    }
+    
     if (targetMode === 'customers' && selectedCustomers.length === 0) {
       toast({ title: "Error", description: "Please select customers or import a CSV.", variant: "destructive" });
       return;
@@ -391,6 +439,14 @@ export function BroadcastModal({
           title: "Broadcast Sent Successfully",
           description: `Message sent to ${successfulSends} recipient(s). Broadcast ID: ${broadcastId}.`,
         });
+        
+        // Refresh the blast limit information after successful broadcast
+        await refetchBlastLimit();
+        
+        // Call the onBroadcastSent callback if provided
+        if (onBroadcastSent) {
+          onBroadcastSent();
+        }
       }
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : "An unknown error occurred.";
@@ -673,16 +729,40 @@ export function BroadcastModal({
 
             {targetMode === 'customers' && (
               <div className="space-y-2">
-                <Label>Select Customers ({selectedCustomers.length} selected - max 200)</Label>
+                <Label>
+                  Select Customers
+                  {blastLimitInfo && (
+                    <span className={`ml-2 text-sm ${blastLimitInfo.remaining <= 0 ? 'text-red-600 font-medium' : 'text-blue-600'}`}>
+                      (WhatsApp daily limit: {blastLimitInfo.remaining} remaining of {blastLimitInfo.limit})
+                    </span>
+                  )}
+                </Label>
+                <div className="text-xs text-muted-foreground mb-2">
+                  {selectedCustomers.length} selected
+                  {blastLimitInfo && blastLimitInfo.remaining <= 0 && (
+                    <span className="ml-2 text-red-600 font-medium">
+                      Daily limit reached! Try again tomorrow.
+                    </span>
+                  )}
+                </div>
                 <ScrollArea className="h-[300px] border rounded-md">
                   {isLoadingCustomers ? (
                     <p className="p-4 text-sm text-muted-foreground">Loading customers...</p>
                   ) : customers.length === 0 ? (
                     <p className="p-4 text-sm text-muted-foreground">No customers found.</p>
+                  ) : blastLimitInfo && blastLimitInfo.remaining <= 0 ? (
+                    <div className="p-4 text-center">
+                      <p className="text-red-600 font-medium">Daily WhatsApp blast limit reached!</p>
+                      <p className="text-sm text-muted-foreground mt-2">You've sent {blastLimitInfo.current_count} messages today. Try again tomorrow.</p>
+                    </div>
                   ) : (
                     <ul className="p-2">
                       {customers.map((customer) => (
-                        <li key={customer.id} className="flex items-center justify-between p-2 hover:bg-muted rounded cursor-pointer" onClick={() => handleSelectCustomer(customer.id)}>
+                        <li 
+                          key={customer.id} 
+                          className={`flex items-center justify-between p-2 hover:bg-muted rounded cursor-pointer`} 
+                          onClick={() => handleSelectCustomer(customer.id)}
+                        >
                           <span>{customer.name} ({customer.phone_number})</span>
                           <input type="checkbox" readOnly checked={selectedCustomers.includes(customer.id)} className="pointer-events-none h-4 w-4" />
                         </li>
@@ -881,6 +961,36 @@ export function BroadcastModal({
                 `${selectedCustomers.length} selected customer(s)`
               }
             </p>
+            
+            {/* WhatsApp Blast Limit Information */}
+            {blastLimitInfo && (
+              <Alert className="mt-4 bg-blue-50 border-blue-200">
+                <AlertDescription className="text-sm">
+                  <div className="flex justify-between items-center">
+                    <span>WhatsApp Daily Blast Limit:</span>
+                    <span className="font-medium">{blastLimitInfo.remaining} remaining of {blastLimitInfo.limit}</span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-2.5 mt-2">
+                    <div 
+                      className={`h-2.5 rounded-full ${blastLimitInfo.remaining === 0 ? 'bg-red-600' : 'bg-blue-600'}`}
+                      style={{ width: `${(blastLimitInfo.current_count / blastLimitInfo.limit) * 100}%` }}
+                    ></div>
+                  </div>
+                  <div className="text-xs mt-1 text-gray-500">
+                    You've sent {blastLimitInfo.current_count} messages today
+                    {blastLimitInfo.remaining === 0 && (
+                      <span className="text-red-600 font-medium ml-1">
+                        - Daily limit reached! Try again tomorrow.
+                      </span>
+                    )}
+                  </div>
+                </AlertDescription>
+              </Alert>
+            )}
+            
+            {isLoadingBlastLimit && (
+              <p className="text-xs text-muted-foreground mt-2">Loading blast limit information...</p>
+            )}
           </div>
         )}
 
