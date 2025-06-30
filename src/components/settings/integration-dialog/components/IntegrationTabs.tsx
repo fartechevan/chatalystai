@@ -13,6 +13,7 @@ import { useToast } from "@/hooks/use-toast";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Loader2, Trash2, Plus, CheckCircle, AlertCircle, X, Power, RefreshCw } from "lucide-react"; // Consolidated imports + RefreshCw
 import { supabase } from "@/integrations/supabase/client";
+import { useQueryClient } from "@tanstack/react-query";
 import { ConnectionState, EvolutionInstance } from "@/integrations/evolution-api/types"; // Corrected import path, added EvolutionInstance
 import { useIntegrationConnectionState } from "../hooks/useIntegrationConnectionState"; // Import the hook
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@/components/ui/table"; // Import Table components
@@ -39,6 +40,7 @@ export function IntegrationTabs({
   currentPlan, // Destructure currentPlan
   profileId, // Changed tenantId to profileId
 }: IntegrationTabsProps) {
+  const queryClient = useQueryClient();
   const [activeTab, setActiveTab] = useState<"settings" | "authorization">("settings");
   const [isClearing, setIsClearing] = useState(false);
   const { toast } = useToast();
@@ -105,6 +107,8 @@ export function IntegrationTabs({
                if (typeof refetchInstances === 'function') {
                  await refetchInstances(); // Ensure await if refetch is async
                }
+               await queryClient.invalidateQueries({ queryKey: ['configuredIntegrations'] });
+               await queryClient.invalidateQueries({ queryKey: ['integrations'] });
                // Show single success toast after refetch
                toast({ title: "Success", description: `Instance ${instanceName} deleted successfully.` });
 
