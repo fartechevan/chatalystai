@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { corsHeaders } from "../_shared/cors.ts";
+import { corsHeaders } from "./cors.ts";
 import { verify } from "https://deno.land/x/djwt@v2.8/mod.ts"; // Ensure you have a compatible djwt version
 import { decode as base64Decode } from "https://deno.land/std@0.168.0/encoding/base64.ts";
 
@@ -13,14 +13,20 @@ interface LicenseClaims {
 }
 
 serve(async (req) => {
+  console.log("licensed-signup function invoked.");
+
   if (req.method === "OPTIONS") {
+    console.log("Handling OPTIONS preflight request.");
     return new Response("ok", { headers: corsHeaders });
   }
 
   try {
+    console.log("Parsing request body.");
     const { email, password, licenseKey } = await req.json();
+    console.log(`Request body parsed. Email: ${email}, License Key provided: ${!!licenseKey}`);
 
     if (!email || !password || !licenseKey) {
+      console.error("Missing required fields: email, password, or licenseKey.");
       return new Response(
         JSON.stringify({ error: "Email, password, and licenseKey are required." }),
         {
@@ -30,112 +36,87 @@ serve(async (req) => {
       );
     }
 
+    console.log("Initializing Supabase admin client.");
     const supabaseAdminClient = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
     );
+    console.log("Supabase admin client initialized.");
 
     const newJwtSecret = Deno.env.get("JWT_SECRET_NEW") ?? "";
     const oldJwtSecret = Deno.env.get("JWT_SECRET") ?? "";
 
-    // Log the retrieved secrets to check their exact values
-    console.log(`Retrieved JWT_SECRET_NEW for decoding: '${newJwtSecret}' (length: ${newJwtSecret?.length})`);
-    if (oldJwtSecret) {
-      console.log(`Retrieved JWT_SECRET (old) for decoding: '${oldJwtSecret}' (length: ${oldJwtSecret?.length})`);
-    }
+    console.log(`Retrieved JWT_SECRET_NEW: ${newJwtSecret ? 'found' : 'not found'} (length: ${newJwtSecret?.length})`);
+    console.log(`Retrieved JWT_SECRET (old): ${oldJwtSecret ? 'found' : 'not found'} (length: ${oldJwtSecret?.length})`);
 
     let licenseClaims: LicenseClaims | null = null;
     let isValidLicense = false;
 
     if (!newJwtSecret) {
-        console.error("JWT_SECRET_NEW is not set in environment variables.");
+        console.error("JWT_SECRET_NEW is not set. Falling back to old secret.");
         if (oldJwtSecret && typeof oldJwtSecret === 'string') {
-            console.log(`Attempting to prepare oldJwtSecret (primary due to new missing): '${oldJwtSecret}' for JWT verification.`);
             try {
-                console.log(`Received licenseKey for verification with old secret (primary): '${licenseKey}'`); // Log the licenseKey
+                console.log("Verifying license with old JWT secret (primary).");
                 const oldKeyData = oldJwtSecret.trim();
-                const oldCryptoKey = await crypto.subtle.importKey(
-                  "raw",
-                  new TextEncoder().encode(oldKeyData),
-                  { name: "HMAC", hash: "SHA-256" },
-                  false, // extractable
-                  ["verify"] // key usages
-                );
+                const oldCryptoKey = await crypto.subtle.importKey("raw", new TextEncoder().encode(oldKeyData), { name: "HMAC", hash: "SHA-256" }, false, ["verify"]);
                 licenseClaims = await verify(licenseKey, oldCryptoKey) as LicenseClaims;
                 isValidLicense = true;
-                console.log("License verified with old JWT secret (new secret was not set) using CryptoKey.");
+                console.log("License verified successfully with old JWT secret.");
             } catch (e) {
-                console.error(`License verification failed with old JWT secret (new secret was not set): ${e.message}`);
+                console.error(`License verification failed with old JWT secret: ${e.message}`);
             }
         } else {
-            if (!oldJwtSecret) console.error("Old JWT_SECRET is also not set.");
-            else console.error("Old JWT_SECRET is not a string.");
-            
+            console.error("Old JWT_SECRET is not available or not a string. Cannot verify license.");
             return new Response(
-                JSON.stringify({ error: "JWT secret configuration error. Neither new nor old secret is properly configured." }),
+                JSON.stringify({ error: "JWT secret configuration error." }),
                 { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
             );
         }
-    } else { // newJwtSecret IS set
+    } else {
         try {
-            if (typeof newJwtSecret !== 'string') { 
-                throw new Error(`JWT_SECRET_NEW is not a valid string. Value: ${newJwtSecret}`);
-            }
-            console.log(`Attempting to prepare newJwtSecret: '${newJwtSecret}' for JWT verification.`);
-            console.log(`Received licenseKey for verification with new secret: '${licenseKey}'`); // Log the licenseKey
-                    const newKeyData = newJwtSecret.trim();
-                    const newCryptoKey = await crypto.subtle.importKey(
-                      "raw",
-                      new TextEncoder().encode(newKeyData),
-                      { name: "HMAC", hash: "SHA-256" },
-                      false, // extractable
-                      ["verify"] // key usages
-                    );
-            licenseClaims = await verify(licenseKey, newCryptoKey) as LicenseClaims; // djwt infers alg from CryptoKey
+            console.log("Verifying license with new JWT secret.");
+            if (typeof newJwtSecret !== 'string') { throw new Error("JWT_SECRET_NEW is not a valid string."); }
+            const newKeyData = newJwtSecret.trim();
+            const newCryptoKey = await crypto.subtle.importKey("raw", new TextEncoder().encode(newKeyData), { name: "HMAC", hash: "SHA-256" }, false, ["verify"]);
+            licenseClaims = await verify(licenseKey, newCryptoKey) as LicenseClaims;
             isValidLicense = true;
-            console.log("License verified with new JWT secret using CryptoKey.");
-        } catch (e) { // Failed with newJwtSecret
-            console.warn(`License verification with new JWT secret failed: ${e.message}`);
+            console.log("License verified successfully with new JWT secret.");
+        } catch (e) {
+            console.warn(`License verification with new JWT secret failed: ${e.message}. Trying fallback.`);
             if (oldJwtSecret && typeof oldJwtSecret === 'string') {
-                console.log(`Attempting to prepare oldJwtSecret (fallback): '${oldJwtSecret}' for JWT verification.`);
                 try {
-                    console.log(`Received licenseKey for verification with old secret (fallback): '${licenseKey}'`); // Log the licenseKey
+                    console.log("Verifying license with old JWT secret (fallback).");
                     const oldKeyDataFallback = oldJwtSecret.trim();
-                    const oldCryptoKeyFallback = await crypto.subtle.importKey(
-                      "raw",
-                      new TextEncoder().encode(oldKeyDataFallback),
-                      { name: "HMAC", hash: "SHA-256" },
-                      false, // extractable
-                      ["verify"] // key usages
-                    );
+                    const oldCryptoKeyFallback = await crypto.subtle.importKey("raw", new TextEncoder().encode(oldKeyDataFallback), { name: "HMAC", hash: "SHA-256" }, false, ["verify"]);
                     licenseClaims = await verify(licenseKey, oldCryptoKeyFallback) as LicenseClaims;
                     isValidLicense = true;
-                    console.log("License verified with old JWT secret (fallback) using CryptoKey.");
+                    console.log("License verified successfully with old JWT secret (fallback).");
                 } catch (e2) {
                     console.error(`License verification failed with old JWT secret (fallback): ${e2.message}`);
                 }
             } else {
-                console.log("Old JWT_SECRET not available for fallback or not a string.");
+                console.log("Old JWT_SECRET not available for fallback.");
             }
         }
     }
-    
 
     if (!isValidLicense || !licenseClaims) {
+      console.error("License is invalid or verification failed.");
       return new Response(
         JSON.stringify({ error: "Invalid or expired license key." }),
         {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
-          status: 403, // Forbidden
+          status: 403,
         }
       );
     }
+    console.log("License is valid. Proceeding to check expiration.");
 
-    // Optional: Further validation of claims (e.g., check expires_at)
     if (licenseClaims.expires_at) {
       try {
         const expiresAt = new Date(licenseClaims.expires_at);
         if (expiresAt < new Date()) {
+          console.error("License key has expired.");
           return new Response(
             JSON.stringify({ error: "License key has expired." }),
             {
@@ -144,6 +125,7 @@ serve(async (req) => {
             }
           );
         }
+        console.log("License expiration check passed.");
       } catch (e) {
         console.error("Error parsing expires_at:", e);
         return new Response(
@@ -156,36 +138,32 @@ serve(async (req) => {
       }
     }
 
-    // Create the user
+    console.log("Creating user in Supabase.");
     const { data: userData, error: userError } = await supabaseAdminClient.auth.admin.createUser({
       email,
       password,
-      email_confirm: true, // Auto-confirm email, or handle confirmation flow
+      email_confirm: true,
       user_metadata: {
-        license_details: licenseClaims, // Store validated license claims
+        license_details: licenseClaims,
       },
     });
 
     if (userError) {
-      console.error("Error creating user:", userError);
+      console.error("Error creating user:", userError.message);
       return new Response(JSON.stringify({ error: userError.message }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
         status: userError.status || 400,
       });
     }
 
-    // Optionally, sign in the user and return a session
-    // This part might be complex if you want to return a client-side usable session directly
-    // For simplicity, we'll just return the user data for now.
-    // The client can then attempt to sign in with the credentials.
-
+    console.log("User created successfully:", userData.user.id);
     return new Response(JSON.stringify({ user: userData.user }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
-      status: 201, // Created
+      status: 201,
     });
 
   } catch (error) {
-    console.error("Unhandled error:", error);
+    console.error("Unhandled error in licensed-signup function:", error.message);
     return new Response(JSON.stringify({ error: error.message || "Internal server error." }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
       status: 500,

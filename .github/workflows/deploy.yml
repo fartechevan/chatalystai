@@ -1,0 +1,48 @@
+name: Deploy to Supabase
+
+on:
+  workflow_dispatch:
+    inputs:
+      client:
+        description: 'Client to deploy'
+        required: true
+        type: choice
+        options:
+        - melofy
+        - chattalyst
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Set up Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Set environment variables for Melofy
+        if: github.event.inputs.client == 'melofy'
+        run: |
+          echo "SUPABASE_URL=${{ secrets.MELOFY_SUPABASE_URL }}" >> $GITHUB_ENV
+          echo "SUPABASE_ANON_KEY=${{ secrets.MELOFY_SUPABASE_ANON_KEY }}" >> $GITHUB_ENV
+
+      - name: Set environment variables for Chattalyst
+        if: github.event.inputs.client == 'chattalyst'
+        run: |
+          echo "SUPABASE_URL=${{ secrets.CHATTALYST_SUPABASE_URL }}" >> $GITHUB_ENV
+          echo "SUPABASE_ANON_KEY=${{ secrets.CHATTALYST_SUPABASE_ANON_KEY }}" >> $GITHUB_ENV
+
+      - name: Deploy Supabase migrations
+        run: |
+          supabase db push --remote ${{ github.event.inputs.client }}
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+
+      - name: Deploy Supabase functions
+        run: |
+          supabase functions deploy --remote ${{ github.event.inputs.client }}
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}

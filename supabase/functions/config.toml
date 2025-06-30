@@ -1,3 +1,2 @@
 
-project_id = "vezdxxqzzcjkunoaxcxc"
 import_map = "./import_map.json" # Explicitly set import map path
