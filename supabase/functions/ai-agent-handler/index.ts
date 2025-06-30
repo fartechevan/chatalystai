@@ -330,15 +330,15 @@ serve(async (req: Request) => {
         .single();
 
       if (profileError || !userProfile) {
-        console.error(`[${requestStartTime}] Profile check failed for user ${userId}:`, profileError);
-        return createJsonResponse({ error: 'User profile not found or access denied.' }, 403);
+        console.warn(`[${requestStartTime}] Profile check failed for user ${userId}, returning empty agent list. Error:`, profileError);
+        return createJsonResponse({ agents: [] }, 200);
       }
       
       console.log(`[${requestStartTime}] Routing to: List Agents (REST) - User ${userId} has a profile.`);
       const { data: agentsData, error: fetchAgentsError } = await supabase
         .from('ai_agents')
         .select('*')
-        .eq('user_id', userId) // Filter by the authenticated user's ID
+        .eq('user_id', userId) 
         .order('created_at', { ascending: false });
       if (fetchAgentsError) return createJsonResponse({ error: 'Failed to fetch agents', details: fetchAgentsError.message }, 500);
       if (!agentsData) return createJsonResponse({ agents: [] }, 200);
