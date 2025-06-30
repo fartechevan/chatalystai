@@ -199,7 +199,7 @@ const BroadcastListView = () => {
   const [error, setError] = useState<string | null>(null);
   
   // Use the WhatsApp blast limit hook
-  const { blastLimitInfo } = useWhatsAppBlastLimit();
+  const { blastLimitInfo, refetchBlastLimit } = useWhatsAppBlastLimit();
   
   // Pagination state
   const [page, setPage] = useState(1);
@@ -392,6 +392,7 @@ const BroadcastListView = () => {
         isOpen={isModalOpen}
         onClose={handleCloseModal}
         initialMessage={messageToDuplicate ?? undefined}
+        onBroadcastSent={refetchBlastLimit} // Refresh blast limit when a broadcast is sent
       />
     </div>
   );

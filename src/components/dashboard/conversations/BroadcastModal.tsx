@@ -44,12 +44,14 @@ interface BroadcastModalProps {
   isOpen: boolean;
   onClose: () => void;
   initialMessage?: string;
+  onBroadcastSent?: () => void; // Callback for when a broadcast is successfully sent
 }
 
 export function BroadcastModal({
   isOpen,
   onClose,
-  initialMessage
+  initialMessage,
+  onBroadcastSent
 }: BroadcastModalProps) {
   const { toast } = useToast();
   const { userData } = useAuthUser();
@@ -87,7 +89,7 @@ export function BroadcastModal({
   const [isUploadingImage, setIsUploadingImage] = useState(false);
   
   // Use the WhatsApp blast limit hook
-  const { blastLimitInfo, isLoading: isLoadingBlastLimit } = useWhatsAppBlastLimit();
+  const { blastLimitInfo, isLoading: isLoadingBlastLimit, refetchBlastLimit } = useWhatsAppBlastLimit();
 
   const fileInputRef = useRef<HTMLInputElement>(null); // For CSV
   const imageFileInputRef = useRef<HTMLInputElement>(null); // For Image
@@ -437,6 +439,14 @@ export function BroadcastModal({
           title: "Broadcast Sent Successfully",
           description: `Message sent to ${successfulSends} recipient(s). Broadcast ID: ${broadcastId}.`,
         });
+        
+        // Refresh the blast limit information after successful broadcast
+        await refetchBlastLimit();
+        
+        // Call the onBroadcastSent callback if provided
+        if (onBroadcastSent) {
+          onBroadcastSent();
+        }
       }
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : "An unknown error occurred.";
