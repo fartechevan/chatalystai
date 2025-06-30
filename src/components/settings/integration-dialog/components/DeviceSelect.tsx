@@ -28,7 +28,7 @@ export function DeviceSelect({
       <div className="space-y-6">
         <div className="flex justify-center">
           <img
-            src={supabase.storage.from('fartech').getPublicUrl('wa-lite-select-device@x2.png').data.publicUrl}
+            src={supabase.storage.from('assets').getPublicUrl('wa-lite-select-device@x2.png').data.publicUrl}
             alt="WhatsApp Connection"
             className="max-w-full h-auto mb-8"
           />
