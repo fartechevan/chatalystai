@@ -58,6 +58,37 @@ export const sendBroadcastService = async (params: SendBroadcastParams): Promise
     throw new Error("phoneNumbers must be provided for 'csv' target mode.");
   }
 
+  // Calculate total recipient count
+  let recipientCount = 0;
+  if (targetMode === 'customers' && customerIds) {
+    recipientCount = customerIds.length;
+  } else if (targetMode === 'segment' && segmentId) {
+    // For segments, we'll count the recipients after fetching them
+  } else if (targetMode === 'csv' && phoneNumbers) {
+    recipientCount = phoneNumbers.length;
+  }
+
+  // Check WhatsApp blast limit before proceeding
+  try {
+    const { data: blastLimitCheck, error: blastLimitError } = await supabase.functions.invoke(
+      'check-whatsapp-blast-limit',
+      {
+        body: { recipient_count: recipientCount, check_only: false }
+      }
+    );
+
+    if (blastLimitError) {
+      throw new Error(`Failed to check blast limit: ${blastLimitError.message}`);
+    }
+
+    if (blastLimitCheck && !blastLimitCheck.allowed) {
+      throw new Error(blastLimitCheck.error_message || 'Daily WhatsApp blast limit exceeded');
+    }
+  } catch (error) {
+    console.error("Error checking WhatsApp blast limit:", error);
+    throw new Error(`WhatsApp blast limit check failed: ${error instanceof Error ? error.message : String(error)}`);
+  }
+
   let broadcastId: string;
   let validRecipients: RecipientInfo[] = [];
 
@@ -103,6 +134,29 @@ export const sendBroadcastService = async (params: SendBroadcastParams): Promise
       validCustomers = (segmentContactsData || [])
         .map(sc => sc.customers)
         .filter((c): c is CustomerInfo => c !== null && typeof c.phone_number === 'string' && c.phone_number.trim() !== '');
+      
+      // Now that we have the segment contacts, check the blast limit with the actual count
+      if (validCustomers.length > 0) {
+        try {
+          const { data: blastLimitCheck, error: blastLimitError } = await supabase.functions.invoke(
+            'check-whatsapp-blast-limit',
+            {
+              body: { recipient_count: validCustomers.length, check_only: false }
+            }
+          );
+  
+          if (blastLimitError) {
+            throw new Error(`Failed to check blast limit: ${blastLimitError.message}`);
+          }
+  
+          if (blastLimitCheck && !blastLimitCheck.allowed) {
+            throw new Error(blastLimitCheck.error_message || 'Daily WhatsApp blast limit exceeded');
+          }
+        } catch (error) {
+          console.error("Error checking WhatsApp blast limit for segment:", error);
+          throw new Error(`WhatsApp blast limit check failed: ${error instanceof Error ? error.message : String(error)}`);
+        }
+      }
     } else if (targetMode === 'customers' && customerIds && customerIds.length > 0) {
       const { data: customersData, error: customerError } = await supabase
         .from("customers")
