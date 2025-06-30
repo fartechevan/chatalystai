@@ -3,8 +3,12 @@ import { createClient } from '@supabase/supabase-js';
 // import type { Database } from '@/types/supabase'; // Old import
 import type { Database } from './types'; // Corrected import to use the regenerated types
 
-// Hardcoded Production URL and Key (Original State)
-const SUPABASE_URL = "https://vezdxxqzzcjkunoaxcxc.supabase.co";
-const SUPABASE_PUBLISHABLE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZlemR4eHF6emNqa3Vub2F4Y3hjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MzczODA2MjcsImV4cCI6MjA1Mjk1NjYyN30.ypX-5S8PCV_b-zbJiJW94aRsXd5lUO9TMjXXSdcE2Cw";
+// The deployment environment is responsible for providing these values.
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+const SUPABASE_PUBLISHABLE_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+if (!SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY) {
+  throw new Error('Supabase URL and Anon Key are required.');
+}
 
 export const supabase = createClient<Database>(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);

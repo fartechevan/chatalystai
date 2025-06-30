@@ -1,4 +1,13 @@
+# The project_id is now managed by remotes.
+# project_id = "vezdxxqzzcjkunoaxcxc"
+
+# Remote configuration for the 'melofy' client (production/melofy branch)
+[remotes.melofy]
 project_id = "vezdxxqzzcjkunoaxcxc"
+
+# Remote configuration for the 'chattalyst' client (production/chattalyst branch)
+[remotes.chattalyst]
+project_id = "yrnbbkljrdwoyqjpswtv"
 
 [api]
 enabled = true
@@ -27,6 +36,63 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.smart-chunking]
+verify_jwt = false
+
+[functions.add-new-customers]
+verify_jwt = false
+
+[functions.ai-agent-handler]
+verify_jwt = false
+
+[functions.analyze-sentiment-batch]
+verify_jwt = false
+
+[functions.check-csv-contacts]
+verify_jwt = false
+
+[functions.edit-customer-contact]
+verify_jwt = false
+
+[functions.end-agent-session]
+verify_jwt = false
+
+[functions.evolution-api-handler]
+verify_jwt = false
+
+[functions.get-integration-access]
+verify_jwt = false
+
+[functions.get-media-base64]
+verify_jwt = false
+
+[functions.invite-user]
+verify_jwt = false
+
+[functions.licensed-signup]
+verify_jwt = false
+
+[functions.list-knowledge-documents]
+verify_jwt = false
+
+[functions.query-agent]
+verify_jwt = false
+
+[functions.query-data-with-ai]
+verify_jwt = false
+
+[functions.segment-handler]
+verify_jwt = false
+
+[functions.send-message-handler]
+verify_jwt = false
+
+[functions.suggest-ai-prompt]
+verify_jwt = false
+
+[functions.test-secrets]
+verify_jwt = false
+
+[functions.vectorize-schema]
 verify_jwt = false
 
 # New auth section from the diff

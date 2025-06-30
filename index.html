@@ -4,11 +4,22 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Chatalyst</title>
+    <title>Chattalyst</title>
     <meta name="description" content="Lovable Generated Project" />
     <meta name="author" content="Lovable" />
     <meta property="og:image" content="/og-image.png" />
-    <link rel="icon" type="image/png" href="https://vezdxxqzzcjkunoaxcxc.supabase.co/storage/v1/object/sign/fartech/chattalyst-logo.png?token=eyJraWQiOiJzdG9yYWdlLXVybC1zaWduaW5nLWtleV8xNGVlZmYzNC00ZTNlLTQyM2ItYmM3MC1hMzMzNzI4MjhmNzMiLCJhbGciOiJIUzI1NiJ9.eyJ1cmwiOiJmYXJ0ZWNoL2NoYXR0YWx5c3QtbG9nby5wbmciLCJpYXQiOjE3NDkyMDg3ODUsImV4cCI6MjE4MTIwODc4NX0.dY0gIKtct6RFZ4LUNckHDEvsdoCgGYnlEVMfxN0bItQ" />
+    <link rel="icon" id="favicon" type="image/png" href="" />
+    <script>
+      (function() {
+        // This script runs before the main application to set the correct favicon
+        // based on the environment variables.
+        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+        if (supabaseUrl) {
+          const faviconUrl = `${supabaseUrl}/storage/v1/object/public/fartech/chattalyst-logo.png`;
+          document.getElementById('favicon').href = faviconUrl;
+        }
+      })();
+    </script>
   </head>
 
   <body>

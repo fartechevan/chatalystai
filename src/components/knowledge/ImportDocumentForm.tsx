@@ -666,7 +666,8 @@ export function ImportDocumentForm({ onCancel, onSuccess }: ImportDocumentFormPr
   useEffect(() => {
     // this effect runs only once, on the initial render
     if (typeof window !== "undefined") {
-      const raw = localStorage.getItem("sb-vezdxxqzzcjkunoaxcxc-auth-token");
+      const projectRef = new URL(supabase.storage.from('documents').getPublicUrl('').data.publicUrl).hostname.split('.')[0];
+      const raw = localStorage.getItem(`sb-${projectRef}-auth-token`);
       if (raw) {
         try {
           const token = JSON.parse(raw);

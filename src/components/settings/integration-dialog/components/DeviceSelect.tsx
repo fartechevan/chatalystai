@@ -1,5 +1,6 @@
 import { Button } from "@/components/ui/button";
 import { BaseDialog } from "./BaseDialog";
+import { supabase } from "@/integrations/supabase/client";
 
 interface DeviceSelectProps {
   open: boolean;
@@ -27,7 +28,7 @@ export function DeviceSelect({
       <div className="space-y-6">
         <div className="flex justify-center">
           <img
-            src="https://vezdxxqzzcjkunoaxcxc.supabase.co/storage/v1/object/sign/fartech/wa-lite-select-device@x2.png?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1cmwiOiJmYXJ0ZWNoL3dhLWxpdGUtc2VsZWN0LWRldmljZUB4Mi5wbmciLCJpYXQiOjE3NDAxNDIyNTMsImV4cCI6MjA1NTUwMjI1M30.IzZbXVzJpb9WnwMjCr5VkI4KfG-r_4PpNEBMyOKr3t4"
+            src={supabase.storage.from('fartech').getPublicUrl('wa-lite-select-device@x2.png').data.publicUrl}
             alt="WhatsApp Connection"
             className="max-w-full h-auto mb-8"
           />
