@@ -12,6 +12,7 @@ import { connectToInstance as evolutionConnectToInstance } from "@/integrations/
 import { setEvolutionWebhook } from "@/integrations/evolution-api/services/setWebhookService"; // Import the new service
 import { checkInstanceStatus } from "@/integrations/evolution-api/services/instanceStatusService"; // Import checkInstanceStatus
 import { toast } from "@/components/ui/use-toast"; // Import toast for error handling
+import { useQueryClient } from "@tanstack/react-query";
 
 
 // import { WebhookSetupForm } from "../components/WebhookSetupForm"; // Not used directly in this hook
@@ -63,6 +64,7 @@ export function useIntegrationConnectionState(
   useEffect(() => {
     console.log(`[DEBUG DUPLICATE CHECK][useIntegrationConnectionState] Hook initialized/props updated. profileId prop value:`, profileId);
   }, [profileId]);
+  const queryClient = useQueryClient();
   const [integrationMainPopup, setIntegrationMainPopup] = useState(true);
   const [showDeviceSelect, setShowDeviceSelect] = useState(false);
   const [isConnected, setIsConnected] = useState(false); // Represents if connection was ever 'open'
@@ -278,12 +280,46 @@ export function useIntegrationConnectionState(
               p_status: instance.connectionStatus // Pass connectionStatus as p_status
             };
             console.log('[DEBUG DUPLICATE CHECK][refetchInstances] RPC Args:', rpcArgs);
-            const { error: rpcError } = await supabase.rpc('upsert_integration_config', rpcArgs);
+            const { data: existingConfig, error: checkError } = await supabase
+              .from('integrations_config')
+              .select('id')
+              .eq('integration_id', integrationId)
+              .maybeSingle();
 
-            if (rpcError) {
-              console.error(`[DEBUG DUPLICATE CHECK][refetchInstances] ERROR calling upsert_integration_config RPC for instance ${instanceId} (profile: ${profileId}):`, rpcError, 'Args were:', rpcArgs);
+            if (checkError) {
+              console.error(`[DEBUG DUPLICATE CHECK][refetchInstances] ERROR checking for existing config for instance ${instanceId} (profile: ${profileId}):`, checkError);
+              return;
+            }
+
+            if (existingConfig) {
+              // Update existing config
+              const updateArgs = {
+                instance_id: instanceId,
+                instance_display_name: instanceDisplayName,
+                owner_id: ownerId,
+                user_reference_id: userReferenceId,
+                pipeline_id: currentPipelineId || null,
+                token: instance.token,
+                status: instance.connectionStatus,
+              };
+              const { error: updateError } = await supabase
+                .from('integrations_config')
+                .update(updateArgs)
+                .eq('id', existingConfig.id);
+              if (updateError) {
+                console.error(`[DEBUG DUPLICATE CHECK][refetchInstances] ERROR updating existing config for instance ${instanceId} (profile: ${profileId}):`, updateError, 'Args were:', rpcArgs);
+              } else {
+                console.log(`[refetchInstances] Successfully updated existing config for instance ${instanceId} (profile: ${profileId}).`);
+              }
             } else {
-               console.log(`[refetchInstances] Successfully called upsert_integration_config RPC for instance ${instanceId} (profile: ${profileId}).`);
+              // Insert new config
+              const { error: rpcError } = await supabase.rpc('upsert_integration_config', rpcArgs);
+
+              if (rpcError) {
+                console.error(`[DEBUG DUPLICATE CHECK][refetchInstances] ERROR calling upsert_integration_config RPC for instance ${instanceId} (profile: ${profileId}):`, rpcError, 'Args were:', rpcArgs);
+              } else {
+                 console.log(`[refetchInstances] Successfully called upsert_integration_config RPC for instance ${instanceId} (profile: ${profileId}).`);
+              }
             }
           } catch (err) {
             console.error(`[refetchInstances] Exception during insert for instance ${instanceId}:`, err);
@@ -413,12 +449,46 @@ export function useIntegrationConnectionState(
               p_status: instance.connectionStatus // Pass connectionStatus as p_status
             };
             console.log('[DEBUG DUPLICATE CHECK][fetchInstancesAndSetState] RPC Args:', rpcArgs);
-            const { error: rpcError } = await supabase.rpc('upsert_integration_config', rpcArgs);
+            const { data: existingConfig, error: checkError } = await supabase
+              .from('integrations_config')
+              .select('id')
+              .eq('integration_id', integrationId)
+              .maybeSingle();
 
-            if (rpcError) {
-              console.error(`[DEBUG DUPLICATE CHECK][fetchInstancesAndSetState] ERROR calling upsert_integration_config RPC for instance ${instanceId} (profile: ${profileId}):`, rpcError, 'Args were:', rpcArgs);
+            if (checkError) {
+              console.error(`[DEBUG DUPLICATE CHECK][fetchInstancesAndSetState] ERROR checking for existing config for instance ${instanceId} (profile: ${profileId}):`, checkError);
+              return;
+            }
+
+            if (existingConfig) {
+              // Update existing config
+              const updateArgs = {
+                instance_id: instanceId,
+                instance_display_name: instanceDisplayName,
+                owner_id: ownerId,
+                user_reference_id: userReferenceId,
+                pipeline_id: currentPipelineId || null,
+                token: instance.token,
+                status: instance.connectionStatus,
+              };
+              const { error: updateError } = await supabase
+                .from('integrations_config')
+                .update(updateArgs)
+                .eq('id', existingConfig.id);
+              if (updateError) {
+                console.error(`[DEBUG DUPLICATE CHECK][fetchInstancesAndSetState] ERROR updating existing config for instance ${instanceId} (profile: ${profileId}):`, updateError, 'Args were:', rpcArgs);
+              } else {
+                console.log(`[fetchInstancesAndSetState] Successfully updated existing config for instance ${instanceId} (profile: ${profileId}).`);
+              }
             } else {
-               console.log(`[fetchInstancesAndSetState] Successfully called upsert_integration_config RPC for instance ${instanceId} (profile: ${profileId}).`);
+              // Insert new config
+              const { error: rpcError } = await supabase.rpc('upsert_integration_config', rpcArgs);
+
+              if (rpcError) {
+                console.error(`[DEBUG DUPLICATE CHECK][fetchInstancesAndSetState] ERROR calling upsert_integration_config RPC for instance ${instanceId} (profile: ${profileId}):`, rpcError, 'Args were:', rpcArgs);
+              } else {
+                 console.log(`[fetchInstancesAndSetState] Successfully called upsert_integration_config RPC for instance ${instanceId} (profile: ${profileId}).`);
+              }
             }
           } catch (err) {
             console.error(`[fetchInstancesAndSetState] Exception during insert for instance ${instanceId}:`, err);
@@ -874,6 +944,8 @@ export function useIntegrationConnectionState(
     const { success, error, instanceData } = await createEvolutionInstance(newInstanceName, selectedIntegration.id);
     if (success && instanceData) {
       await refetchInstances();
+      await queryClient.invalidateQueries({ queryKey: ['configuredIntegrations'] });
+      await queryClient.invalidateQueries({ queryKey: ['integrations'] });
       setSelectedInstanceName(newInstanceName);
       // After creating, the connect logic will run, which also has the canAddMoreIntegrations check.
       // This is slightly redundant but ensures consistency if connect is called standalone.
