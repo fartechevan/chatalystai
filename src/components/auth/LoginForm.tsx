@@ -106,7 +106,7 @@ export const LoginForm = () => {
       className="min-h-screen flex flex-col items-center justify-center bg-cover bg-center"
       style={{
         backgroundImage: `url('${
-          supabase.storage.from('fartech').getPublicUrl('Chatalyst_BG.png').data
+          supabase.storage.from('assets').getPublicUrl('bg_chattalyst.png').data
             .publicUrl
         }')`,
       }}
