@@ -18,6 +18,7 @@ max_rows = 1000
 
 [db]
 port = 54322
+major_version = 17
 
 [studio]
 enabled = true
@@ -99,7 +100,7 @@ verify_jwt = false
 # New auth section from the diff
 [auth]
 enabled = true
-site_url = "https://app.chattalyst.com"
+site_url = "http://localhost:3000"
 
 additional_redirect_urls = []
 jwt_expiry = 3600
@@ -110,8 +111,8 @@ refresh_token_reuse_interval = 10
 max_enrolled_factors = 10
 
 [auth.mfa.totp]
-enroll_enabled = true
-verify_enabled = true
+enroll_enabled = false
+verify_enabled = false
 
 [auth.mfa.phone]
 enroll_enabled = false
@@ -119,8 +120,8 @@ verify_enabled = false
 
 [auth.email]
 enable_signup = true
-double_confirm_changes = false
-enable_confirmations = false
+double_confirm_changes = true
+enable_confirmations = true
 secure_password_change = false
 max_frequency = "1m0s"
 otp_length = 6
