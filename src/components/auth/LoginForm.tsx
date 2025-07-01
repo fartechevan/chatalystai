@@ -269,6 +269,6 @@ export const LoginForm = () => {
       />
       {authError && <p className="mt-4 text-center text-sm text-red-600">{authError}</p>}
     </>,
-    authView === "forgotPassword" ? "Reset Password" : "Chattalyst Login"
+    authView === "forgotPassword" ? "Reset Password" : "Chattalyst"
   );
 };
