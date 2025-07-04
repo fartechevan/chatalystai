@@ -1,5 +1,5 @@
 # The project_id is now managed by remotes.
-# project_id = "vezdxxqzzcjkunoaxcxc"
+project_id = "yrnbbkljrdwoyqjpswtv"
 
 # Remote configuration for the 'melofy' client (production/melofy branch)
 [remotes.melofy]

@@ -115,7 +115,21 @@ const AgentDetailsPanel: React.FC<AgentDetailsPanelProps> = ({ selectedAgentId, 
     },
   });
 
-   // TODO: Add deleteMutation later
+   const deleteMutation = useMutation({
+    mutationFn: deleteAIAgent,
+    onSuccess: (_, deletedAgentId) => {
+      queryClient.invalidateQueries({ queryKey: ['aiAgents'] });
+      toast({ title: "Success", description: "Agent deleted." });
+      onAgentUpdate(); // Navigate back to the list
+    },
+    onError: (error: Error, deletedAgentId) => {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: `Failed to delete agent ${deletedAgentId}: ${error.message}`,
+      });
+    },
+  });
 
    // --- Queries ---
   const {
@@ -382,9 +396,9 @@ const AgentDetailsPanel: React.FC<AgentDetailsPanelProps> = ({ selectedAgentId, 
 
   const handleDelete = () => {
     if (selectedAgentId) {
-      // TODO: Implement delete mutation
-      // Call deleteAIAgent mutation here
-      // On success, invalidate queries and call onAgentUpdate()
+      if (window.confirm("Are you sure you want to delete this agent? This action cannot be undone.")) {
+        deleteMutation.mutate(selectedAgentId);
+      }
     }
   };
 
@@ -975,11 +989,10 @@ const AgentDetailsPanel: React.FC<AgentDetailsPanelProps> = ({ selectedAgentId, 
               size="icon"
               onClick={handleDelete}
                // Disable only during mutations/loading
-              disabled={/* deleteMutation.isPending || */ updateMutation.isPending || isLoadingAgent}
+              disabled={deleteMutation.isPending || updateMutation.isPending || isLoadingAgent}
               aria-label="Delete Agent"
             >
-             {/* TODO: Add loading spinner for delete */}
-             <Trash2 className="h-4 w-4" />
+             {deleteMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
            </Button>
          )}
       </CardFooter>

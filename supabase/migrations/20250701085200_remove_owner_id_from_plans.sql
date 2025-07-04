@@ -1,9 +1,8 @@
 -- Drop existing RLS policies on plans table that reference owner_id
-DROP POLICY IF EXISTS "Allow individual access to plans" ON public.plans;
-DROP POLICY IF EXISTS "Allow admin update access to plans" ON public.plans;
-DROP POLICY IF EXISTS "Allow admin delete access to plans" ON public.plans;
-DROP POLICY IF EXISTS "Allow insert for admins and owners" ON public.plans;
-DROP POLICY IF EXISTS "Allow admin full access to plans" ON public.plans;
+DROP POLICY IF EXISTS "Allow team admins or owners to create plans" ON public.plans;
+DROP POLICY IF EXISTS "Allow team admins or owners to delete plans" ON public.plans;
+DROP POLICY IF EXISTS "Allow team admins or owners to update plans" ON public.plans;
+DROP POLICY IF EXISTS "Allow users to see their team's or own plans" ON public.plans;
 
 -- Drop the owner_id column from the plans table
 ALTER TABLE public.plans DROP COLUMN IF EXISTS owner_id;
