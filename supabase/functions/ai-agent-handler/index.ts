@@ -207,7 +207,7 @@ serve(async (req: Request) => {
           }
 
           const customAgentPayload = {
-            message: query, // Changed key from query
+            query: query, 
             sessionId: sessionId,
             phone_number: processedContactIdentifier, 
             // Potentially add other relevant info from agentData.custom_agent_config
@@ -511,8 +511,36 @@ serve(async (req: Request) => {
     // --- DELETE AGENT (DELETE /:id) ---
     else if (req.method === 'DELETE' && agentIdFromPath) {
       if (!userId) return createJsonResponse({ error: 'User authentication required' }, 401);
+      
+      console.log(`[${requestStartTime}] Routing to: Delete Agent (REST - ID: ${agentIdFromPath})`);
+
+      // First, verify the agent exists and belongs to the user
+      const { data: agent, error: fetchError } = await supabase
+        .from('ai_agents')
+        .select('id')
+        .eq('id', agentIdFromPath)
+        .eq('user_id', userId)
+        .single();
+
+      if (fetchError || !agent) {
+        // If the agent doesn't exist or doesn't belong to the user, return 404
+        // This also handles cases where it's already deleted.
+        return createJsonResponse({ error: 'Agent not found or access denied.' }, 404);
+      }
+
+      // Delete related records first to avoid foreign key violations
+      await supabase.from('ai_agent_knowledge_documents').delete().eq('agent_id', agentIdFromPath);
+      await supabase.from('ai_agent_integrations').delete().eq('agent_id', agentIdFromPath);
+
+      // Finally, delete the agent itself
       const { error } = await supabase.from('ai_agents').delete().eq('id', agentIdFromPath).eq('user_id', userId);
-      if (error && error.code !== 'PGRST116') return createJsonResponse({ error: 'Failed to delete agent', details: error.message }, 500);
+
+      if (error) {
+        console.error(`[${requestStartTime}] Error deleting agent ${agentIdFromPath}:`, error.message);
+        return createJsonResponse({ error: 'Failed to delete agent', details: error.message }, 500);
+      }
+
+      console.log(`[${requestStartTime}] Successfully deleted agent ${agentIdFromPath} and its relations.`);
       return createJsonResponse(null, 204);
     }
     else {
