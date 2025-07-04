@@ -145,6 +145,8 @@ const AgentDetailsPanel: React.FC<AgentDetailsPanelProps> = ({ selectedAgentId, 
 
   // Effect to update form state when selected agent changes or when creating new
   useEffect(() => {
+    console.log("selectedAgent", selectedAgent);
+    console.log("isLoadingAgent", isLoadingAgent);
     if (selectedAgentId && selectedAgent) {
       // Populate form for editing
       setAgentName(selectedAgent.name || '');
