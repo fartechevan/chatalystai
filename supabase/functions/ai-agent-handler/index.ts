@@ -143,6 +143,7 @@ serve(async (req: Request) => {
         console.log(`[${requestStartTime}] Internal Query: Processing for agent ${agentData.name} (ID: ${agentId}), Type: ${agentData.agent_type}`);
 
         let responseText: string | null = null;
+        let imageUrl: string | null = null;
         let knowledgeUsed: unknown = null;
 
         if (agentData.agent_type === 'chattalyst') {
@@ -234,7 +235,8 @@ serve(async (req: Request) => {
                 const responseJson = JSON.parse(responseBodyText);
                 responseText = responseJson.output || responseJson.response || null; 
                 knowledgeUsed = responseJson.knowledge_used || null;
-                console.log(`[${requestStartTime}] Internal Query: Successfully parsed response for agent ${agentId}. Response text: ${responseText}`);
+                imageUrl = responseJson.image || null; // Extract image URL if present
+                console.log(`[${requestStartTime}] Internal Query: Successfully parsed response for agent ${agentId}. Response text: ${responseText}, Image URL: ${imageUrl}`);
               } catch (parseError) {
                 console.error(`[${requestStartTime}] Internal Query: Failed to parse JSON response from Custom Agent webhook for agent ${agentId}. Body: "${responseBodyText.substring(0, 500)}"... Error: ${(parseError as Error).message}`);
                 responseText = agentData.error_message || "Sorry, the custom service returned an invalid JSON response.";
@@ -249,7 +251,7 @@ serve(async (req: Request) => {
           responseText = agentData.error_message || "Sorry, this agent is not configured correctly.";
         }
 
-        return createJsonResponse({ response: responseText, knowledge_used: knowledgeUsed }, 200);
+        return createJsonResponse({ response: responseText, image: imageUrl, knowledge_used: knowledgeUsed }, 200);
 
       } catch (e) {
         console.error(`[${requestStartTime}] Internal Query: Error processing internal agent query. Error: ${(e as Error).message}`);
