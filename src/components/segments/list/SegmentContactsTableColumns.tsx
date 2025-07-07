@@ -61,21 +61,21 @@ export const getSegmentContactsTableColumns = ({
     },
   },
   {
-    accessorKey: "email",
+    accessorKey: "phone_number",
     header: ({ column }) => {
       return (
         <Button
           variant="ghost"
           onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
         >
-          Email
+          Phone
           <ArrowUpDown className="ml-2 h-4 w-4" />
         </Button>
       );
     },
     cell: ({ row }) => {
-      const email = row.getValue("email") as string;
-      return <div>{email || "No email"}</div>;
+      const phone_number = row.getValue("phone_number") as string;
+      return <div>{phone_number || "No phone number"}</div>;
     },
   },
   {
