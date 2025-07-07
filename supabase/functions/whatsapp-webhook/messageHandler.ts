@@ -38,6 +38,27 @@ export interface WhatsAppMessageData {
  * Handles a WhatsApp message event
  * @returns {Promise<true | string>} Returns true on success, or an error message string on failure.
  */
+// Helper function to send text messages (to avoid code duplication)
+function sendTextMessage(supabaseClient: SupabaseClient, configId: string, recipientJid: string, text: string) {
+  console.log(`[MessageHandler] Invoking evolution-api-handler with text: "${text}"`);
+  supabaseClient.functions.invoke('evolution-api-handler', { 
+    body: {
+      action: 'sendText',
+      integrationConfigId: configId,
+      number: recipientJid,
+      text: text,
+    },
+  }).then(({ data: evoData, error: evoError }) => {
+    if (evoError) {
+      console.error(`[MessageHandler] evolution-api-handler text send resulted in an error:`, evoError);
+    } else {
+      console.log(`[MessageHandler] evolution-api-handler text send successful. Response:`, JSON.stringify(evoData, null, 2));
+    }
+  }).catch(invokeError => {
+    console.error(`[MessageHandler] Error invoking evolution-api-handler for text (outer catch):`, invokeError);
+  });
+}
+
 export async function handleMessageEvent(supabaseClient: SupabaseClient, data: WhatsAppMessageData, instanceId: string): Promise<true | string> {
   console.log('Processing message event with data:', JSON.stringify(data, null, 2));
   
@@ -375,6 +396,7 @@ export async function handleMessageEvent(supabaseClient: SupabaseClient, data: W
             },
           }).then(async ({ data: handlerResponse, error: handlerError }) => {
             let aiResponseContent: string | null = null;
+            let imageUrl: string | null = null;     // Add this line to store the image URL
             let knowledgeUsed: unknown = null; 
             const logSenderType = 'ai' as const;
 
@@ -387,6 +409,7 @@ export async function handleMessageEvent(supabaseClient: SupabaseClient, data: W
               // Ensure handlerResponse and handlerResponse.response are what we expect
               console.log(`[MessageHandler] ai-agent-handler successful response data:`, JSON.stringify(handlerResponse, null, 2));
               aiResponseContent = handlerResponse?.response || agentSettings.error_message; 
+              imageUrl = handlerResponse?.image || null; // Extract image URL if present
               knowledgeUsed = handlerResponse?.knowledge_used; 
               console.log(`[MessageHandler] Extracted aiResponseContent: "${aiResponseContent}"`);
             }
@@ -400,8 +423,41 @@ export async function handleMessageEvent(supabaseClient: SupabaseClient, data: W
                 knowledge_used: knowledgeUsed,
               });
             
-            console.log(`[MessageHandler] Before invoking evolution-api-handler. aiResponseContent: "${aiResponseContent}" (Type: ${typeof aiResponseContent})`);
-            if (aiResponseContent && typeof aiResponseContent === 'string' && aiResponseContent.trim() !== "") {
+            console.log(`[MessageHandler] Before invoking evolution-api-handler. aiResponseContent: "${aiResponseContent}" (Type: ${typeof aiResponseContent}), imageUrl: "${imageUrl}"`);
+            console.log(`[MessageHandler] Image URL: "${imageUrl}"`);
+            // Check if there's an image to send
+            if (imageUrl && typeof imageUrl === 'string' && imageUrl.trim() !== "") {
+              console.log(`[MessageHandler] Invoking evolution-api-handler to send image: "${imageUrl}"`);
+              
+              // First send the image
+              supabaseClient.functions.invoke('evolution-api-handler', { 
+                body: {
+                  action: 'sendMedia',  // Use sendMedia action for images
+                  integrationConfigId: config.id,
+                  recipientJid: remoteJid,
+                  mediaData: imageUrl,  // The public URL of the image
+                  mimeType: 'image/jpeg', // Assume JPEG, adjust if needed
+                  filename: 'image.jpg', // Default filename
+                  caption: aiResponseContent || undefined, // Use the text response as caption if available
+                },
+              }).then(({ data: evoData, error: evoError }) => {
+                if (evoError) {
+                  console.error(`[MessageHandler] evolution-api-handler image send resulted in an error:`, evoError);
+                  
+                  // If image sending fails, fall back to sending just the text
+                  if (aiResponseContent && typeof aiResponseContent === 'string' && aiResponseContent.trim() !== "") {
+                    console.log(`[MessageHandler] Falling back to text-only message after image send failure`);
+                    sendTextMessage(supabaseClient, config.id, remoteJid, aiResponseContent);
+                  }
+                } else {
+                  console.log(`[MessageHandler] evolution-api-handler image send successful. Response:`, JSON.stringify(evoData, null, 2));
+                }
+              }).catch(invokeError => {
+                console.error(`[MessageHandler] Error invoking evolution-api-handler for image (outer catch):`, invokeError);
+              });
+            } 
+            // If there's only text (no image), send as a text message
+            else if (aiResponseContent && typeof aiResponseContent === 'string' && aiResponseContent.trim() !== "") {
               console.log(`[MessageHandler] Invoking evolution-api-handler with text: "${aiResponseContent}"`);
               supabaseClient.functions.invoke('evolution-api-handler', { 
                 body: {
@@ -421,7 +477,7 @@ export async function handleMessageEvent(supabaseClient: SupabaseClient, data: W
                  console.error(`[MessageHandler] Error invoking evolution-api-handler function (outer catch):`, invokeError);
               });
             } else {
-              console.log(`[MessageHandler] Skipped invoking evolution-api-handler because aiResponseContent was empty or not a string. Content: "${aiResponseContent}"`);
+              console.log(`[MessageHandler] Skipped invoking evolution-api-handler because both image and text content were empty or invalid.`);
             }
           }).catch(handlerInvokeError => {
              console.error(`[MessageHandler] Error invoking ai-agent-handler function:`, handlerInvokeError);
