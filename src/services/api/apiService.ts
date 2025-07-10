@@ -11,6 +11,7 @@ interface FileUploadResponse {
   session_id?: string;
   image_urls?: string[];
   document_name?: string;
+  file_path?: string;
 }
 
 interface ApiServiceConfig {
