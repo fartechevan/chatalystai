@@ -379,7 +379,8 @@ export function ChunksList({ documentId }: ChunksListProps) {
         </div>
       </div>
       
-      {documentData?.file_path && documentData.file_type === 'pdf' && (
+      {/* THIS PART IS NOT NEEDED NOW SINCE THE ORIGINAL DOCUMENT IS OPENED IN A NEW TAB, AND THE URL IS FROM GOOGLE BUCKET */}
+      {/* {documentData?.file_path && documentData.file_type === 'pdf' && (
         <Card className="mb-4">
           <CardHeader className="pb-2">
             <CardTitle className="text-base flex items-center gap-2">
@@ -397,7 +398,7 @@ export function ChunksList({ documentId }: ChunksListProps) {
             </div>
           </CardContent>
         </Card>
-      )}
+      )} */}
       
       <div className="max-h-[70vh] overflow-y-auto pr-2 border rounded-lg"> {/* Moved border and rounded-lg to the container */}
         <Table> {/* Removed className="border rounded-lg" */}

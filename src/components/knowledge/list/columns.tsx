@@ -48,7 +48,7 @@ const DocumentTableActions: React.FC<DocumentColumnActionsProps> = ({
       <DropdownMenuContent align="end">
         <DropdownMenuLabel>Actions</DropdownMenuLabel>
         {document.file_type === 'pdf' && document.file_path && (
-          <DropdownMenuItem onClick={() => onViewOriginal(document)}>
+          <DropdownMenuItem onClick={() => window.open(document.file_path, '_blank')}>
             <ExternalLink className="mr-2 h-4 w-4" />
             View Original
           </DropdownMenuItem>
