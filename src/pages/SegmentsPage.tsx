@@ -24,7 +24,7 @@ const SegmentsPage: React.FC = () => {
   const [segments, setSegments] = useState<Segment[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
-  const { user } = useAuth(); // Get current user
+  const { user, session } = useAuth(); // Get current user and session
 
   const [showCreateSegmentModal, setShowCreateSegmentModal] = useState(false);
   const [newSegmentName, setNewSegmentName] = useState('');
@@ -443,16 +443,55 @@ const SegmentsPage: React.FC = () => {
                 onClick={async () => {
                   if (importFile && selectedSegmentForDetails) {
                     setIsImportingContacts(true);
-                    // Placeholder for actual import logic
-                    toast({ title: "Import Started", description: `Importing contacts from ${importFile.name} to ${selectedSegmentForDetails.name}. This feature is a placeholder.`});
-                    console.log("Importing file:", importFile, "for segment:", selectedSegmentForDetails.id);
-                    // Simulate import
-                    await new Promise(resolve => setTimeout(resolve, 2000)); 
-                    setIsImportingContacts(false);
-                    setShowImportContactsModal(false);
-                    setImportFile(null);
-                    // Potentially refetch contacts for the segment here
-                    if (selectedSegmentForDetails) { // Re-check as it might be null if component unmounted
+                    
+                    try {
+                      // Read the file as text
+                      const csvData = await new Promise<string>((resolve, reject) => {
+                        const reader = new FileReader();
+                        reader.onload = (e) => resolve(e.target?.result as string);
+                        reader.onerror = (e) => reject(e);
+                        reader.readAsText(importFile);
+                      });
+
+                      console.log("Request body: ", JSON.stringify({
+                        csvData, 
+                        segmentId: selectedSegmentForDetails.id, 
+                        importMode: 'save_new', 
+                        duplicateAction: 'add', // Default action
+                      }))
+                      
+                      // Call the segment-handler edge function using direct fetch
+                      const response = await fetch(`https://vezdxxqzzcjkunoaxcxc.supabase.co/functions/v1/segment-handler/segments/import-csv`, {
+                        method: 'POST',
+                        headers: {
+                          'Content-Type': 'application/json',
+                          'Authorization': `Bearer ${session?.access_token}`,
+                        },
+                        body: JSON.stringify({
+                          csvData,
+                          segmentId: selectedSegmentForDetails.id,
+                          importMode: 'save_new', // Default mode
+                          duplicateAction: 'add', // Default action
+                        }),
+                      });
+                      
+                      if (!response.ok) {
+                        const errorData = await response.json();
+                        throw new Error(errorData.error || 'Failed to import contacts');
+                      }
+                      
+                      const result = await response.json();
+                      
+                      toast({ 
+                        title: "Import Successful", 
+                        description: `Imported ${result.newContactsAdded} new contacts and added ${result.existingContactsAddedToSegment} existing contacts to the segment.`
+                      });
+                      
+                      setShowImportContactsModal(false);
+                      setImportFile(null);
+                      
+                      // Refetch contacts for the segment
+                      if (selectedSegmentForDetails) {
                         const refetchCurrentSegmentContacts = async () => {
                           setIsLoadingContacts(true);
                           try {
@@ -479,6 +518,17 @@ const SegmentsPage: React.FC = () => {
                           }
                         };
                         await refetchCurrentSegmentContacts();
+                      }
+                    } catch (err) {
+                      console.error('Error importing contacts:', err);
+                      const errorMessage = err instanceof Error ? err.message : 'Failed to import contacts';
+                      toast({ 
+                        title: "Import Failed", 
+                        description: errorMessage, 
+                        variant: "destructive" 
+                      });
+                    } finally {
+                      setIsImportingContacts(false);
                     }
                   } else {
                     toast({ title: "Error", description: "Please select a file to import.", variant: "destructive"});

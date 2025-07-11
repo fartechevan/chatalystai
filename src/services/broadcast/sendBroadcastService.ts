@@ -58,10 +58,27 @@ export const sendBroadcastService = async (params: SendBroadcastParams): Promise
 
   // Calculate total recipient count
   let recipientCount = 0;
-  if (targetMode === 'customers' && customerIds) {
+  
+  // For segments, we need to fetch the contacts first to get the count
+  if (targetMode === 'segment' && segmentId) {
+    try {
+      const { data: segmentContactsData, error: segmentContactsError } = await supabase
+        .from('segment_contacts')
+        .select('contact_id')
+        .eq('segment_id', segmentId);
+      
+      if (segmentContactsError) throw segmentContactsError;
+      recipientCount = (segmentContactsData || []).length;
+      
+      if (recipientCount === 0) {
+        throw new Error("No contacts found in the selected segment");
+      }
+    } catch (error) {
+      console.error("Error fetching segment contacts count:", error);
+      throw new Error(`Failed to get contacts from segment: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  } else if (targetMode === 'customers' && customerIds) {
     recipientCount = customerIds.length;
-  } else if (targetMode === 'segment' && segmentId) {
-    // For segments, we'll count the recipients after fetching them
   } else if (targetMode === 'csv' && phoneNumbers) {
     recipientCount = phoneNumbers.length;
   }
@@ -131,28 +148,7 @@ export const sendBroadcastService = async (params: SendBroadcastParams): Promise
         .map(sc => sc.customers)
         .filter((c): c is CustomerInfo => c !== null && typeof c.phone_number === 'string' && c.phone_number.trim() !== '');
       
-      // Now that we have the segment contacts, check the blast limit with the actual count
-      if (validCustomers.length > 0) {
-        try {
-          const { data: blastLimitCheck, error: blastLimitError } = await supabase.functions.invoke(
-            'check-whatsapp-blast-limit',
-            {
-              body: { recipient_count: validCustomers.length, check_only: false }
-            }
-          );
-  
-          if (blastLimitError) {
-            throw new Error(`Failed to check blast limit: ${blastLimitError.message}`);
-          }
-  
-          if (blastLimitCheck && !blastLimitCheck.allowed) {
-            throw new Error(blastLimitCheck.error_message || 'Daily WhatsApp blast limit exceeded');
-          }
-        } catch (error) {
-          console.error("Error checking WhatsApp blast limit for segment:", error);
-          throw new Error(`WhatsApp blast limit check failed: ${error instanceof Error ? error.message : String(error)}`);
-        }
-      }
+      // We've already checked the blast limit with the actual count before fetching the contacts
     } else if (targetMode === 'customers' && customerIds && customerIds.length > 0) {
       const { data: customersData, error: customerError } = await supabase
         .from("customers")

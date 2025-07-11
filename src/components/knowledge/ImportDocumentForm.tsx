@@ -72,6 +72,7 @@ export function ImportDocumentForm({ onCancel, onSuccess }: ImportDocumentFormPr
 
   const [isChunked, setIsChunked] = useState(false);
   const [currentDocumentID, setCurrentDocumentID] = useState<string>('');
+  const [publicFileURL, setPublicFileURL] = useState<string>('');
 
   const [isConfirmingUpload, setIsConfirmingUpload] = useState<boolean>(false);
 
@@ -153,6 +154,7 @@ export function ImportDocumentForm({ onCancel, onSuccess }: ImportDocumentFormPr
             // For first file, set the content directly
             if (successCount === 1) {
               setPdfText(response.text_content);
+              setPublicFileURL(response.file_path);   // to be stored in the table
               setExtractedImages(response.image_urls)
               form.setValue("content", response.text_content);
             } else {
@@ -530,7 +532,8 @@ export function ImportDocumentForm({ onCancel, onSuccess }: ImportDocumentFormPr
           content: values.content || "",
           user_id: userId,
           chunking_method: "openai",
-          file_type: pdfFile ? 'pdf' : 'text'
+          file_type: pdfFile ? 'pdf' : 'text',
+          file_path: publicFileURL || "",
         })
         .select("id")
         .single();
