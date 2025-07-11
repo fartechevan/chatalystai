@@ -144,23 +144,20 @@ export const useDashboardData = (
   });
 
   const { data: subscriptionPlan, isLoading: isSubscriptionPlanLoading } = useQuery({
-    queryKey: ["subscriptionPlan", currentUserId],
+    queryKey: ["subscriptionPlan"],
     queryFn: async () => {
-      if (!currentUserId) return null;
       const { data, error } = await supabase
         .from("subscriptions")
         .select("*, plans(*)")
-        .eq("profile_id", currentUserId)
-        .or("status.eq.active,status.eq.trialing")
-        .maybeSingle(); // Use maybeSingle to handle no active subscription gracefully
+        .or("status.eq.active,status.eq.trialing");
 
       if (error) {
         console.error("Error fetching subscription plan:", error);
         return null;
       }
-      return data;
+      // Assuming there is only one active subscription in the system, take the first one.
+      return data && data.length > 0 ? data[0] : null;
     },
-    enabled: !!currentUserId,
   });
 
   // Log subscriptionPlan after its query
