@@ -403,7 +403,7 @@ export function ChunksList({ documentId }: ChunksListProps) {
       <div className="max-h-[70vh] overflow-y-auto pr-2 border rounded-lg"> {/* Moved border and rounded-lg to the container */}
         <Table> {/* Removed className="border rounded-lg" */}
           <TableHeader>
-            <TableRow className="hover:bg-transparent bg-muted/50"> {/* Added subtle bg to header row */}
+            <TableRow className="bg-muted/50 hover:bg-muted/70"> {/* Fixed hover effect for header row */}
               <TableHead className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Chunk</TableHead>
               <TableHead className="h-12 px-4 text-left align-middle font-medium text-muted-foreground w-[150px]">Characters</TableHead>
               {/* <TableHead className="h-12 px-4 text-left align-middle font-medium text-muted-foreground w-[180px]">Retrieval count</TableHead> */}
