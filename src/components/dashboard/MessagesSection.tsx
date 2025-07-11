@@ -11,7 +11,7 @@ import { Tables } from "@/integrations/supabase/types";
 interface MessagesSectionProps {
   className?: string;
   messages?: Tables<'messages'>[]; // These will be pre-filtered WhatsApp Web messages
-  timeFilter?: 'today' | 'yesterday' | 'week' | 'month';
+  timeFilter?: 'today' | 'yesterday' | 'week' | 'month' | 'custom';
   planMessageUsage?: { messages_sent_this_cycle: number } | null; // Added new prop
 }
 
