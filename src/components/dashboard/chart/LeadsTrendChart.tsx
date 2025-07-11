@@ -6,7 +6,7 @@ import { format, parseISO, startOfDay, startOfWeek, startOfMonth, eachDayOfInter
 
 interface LeadsTrendChartProps {
   leads: Tables<'leads'>[];
-  timeFilter: 'today' | 'yesterday' | 'week' | 'month';
+  timeFilter: 'today' | 'yesterday' | 'week' | 'month' | 'custom';
   className?: string;
 }
 
@@ -24,29 +24,34 @@ const formatDate = (date: Date, timeFilter: LeadsTrendChartProps['timeFilter']):
   }
 };
 
-const aggregateData = (leads: Tables<'leads'>[], timeFilter: LeadsTrendChartProps['timeFilter']) => {
+const aggregateData = (leads: Tables<'leads'>[], timeFilter: LeadsTrendChartProps['timeFilter'], dateRange?: { from: Date, to: Date }) => {
   if (!leads.length) return [];
 
   const now = new Date();
   let startDate: Date;
   let endDate: Date = startOfDay(now); // Default to today for aggregation end
 
-  switch (timeFilter) {
-    case 'today':
-      startDate = startOfDay(now);
-      break;
-    case 'yesterday':
-      startDate = startOfDay(subDays(now, 1));
-      endDate = startOfDay(now); // end of yesterday
-      break;
-    case 'week':
-      startDate = startOfWeek(subWeeks(now, 0), { weekStartsOn: 1 }); // Current week starting Monday
-      break;
-    case 'month':
-      startDate = startOfMonth(subMonths(now, 0)); // Current month
-      break;
-    default:
-      startDate = startOfDay(subDays(now, 7)); // Default to last 7 days
+  if (timeFilter === 'custom' && dateRange) {
+    startDate = dateRange.from;
+    endDate = dateRange.to;
+  } else {
+    switch (timeFilter) {
+      case 'today':
+        startDate = startOfDay(now);
+        break;
+      case 'yesterday':
+        startDate = startOfDay(subDays(now, 1));
+        endDate = startOfDay(now); // end of yesterday
+        break;
+      case 'week':
+        startDate = startOfWeek(subWeeks(now, 0), { weekStartsOn: 1 }); // Current week starting Monday
+        break;
+      case 'month':
+        startDate = startOfMonth(subMonths(now, 0)); // Current month
+        break;
+      default:
+        startDate = startOfDay(subDays(now, 7)); // Default to last 7 days
+    }
   }
   
   const relevantLeads = leads.filter(lead => {
