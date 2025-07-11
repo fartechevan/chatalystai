@@ -36,49 +36,47 @@ export function DashboardFilters({
   });
 
   return (
-    <div className="max-w-full mt-4">
-      <div className="flex flex-row gap-2 items-center">
-        {/* Time Period Tabs */}
-        <div className="flex items-center gap-2">
-          <Tabs value={selectedTime} onValueChange={(value) => onTimeChange(value as 'today' | 'yesterday' | 'week' | 'month' | 'custom')} className="w-auto">
+    <div className="flex flex-col md:flex-row items-start md:items-center gap-2">
+        <Tabs value={selectedTime} onValueChange={(value) => onTimeChange(value as 'today' | 'yesterday' | 'week' | 'month' | 'custom')} className="w-auto">
             <TabsList className="bg-card border rounded-full p-1 h-auto">
-              <TabsTrigger value="today" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-3 py-1 text-sm">Today</TabsTrigger>
-              <TabsTrigger value="yesterday" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-3 py-1 text-sm">Yesterday</TabsTrigger>
-              <TabsTrigger value="week" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-3 py-1 text-sm">Week</TabsTrigger>
-              <TabsTrigger value="month" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-3 py-1 text-sm">Month</TabsTrigger>
+                <TabsTrigger value="today" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-3 py-1 text-sm">Today</TabsTrigger>
+                <TabsTrigger value="yesterday" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-3 py-1 text-sm">Yesterday</TabsTrigger>
+                <TabsTrigger value="week" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-3 py-1 text-sm">Week</TabsTrigger>
+                <TabsTrigger value="month" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground rounded-full px-3 py-1 text-sm">Month</TabsTrigger>
             </TabsList>
-          </Tabs>
-          
-          {/* User Select */}
-          <Select defaultValue={selectedUser} onValueChange={onUserChange}>
-            <SelectTrigger className="min-w-[180px] h-10 rounded-full bg-card border text-foreground data-[placeholder]:text-muted-foreground">
+        </Tabs>
+        
+        {/* User Select */}
+        <Select defaultValue={selectedUser} onValueChange={onUserChange}>
+            <SelectTrigger className="w-full md:w-auto h-10 rounded-md bg-card border text-foreground data-[placeholder]:text-muted-foreground px-3">
             <SelectValue placeholder="Select user">
-              {selectedUser === 'all' ? (
-                'All Users'
-              ) : (
+                {selectedUser === 'all' ? (
                 <div className="flex items-center">
-                  <User className="h-4 w-4 mr-2 flex-shrink-0" />
-                  <span className="truncate">
-                    {profiles?.find(p => p.id === selectedUser)?.name || profiles?.find(p => p.id === selectedUser)?.email || 'User'}
-                  </span>
+                    <User className="h-4 w-4 mr-2 flex-shrink-0" />
+                    All Users
                 </div>
-              )}
+                ) : (
+                <div className="flex items-center">
+                    <User className="h-4 w-4 mr-2 flex-shrink-0" />
+                    <span className="truncate">
+                    {profiles?.find(p => p.id === selectedUser)?.name || profiles?.find(p => p.id === selectedUser)?.email || 'User'}
+                    </span>
+                </div>
+                )}
             </SelectValue>
-          </SelectTrigger>
-          <SelectContent>
+            </SelectTrigger>
+            <SelectContent>
             <SelectItem value="all">All Users</SelectItem>
             {profiles?.map((profile) => (
-              <SelectItem key={profile.id} value={profile.id}>
+                <SelectItem key={profile.id} value={profile.id}>
                 <div className="flex items-center">
-                  <User className="h-4 w-4 mr-2 flex-shrink-0" />
-                  <span className="truncate">{profile.name || profile.email}</span>
+                    <User className="h-4 w-4 mr-2 flex-shrink-0" />
+                    <span className="truncate">{profile.name || profile.email}</span>
                 </div>
-              </SelectItem>
+                </SelectItem>
             ))}
-          </SelectContent>
+            </SelectContent>
         </Select>
-        </div>
-      </div>
     </div>
   );
 }

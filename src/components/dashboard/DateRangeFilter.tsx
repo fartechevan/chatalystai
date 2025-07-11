@@ -37,7 +37,7 @@ export function DateRangeFilter({ selectedRange, onRangeChange, className }: Dat
           <Button
             id="date"
             variant={"outline"}
-            className="w-[300px] justify-start text-left font-normal"
+            className="w-full md:w-auto justify-start text-left font-normal"
           >
             <CalendarIcon className="mr-2 h-4 w-4" />
             {selectedRange?.from ? (

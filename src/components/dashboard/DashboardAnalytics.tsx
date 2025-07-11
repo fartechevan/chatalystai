@@ -39,7 +39,7 @@ export function DashboardAnalytics({
 
   return (
     <div className="h-full flex flex-col">
-      <div className="w-full mb-2 px-6 pt-6 sticky top-0 bg-background z-10 flex flex-row gap-2 justify-between items-center">
+      <div className="w-full mb-2 px-6 pt-6 sticky top-0 bg-background z-10 flex flex-col md:flex-row gap-2 justify-between md:items-center">
         <DashboardFilters
           selectedTime={timeFilter}
           onTimeChange={onTimeChange}
