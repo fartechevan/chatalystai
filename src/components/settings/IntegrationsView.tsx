@@ -20,14 +20,13 @@ interface UserPlan {
 const VALID_CONNECTION_STATES: ReadonlyArray<ConnectionState> = ['idle', 'connecting', 'open', 'close', 'unknown', 'qrcode', 'pairingCode'];
 
 // Helper function to fetch user plan details
-async function fetchUserPlanDetails(userId: string): Promise<UserPlan> {
+async function fetchUserPlanDetails(): Promise<UserPlan> {
   let determinedIntegrationsLimit: number | null = null; 
 
   try {
     const { data: subscriptionData, error: subscriptionError } = await supabase
       .from('subscriptions')
       .select('plan_id, status')
-      .eq('profile_id', userId) 
       .in('status', ['active', 'trialing'])
       .order('created_at', { ascending: false })
       .limit(1)
@@ -73,15 +72,18 @@ interface IntegrationsViewProps {
   isActive: boolean;
   activeTab: IntegrationsTabValue;
   setActiveTab: React.Dispatch<React.SetStateAction<IntegrationsTabValue>>;
+  profileId?: string; // Add profileId to props
 }
 
-export function IntegrationsView({ isActive, activeTab, setActiveTab }: IntegrationsViewProps) {
+export function IntegrationsView({ isActive, activeTab, setActiveTab, profileId }: IntegrationsViewProps) {
   const { searchQuery } = useSettingsSearch();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [selectedIntegration, setSelectedIntegration] = useState<ProcessedIntegration | null>(null);
   const { toast } = useToast();
   const { user: authUser } = useAuth();
   const queryClient = useQueryClient();
+
+  const targetUserId = profileId || authUser?.id;
 
   const { data: availableIntegrationTypes = [], isLoading: isLoadingIntegrationTypes } = useQuery<DBIntegrationType[], Error>({
     queryKey: ['availableIntegrationTypes'],
@@ -94,13 +96,9 @@ export function IntegrationsView({ isActive, activeTab, setActiveTab }: Integrat
   });
 
   const { data: userIntegrationConfigs = [], isLoading: isLoadingUserConfigs, refetch: refetchUserConfigs } = useQuery<DBUserIntegrationConfig[], Error>({
-    queryKey: ['userIntegrationConfigs', authUser?.id],
+    queryKey: ['userIntegrationConfigs'],
     queryFn: async (): Promise<DBUserIntegrationConfig[]> => {
-      if (!authUser?.id) {
-        return [];
-      }
-      // console.log(`[IntegrationsView DEBUG] Fetching integrations_config for owner_id: ${authUser.id}`);
-      const { data, error } = await supabase.from('integrations_config').select('*').eq('owner_id', authUser.id); // Changed to owner_id
+      const { data, error } = await supabase.from('integrations_config').select('*');
       
       if (error) {
         console.error('[IntegrationsView DEBUG] Error fetching userIntegrationConfigs:', error);
@@ -109,15 +107,13 @@ export function IntegrationsView({ isActive, activeTab, setActiveTab }: Integrat
       console.log('[IntegrationsView DEBUG] User Integration Configs (data from Supabase):', data);
       return data || [];
     },
-    enabled: !!authUser?.id && isActive,
+    enabled: isActive,
   });
 
   const { data: userPlan, isLoading: isLoadingPlan } = useQuery<UserPlan, Error>({
-    queryKey: ['userPlanData', authUser?.id],
-    queryFn: () => {
-      return fetchUserPlanDetails(authUser!.id);
-    },
-    enabled: !!authUser?.id && isActive,
+    queryKey: ['activeSubscriptionPlan'],
+    queryFn: fetchUserPlanDetails,
+    enabled: isActive,
   });
   
   const processedIntegrations: ProcessedIntegration[] = useMemo(() => {

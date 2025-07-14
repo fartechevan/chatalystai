@@ -319,6 +319,31 @@ const BroadcastListView = () => {
   });
 
 
+  const handleDeleteSelected = async () => {
+    const selectedRows = table.getFilteredSelectedRowModel().rows;
+    const idsToDelete = selectedRows.map(row => row.original.id);
+
+    if (idsToDelete.length === 0) {
+      return;
+    }
+
+    const { error: deleteError } = await supabase
+      .from('broadcasts')
+      .delete()
+      .in('id', idsToDelete);
+
+    if (deleteError) {
+      setError(deleteError.message);
+    } else {
+      // Refetch data
+      const filters = { status: statusFilter };
+      const { data, totalCount: fetchedTotalCount } = await fetchBroadcastsFromAPI(page, pageSize, searchTerm, filters);
+      setBroadcasts(data);
+      setTotalCount(fetchedTotalCount);
+      table.resetRowSelection();
+    }
+  };
+
   const outletContext = useOutletContext<PageHeaderContextType | undefined>();
 
   useEffect(() => {
@@ -330,7 +355,7 @@ const BroadcastListView = () => {
           {/* <WhatsAppBlastLimitInfo /> */}
           
           {/* BroadcastTableToolbar now only contains search and view options */}
-          <BroadcastTableToolbar table={table as Table<Broadcast>} /> 
+          <BroadcastTableToolbar table={table as Table<Broadcast>} onDeleteSelected={handleDeleteSelected} /> 
           
           {/* Moved Status Filter and Reset Button here */}
           {table.getColumn("status") && (

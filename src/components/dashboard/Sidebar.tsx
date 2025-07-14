@@ -98,7 +98,6 @@ export const menuItems: MenuItem[] = [
       { title: "Database", icon: Database, path: "/dashboard/settings/database" },
     ],
   },
-  { id: "help", title: "Help", icon: HelpCircle, path: "/dashboard/help" },
 ];
 
 export function DashboardSidebar() {
