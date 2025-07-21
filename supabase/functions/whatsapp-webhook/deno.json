@@ -1,6 +1,24 @@
 {
-  "imports": {
-    "std/": "https://deno.land/std@0.190.0/",
-    "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@2.43.4"
+  "importMap": "./import_map.json",
+  "lint": {
+    "files": {
+      "include": ["./*.ts"]
+    },
+    "rules": {
+      "tags": ["recommended"],
+      "include": [],
+      "exclude": []
+    }
+  },
+  "fmt": {
+    "files": {
+      "include": ["./*.ts"]
+    },
+    "options": {
+      "useTabs": false,
+      "lineWidth": 80,
+      "indentWidth": 2,
+      "singleQuote": false
+    }
   }
 }

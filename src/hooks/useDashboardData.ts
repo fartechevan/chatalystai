@@ -108,13 +108,12 @@ export const useDashboardData = (
     },
   });
 
-  const { data: integrations = [], isLoading: isIntegrationsLoading } = useQuery({
-    queryKey: ["integrations"],
+  const { data: integrationsConfig = [], isLoading: isIntegrationsConfigLoading } = useQuery({
+    queryKey: ["integrations_config"],
     queryFn: async () => {
-      // Assuming 'name' is the column to identify 'WhatsApp Web'
-      const { data, error } = await supabase.from("integrations").select("id, name");
+      const { data, error } = await supabase.from("integrations_config").select("id, integration_id(*)");
       if (error) {
-        console.error("Error fetching integrations:", error);
+        console.error("Error fetching integrations_config:", error);
         return [];
       }
       return data || [];
@@ -299,22 +298,22 @@ export const useDashboardData = (
     segmentedBroadcasts: broadcasts.filter(b => b.segment_id !== null), // Keep this for other potential uses
     // Derived state for WhatsApp Web messages
     whatsappWebMessages: (() => {
-      if (isMessagesLoading || isConversationsLoading || isIntegrationsLoading || !messages || !conversations || !integrations) {
+      if (isMessagesLoading || isConversationsLoading || isIntegrationsConfigLoading || !messages || !conversations || !integrationsConfig) {
         return [];
       }
-      // Find the WhatsApp Web integration ID. Adjust 'WhatsApp Web' string if needed.
-      const whatsAppWebIntegration = integrations.find(
-        (integ) => integ.name?.toLowerCase() === 'whatsapp web' || integ.name?.toLowerCase() === 'whatsapp'
+      // Find the WhatsApp Web integration config ID. Adjust 'WhatsApp Web' string if needed.
+      const whatsAppWebIntegrationConfig = integrationsConfig.find(
+        (config) => config.integration_id.name?.toLowerCase() === 'whatsapp web' || config.integration_id.name?.toLowerCase() === 'whatsapp'
       );
 
-      if (!whatsAppWebIntegration || !whatsAppWebIntegration.id) {
-        return []; // WhatsApp Web integration not found or has no ID
+      if (!whatsAppWebIntegrationConfig || !whatsAppWebIntegrationConfig.id) {
+        return []; // WhatsApp Web integration config not found or has no ID
       }
 
       // Get conversation IDs linked to WhatsApp Web
       const whatsAppWebConversationIds = new Set(
         conversations
-          .filter(conv => conv.integrations_id === whatsAppWebIntegration.id)
+          .filter(conv => conv.integrations_id === whatsAppWebIntegrationConfig.id)
           .map(conv => conv.conversation_id)
       );
 
@@ -327,7 +326,7 @@ export const useDashboardData = (
       isMessagesLoading ||
       isBroadcastsLoading ||
       isBroadcastRecipientsLoading ||
-      isIntegrationsLoading || // Added
+      isIntegrationsConfigLoading || // Added
       isTasksLoading ||
       isAuthUserLoading ||
       isSubscriptionPlanLoading ||

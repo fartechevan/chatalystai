@@ -29,6 +29,8 @@ verify_jwt = false
 
 [functions.whatsapp-webhook]
 verify_jwt = false
+import_map = "./functions/whatsapp-webhook/import_map.json"
+entrypoint = "./functions/whatsapp-webhook/index.ts"
 
 [functions.knowledge-base]
 verify_jwt = false
