@@ -7,6 +7,11 @@ export type Json =
   | Json[]
 
 export type Database = {
+  // Allows to automatically instanciate createClient with right options
+  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
+  __InternalSupabase: {
+    PostgrestVersion: "12.2.3 (519615d)"
+  }
   public: {
     Tables: {
       agent_conversations: {
@@ -73,47 +78,56 @@ export type Database = {
           },
         ]
       }
-      ai_agent_integrations: {
+      ai_agent_channels: {
         Row: {
           activation_mode: string | null
           agent_id: string
-          created_at: string
+          created_at: string | null
           error_message: string | null
-          integrations_config_id: string | null
+          id: string
+          integrations_config_id: string
+          is_enabled_on_channel: boolean | null
+          keyword_trigger: string | null
           session_timeout_minutes: number | null
           stop_keywords: string[] | null
-          updated_at: string
+          updated_at: string | null
         }
         Insert: {
           activation_mode?: string | null
           agent_id: string
-          created_at?: string
+          created_at?: string | null
           error_message?: string | null
-          integrations_config_id?: string | null
+          id?: string
+          integrations_config_id: string
+          is_enabled_on_channel?: boolean | null
+          keyword_trigger?: string | null
           session_timeout_minutes?: number | null
           stop_keywords?: string[] | null
-          updated_at?: string
+          updated_at?: string | null
         }
         Update: {
           activation_mode?: string | null
           agent_id?: string
-          created_at?: string
+          created_at?: string | null
           error_message?: string | null
-          integrations_config_id?: string | null
+          id?: string
+          integrations_config_id?: string
+          is_enabled_on_channel?: boolean | null
+          keyword_trigger?: string | null
           session_timeout_minutes?: number | null
           stop_keywords?: string[] | null
-          updated_at?: string
+          updated_at?: string | null
         }
         Relationships: [
           {
-            foreignKeyName: "ai_agent_integrations_agent_id_fkey"
+            foreignKeyName: "ai_agent_channels_agent_id_fkey"
             columns: ["agent_id"]
             isOneToOne: false
             referencedRelation: "ai_agents"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "ai_agent_integrations_integrations_config_id_fkey"
+            foreignKeyName: "ai_agent_channels_integrations_config_id_fkey"
             columns: ["integrations_config_id"]
             isOneToOne: false
             referencedRelation: "integrations_config"
@@ -210,48 +224,33 @@ export type Database = {
       }
       ai_agents: {
         Row: {
-          activation_mode:
-            | Database["public"]["Enums"]["agent_activation_mode"]
-            | null
           agent_type: string
           created_at: string
           custom_agent_config: Json | null
           id: string
           is_enabled: boolean | null
-          keyword_trigger: string | null
-          knowledge_document_ids: string[] | null
           name: string
           prompt: string
           updated_at: string
           user_id: string
         }
         Insert: {
-          activation_mode?:
-            | Database["public"]["Enums"]["agent_activation_mode"]
-            | null
           agent_type?: string
           created_at?: string
           custom_agent_config?: Json | null
           id?: string
           is_enabled?: boolean | null
-          keyword_trigger?: string | null
-          knowledge_document_ids?: string[] | null
           name: string
           prompt: string
           updated_at?: string
           user_id: string
         }
         Update: {
-          activation_mode?:
-            | Database["public"]["Enums"]["agent_activation_mode"]
-            | null
           agent_type?: string
           created_at?: string
           custom_agent_config?: Json | null
           id?: string
           is_enabled?: boolean | null
-          keyword_trigger?: string | null
-          knowledge_document_ids?: string[] | null
           name?: string
           prompt?: string
           updated_at?: string
@@ -351,7 +350,7 @@ export type Database = {
           conversation_id: string
           created_at?: string
           description?: string | null
-          id?: never
+          id: number
           sentiment: Database["public"]["Enums"]["sentiment_enum"]
         }
         Update: {
@@ -359,7 +358,7 @@ export type Database = {
           conversation_id?: string
           created_at?: string
           description?: string | null
-          id?: never
+          id?: number
           sentiment?: Database["public"]["Enums"]["sentiment_enum"]
         }
         Relationships: [
@@ -583,17 +582,17 @@ export type Database = {
         }
         Relationships: [
           {
-            foreignKeyName: "conversations_integrations_id_fkey"
-            columns: ["integrations_id"]
-            isOneToOne: false
-            referencedRelation: "integrations"
-            referencedColumns: ["id"]
-          },
-          {
             foreignKeyName: "conversations_lead_id_fkey"
             columns: ["lead_id"]
             isOneToOne: false
             referencedRelation: "leads"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "fk_integrations_config"
+            columns: ["integrations_id"]
+            isOneToOne: false
+            referencedRelation: "integrations_config"
             referencedColumns: ["id"]
           },
         ]
@@ -1008,6 +1007,7 @@ export type Database = {
           id: string
           integration_config_id: string | null
           media_details: Json | null
+          media_url: string | null
           message_content: string | null
           message_type: Database["public"]["Enums"]["message_log_type"]
           profile_id: string | null
@@ -1024,6 +1024,7 @@ export type Database = {
           id?: string
           integration_config_id?: string | null
           media_details?: Json | null
+          media_url?: string | null
           message_content?: string | null
           message_type?: Database["public"]["Enums"]["message_log_type"]
           profile_id?: string | null
@@ -1040,6 +1041,7 @@ export type Database = {
           id?: string
           integration_config_id?: string | null
           media_details?: Json | null
+          media_url?: string | null
           message_content?: string | null
           message_type?: Database["public"]["Enums"]["message_log_type"]
           profile_id?: string | null
@@ -1258,52 +1260,6 @@ export type Database = {
           {
             foreignKeyName: "plans_owner_id_fkey"
             columns: ["owner_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      profile_integration_access: {
-        Row: {
-          created_at: string
-          created_by: string | null
-          id: string
-          integration_id: string
-          profile_id: string
-        }
-        Insert: {
-          created_at?: string
-          created_by?: string | null
-          id?: string
-          integration_id: string
-          profile_id: string
-        }
-        Update: {
-          created_at?: string
-          created_by?: string | null
-          id?: string
-          integration_id?: string
-          profile_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "profile_integration_access_created_by_fkey"
-            columns: ["created_by"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "profile_integration_access_integration_id_fkey"
-            columns: ["integration_id"]
-            isOneToOne: false
-            referencedRelation: "integrations"
-            referencedColumns: ["id"]
-          },
-          {
-            foreignKeyName: "profile_integration_access_profile_id_fkey"
-            columns: ["profile_id"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
@@ -1578,24 +1534,38 @@ export type Database = {
       }
       vector_db_v1: {
         Row: {
+          chunk_type: string | null
           content: string | null
+          document_id: string
           embedding: string | null
           id: string
           metadata: Json | null
         }
         Insert: {
+          chunk_type?: string | null
           content?: string | null
+          document_id: string
           embedding?: string | null
           id?: string
           metadata?: Json | null
         }
         Update: {
+          chunk_type?: string | null
           content?: string | null
+          document_id?: string
           embedding?: string | null
           id?: string
           metadata?: Json | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "fk_vector_to_document"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "knowledge_documents"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       whatsapp_blast_limits: {
         Row: {
@@ -1603,31 +1573,20 @@ export type Database = {
           count: number
           date: string
           id: string
-          integration_id: string
         }
         Insert: {
           blast_limit: number
           count?: number
           date: string
           id?: string
-          integration_id: string
         }
         Update: {
           blast_limit?: number
           count?: number
           date?: string
           id?: string
-          integration_id?: string
         }
-        Relationships: [
-          {
-            foreignKeyName: "whatsapp_blast_limits_integration_id_fkey"
-            columns: ["integration_id"]
-            isOneToOne: false
-            referencedRelation: "integrations"
-            referencedColumns: ["id"]
-          },
-        ]
+        Relationships: []
       }
     }
     Views: {
@@ -1638,9 +1597,22 @@ export type Database = {
         Args: { "": string } | { "": unknown }
         Returns: unknown
       }
+      delete_agent_with_relations: {
+        Args: { p_agent_id: string; p_user_id: string }
+        Returns: undefined
+      }
       execute_dynamic_sql: {
         Args: { sql_query: string }
         Returns: Json
+      }
+      get_active_subscription_details_for_profile: {
+        Args: { profile_id_param: string }
+        Returns: {
+          subscription_id: string
+          plan_id: string
+          plan_name: string
+          messages_per_month: number
+        }[]
       }
       get_current_month: {
         Args: Record<PropertyKey, never>
@@ -1659,19 +1631,6 @@ export type Database = {
       get_evolution_api_key: {
         Args: Record<PropertyKey, never>
         Returns: string
-      }
-      get_or_create_conversation_and_participants: {
-        Args: {
-          p_integration_id: string
-          p_customer_id: string
-          p_profile_id: string
-          p_customer_external_id: string
-        }
-        Returns: {
-          conversation_id: string
-          sender_participant_id: string
-          recipient_participant_id: string
-        }[]
       }
       halfvec_avg: {
         Args: { "": number[] }
@@ -1704,10 +1663,6 @@ export type Database = {
       hnswhandler: {
         Args: { "": unknown }
         Returns: unknown
-      }
-      increment_message_usage: {
-        Args: { p_subscription_id: string; p_year: number; p_month: number }
-        Returns: undefined
       }
       is_user_team_admin_or_owner: {
         Args: { p_user_id: string; p_team_id: string }
@@ -1757,15 +1712,6 @@ export type Database = {
           similarity: number
         }[]
       }
-      match_documents: {
-        Args: { query_embedding: string; match_count?: number; filter?: Json }
-        Returns: {
-          id: number
-          content: string
-          metadata: Json
-          similarity: number
-        }[]
-      }
       match_knowledge_chunks: {
         Args: {
           query_embedding: string
@@ -1794,28 +1740,6 @@ export type Database = {
           similarity: number
         }[]
       }
-      match_vector_db_v1: {
-        Args: { query_embedding: string; match_count?: number; filter?: Json }
-        Returns: {
-          id: string
-          content: string
-          metadata: Json
-          embedding: Json
-          similarity: number
-        }[]
-      }
-      n8n_match_knowledge_chunks_test: {
-        Args: {
-          p_filter: string
-          p_match_count: number
-          p_query_embedding: string
-        }
-        Returns: {
-          id: string
-          content: string
-          similarity: number
-        }[]
-      }
       profile_has_integration_access: {
         Args: { _profile_id: string; _integration_config_id: string }
         Returns: boolean
@@ -1832,21 +1756,11 @@ export type Database = {
         Args: { "": unknown[] }
         Returns: number
       }
-      update_pipeline_name: {
-        Args: { pipeline_id: string; new_name: string }
-        Returns: {
-          created_at: string
-          id: string
-          is_default: boolean | null
-          name: string
-          updated_at: string
-          user_id: string
-        }[]
-      }
       upsert_integration_config: {
         Args: {
           p_integration_id: string
           p_instance_id: string
+          p_tenant_id: string
           p_instance_display_name: string
           p_token: string
           p_owner_id: string
@@ -1939,21 +1853,25 @@ export type Database = {
   }
 }
 
-type DefaultSchema = Database[Extract<keyof Database, "public">]
+type DatabaseWithoutInternals = Omit<Database, "__InternalSupabase">
+
+type DefaultSchema = DatabaseWithoutInternals[Extract<keyof Database, "public">]
 
 export type Tables<
   DefaultSchemaTableNameOrOptions extends
     | keyof (DefaultSchema["Tables"] & DefaultSchema["Views"])
-    | { schema: keyof Database },
+    | { schema: keyof DatabaseWithoutInternals },
   TableName extends DefaultSchemaTableNameOrOptions extends {
-    schema: keyof Database
+    schema: keyof DatabaseWithoutInternals
   }
-    ? keyof (Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
-        Database[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
+    ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+        DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])
     : never = never,
-> = DefaultSchemaTableNameOrOptions extends { schema: keyof Database }
-  ? (Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
-      Database[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"] &
+      DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Views"])[TableName] extends {
       Row: infer R
     }
     ? R
@@ -1971,14 +1889,16 @@ export type Tables<
 export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
-    | { schema: keyof Database },
+    | { schema: keyof DatabaseWithoutInternals },
   TableName extends DefaultSchemaTableNameOrOptions extends {
-    schema: keyof Database
+    schema: keyof DatabaseWithoutInternals
   }
-    ? keyof Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
     : never = never,
-> = DefaultSchemaTableNameOrOptions extends { schema: keyof Database }
-  ? Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
       Insert: infer I
     }
     ? I
@@ -1994,14 +1914,16 @@ export type TablesInsert<
 export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
     | keyof DefaultSchema["Tables"]
-    | { schema: keyof Database },
+    | { schema: keyof DatabaseWithoutInternals },
   TableName extends DefaultSchemaTableNameOrOptions extends {
-    schema: keyof Database
+    schema: keyof DatabaseWithoutInternals
   }
-    ? keyof Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
+    ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"]
     : never = never,
-> = DefaultSchemaTableNameOrOptions extends { schema: keyof Database }
-  ? Database[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
+> = DefaultSchemaTableNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions["schema"]]["Tables"][TableName] extends {
       Update: infer U
     }
     ? U
@@ -2017,14 +1939,16 @@ export type TablesUpdate<
 export type Enums<
   DefaultSchemaEnumNameOrOptions extends
     | keyof DefaultSchema["Enums"]
-    | { schema: keyof Database },
+    | { schema: keyof DatabaseWithoutInternals },
   EnumName extends DefaultSchemaEnumNameOrOptions extends {
-    schema: keyof Database
+    schema: keyof DatabaseWithoutInternals
   }
-    ? keyof Database[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
+    ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"]
     : never = never,
-> = DefaultSchemaEnumNameOrOptions extends { schema: keyof Database }
-  ? Database[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
+> = DefaultSchemaEnumNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions["schema"]]["Enums"][EnumName]
   : DefaultSchemaEnumNameOrOptions extends keyof DefaultSchema["Enums"]
     ? DefaultSchema["Enums"][DefaultSchemaEnumNameOrOptions]
     : never
@@ -2032,14 +1956,16 @@ export type Enums<
 export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
     | keyof DefaultSchema["CompositeTypes"]
-    | { schema: keyof Database },
+    | { schema: keyof DatabaseWithoutInternals },
   CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
-    schema: keyof Database
+    schema: keyof DatabaseWithoutInternals
   }
-    ? keyof Database[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
+    ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"]
     : never = never,
-> = PublicCompositeTypeNameOrOptions extends { schema: keyof Database }
-  ? Database[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
+> = PublicCompositeTypeNameOrOptions extends {
+  schema: keyof DatabaseWithoutInternals
+}
+  ? DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions["schema"]]["CompositeTypes"][CompositeTypeName]
   : PublicCompositeTypeNameOrOptions extends keyof DefaultSchema["CompositeTypes"]
     ? DefaultSchema["CompositeTypes"][PublicCompositeTypeNameOrOptions]
     : never

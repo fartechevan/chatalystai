@@ -6,43 +6,52 @@ import OpenAI from "openai"; // Use mapped import from import_map.json
 
 // Define types based on database schema and expected payloads
 type AIAgentDbRow = Database['public']['Tables']['ai_agents']['Row'];
+type AgentChannelData = Database['public']['Tables']['ai_agent_channels']['Row'];
+
+// Payload for creating/updating a channel link
+interface AgentChannelPayload {
+  integrations_config_id: string;
+  is_enabled_on_channel?: boolean;
+  activation_mode?: 'keyword' | 'always_on';
+  keyword_trigger?: string | null;
+  stop_keywords?: string[];
+  session_timeout_minutes?: number;
+  error_message?: string;
+}
 
 interface NewAgentPayload {
   name: string;
-  prompt?: string; // Prompt is optional for CustomAgent
-  keyword_trigger?: string | null;
+  prompt?: string;
   knowledge_document_ids?: string[];
-  integrations_config_ids?: string[]; // Changed from integration_ids
   is_enabled?: boolean;
-  activation_mode?: 'keyword' | 'always_on';
-  agent_type?: 'chattalyst' | 'CustomAgent'; // Updated agent_type
-  custom_agent_config?: { webhook_url?: string; [key: string]: unknown; } | null; // New field, using unknown
+  agent_type?: 'chattalyst' | 'CustomAgent';
+  custom_agent_config?: { webhook_url?: string; [key: string]: unknown; } | null;
+  // Channels are now a separate part of the payload
+  channels?: AgentChannelPayload[];
 }
 
 interface UpdateAgentPayload {
   name?: string;
   prompt?: string;
-  keyword_trigger?: string | null;
   knowledge_document_ids?: string[];
-  integrations_config_ids?: string[]; // Changed from integration_ids
   is_enabled?: boolean;
-  activation_mode?: 'keyword' | 'always_on';
-  agent_type?: 'chattalyst' | 'CustomAgent'; // Updated agent_type
-  custom_agent_config?: { webhook_url?: string; [key: string]: unknown; } | null; // New field, using unknown
+  agent_type?: 'chattalyst' | 'CustomAgent';
+  custom_agent_config?: { webhook_url?: string; [key: string]: unknown; } | null;
+  // Channels are updated as a whole array
+  channels?: AgentChannelPayload[];
 }
 
 interface AgentWithDetails extends AIAgentDbRow { 
-  integrations_config_ids: string[]; // Changed from integration_ids
   knowledge_document_ids: string[];
+  // Instead of flat IDs, we return the full channel details
+  channels: AgentChannelData[];
 }
 
 // Explicit type for data to be inserted into ai_agents table
 interface AgentForCreate {
   name: string;
   prompt: string; // Will be empty for CustomAgent
-  keyword_trigger: string | null;
   is_enabled: boolean;
-  activation_mode: Database["public"]["Enums"]["agent_activation_mode"]; // Match DB type
   agent_type: string; // Match DB type, will be 'chattalyst' or 'CustomAgent'
   custom_agent_config: { webhook_url?: string; [key: string]: unknown; } | null;
   user_id: string;
@@ -51,9 +60,7 @@ interface AgentForCreate {
 interface AgentForUpdate {
   name?: string;
   prompt?: string;
-  keyword_trigger?: string | null;
   is_enabled?: boolean;
-  activation_mode?: Database["public"]["Enums"]["agent_activation_mode"]; // Match DB type
   agent_type?: string; // Match DB type
   custom_agent_config?: { webhook_url?: string; [key: string]: unknown; } | null;
 }
@@ -208,7 +215,7 @@ serve(async (req: Request) => {
           }
 
           const customAgentPayload = {
-            query: query, 
+            message: query, 
             sessionId: sessionId,
             phone_number: processedContactIdentifier, 
             // Potentially add other relevant info from agentData.custom_agent_config
@@ -231,15 +238,22 @@ serve(async (req: Request) => {
             console.log(`[${requestStartTime}] Internal Query: Custom Agent webhook for agent ${agentId} returned status ${customAgentResponse.status}. Raw response body: "${responseBodyText}"`);
             if (responseBodyText && responseBodyText.trim() !== "") {
               try {
-                console.log(`[${requestStartTime}] Internal Query: Attempting to parse non-empty response body for agent ${agentId}.`);
-                const responseJson = JSON.parse(responseBodyText);
-                responseText = responseJson.output || responseJson.response || null; 
-                knowledgeUsed = responseJson.knowledge_used || null;
-                imageUrl = responseJson.image || null; // Extract image URL if present
+                console.log(`[${requestStartTime}] Internal Query: Attempting to parse response body for agent ${agentId}.`);
+                let parsedData = JSON.parse(responseBodyText);
+
+                // Handle double-stringified JSON
+                if (typeof parsedData === 'string') {
+                    console.log(`[${requestStartTime}] Internal Query: Response body is a string, attempting to parse again.`);
+                    parsedData = JSON.parse(parsedData);
+                }
+                
+                responseText = parsedData.output || parsedData.response || parsedData.message || null;
+                knowledgeUsed = parsedData.knowledge_used || null;
+                imageUrl = parsedData.image || null;
                 console.log(`[${requestStartTime}] Internal Query: Successfully parsed response for agent ${agentId}. Response text: ${responseText}, Image URL: ${imageUrl}`);
               } catch (parseError) {
-                console.error(`[${requestStartTime}] Internal Query: Failed to parse JSON response from Custom Agent webhook for agent ${agentId}. Body: "${responseBodyText.substring(0, 500)}"... Error: ${(parseError as Error).message}`);
-                responseText = agentData.error_message || "Sorry, the custom service returned an invalid JSON response.";
+                console.log(`[${requestStartTime}] Internal Query: Failed to parse response as JSON for agent ${agentId}. Treating raw body as response. Body: "${responseBodyText.substring(0, 500)}"...`);
+                responseText = responseBodyText;
               }
             } else {
               console.warn(`[${requestStartTime}] Internal Query: Custom Agent webhook for agent ${agentId} returned an empty or whitespace-only response body.`);
@@ -281,15 +295,13 @@ serve(async (req: Request) => {
         return createJsonResponse({ error: 'Invalid payload for agent creation', details: (jsonError as Error).message }, 400);
       }
 
-      const { knowledge_document_ids: knowledgeIdsToLink, integrations_config_ids: integrationsConfigIdsToLink, ...agentCorePayload } = payload; // Changed
+      const { knowledge_document_ids: knowledgeIdsToLink, channels: channelsToCreate, ...agentCorePayload } = payload;
       
       const agentToCreateData: AgentForCreate = {
         name: agentCorePayload.name,
         prompt: (agentCorePayload.agent_type === 'chattalyst' && agentCorePayload.prompt) ? agentCorePayload.prompt : '',
-        keyword_trigger: agentCorePayload.keyword_trigger || null,
         is_enabled: agentCorePayload.is_enabled ?? true,
-        activation_mode: agentCorePayload.activation_mode || 'keyword',
-        agent_type: agentCorePayload.agent_type || 'chattalyst', // Will be 'chattalyst' or 'CustomAgent'
+        agent_type: agentCorePayload.agent_type || 'chattalyst',
         custom_agent_config: (agentCorePayload.agent_type === 'CustomAgent' && agentCorePayload.custom_agent_config) ? agentCorePayload.custom_agent_config : null,
         user_id: userId!,
       };
@@ -302,22 +314,40 @@ serve(async (req: Request) => {
       }
       if (!newAgent) return createJsonResponse({ error: 'Failed to create agent, no data returned after insert' }, 500);
 
+      // Link knowledge documents
       if (knowledgeIdsToLink && knowledgeIdsToLink.length > 0) {
         const links = knowledgeIdsToLink.map(docId => ({ agent_id: newAgent.id, document_id: docId }));
         await supabase.from('ai_agent_knowledge_documents').insert(links);
       }
-      if (integrationsConfigIdsToLink && integrationsConfigIdsToLink.length > 0) {
-        const links = integrationsConfigIdsToLink.map(configId => ({ 
-          agent_id: newAgent.id, 
-          integrations_config_id: configId
+
+      // Create channel configurations
+      let createdChannels: AgentChannelData[] = [];
+      if (channelsToCreate && channelsToCreate.length > 0) {
+        const channelLinks = channelsToCreate.map(channel => ({
+          agent_id: newAgent.id,
+          integrations_config_id: channel.integrations_config_id,
+          is_enabled_on_channel: channel.is_enabled_on_channel ?? true,
+          activation_mode: channel.activation_mode || 'keyword',
+          keyword_trigger: channel.keyword_trigger || null,
+          stop_keywords: channel.stop_keywords || [],
+          session_timeout_minutes: channel.session_timeout_minutes || 60,
+          error_message: channel.error_message || 'Sorry, I can\'t help with that right now, we\'ll get in touch with you shortly.',
         }));
-        await supabase.from('ai_agent_integrations').insert(links);
+        const { data, error } = await supabase.from('ai_agent_channels').insert(channelLinks).select();
+        if (error) {
+          // If channel creation fails, we should ideally roll back the agent creation.
+          // For now, log the error and return failure.
+          console.error("Error creating agent channels:", error);
+          await supabase.from('ai_agents').delete().eq('id', newAgent.id); // Attempt cleanup
+          return createJsonResponse({ error: 'Failed to create agent channels', details: error.message }, 500);
+        }
+        createdChannels = data || [];
       }
       
       const responseAgent: AgentWithDetails = {
         ...newAgent,
-        integrations_config_ids: integrationsConfigIdsToLink || [],
         knowledge_document_ids: knowledgeIdsToLink || [],
+        channels: createdChannels,
       };
       return createJsonResponse({ agent: responseAgent }, 201);
     }
@@ -346,24 +376,35 @@ serve(async (req: Request) => {
       if (!agentsData) return createJsonResponse({ agents: [] }, 200);
 
       const agentIds = agentsData.map(a => a.id);
-      // Fetch using the new integrations_config_id
-      const { data: integrationsData } = await supabase.from('ai_agent_integrations').select('agent_id, integrations_config_id').in('agent_id', agentIds);
+      // Fetch channels and knowledge links for all agents
+      const { data: channelsData } = await supabase.from('ai_agent_channels').select('*').in('agent_id', agentIds);
       const { data: knowledgeLinksData } = await supabase.from('ai_agent_knowledge_documents').select('agent_id, document_id').in('agent_id', agentIds);
       
-      const integrationsMap = new Map<string, string[]>();
-      if (integrationsData) integrationsData.forEach(link => {
-        if (link.integrations_config_id) { // Ensure it's not null
-          integrationsMap.set(link.agent_id, [...(integrationsMap.get(link.agent_id) || []), link.integrations_config_id])
-        }
-      });
-      const knowledgeLinksMap = new Map<string, string[]>();
-      if (knowledgeLinksData) knowledgeLinksData.forEach(link => knowledgeLinksMap.set(link.agent_id, [...(knowledgeLinksMap.get(link.agent_id) || []), link.document_id]));
+      const channelsMap = new Map<string, AgentChannelData[]>();
+      if (channelsData) {
+        channelsData.forEach(channel => {
+          const existing = channelsMap.get(channel.agent_id) || [];
+          channelsMap.set(channel.agent_id, [...existing, channel]);
+        });
+      }
 
-      const agentsWithDetails: AgentWithDetails[] = agentsData.map(agent => ({
-        ...agent,
-        integrations_config_ids: integrationsMap.get(agent.id) || [],
-        knowledge_document_ids: knowledgeLinksMap.get(agent.id) || [],
-      }));
+      const knowledgeLinksMap = new Map<string, string[]>();
+      if (knowledgeLinksData) {
+        knowledgeLinksData.forEach(link => {
+          const existing = knowledgeLinksMap.get(link.agent_id) || [];
+          knowledgeLinksMap.set(link.agent_id, [...existing, link.document_id]);
+        });
+      }
+
+      const agentsWithDetails: AgentWithDetails[] = agentsData.map(agent => {
+        const agentChannels = channelsMap.get(agent.id) || [];
+        // console.log(`Agent ${agent.id} has channels:`, agentChannels); // Debug log
+        return {
+          ...agent,
+          channels: agentChannels,
+          knowledge_document_ids: knowledgeLinksMap.get(agent.id) || [],
+        };
+      });
       return createJsonResponse({ agents: agentsWithDetails }, 200);
     }
     // --- GET AGENT (GET /:id) ---
@@ -388,13 +429,13 @@ serve(async (req: Request) => {
       if (agentFetchError) return createJsonResponse({ error: 'Agent not found', details: agentFetchError.message }, agentFetchError.code === 'PGRST116' ? 404 : 500);
       if (!agentData) return createJsonResponse({ error: 'Agent not found' }, 404);
 
-      // Fetch using the new integrations_config_id
-      const { data: integrationsData } = await supabase.from('ai_agent_integrations').select('integrations_config_id').eq('agent_id', agentIdFromPath);
+      // Fetch associated channels and knowledge links
+      const { data: channelsData } = await supabase.from('ai_agent_channels').select('*').eq('agent_id', agentIdFromPath);
       const { data: knowledgeLinksData } = await supabase.from('ai_agent_knowledge_documents').select('document_id').eq('agent_id', agentIdFromPath);
       
       const agentWithDetails: AgentWithDetails = {
         ...agentData,
-        integrations_config_ids: integrationsData?.map(link => link.integrations_config_id).filter(id => id !== null) as string[] || [],
+        channels: channelsData || [],
         knowledge_document_ids: knowledgeLinksData?.map(link => link.document_id) || [],
       };
       return createJsonResponse({ agent: agentWithDetails }, 200);
@@ -420,18 +461,16 @@ serve(async (req: Request) => {
       }
       console.log(`[${requestStartTime}] Update Agent: Successfully parsed JSON payload for ID ${agentIdFromPath}`);
 
-      const { knowledge_document_ids: knowledgeIdsToUpdate, integrations_config_ids: integrationsConfigIdsToUpdate, ...agentCorePayload } = payload; // Changed
+      const { knowledge_document_ids: knowledgeIdsToUpdate, channels: channelsToUpdate, ...agentCorePayload } = payload;
       
-      const agentToUpdateData: AgentForUpdate = {}; // Using the explicitly defined interface
+      const agentToUpdateData: AgentForUpdate = {};
 
       if (agentCorePayload.name !== undefined) agentToUpdateData.name = agentCorePayload.name;
-      if (agentCorePayload.keyword_trigger !== undefined) agentToUpdateData.keyword_trigger = agentCorePayload.keyword_trigger;
       if (agentCorePayload.is_enabled !== undefined) agentToUpdateData.is_enabled = agentCorePayload.is_enabled;
-      if (agentCorePayload.activation_mode !== undefined) agentToUpdateData.activation_mode = agentCorePayload.activation_mode;
       
-      const agentTypeFromPayload = agentCorePayload.agent_type; // This is 'chattalyst' | 'CustomAgent' | undefined
+      const agentTypeFromPayload = agentCorePayload.agent_type;
 
-      if (agentTypeFromPayload) { // If agent_type is being explicitly set
+      if (agentTypeFromPayload) {
         agentToUpdateData.agent_type = agentTypeFromPayload;
         if (agentTypeFromPayload === 'chattalyst') {
           agentToUpdateData.custom_agent_config = null;
@@ -439,7 +478,7 @@ serve(async (req: Request) => {
             agentToUpdateData.prompt = agentCorePayload.prompt;
           }
         } else if (agentTypeFromPayload === 'CustomAgent') {
-          agentToUpdateData.prompt = ''; // Custom agents don't use our prompt field
+          agentToUpdateData.prompt = '';
           if (agentCorePayload.custom_agent_config !== undefined) { 
             agentToUpdateData.custom_agent_config = agentCorePayload.custom_agent_config;
           } else {
@@ -447,16 +486,15 @@ serve(async (req: Request) => {
           }
         }
       } else {
-        // If agent_type is NOT in payload, update prompt and custom_agent_config only if they are explicitly provided
         if (agentCorePayload.prompt !== undefined) {
           agentToUpdateData.prompt = agentCorePayload.prompt;
-          if (agentCorePayload.custom_agent_config === undefined) { // If prompt is set, and no custom_config, nullify custom_config
+          if (agentCorePayload.custom_agent_config === undefined) {
              agentToUpdateData.custom_agent_config = null;
           }
         }
         if (agentCorePayload.custom_agent_config !== undefined) {
           agentToUpdateData.custom_agent_config = agentCorePayload.custom_agent_config;
-          if (agentCorePayload.prompt === undefined || agentCorePayload.prompt === '') { // If custom_config is set, and no prompt, empty prompt
+          if (agentCorePayload.prompt === undefined || agentCorePayload.prompt === '') {
             agentToUpdateData.prompt = '';
           }
         }
@@ -481,31 +519,49 @@ serve(async (req: Request) => {
       }
       if (!updatedAgent) return createJsonResponse({ error: 'Agent not found or update failed' }, 404);
 
-      if (knowledgeIdsToUpdate !== undefined) { // This means the key was present in the payload
+      if (knowledgeIdsToUpdate !== undefined) {
         await supabase.from('ai_agent_knowledge_documents').delete().eq('agent_id', agentIdFromPath);
-        // Check if knowledgeIdsToUpdate is not null AND has items before trying to map/insert
         if (knowledgeIdsToUpdate && knowledgeIdsToUpdate.length > 0) {
           const links = knowledgeIdsToUpdate.map(id => ({ agent_id: agentIdFromPath, document_id: id }));
           await supabase.from('ai_agent_knowledge_documents').insert(links);
         }
       }
-      if (integrationsConfigIdsToUpdate !== undefined) { // This means the key was present in the payload
-        await supabase.from('ai_agent_integrations').delete().eq('agent_id', agentIdFromPath);
-        if (integrationsConfigIdsToUpdate && integrationsConfigIdsToUpdate.length > 0) {
-          const links = integrationsConfigIdsToUpdate.map(configId => ({ 
-            agent_id: agentIdFromPath, 
-            integrations_config_id: configId
+
+      if (channelsToUpdate !== undefined) {
+        console.log(`[${requestStartTime}] Updating channels for agent ${agentIdFromPath}:`, JSON.stringify(channelsToUpdate, null, 2));
+        // Simple strategy: delete all existing channels and re-create them from the payload.
+        const { error: deleteError } = await supabase.from('ai_agent_channels').delete().eq('agent_id', agentIdFromPath);
+        if (deleteError) {
+            console.error(`[${requestStartTime}] Error deleting old channels for agent ${agentIdFromPath}:`, deleteError.message);
+            // Decide if you should stop or continue. For now, we'll log and continue.
+        }
+        if (channelsToUpdate && channelsToUpdate.length > 0) {
+          const channelLinks = channelsToUpdate.map(channel => ({
+            agent_id: agentIdFromPath,
+            integrations_config_id: channel.integrations_config_id,
+            is_enabled_on_channel: channel.is_enabled_on_channel ?? true,
+            activation_mode: channel.activation_mode || 'keyword',
+            keyword_trigger: channel.keyword_trigger || null,
+            stop_keywords: channel.stop_keywords || [],
+            session_timeout_minutes: channel.session_timeout_minutes || 60,
+            error_message: channel.error_message || 'Sorry, I can\'t help with that right now, we\'ll get in touch with you shortly.',
           }));
-          await supabase.from('ai_agent_integrations').insert(links);
+          console.log(`[${requestStartTime}] Inserting new channels for agent ${agentIdFromPath}:`, JSON.stringify(channelLinks, null, 2));
+          const { error: insertError } = await supabase.from('ai_agent_channels').insert(channelLinks);
+          if (insertError) {
+              console.error(`[${requestStartTime}] Error inserting new channels for agent ${agentIdFromPath}:`, insertError.message);
+              // If insert fails, the agent is left in an inconsistent state (no channels).
+              // Depending on requirements, you might want to return an error here.
+          }
         }
       }
       
-      const { data: finalIntegrations } = await supabase.from('ai_agent_integrations').select('integrations_config_id').eq('agent_id', agentIdFromPath);
+      const { data: finalChannels } = await supabase.from('ai_agent_channels').select('*').eq('agent_id', agentIdFromPath);
       const { data: finalKnowledge } = await supabase.from('ai_agent_knowledge_documents').select('document_id').eq('agent_id', agentIdFromPath);
 
       const responseAgent: AgentWithDetails = {
         ...updatedAgent, 
-        integrations_config_ids: finalIntegrations?.map(l => l.integrations_config_id).filter(id => id !== null) as string[] || [],
+        channels: finalChannels || [],
         knowledge_document_ids: finalKnowledge?.map(l => l.document_id) || []
       };
       return createJsonResponse({ agent: responseAgent }, 200);
@@ -530,9 +586,10 @@ serve(async (req: Request) => {
         return createJsonResponse({ error: 'Agent not found or access denied.' }, 404);
       }
 
-      // Delete related records first to avoid foreign key violations
+      // The ON DELETE CASCADE on the tables should handle this automatically,
+      // but explicit deletion is safer if the constraints change.
       await supabase.from('ai_agent_knowledge_documents').delete().eq('agent_id', agentIdFromPath);
-      await supabase.from('ai_agent_integrations').delete().eq('agent_id', agentIdFromPath);
+      await supabase.from('ai_agent_channels').delete().eq('agent_id', agentIdFromPath);
 
       // Finally, delete the agent itself
       const { error } = await supabase.from('ai_agents').delete().eq('id', agentIdFromPath).eq('user_id', userId);
