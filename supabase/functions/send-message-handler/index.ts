@@ -16,6 +16,7 @@ export type MessageLogType =
   | "location"
   | "contact"
   | "sticker"
+  | "buttons"
   | "unknown";
 
 interface SendMessageRequestBody {
@@ -49,7 +50,7 @@ interface EvolutionSendTextPayload {
 }
 
 interface EvolutionSendMediaPayload {
-  action: 'sendMedia';
+  action: 'send-media';
   integrationConfigId: string; // This will be integrations_config.id
   recipientJid: string;
   mediaData: string;
@@ -292,7 +293,7 @@ serve(async (req: Request) => {
         }
 
         evolutionPayload = {
-          action: 'sendMedia',
+          action: 'send-media',
           integrationConfigId: actualIntegrationConfigId,
           recipientJid: recipient_identifier,
           mediaData: media_url, // Use the direct media_url
