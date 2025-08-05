@@ -5,7 +5,7 @@ import type { Conversation } from "../types";
 /**
  * Fetches conversations the current user has access to, with their associated leads
  */
-export async function fetchConversationsWithParticipants() {
+export async function fetchConversationsWithParticipants(selectedIntegrationIds: string[]) {
   // 1. Get current user ID
   const { data: { user }, error: userError } = await supabase.auth.getUser();
   if (userError || !user) {
@@ -36,6 +36,10 @@ export async function fetchConversationsWithParticipants() {
     `
     )
     .order("updated_at", { ascending: false });
+
+  if (selectedIntegrationIds.length > 0) {
+    query.in("integrations_id", selectedIntegrationIds);
+  }
 
   // Execute the query
   const { data: conversations, error: conversationsError } = await query;

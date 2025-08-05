@@ -6,7 +6,7 @@ import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { createLead } from "@/components/leads/services/leadService";
 import { useToast } from "@/components/ui/use-toast";
-import type { Database } from "@/types/supabase"; // Import Database type
+import type { Database } from "@/integrations/supabase/types"; // Import Database type
 type PipelineStage = Database['public']['Tables']['pipeline_stages']['Row']; // Define PipelineStage type locally
 
 interface EmptyLeadStateProps {
@@ -82,7 +82,7 @@ export function EmptyLeadState({ conversationId, onLeadCreated }: EmptyLeadState
         const { data: integrationConfig, error: configError } = await supabase
           .from('integrations_config')
           .select('pipeline_id')
-          .eq('integration_id', conversationData.integrations_id) // Corrected property access
+          .eq('id', conversationData.integrations_id) // Corrected property access
           .maybeSingle();
 
         if (configError) {

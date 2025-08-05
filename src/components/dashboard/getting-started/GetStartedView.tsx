@@ -9,6 +9,8 @@ import { useIntegrationsCount } from "@/hooks/useIntegrationsCount";
 import { useCustomerCount } from "@/hooks/useCustomerCount";
 import { useDashboardData } from "@/hooks/useDashboardData"; // Added
 import { Skeleton } from "@/components/ui/skeleton"; // Added for loading state
+import { useEffect, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
 
 interface GetStartedViewProps {
   userData: User | undefined | null;
@@ -17,6 +19,27 @@ interface GetStartedViewProps {
 export function GetStartedView({ userData }: GetStartedViewProps) {
   const { integrationsCount, isLoading: isLoadingIntegrations } = useIntegrationsCount();
   const { customerCount, isLoading: isLoadingCustomers } = useCustomerCount();
+  const [profileName, setProfileName] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchProfile = async () => {
+      if (userData) {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('name')
+          .eq('id', userData.id)
+          .single();
+
+        if (error) {
+          console.error('Error fetching profile:', error);
+        } else if (data) {
+          setProfileName(data.name);
+        }
+      }
+    };
+
+    fetchProfile();
+  }, [userData]);
   
   // Fetch dashboard data for plan, messages, tokens
   // The 'all' for userFilter is fine as useDashboardData uses authUser.id for these specific stats
@@ -35,7 +58,7 @@ export function GetStartedView({ userData }: GetStartedViewProps) {
     <div className="container mx-auto p-6 space-y-6">
       <Card className="bg-white">
         <CardContent className="p-6">
-          <h1 className="text-2xl font-semibold mb-4">Hello, {userData?.email?.split('@')[0] || 'User'}!</h1>
+          <h1 className="text-2xl font-semibold mb-4">Hello, {profileName || userData?.email?.split('@')[0] || 'User'}!</h1>
           <div className="flex flex-wrap gap-x-4 gap-y-2 text-sm text-muted-foreground">
             {isLoadingIntegrations || isLoadingDashboardData ? (
               <Skeleton className="h-4 w-20" />

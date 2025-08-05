@@ -70,16 +70,14 @@ export function BillingStats() {
   const [isSubscribing, setIsSubscribing] = React.useState<string | null>(null); // plan.id of plan being subscribed to
 
   const { data: userSubscriptionData, isLoading: isLoadingSubscription } = useQuery<SubscriptionWithPlan | null>({
-    queryKey: ['user-subscription', userId],
+    queryKey: ['user-subscription'],
     queryFn: async () => {
-      if (!userId) return null;
       const { data, error } = await supabase
         .from('subscriptions')
         .select(`
           *,
           plans (*)
         `)
-        .eq('profile_id', userId)
         .in('status', ['active', 'trialing', 'past_due']) // Active-like statuses
         .maybeSingle(); // Expect one or null
 
@@ -89,7 +87,6 @@ export function BillingStats() {
       }
       return data as SubscriptionWithPlan | null;
     },
-    enabled: !!userId,
   });
   
   const currentPlan = userSubscriptionData?.plans;
@@ -166,31 +163,32 @@ export function BillingStats() {
       const endOfMonth = new Date(startOfMonth);
       endOfMonth.setMonth(endOfMonth.getMonth() + 1);
 
-      const { data: currentMonthUsageData } = await supabase
-        .from('token_usage')
-        .select('tokens_used')
-        .eq('user_id', userId) // Use userId here
-        .gte('created_at', startOfMonth.toISOString())
-        .lt('created_at', endOfMonth.toISOString());
+      // const { data: currentMonthUsageData } = await supabase
+      //   .from('token_usage')
+      //   .select('tokens_used')
+      //   .eq('user_id', userId) // Use userId here
+      //   .gte('created_at', startOfMonth.toISOString())
+      //   .lt('created_at', endOfMonth.toISOString());
 
-      const totalUsageThisMonth = (currentMonthUsageData || []).reduce((sum, record) => sum + record.tokens_used, 0);
+      // const totalUsageThisMonth = (currentMonthUsageData || []).reduce((sum, record) => sum + record.tokens_used, 0);
+      const totalUsageThisMonth = 0; // TODO: Implement token usage tracking
 
       // --- Fetch historical monthly usage ---
       // This requires a more complex query, potentially a database function or view
       // For now, let's assume we get some dummy data or fetch all usage and process client-side (less efficient)
 
-      const { data: allUsage } = await supabase
-        .from('token_usage')
-        .select('tokens_used, created_at')
-        .eq('user_id', userId) // Use userId here
-        .order('created_at', { ascending: false }); // Fetch all usage
+      // const { data: allUsage } = await supabase
+      //   .from('token_usage')
+      //   .select('tokens_used, created_at')
+      //   .eq('user_id', userId) // Use userId here
+      //   .order('created_at', { ascending: false }); // Fetch all usage
 
       const monthlyBillsData: Record<string, number> = {};
-      (allUsage || []).forEach(record => {
-          const recordDate = new Date(record.created_at);
-          const monthKey = `${recordDate.getFullYear()}-${String(recordDate.getMonth() + 1).padStart(2, '0')}`; // Format YYYY-MM
-          monthlyBillsData[monthKey] = (monthlyBillsData[monthKey] || 0) + record.tokens_used;
-      });
+      // (allUsage || []).forEach(record => {
+      //     const recordDate = new Date(record.created_at);
+      //     const monthKey = `${recordDate.getFullYear()}-${String(recordDate.getMonth() + 1).padStart(2, '0')}`; // Format YYYY-MM
+      //     monthlyBillsData[monthKey] = (monthlyBillsData[monthKey] || 0) + record.tokens_used;
+      // });
 
       const monthlyBills: MonthlyBill[] = Object.entries(monthlyBillsData)
         .map(([month, tokens_used]) => {

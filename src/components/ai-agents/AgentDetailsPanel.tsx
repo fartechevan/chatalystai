@@ -15,7 +15,7 @@ import { getAIAgent, createAIAgent, updateAIAgent, deleteAIAgent } from '@/servi
 import { listKnowledgeDocuments, KnowledgeDocument } from '@/services/knowledge/documentService';
 // Import the updated integration service and type
 import { listIntegrations, ConfiguredIntegration } from '@/services/integrations/integrationService';
-import { AIAgent, NewAIAgent, UpdateAIAgent } from '@/types/aiAgents';
+import { AIAgent, NewAIAgent, UpdateAIAgent, AgentChannel } from '@/types/aiAgents';
 import { supabase } from '@/integrations/supabase/client'; // Import supabase client for function invocation
 import { useToast } from '@/hooks/use-toast';
 import PromptSuggestionDialog from './PromptSuggestionDialog';
@@ -101,10 +101,11 @@ const AgentDetailsPanel: React.FC<AgentDetailsPanelProps> = ({ selectedAgentId, 
     mutationFn: ({ agentId, updates }: { agentId: string; updates: UpdateAIAgent }) =>
       updateAIAgent(agentId, updates),
     onSuccess: (updatedAgent) => {
-      queryClient.invalidateQueries({ queryKey: ['aiAgents'] }); // Refresh list
-      queryClient.invalidateQueries({ queryKey: ['aiAgent', updatedAgent.id] }); // Refresh details view
+      // Manually update the cache for the single agent query
+      queryClient.setQueryData(['aiAgent', updatedAgent.id], updatedAgent);
+      // Invalidate the list query to ensure it's refetched
+      queryClient.invalidateQueries({ queryKey: ['aiAgents'] });
       toast({ title: "Success", description: `Agent "${updatedAgent.name}" updated.` });
-      // Remove onAgentUpdate() call here - let query invalidation handle UI update via useEffect
     },
     onError: (error, variables) => {
       toast({
@@ -151,11 +152,16 @@ const AgentDetailsPanel: React.FC<AgentDetailsPanelProps> = ({ selectedAgentId, 
       // Populate form for editing
       setAgentName(selectedAgent.name || '');
       setPromptText(selectedAgent.prompt || '');
-      setKeywordTrigger(selectedAgent.keyword_trigger || '');
+      // The backend now sends the full channel objects
+      const firstChannel = selectedAgent.channels?.[0];
+      if (firstChannel) {
+        setKeywordTrigger(firstChannel.keyword_trigger || '');
+        setActivationMode(firstChannel.activation_mode || 'keyword');
+      }
       setSelectedDocumentIds(selectedAgent.knowledge_document_ids || []);
-      setSelectedIntegrationIds(selectedAgent.integrations_config_ids || []);
+      // Extract integration config IDs from the channels
+      setSelectedIntegrationIds(selectedAgent.channels?.map(c => c.integrations_config_id) || []);
       setIsEnabled(selectedAgent.is_enabled ?? true);
-      setActivationMode(selectedAgent.activation_mode || 'keyword');
       setAgentType(selectedAgent.agent_type || 'chattalyst'); // DB migration already handled 'n8n' to 'CustomAgent'
       setN8nWebhookUrl(selectedAgent.custom_agent_config?.webhook_url || ''); // Use new field
       // setSelectedReplyInstanceId(selectedAgent.reply_evolution_instance_id || null); // Removed
@@ -309,12 +315,11 @@ const AgentDetailsPanel: React.FC<AgentDetailsPanelProps> = ({ selectedAgentId, 
   }
 
 
-  // TODO: Implement handleSave and handleDelete using mutations
   const handleSave = () => {
-    // Logging removed
+    console.log('handleSave triggered');
 
     if (isCreating) {
-      // --- Create Agent ---
+      console.log('Executing create logic...');
       if (!agentName.trim()) {
         toast({ variant: "destructive", title: "Validation Error", description: "Agent name is required." });
         return;
@@ -330,20 +335,22 @@ const AgentDetailsPanel: React.FC<AgentDetailsPanelProps> = ({ selectedAgentId, 
 
       const agentData: NewAIAgent = {
         name: agentName,
-        prompt: agentType === 'chattalyst' ? promptText : '', // Only save prompt for chattalyst
-        knowledge_document_ids: agentType === 'chattalyst' && selectedDocumentIds.length > 0 ? selectedDocumentIds : null,
-        keyword_trigger: keywordTrigger?.trim() || null,
-        integrations_config_ids: selectedIntegrationIds.length > 0 ? selectedIntegrationIds : [],
+        prompt: agentType === 'chattalyst' ? promptText : '',
+        knowledge_document_ids: agentType === 'chattalyst' ? selectedDocumentIds : [],
         is_enabled: isEnabled,
-        activation_mode: activationMode,
-        agent_type: agentType, // Will be 'chattalyst' or 'CustomAgent'
+        agent_type: agentType,
         custom_agent_config: agentType === 'CustomAgent' ? { webhook_url: n8nWebhookUrl.trim() } : null,
-        // reply_evolution_instance_id: selectedReplyInstanceId, // Removed
+        channels: selectedIntegrationIds.map(id => ({
+          integrations_config_id: id,
+          activation_mode: activationMode,
+          keyword_trigger: activationMode === 'keyword' ? keywordTrigger?.trim() || null : null,
+        })),
       };
+      console.log('Calling createMutation with:', agentData);
       createMutation.mutate(agentData);
 
     } else if (selectedAgentId && selectedAgent) {
-      // --- Update Agent ---
+      console.log('Executing update logic...');
       if (!agentName.trim()) {
         toast({ variant: "destructive", title: "Validation Error", description: "Agent name is required." });
         return;
@@ -359,39 +366,24 @@ const AgentDetailsPanel: React.FC<AgentDetailsPanelProps> = ({ selectedAgentId, 
 
       const updates: UpdateAIAgent = {
         name: agentName.trim(),
-        prompt: agentType === 'chattalyst' ? promptText : '', // Only save prompt for chattalyst
-        knowledge_document_ids: agentType === 'chattalyst' && selectedDocumentIds.length > 0 ? selectedDocumentIds : null,
-        keyword_trigger: keywordTrigger?.trim() || null,
-        integrations_config_ids: selectedIntegrationIds.length > 0 ? selectedIntegrationIds : [],
+        prompt: agentType === 'chattalyst' ? promptText : '',
+        knowledge_document_ids: agentType === 'chattalyst' ? selectedDocumentIds : [],
         is_enabled: isEnabled,
-        activation_mode: activationMode,
-        agent_type: agentType, // Will be 'chattalyst' or 'CustomAgent'
+        agent_type: agentType,
         custom_agent_config: agentType === 'CustomAgent' ? { webhook_url: n8nWebhookUrl.trim() } : null,
-        // reply_evolution_instance_id: selectedReplyInstanceId, // Removed
+        channels: selectedIntegrationIds.map(id => ({
+          integrations_config_id: id,
+          activation_mode: activationMode,
+          keyword_trigger: activationMode === 'keyword' ? keywordTrigger?.trim() || null : null,
+        })),
       };
-
-       // Only send update if something actually changed (optional optimization)
-       // Consider comparing keyword_trigger and integration_ids as well
-       // const hasChanged = updates.name !== selectedAgent.name ||
-       //                    updates.prompt !== selectedAgent.prompt ||
-       //                    JSON.stringify(updates.knowledge_document_ids?.sort()) !== JSON.stringify(selectedAgent.knowledge_document_ids?.sort());
-       // if (!hasChanged) {
-       //   toast({ title: "Info", description: "No changes detected." });
-       //   return;
-       // }
-
-       // Logging removed
-       // console.log("Updating agent", selectedAgentId, "with data:", updates); // Remove this log as well
-       
-       console.log('[CLIENT DEBUG] Attempting to update agent. ID:', selectedAgentId);
-       console.log('[CLIENT DEBUG] Update payload:', JSON.stringify(updates, null, 2)); // Pretty print JSON
 
        if (!selectedAgentId) {
          toast({ variant: "destructive", title: "Critical Error", description: "Agent ID is missing before update attempt. Please refresh." });
          console.error('[CLIENT DEBUG] CRITICAL: selectedAgentId is null or undefined before mutate call.');
          return;
        }
-
+       console.log('Calling updateMutation with:', updates);
        updateMutation.mutate({ agentId: selectedAgentId, updates });
     }
   };
@@ -570,6 +562,8 @@ const AgentDetailsPanel: React.FC<AgentDetailsPanelProps> = ({ selectedAgentId, 
           />
           <p className="text-sm text-muted-foreground">
             The webhook URL your custom agent will receive requests at.
+            <br />
+            <strong>Important:</strong> Use the <strong>Production URL</strong> from n8n, not the Test URL. The Test URL is for one-time tests only and will not work for continuous operation.
           </p>
         </div>
       )}
@@ -721,6 +715,8 @@ const AgentDetailsPanel: React.FC<AgentDetailsPanelProps> = ({ selectedAgentId, 
           />
           <p className="text-sm text-muted-foreground">
             The webhook URL your custom agent will receive requests at.
+            <br />
+            <strong>Important:</strong> Use the <strong>Production URL</strong> from n8n, not the Test URL. The Test URL is for one-time tests only and will not work for continuous operation.
           </p>
         </div>
        )}

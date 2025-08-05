@@ -15,6 +15,7 @@ import { useConversationData } from "./hooks/useConversationData";
 import { useConversationRealtime } from "./useConversationRealtime";
 import { useParticipantsData } from "./hooks/useParticipantsData";
 import { useCustomersData } from "./hooks/useCustomersData";
+import { useIntegrationsConfig } from "@/hooks/useIntegrationsConfig";
 import {
   processConversationsWithCustomerNames,
   // filterConversations // filterConversations is not used here anymore
@@ -33,6 +34,7 @@ interface MediaBase64Response {
 
 export function ConversationView() {
   const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
+  const [selectedIntegrationIds, setSelectedIntegrationIds] = useState<string[]>([]);
   const [isMobileConvoListDrawerOpen, setIsMobileConvoListDrawerOpen] = useState(false);
   const [isLeadDetailsDrawerOpen, setIsLeadDetailsDrawerOpen] = useState(false);
 
@@ -58,8 +60,9 @@ export function ConversationView() {
     summaryTimestamp,
     sendMessageMutation,
     summarizeMutation
-  } = useConversationData(selectedConversation);
+  } = useConversationData(selectedConversation, selectedIntegrationIds);
 
+  const { data: integrationsConfig, isLoading: isLoadingIntegrationsConfig } = useIntegrationsConfig();
   const { participantsData, isLoadingParticipants } = useParticipantsData();
   const { customersData, isLoadingCustomers } = useCustomersData();
 
@@ -201,6 +204,9 @@ export function ConversationView() {
       customersData={customersData} // Pass customersData for filtering inside
       selectedConversation={selectedConversation}
       setSelectedConversation={handleSelectConversation}
+      integrationsConfig={integrationsConfig || []}
+      selectedIntegrationIds={selectedIntegrationIds}
+      setSelectedIntegrationIds={setSelectedIntegrationIds}
       onConversationSelect={() => { // Re-added for mobile drawer closing, as it's in ConversationLeftPanel's props
         if(!isDesktop) setIsMobileConvoListDrawerOpen(false);
       }}

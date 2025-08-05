@@ -163,8 +163,8 @@ serve(async (req: Request) => {
 
     console.log(`Billing entity: ${billingEntityType}, ID: ${billingEntityId}`);
     
-    // Updated call to getActivePlanDetails, removed supabaseClient argument
-    const { data: activePlanDetails, error: planError } = await getActivePlanDetails(authUserId);
+    // Updated call to getActivePlanDetails, removed supabaseClient and authUserId arguments
+    const { data: activePlanDetails, error: planError } = await getActivePlanDetails();
 
     if (planError) {
       console.error(`Error fetching active plan for ${billingEntityType} ${billingEntityId}:`, planError.message);
@@ -523,46 +523,52 @@ interface ActivePlanDetails {
   messages_per_month: number | null;
 }
 
-async function getActivePlanDetails( // supabaseClient parameter removed
-  profileId: string | null
+async function getActivePlanDetails(
 ): Promise<{ data: ActivePlanDetails | null; error: Error | null }> {
-  if (!profileId) {
-    return { data: null, error: new Error("Profile ID must be provided to get active plan.") };
-  }
-
   // Create a service role client for this specific operation
   const serviceRoleClient = createClient(
     Deno.env.get("SUPABASE_URL")!,
     Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!
   );
 
-  // Call the RPC function
-  const { data: rpcData, error: rpcError } = await serviceRoleClient.rpc(
-    'get_active_subscription_details_for_profile',
-    { profile_id_param: profileId }
-  );
+  // Query subscriptions table directly to find the single active/trialing subscription
+  const { data, error } = await serviceRoleClient
+    .from("subscriptions")
+    .select(`
+      id,
+      plan_id,
+      plans (
+        name,
+        messages_per_month
+      )
+    `)
+    .or("status.eq.active,status.eq.trialing")
+    .limit(1)
+    .single();
 
-  if (rpcError) {
-    console.error("Error calling get_active_subscription_details_for_profile RPC:", rpcError);
-    return { data: null, error: rpcError };
+  if (error) {
+    // If no rows are found, it's not a critical error, just no active plan.
+    if (error.code === 'PGRST116') {
+      console.log("No active or trialing subscription found for any user.");
+      return { data: null, error: null };
+    }
+    console.error("Error fetching active subscription:", error);
+    return { data: null, error };
   }
 
-  // The RPC returns an array of rows, even if it's just one or zero.
-  // We expect at most one row due to LIMIT 1 in the function.
-  if (!rpcData || rpcData.length === 0) {
-    console.log(`No active subscription found via RPC for profile_id: ${profileId}`);
+  if (!data || !data.plans) {
+    console.log("No active subscription found or plan details are missing.");
     return { data: null, error: null };
   }
 
-  // The RPC directly returns the fields we need.
-  const subscriptionDetails = rpcData[0]; 
+  const planDetails = Array.isArray(data.plans) ? data.plans[0] : data.plans;
 
   return {
     data: {
-      subscription_id: subscriptionDetails.subscription_id,
-      plan_id: subscriptionDetails.plan_id,
-      plan_name: subscriptionDetails.plan_name,
-      messages_per_month: subscriptionDetails.messages_per_month,
+      subscription_id: data.id,
+      plan_id: data.plan_id,
+      plan_name: planDetails.name,
+      messages_per_month: planDetails.messages_per_month,
     },
     error: null,
   };
