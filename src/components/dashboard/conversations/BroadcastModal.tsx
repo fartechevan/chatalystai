@@ -87,6 +87,7 @@ export function BroadcastModal({
   const [selectedImageFile, setSelectedImageFile] = useState<File | null>(null);
   const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const [includeOptOutButton, setIncludeOptOutButton] = useState(false);
   
   // Use the WhatsApp blast limit hook
   const { blastLimitInfo, isLoading: isLoadingBlastLimit, refetchBlastLimit } = useWhatsAppBlastLimit();
@@ -397,6 +398,7 @@ export function BroadcastModal({
         media: mediaData,
         mimetype: mediaMimeType,
         fileName: mediaFileName,
+        includeOptOutButton: includeOptOutButton && !selectedImageFile, // Only include if enabled and no media
       };
 
       if (targetMode === 'segment') {
@@ -952,6 +954,34 @@ export function BroadcastModal({
                 </div>
               )}
             </div>
+
+            {/* Opt-out Button Toggle - Only show for text messages (no media) */}
+            {!selectedImageFile && (
+              <div className="flex items-center space-x-2 p-3 border rounded-md bg-slate-50">
+                <input
+                  type="checkbox"
+                  id="include-opt-out"
+                  checked={includeOptOutButton}
+                  onChange={(e) => setIncludeOptOutButton(e.target.checked)}
+                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                />
+                <Label htmlFor="include-opt-out" className="text-sm font-medium">
+                  Include "Opt out" button
+                </Label>
+                <span className="text-xs text-muted-foreground ml-2">
+                  (Adds an interactive button for users to opt out of future broadcasts)
+                </span>
+              </div>
+            )}
+
+            {/* Show note when image is selected */}
+            {selectedImageFile && (
+              <div className="p-3 border rounded-md bg-amber-50 border-amber-200">
+                <p className="text-sm text-amber-800">
+                  <strong>Note:</strong> Opt-out buttons are not available with media messages due to WhatsApp API limitations.
+                </p>
+              </div>
+            )}
 
             <p className="text-sm text-muted-foreground mt-2">
               Sending to: {

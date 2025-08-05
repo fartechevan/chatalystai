@@ -48,7 +48,7 @@ export const sendBroadcastService = async (params: SendBroadcastParams): Promise
     mimetype,
     fileName,
     imageUrl,
-    includeOptOutButton = true // Default to true to include opt-out button
+    includeOptOutButton = false // Default to false to maintain existing behavior
   } = params;
 
   if (targetMode === 'customers' && (!customerIds || customerIds.length === 0)) {
