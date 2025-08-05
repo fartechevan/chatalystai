@@ -8,6 +8,7 @@ export interface SendButtonParams {
   description: string; // Button message description
   footer?: string; // Optional footer
   buttons: Array<{
+    type: string; // Button type (e.g., "reply")
     title: string; // Button title
     displayText: string; // Button display text
     id: string; // Button ID/value

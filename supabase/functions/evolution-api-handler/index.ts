@@ -270,6 +270,7 @@ serve(async (req: Request) => {
         description?: string;
         footer?: string;
         buttons?: Array<{
+          type: string;
           title: string;
           displayText: string;
           id: string;
