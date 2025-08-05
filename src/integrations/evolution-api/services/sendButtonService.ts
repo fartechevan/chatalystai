@@ -16,14 +16,14 @@ export interface SendButtonParams {
 
 export interface SendButtonResponse {
   success: boolean;
-  messageId?: string;
-  error?: string;
+  provider_message_id?: string;
+  error_message?: string;
 }
 
 /**
  * Invokes the 'evolution-api-handler' Supabase function to send a button message.
  */
-export async function sendButtonService(params: SendButtonParams): Promise<SendButtonResponse> {
+export async function sendButtonService(params: SendButtonParams): Promise<void> {
   const { instance, integrationId, number, title, description, footer, buttons } = params;
 
   const body = {
@@ -36,6 +36,8 @@ export async function sendButtonService(params: SendButtonParams): Promise<SendB
     buttons: buttons,
   };
 
+  console.log('sendButtonService: Calling evolution-api-handler with body:', JSON.stringify(body, null, 2));
+
   try {
     const { data, error } = await supabase.functions.invoke<SendButtonResponse>('evolution-api-handler', { body });
 
@@ -44,15 +46,20 @@ export async function sendButtonService(params: SendButtonParams): Promise<SendB
       throw new Error(error.message || 'Failed to send button message via Supabase function.');
     }
 
+    console.log('sendButtonService: Received response from evolution-api-handler:', data);
+
     if (data && data.success) {
-      return data;
+      console.log('sendButtonService: Button message sent successfully');
+      return; // Success - no need to return anything for void function
     } else {
-      throw new Error(data?.error || 'Unknown error from evolution-api-handler for send-buttons.');
+      const errorMsg = data?.error_message || 'Unknown error from evolution-api-handler for send-buttons.';
+      console.error('sendButtonService: Button message failed:', errorMsg);
+      throw new Error(errorMsg);
     }
 
   } catch (e: unknown) {
     const errorMessage = e instanceof Error ? e.message : 'An unexpected error occurred.';
     console.error('Exception in sendButtonService:', errorMessage);
-    return { success: false, error: errorMessage };
+    throw e; // Re-throw the error so broadcast service can catch it
   }
 }

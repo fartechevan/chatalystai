@@ -357,15 +357,18 @@ serve(async (req: Request) => {
 
         evolutionApiUrl = `${config.integration.base_url}/message/sendButtons/${evolutionInstanceName}`;
         
+        // Format the recipient number the same way as sendText
+        const recipientNumber = recipientJid!.includes('@') ? recipientJid : `${recipientJid}@c.us`;
+        
         payload = {
-          number: recipientJid!,
+          number: recipientNumber,
           title: title!,
           description: description!,
           footer: footer || undefined,
           buttons: buttons!,
           options: { presence: "composing", delay: 1200 }
         };
-        console.log(`Action: sendButtons to ${recipientJid} via instance name: ${evolutionInstanceName} (DB config ID: ${integrationConfigId}) Final Payload for API:`, JSON.stringify(payload, null, 2));
+        console.log(`Action: sendButtons to ${recipientNumber} via instance name: ${evolutionInstanceName} (DB config ID: ${integrationConfigId}) Final Payload for API:`, JSON.stringify(payload, null, 2));
       } else {
         // This case should ideally not be reached if the outer 'if/else if' is correct for 'sendText', 'send-media', or 'send-buttons'
         console.error(`Internal logic error: Action '${action}' was expected to be 'sendText', 'send-media', or 'send-buttons' but was not handled.`);
