@@ -270,7 +270,6 @@ serve(async (req: Request) => {
         description?: string;
         footer?: string;
         buttons?: Array<{
-          type: string;
           title: string;
           displayText: string;
           id: string;
@@ -366,8 +365,12 @@ serve(async (req: Request) => {
           title: title!,
           description: description!,
           footer: footer || undefined,
-          buttons: buttons!,
-          options: { presence: "composing", delay: 1200 }
+          buttons: buttons!.map(btn => ({
+            title: btn.title,
+            displayText: btn.displayText,
+            id: btn.id
+          })),
+          delay: 1200
         };
         console.log(`Action: sendButtons to ${recipientNumber} via instance name: ${evolutionInstanceName} (DB config ID: ${integrationConfigId}) Final Payload for API:`, JSON.stringify(payload, null, 2));
       } else {

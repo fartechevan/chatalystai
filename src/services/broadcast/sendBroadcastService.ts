@@ -227,7 +227,6 @@ export const sendBroadcastService = async (params: SendBroadcastParams): Promise
           footer: "Reply STOP to opt out",
           buttons: [
             {
-              type: "reply",
               title: "Opt out",
               displayText: "Opt out",
               id: "1"
