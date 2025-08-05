@@ -1,6 +1,7 @@
 import { supabase } from '@/integrations/supabase/client';
 import { sendTextService } from '@/integrations/evolution-api/services/sendTextService';
 import { sendMediaService, SendMediaParams } from '@/integrations/evolution-api/services/sendMediaService';
+import { sendButtonService } from '@/integrations/evolution-api/services/sendButtonService';
 // Removed TablesUpdate import as it's not resolving the type issue for the update call as expected.
 
 interface CustomerInfo {
@@ -24,6 +25,7 @@ export interface SendBroadcastParams {
   mimetype?: string; // e.g., image/jpeg
   fileName?: string; // e.g., image.jpg
   imageUrl?: string; // Optional image URL (for DB record / UI display)
+  includeOptOutButton?: boolean; // Whether to include the opt-out button
 }
 
 export interface SendBroadcastResult {
@@ -45,7 +47,8 @@ export const sendBroadcastService = async (params: SendBroadcastParams): Promise
     media,
     mimetype,
     fileName,
-    imageUrl 
+    imageUrl,
+    includeOptOutButton = true // Default to true to include opt-out button
   } = params;
 
   if (targetMode === 'customers' && (!customerIds || customerIds.length === 0)) {
@@ -205,7 +208,25 @@ export const sendBroadcastService = async (params: SendBroadcastParams): Promise
     let updatePayload: { status: string; error_message?: string | null; sent_at?: string | null } = { status: 'failed', error_message: null, sent_at: null };
 
     try {
-      if (media && mimetype && fileName) {
+      if (includeOptOutButton && !media) {
+        // Send button message with opt-out button for text messages
+        await sendButtonService({
+          instance: instanceId,
+          integrationId: integrationConfigId,
+          number: number,
+          title: "📢 Broadcast Message",
+          description: messageText,
+          footer: "Reply STOP to opt out",
+          buttons: [
+            {
+              title: "Opt out",
+              displayText: "Opt out",
+              id: "1"
+            }
+          ]
+        });
+      } else if (media && mimetype && fileName) {
+        // For media messages, send media without button (Evolution API doesn't support buttons with media)
         await sendMediaService({
           instance: instanceId,
           integrationId: integrationConfigId,
@@ -216,15 +237,12 @@ export const sendBroadcastService = async (params: SendBroadcastParams): Promise
           caption: messageText, // Use messageText as caption
         });
       } else {
-        // Pass integrationConfigId (which is integrations_config.id) to sendTextService
-        // sendTextService expects its 'integrationId' param to be integrations_config.id
+        // Send regular text message without button
         await sendTextService({
             integrationId: integrationConfigId,
             instance: instanceId,
             number: number,
             text: messageText,
-            // imageUrl is not directly used by sendTextService for sending.
-            // If only imageUrl is provided without base64, it won't be sent as media by this logic.
         });
       }
       successfulSends++;

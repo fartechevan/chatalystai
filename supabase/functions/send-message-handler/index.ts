@@ -16,6 +16,7 @@ export type MessageLogType =
   | "location"
   | "contact"
   | "sticker"
+  | "buttons"
   | "unknown";
 
 interface SendMessageRequestBody {
