@@ -2,6 +2,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { sendTextService } from '@/integrations/evolution-api/services/sendTextService';
 import { sendMediaService, SendMediaParams } from '@/integrations/evolution-api/services/sendMediaService';
 import { sendButtonService } from '@/integrations/evolution-api/services/sendButtonService';
+import { checkCustomersAgainstBlacklist, checkPhoneNumbersAgainstBlacklist } from './blacklistService';
 // Removed TablesUpdate import as it's not resolving the type issue for the update call as expected.
 
 interface CustomerInfo {
@@ -180,7 +181,25 @@ export const sendBroadcastService = async (params: SendBroadcastParams): Promise
           console.warn("sendBroadcastService: No valid recipients found for the broadcast target.");
           return { broadcastId, successfulSends: 0, failedSends: 0, totalAttempted: 0 };
         }
-        const recipientRecords = validCustomers.map(c => ({
+
+        // Check customers against blacklist
+        const blacklistResult = await checkCustomersAgainstBlacklist(validCustomers);
+        const nonBlacklistedCustomers = blacklistResult.validCustomers;
+        
+        // Log blacklisted customers that will be skipped
+        if (blacklistResult.blacklistedCustomers.length > 0) {
+          console.log(`sendBroadcastService: Skipping ${blacklistResult.blacklistedCustomers.length} blacklisted customers`);
+          blacklistResult.blacklistedCustomers.forEach(customer => {
+            console.log(`Blacklisted customer skipped: ${customer.phone_number}`);
+          });
+        }
+
+        if (nonBlacklistedCustomers.length === 0) {
+          console.warn("sendBroadcastService: All customers are blacklisted, no recipients to send to.");
+          return { broadcastId, successfulSends: 0, failedSends: 0, totalAttempted: 0 };
+        }
+
+        const recipientRecords = nonBlacklistedCustomers.map(c => ({
           broadcast_id: broadcastId,
           customer_id: c.id,
           phone_number: c.phone_number,
@@ -206,7 +225,29 @@ export const sendBroadcastService = async (params: SendBroadcastParams): Promise
   let failedSends = 0;
   let totalAttempted = 0;
 
-  const numbersToSend = targetMode === 'csv' ? (phoneNumbers || []) : validRecipients.map(r => r.phone_number);
+  let numbersToSend: string[] = [];
+  
+  if (targetMode === 'csv' && phoneNumbers) {
+    // Check phone numbers against blacklist for CSV mode
+    const blacklistResult = await checkPhoneNumbersAgainstBlacklist(phoneNumbers);
+    numbersToSend = blacklistResult.validPhoneNumbers;
+    
+    // Log blacklisted phone numbers that will be skipped
+    if (blacklistResult.blacklistedPhoneNumbers.length > 0) {
+      console.log(`sendBroadcastService: Skipping ${blacklistResult.blacklistedPhoneNumbers.length} blacklisted phone numbers`);
+      blacklistResult.blacklistedPhoneNumbers.forEach(phone => {
+        console.log(`Blacklisted phone number skipped: ${phone}`);
+      });
+    }
+
+    if (numbersToSend.length === 0) {
+      console.warn("sendBroadcastService: All phone numbers are blacklisted, no recipients to send to.");
+      return { broadcastId, successfulSends: 0, failedSends: 0, totalAttempted: 0 };
+    }
+  } else {
+    numbersToSend = validRecipients.map(r => r.phone_number);
+  }
+  
   totalAttempted = numbersToSend.length;
 
   const recipientRecordMap = new Map(validRecipients.map(r => [r.phone_number, r.recipient_id]));
@@ -217,7 +258,7 @@ export const sendBroadcastService = async (params: SendBroadcastParams): Promise
 
     try {
       if (includeOptOutButton && !media) {
-        // Send button message with opt-out button for text messages
+        // Send button message with opt-out button for text messages only when includeOptOutButton is true
         await sendButtonService({
           instance: instanceId,
           integrationId: integrationConfigId,

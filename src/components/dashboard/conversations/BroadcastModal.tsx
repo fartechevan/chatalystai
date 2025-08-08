@@ -404,6 +404,7 @@ export function BroadcastModal({
         media: mediaData,
         mimetype: mediaMimeType,
         fileName: mediaFileName,
+        includeOptOutButton: !includeOptOutText, // Only include button if opt-out text is NOT checked
       };
 
       if (targetMode === 'segment') {
