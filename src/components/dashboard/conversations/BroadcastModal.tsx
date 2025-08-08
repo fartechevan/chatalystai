@@ -87,7 +87,7 @@ export function BroadcastModal({
   const [selectedImageFile, setSelectedImageFile] = useState<File | null>(null);
   const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
-  const [includeOptOutButton, setIncludeOptOutButton] = useState(false);
+  const [includeOptOutText, setIncludeOptOutText] = useState(false);
   
   // Use the WhatsApp blast limit hook
   const { blastLimitInfo, isLoading: isLoadingBlastLimit, refetchBlastLimit } = useWhatsAppBlastLimit();
@@ -393,7 +393,7 @@ export function BroadcastModal({
 
       // Prepend opt-out text to the message if the option is checked
       let finalMessageText = broadcastMessage;
-      if (includeOptOutButton) {
+      if (includeOptOutText) {
         finalMessageText = "If you want to opt out of these marketing messages reply with '0'\n\n" + broadcastMessage;
       }
 
@@ -965,8 +965,8 @@ export function BroadcastModal({
               <input
                 type="checkbox"
                 id="include-opt-out"
-                checked={includeOptOutButton}
-                onChange={(e) => setIncludeOptOutButton(e.target.checked)}
+                checked={includeOptOutText}
+                onChange={(e) => setIncludeOptOutText(e.target.checked)}
                 className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
               />
               <Label htmlFor="include-opt-out" className="text-sm font-medium">
