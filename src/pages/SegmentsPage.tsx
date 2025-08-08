@@ -461,7 +461,7 @@ const SegmentsPage: React.FC = () => {
                       }))
                       
                       // Call the segment-handler edge function using direct fetch
-                      const response = await fetch(`https://vezdxxqzzcjkunoaxcxc.supabase.co/functions/v1/segment-handler/segments/import-csv`, {
+                      const response = await fetch(`https://yrnbbkljrdwoyqjpswtv.supabase.co/functions/v1/segment-handler/segments/import-csv`, {
                         method: 'POST',
                         headers: {
                           'Content-Type': 'application/json',
