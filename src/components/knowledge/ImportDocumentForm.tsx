@@ -384,7 +384,7 @@ export function ImportDocumentForm({ onCancel, onSuccess }: ImportDocumentFormPr
     }
   };
 
-  const updateVectorTable = async () => {
+  const updateVectorTable = async (documentId: string) => {
     try {
       interface UpdateVectorTable {
         success: boolean,
@@ -402,7 +402,7 @@ export function ImportDocumentForm({ onCancel, onSuccess }: ImportDocumentFormPr
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          "document_id": currentDocumentID,
+          "document_id": documentId,
         })
       })
 
@@ -483,7 +483,16 @@ export function ImportDocumentForm({ onCancel, onSuccess }: ImportDocumentFormPr
     }
   };
 
-  const onSubmit = async (values: FormValues) => {
+  const onSubmit = async (values: FormValues): Promise<{ documentId: string } | void> => {
+    if (!userId) {
+      toast({
+        variant: "destructive",
+        title: "Authentication required",
+        description: "Please log in to import documents.",
+      });
+      return;
+    }
+
     try {
       setIsSubmitting(true);
       
@@ -527,7 +536,6 @@ export function ImportDocumentForm({ onCancel, onSuccess }: ImportDocumentFormPr
       const { data: documentData, error: documentError } = await supabase
         .from("knowledge_documents")
         .insert({
-          id: currentDocumentID,
           title: values.title,
           content: values.content || "",
           user_id: userId,
@@ -609,6 +617,9 @@ export function ImportDocumentForm({ onCancel, onSuccess }: ImportDocumentFormPr
         title: "Document imported successfully",
         description: `Created ${documentChunks.length} chunks using AI-powered chunking.`,
       });
+      
+      // Return the document ID for use in the calling function
+      return { documentId: documentData.id };
       
     } catch (error) {
       setIsSubmitting(false);
@@ -973,7 +984,14 @@ export function ImportDocumentForm({ onCancel, onSuccess }: ImportDocumentFormPr
                 <Button 
                   type="button"
                   variant="outline"
-                  onClick={handlePreviewChunks_v2}
+                  onClick={() => {
+                    const sessionId = localStorage.getItem("upload_session_id");
+                    if (sessionId) {
+                      handlePreviewChunks_v2();
+                    } else {
+                      handlePreviewChunks();
+                    }
+                  }}
                   disabled={isSubmitting || isProcessingChunks || !form.getValues("content")}
                 >
                   {isProcessingChunks ? (
@@ -1027,27 +1045,19 @@ export function ImportDocumentForm({ onCancel, onSuccess }: ImportDocumentFormPr
                 // Run form submit handler first
                 await form.handleSubmit(async (data) => {
                   // Run the actual submission logic
-                  await onSubmit(data);
+                  const result = await onSubmit(data);
                   
-                  // Then confirm upload, no need to confirm upload now
-                  // await confirmUpload().then(() => {
-                  //   setShowChunks(false);
-                  // })
-                  updateVectorTable()
-                    .then(() => {
-                      setShowChunks(false);
-                      toast({
-                        variant: "default",
-                        title: "Document Import successfully",
-                        description: "Added the document to the knowledge base",
-                      })
-                    })
-                    .catch((error) => {
-                      console.log(error)
-                    })
-                  
-
-                  
+                  // Get the document ID from the form submission result
+                  const documentId = result?.documentId || currentDocumentID;
+                  if (documentId) {
+                    await updateVectorTable(documentId);
+                    setShowChunks(false);
+                    toast({
+                      variant: "default",
+                      title: "Document Import successfully",
+                      description: "Added the document to the knowledge base",
+                    });
+                  }
                 })();
               } catch (err) {
                 console.error('Submit or upload confirmation failed', err);

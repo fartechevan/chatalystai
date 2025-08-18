@@ -400,13 +400,12 @@ export function ChunksList({ documentId }: ChunksListProps) {
         </Card>
       )} */}
       
-      <div className="max-h-[70vh] overflow-y-auto pr-2 border rounded-lg"> {/* Moved border and rounded-lg to the container */}
-        <Table> {/* Removed className="border rounded-lg" */}
+      <div className="max-h-[70vh] overflow-y-auto pr-2 border rounded-lg">
+        <Table>
           <TableHeader>
-            <TableRow className="bg-muted/50 hover:bg-muted/70"> {/* Fixed hover effect for header row */}
+            <TableRow className="bg-muted/50 hover:bg-muted/70">
               <TableHead className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">Chunk</TableHead>
               <TableHead className="h-12 px-4 text-left align-middle font-medium text-muted-foreground w-[150px]">Characters</TableHead>
-              {/* <TableHead className="h-12 px-4 text-left align-middle font-medium text-muted-foreground w-[180px]">Retrieval count</TableHead> */}
               <TableHead className="h-12 px-4 text-center align-middle font-medium text-muted-foreground w-[80px]">Status</TableHead>
               <TableHead className="h-12 px-4 text-right align-middle font-medium text-muted-foreground w-[100px]">Actions</TableHead>
             </TableRow>
@@ -430,7 +429,7 @@ export function ChunksList({ documentId }: ChunksListProps) {
               const retrievalCount = metadata.customOptions?.headerLevels?.length || 0;
               
               return (
-                <TableRow key={chunk.id} className="group hover:bg-muted/50"> {/* Ensured hover state */}
+                <TableRow key={chunk.id} className="group hover:bg-muted/50">
                   <TableCell className="p-4 align-middle">
                     <div className="space-y-1">
                       <div className="font-medium flex items-center gap-2">
@@ -456,14 +455,11 @@ export function ChunksList({ documentId }: ChunksListProps) {
                   <TableCell className="p-4 align-middle text-muted-foreground">
                     {chunk.content.length.toLocaleString()} characters
                   </TableCell>
-                  <TableCell className="p-4 align-middle text-muted-foreground"> {/* Added consistent styling */}
-                    {retrievalCount} Retrieval count
-                  </TableCell>
-                  <TableCell className="p-4 align-middle text-center"> {/* Centered switch */}
+                  <TableCell className="p-4 align-middle text-center">
                     <Switch
                       checked={chunk.enabled}
                       onCheckedChange={() => handleToggleChunk(chunk.id, chunk.enabled)}
-                      disabled={updateChunkStatusMutation.isPending} // Disable while updating
+                      disabled={updateChunkStatusMutation.isPending}
                       aria-label={chunk.enabled ? "Disable chunk" : "Enable chunk"}
                     />
                   </TableCell>

@@ -88,7 +88,7 @@ const App = () => {
                     <Route path="stats" element={<ConversationStatsView />} /> {/* Use the new stats view */}
                     <Route path="help" element={<ComingSoon />} />
                     <Route path="mail" element={<ComingSoon />} />
-                    <Route path="knowledge" element={<KnowledgeBase />} />
+                    <Route path="knowledge/*" element={<KnowledgeBase />} />
                     <Route path="ai-agents" element={<AIAgentsPage />} /> {/* Add AI Agents route */}
                     {/* The route path "teams" is kept for now to avoid breaking existing navigation,
                         but it now renders UsersPage. Consider renaming path to "/users" or "/manage-users" later. */}
