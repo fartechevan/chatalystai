@@ -303,7 +303,7 @@ export const useDashboardData = (
       }
       // Find the WhatsApp Web integration config ID. Adjust 'WhatsApp Web' string if needed.
       const whatsAppWebIntegrationConfig = integrationsConfig.find(
-        (config) => config.integration_id.name?.toLowerCase() === 'whatsapp web' || config.integration_id.name?.toLowerCase() === 'whatsapp'
+        (config) => config.integration_id?.name?.toLowerCase() === 'whatsapp web' || config.integration_id?.name?.toLowerCase() === 'whatsapp'
       );
 
       if (!whatsAppWebIntegrationConfig || !whatsAppWebIntegrationConfig.id) {

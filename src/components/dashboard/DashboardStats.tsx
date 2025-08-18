@@ -77,13 +77,13 @@ export function DashboardStats({
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-4"> {/* Removed lg:grid-rows-3 */}
       {/* Top row */}
-      <StatsCard
+      {/* <StatsCard
         title="ACTIVE LEADS"
         value={activeLeads}
         // color will default to text-primary
         subValue={`${leads.reduce((acc, lead) => acc + Number(lead.value || 0), 0)} RM`}
         className="col-span-1 lg:col-span-3"
-      />
+      /> */}
 
       <StatsCard
         title="ONGOING CONVERSATIONS"
@@ -110,12 +110,12 @@ export function DashboardStats({
       {/* <LeadSourcesSection className="col-span-1 lg:col-span-3 lg:row-span-2" /> */} {/* Removed */}
 
       {/* Second row */}
-      <StatsCard
+      {/* <StatsCard
         title="WON LEADS"
         value={wonLeads}
         color="text-success" // Using theme's success color
         className="col-span-1 lg:col-span-3"
-      />
+      /> */}
 
       <StatsCard
         title="LONGEST AWAITING REPLY"
@@ -125,12 +125,12 @@ export function DashboardStats({
       />
 
       {/* Third row */}
-      <StatsCard
+      {/* <StatsCard
         title="LOST LEADS"
         value={lostLeads}
         color="text-destructive" // Using theme's destructive color
         className="col-span-1 lg:col-span-3"
-      />
+      /> */}
 
       {/* <TasksSection
         tasks={tasks}
