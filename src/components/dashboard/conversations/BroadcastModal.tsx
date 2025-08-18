@@ -87,6 +87,7 @@ export function BroadcastModal({
   const [selectedImageFile, setSelectedImageFile] = useState<File | null>(null);
   const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const [includeOptOutText, setIncludeOptOutText] = useState(false);
   
   // Use the WhatsApp blast limit hook
   const { blastLimitInfo, isLoading: isLoadingBlastLimit, refetchBlastLimit } = useWhatsAppBlastLimit();
@@ -390,13 +391,20 @@ export function BroadcastModal({
 
       let paramsToSend: SendBroadcastParams;
 
+      // Prepend opt-out text to the message if the option is checked
+      let finalMessageText = broadcastMessage;
+      if (includeOptOutText) {
+        finalMessageText = "If you want to opt out of these marketing messages reply with '0'\n\n" + broadcastMessage;
+      }
+
       const commonParams = {
         integrationConfigId: selectedIntegrationId,
         instanceId: selectedIntegrationInfo.instanceId,
-        messageText: broadcastMessage, // This will be the caption
+        messageText: finalMessageText, // This will be the caption with opt-out text if enabled
         media: mediaData,
         mimetype: mediaMimeType,
         fileName: mediaFileName,
+        includeOptOutButton: !includeOptOutText, // Only include button if opt-out text is NOT checked
       };
 
       if (targetMode === 'segment') {
@@ -951,6 +959,23 @@ export function BroadcastModal({
                   </Button>
                 </div>
               )}
+            </div>
+
+            {/* Opt-out Text Toggle */}
+            <div className="flex items-center space-x-2 p-3 border rounded-md bg-slate-50">
+              <input
+                type="checkbox"
+                id="include-opt-out"
+                checked={includeOptOutText}
+                onChange={(e) => setIncludeOptOutText(e.target.checked)}
+                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+              />
+              <Label htmlFor="include-opt-out" className="text-sm font-medium">
+                Include opt-out text
+              </Label>
+              <span className="text-xs text-muted-foreground ml-2">
+                (Adds "If you want to opt out of these marketing messages reply with '0'" to the top of your message)
+              </span>
             </div>
 
             <p className="text-sm text-muted-foreground mt-2">
