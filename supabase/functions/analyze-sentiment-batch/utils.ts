@@ -82,6 +82,74 @@ export async function formatConversationTranscript(
     .join('\\n');
 }
 
+// Simple fallback sentiment analysis based on keywords
+function fallbackSentimentAnalysis(transcript: string): { sentiment: string; description: string } {
+  const lowerTranscript = transcript.toLowerCase();
+  
+  // Define sentiment keywords
+  const positiveKeywords = ['good', 'great', 'excellent', 'happy', 'satisfied', 'love', 'amazing', 'wonderful', 'perfect', 'thank you', 'thanks'];
+  const negativeKeywords = ['bad', 'terrible', 'awful', 'hate', 'angry', 'frustrated', 'disappointed', 'problem', 'issue', 'complaint', 'wrong', 'error'];
+  
+  let positiveScore = 0;
+  let negativeScore = 0;
+  
+  positiveKeywords.forEach(keyword => {
+    const matches = (lowerTranscript.match(new RegExp(keyword, 'g')) || []).length;
+    positiveScore += matches;
+  });
+  
+  negativeKeywords.forEach(keyword => {
+    const matches = (lowerTranscript.match(new RegExp(keyword, 'g')) || []).length;
+    negativeScore += matches;
+  });
+  
+  if (positiveScore > negativeScore) {
+    return { sentiment: "Positive", description: "Fallback analysis detected positive sentiment based on keyword analysis." };
+  } else if (negativeScore > positiveScore) {
+    return { sentiment: "Negative", description: "Fallback analysis detected negative sentiment based on keyword analysis." };
+  } else {
+    return { sentiment: "Neutral", description: "Fallback analysis could not determine clear sentiment polarity." };
+  }
+}
+
+// Retry function with exponential backoff
+async function retryWithBackoff<T>(
+  fn: () => Promise<T>,
+  maxRetries: number = 3,
+  baseDelay: number = 1000
+): Promise<T> {
+  let lastError: Error;
+  
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      return await fn();
+    } catch (error) {
+      lastError = error as Error;
+      
+      if (attempt === maxRetries) {
+        throw lastError;
+      }
+      
+      // Check if error is retryable
+      const isRetryable = error.message.includes('rate limit') || 
+                         error.message.includes('timeout') ||
+                         error.message.includes('network') ||
+                         error.message.includes('503') ||
+                         error.message.includes('502');
+      
+      if (!isRetryable) {
+        throw error;
+      }
+      
+      const delay = baseDelay * Math.pow(2, attempt) + Math.random() * 1000;
+      console.log(`Retrying OpenAI request in ${delay}ms (attempt ${attempt + 1}/${maxRetries + 1})`);
+      await new Promise(resolve => setTimeout(resolve, delay));
+    }
+  }
+  
+  throw lastError!;
+}
+
 export async function analyzeSentimentWithOpenAI(
   openai: OpenAI,
   transcript: string
@@ -91,45 +159,61 @@ export async function analyzeSentimentWithOpenAI(
   }
 
   try {
-    const completion = await openai.chat.completions.create({
-      model: "gpt-3.5-turbo",
-      messages: [
-        {
-          role: "system",
-          content: "You are a sentiment analysis expert. Analyze the sentiment of the following conversation transcript. Respond with JSON containing two keys: 'sentiment' (string, can be 'Positive', 'Negative', or 'Neutral') and 'description' (string, a brief explanation of the sentiment, max 1-2 sentences)."
-        },
-        { role: "user", content: transcript },
-      ],
-      response_format: { type: "json_object" },
-      temperature: 0.1, // Lower temperature for more deterministic sentiment
-      max_tokens: 150, // Sufficient for sentiment and brief description
-    });
+    const result = await retryWithBackoff(async () => {
+      const completion = await openai.chat.completions.create({
+        model: "gpt-3.5-turbo",
+        messages: [
+          {
+            role: "system",
+            content: "You are a sentiment analysis expert. Analyze the sentiment of the following conversation transcript. Respond with JSON containing two keys: 'sentiment' (string, can be 'Positive', 'Negative', or 'Neutral') and 'description' (string, a brief explanation of the sentiment, max 1-2 sentences)."
+          },
+          { role: "user", content: transcript },
+        ],
+        response_format: { type: "json_object" },
+        temperature: 0.1,
+        max_tokens: 150,
+        timeout: 30000, // 30 second timeout
+      });
 
-    const content = completion.choices[0]?.message?.content;
-    if (!content) {
-      throw new Error("OpenAI returned no content for sentiment analysis.");
-    }
+      const content = completion.choices[0]?.message?.content;
+      if (!content) {
+        throw new Error("OpenAI returned no content for sentiment analysis.");
+      }
 
-    const result = JSON.parse(content);
-
-    if (!result.sentiment || !result.description) {
-        console.error("OpenAI response missing sentiment or description:", result);
-        throw new Error("OpenAI returned invalid JSON format for sentiment analysis (missing keys).");
-    }
-    if (!["Positive", "Negative", "Neutral"].includes(result.sentiment)) {
-        console.warn("OpenAI returned unexpected sentiment value: " + result.sentiment);
-        // Optionally, normalize or default here, e.g., result.sentiment = "Neutral";
-    }
-
-    return {
-      sentiment: result.sentiment,
-      description: result.description,
-    };
-  } catch (error) {
-    console.error("Error during OpenAI sentiment analysis:", error);
-    if (error.message.includes("JSON.parse")) {
+      let parsedResult;
+      try {
+        parsedResult = JSON.parse(content);
+      } catch (parseError) {
+        console.error("Failed to parse OpenAI JSON response:", content);
         throw new Error("Failed to parse JSON response from OpenAI for sentiment analysis.");
-    }
-    throw new Error("OpenAI API error during sentiment analysis: " + error.message);
+      }
+
+      if (!parsedResult.sentiment || !parsedResult.description) {
+        console.error("OpenAI response missing sentiment or description:", parsedResult);
+        throw new Error("OpenAI returned invalid JSON format for sentiment analysis (missing keys).");
+      }
+      
+      // Normalize unexpected sentiment values
+      if (!["Positive", "Negative", "Neutral"].includes(parsedResult.sentiment)) {
+        console.warn("OpenAI returned unexpected sentiment value: " + parsedResult.sentiment + ", defaulting to Neutral");
+        parsedResult.sentiment = "Neutral";
+        parsedResult.description = "Sentiment normalized due to unexpected value: " + parsedResult.description;
+      }
+
+      return {
+        sentiment: parsedResult.sentiment,
+        description: parsedResult.description,
+      };
+    }, 3, 1000);
+    
+    return result;
+  } catch (error) {
+    console.error("OpenAI sentiment analysis failed after retries, using fallback:", error.message);
+    
+    // Use fallback sentiment analysis
+    const fallbackResult = fallbackSentimentAnalysis(transcript);
+    console.log("Using fallback sentiment analysis result:", fallbackResult);
+    
+    return fallbackResult;
   }
 }

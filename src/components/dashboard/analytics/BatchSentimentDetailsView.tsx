@@ -68,11 +68,12 @@ const BatchSentimentDetailsView: React.FC<BatchSentimentDetailsViewProps> = ({ a
     }
   };
 
-  // Data for the sentiment distribution chart
+  // Data for the sentiment distribution chart - consistent with database values
   const sentimentData = details ? [
-    { name: 'Positive', value: details.positive_count, color: '#10B981' }, // Emerald 500
-    { name: 'Negative', value: details.negative_count, color: '#EF4444' }, // Red 500
-    { name: 'Neutral', value: details.neutral_count, color: '#6B7280' },  // Gray 500
+    { name: 'Positive', value: details.positive_count || 0, color: '#22c55e' }, // Green 500 - consistent with other components
+    { name: 'Negative', value: details.negative_count || 0, color: '#ef4444' }, // Red 500
+    { name: 'Neutral', value: details.neutral_count || 0, color: '#facc15' },  // Yellow 500 - consistent with moderate
+    { name: 'Unknown', value: details.unknown_count || 0, color: '#a1a1aa' },  // Gray 400 - consistent with unknown
   ] : [];
 
   const totalSentiments = sentimentData.reduce((sum, entry) => sum + entry.value, 0);
@@ -138,18 +139,22 @@ const BatchSentimentDetailsView: React.FC<BatchSentimentDetailsViewProps> = ({ a
         <div>
           <h3 className="text-lg font-semibold mb-2">Sentiment Distribution</h3>
           {totalSentiments > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 text-center">
               <Card>
                 <CardHeader><CardTitle className="text-green-500">Positive</CardTitle></CardHeader>
-                <CardContent><p className="text-2xl font-bold">{details.positive_count}</p></CardContent>
+                <CardContent><p className="text-2xl font-bold">{details.positive_count || 0}</p></CardContent>
               </Card>
               <Card>
                 <CardHeader><CardTitle className="text-red-500">Negative</CardTitle></CardHeader>
-                <CardContent><p className="text-2xl font-bold">{details.negative_count}</p></CardContent>
+                <CardContent><p className="text-2xl font-bold">{details.negative_count || 0}</p></CardContent>
               </Card>
               <Card>
-                <CardHeader><CardTitle className="text-gray-500">Neutral</CardTitle></CardHeader>
-                <CardContent><p className="text-2xl font-bold">{details.neutral_count}</p></CardContent>
+                <CardHeader><CardTitle className="text-yellow-500">Neutral</CardTitle></CardHeader>
+                <CardContent><p className="text-2xl font-bold">{details.neutral_count || 0}</p></CardContent>
+              </Card>
+              <Card>
+                <CardHeader><CardTitle className="text-gray-500">Unknown</CardTitle></CardHeader>
+                <CardContent><p className="text-2xl font-bold">{details.unknown_count || 0}</p></CardContent>
               </Card>
             </div>
             /* Placeholder for a Pie Chart if Recharts or similar is available

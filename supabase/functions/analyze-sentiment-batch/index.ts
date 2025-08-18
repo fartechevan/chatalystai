@@ -63,15 +63,22 @@ Deno.serve(async (req: Request) => {
     const analysisDetails: Array<{ conversation_id: string; sentiment: 'good' | 'moderate' | 'bad' | 'unknown'; description: string | null }> = []; // Array to hold details
 
     console.log("analyze-sentiment-batch: FULL LOGIC - Starting sentiment analysis loop. Count:", conversations.length);
+    let processedCount = 0;
+    let successfulAnalyses = 0;
+    let failedAnalyses = 0;
+    
     for (const conv of conversations) {
       let sentimentResult: 'good' | 'moderate' | 'bad' | 'unknown' = 'unknown';
       let descriptionResult: string | null = null;
+      processedCount++;
 
       try {
+        console.log(`Processing conversation ${processedCount}/${conversations.length} (ID: ${conv.conversation_id})`);
+        
         const transcript = await formatConversationTranscript(supabaseClient, conv.conversation_id);
         if (transcript && transcript.trim() !== "") {
           const analysisResult = await analyzeSentimentWithOpenAI(openai, transcript);
-          descriptionResult = analysisResult.description || null; // Store description
+          descriptionResult = analysisResult.description || null;
 
           if (analysisResult.sentiment === "Positive") {
             sentimentResult = 'good';
@@ -83,16 +90,20 @@ Deno.serve(async (req: Request) => {
             sentimentResult = 'moderate';
             neutralCount++;
           }
+          successfulAnalyses++;
+          console.log(`Successfully analyzed conversation ${conv.conversation_id}: ${sentimentResult}`);
         } else {
           descriptionResult = "Transcript was empty or invalid.";
-          sentimentResult = 'unknown'; // Mark as unknown if no transcript
+          sentimentResult = 'unknown';
           unknownCount++;
+          console.warn(`Empty transcript for conversation ${conv.conversation_id}`);
         }
       } catch (analysisError) {
          console.error(`analyze-sentiment-batch: Error analyzing conv ${conv.conversation_id}:`, analysisError.message);
          descriptionResult = `Analysis failed: ${analysisError.message}`;
-         sentimentResult = 'unknown'; // Mark as unknown on analysis error
+         sentimentResult = 'unknown';
          unknownCount++;
+         failedAnalyses++;
       }
 
       // Add details for this conversation
@@ -101,6 +112,11 @@ Deno.serve(async (req: Request) => {
         sentiment: sentimentResult,
         description: descriptionResult,
       });
+      
+      // Log progress every 10 conversations or at the end
+      if (processedCount % 10 === 0 || processedCount === conversations.length) {
+        console.log(`Progress: ${processedCount}/${conversations.length} conversations processed. Success: ${successfulAnalyses}, Failed: ${failedAnalyses}`);
+      }
     }
     console.log("analyze-sentiment-batch: FULL LOGIC - Sentiment analysis loop completed.");
     console.log("analyze-sentiment-batch: FULL LOGIC - Counts - Positive:", positiveCount, "Negative:", negativeCount, "Neutral:", neutralCount, "Unknown:", unknownCount);
@@ -115,6 +131,7 @@ Deno.serve(async (req: Request) => {
       positive_count: positiveCount,     // Add new count
       negative_count: negativeCount,     // Add new count
       neutral_count: neutralCount,       // Add new count
+      unknown_count: unknownCount,       // Add unknown count
       conversation_ids: conversationIds,
     };
 
@@ -141,7 +158,7 @@ Deno.serve(async (req: Request) => {
     const batchAnalysisId = batchData.id;
     console.log("analyze-sentiment-batch: FULL LOGIC - Main batch insert successful, batchData.id:", batchAnalysisId);
 
-    // --- Insert individual analysis details ---
+    // --- Insert individual analysis details with batch processing ---
     if (analysisDetails.length > 0) {
       const detailPayload = analysisDetails.map(detail => ({
         batch_analysis_id: batchAnalysisId,
@@ -151,17 +168,56 @@ Deno.serve(async (req: Request) => {
       }));
 
       console.log("analyze-sentiment-batch: FULL LOGIC - Attempting to insert details count:", detailPayload.length);
-      const { error: detailError } = await supabaseClient
-        .from('batch_sentiment_analysis_details')
-        .insert(detailPayload);
+      
+      // Insert details in batches to avoid overwhelming the database
+      const batchSize = 100;
+      let insertedCount = 0;
+      let failedInserts = 0;
+      
+      for (let i = 0; i < detailPayload.length; i += batchSize) {
+        const batch = detailPayload.slice(i, i + batchSize);
+        
+        try {
+          const { error: detailError } = await supabaseClient
+            .from('batch_sentiment_analysis_details')
+            .insert(batch);
 
-      if (detailError) {
-        console.error("analyze-sentiment-batch: FULL LOGIC - DB error storing batch analysis DETAILS:", detailError.message);
-        // Decide how to handle this - maybe log and continue, or throw?
-        // For now, log and continue, but the frontend might not get details later.
-        console.warn("analyze-sentiment-batch: Failed to store individual sentiment details for batch:", batchAnalysisId);
-      } else {
-        console.log("analyze-sentiment-batch: FULL LOGIC - Details insert successful for batch:", batchAnalysisId);
+          if (detailError) {
+            console.error(`analyze-sentiment-batch: DB error storing batch ${i}-${i + batch.length}:`, detailError.message);
+            failedInserts += batch.length;
+            
+            // Try inserting individual records if batch fails
+            console.log("Attempting individual inserts for failed batch...");
+            for (const detail of batch) {
+              try {
+                const { error: individualError } = await supabaseClient
+                  .from('batch_sentiment_analysis_details')
+                  .insert([detail]);
+                
+                if (!individualError) {
+                  insertedCount++;
+                  failedInserts--;
+                } else {
+                  console.error(`Failed to insert individual detail for conversation ${detail.conversation_id}:`, individualError.message);
+                }
+              } catch (individualInsertError) {
+                console.error(`Exception during individual insert for conversation ${detail.conversation_id}:`, individualInsertError);
+              }
+            }
+          } else {
+            insertedCount += batch.length;
+            console.log(`Successfully inserted batch ${i}-${i + batch.length} (${batch.length} records)`);
+          }
+        } catch (batchInsertError) {
+          console.error(`Exception during batch insert ${i}-${i + batch.length}:`, batchInsertError);
+          failedInserts += batch.length;
+        }
+      }
+      
+      console.log(`analyze-sentiment-batch: Details insertion completed. Inserted: ${insertedCount}, Failed: ${failedInserts}`);
+      
+      if (failedInserts > 0) {
+        console.warn(`analyze-sentiment-batch: ${failedInserts} detail records failed to insert for batch: ${batchAnalysisId}`);
       }
     }
     // --- End Insert details ---

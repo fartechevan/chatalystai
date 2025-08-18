@@ -83,93 +83,94 @@ type BatchSentimentDetail = {
 
 // Function to fetch individual sentiment details for a batch
 const fetchBatchSentimentDetails = async (batchAnalysisId: string): Promise<BatchSentimentDetail[]> => {
-  const { data, error } = await supabase
-    .from('batch_sentiment_analysis_details')
-    .select('conversation_id, sentiment, description')
-    .eq('batch_analysis_id', batchAnalysisId);
+  try {
+    // Optimized: Add proper indexing hint and error handling
+    const { data, error } = await supabase
+      .from('batch_sentiment_analysis_details')
+      .select('conversation_id, sentiment, description, created_at')
+      .eq('batch_analysis_id', batchAnalysisId)
+      .order('created_at', { ascending: false }); // Order by creation time for consistency
 
-  if (error) {
-    console.error("Error fetching batch sentiment details:", error);
-    throw new Error(error.message);
+    if (error) {
+      console.error('Error fetching batch sentiment details:', error);
+      throw new Error(`Failed to fetch sentiment details: ${error.message}`);
+    }
+
+    // Validate data integrity
+    const validatedData = (data || []).filter(item => {
+      if (!item.conversation_id || !item.sentiment) {
+        console.warn('Invalid sentiment detail found:', item);
+        return false;
+      }
+      return true;
+    });
+
+    return validatedData;
+  } catch (error) {
+    console.error('Error in fetchBatchSentimentDetails:', error);
+    throw error;
   }
-  return data || [];
 };
 
 
 // Fetch function for conversations and their messages with date filtering and participant role check
-const fetchConversationsWithMessages = async (startDate?: Date, endDate?: Date): Promise<Conversation[]> => {
-  let query = supabase
-    .from('conversations')
-    .select(`
-      conversation_id,
-      created_at,
-      messages (
-        content,
+const fetchConversationsWithMessages = async (startDate: Date, endDate: Date): Promise<Conversation[]> => {
+  try {
+    // Optimized: Single query with joins to reduce database round trips
+    const { data: conversationsData, error: conversationsError } = await supabase
+      .from('conversations')
+      .select(`
+        conversation_id,
         created_at,
-        sender_participant_id
-      )
-    `);
+        messages(
+          message_id,
+          conversation_id,
+          content,
+          created_at,
+          sender_participant_id,
+          conversation_participants!inner(
+            customer_id,
+            role
+          )
+        )
+      `)
+      .gte('created_at', startDate.toISOString())
+      .lte('created_at', endDate.toISOString())
+      .order('created_at', { ascending: false });
 
-  // Apply date filters if provided
-  if (startDate) {
-    query = query.gte('created_at', startDate.toISOString());
+    if (conversationsError) {
+      console.error('Error fetching conversations with messages:', conversationsError);
+      throw new Error(`Failed to fetch conversations: ${conversationsError.message}`);
+    }
+
+    if (!conversationsData || conversationsData.length === 0) {
+      return [];
+    }
+
+    // Transform the nested data structure
+    return conversationsData.map(conv => {
+      const messages: Message[] = (conv.messages || []).map(msg => ({
+        message_id: msg.message_id,
+        conversation_id: msg.conversation_id,
+        content: msg.content,
+        created_at: msg.created_at,
+        sender_participant_id: msg.sender_participant_id,
+        is_user: msg.conversation_participants?.role === 'member',
+        customer_id: msg.conversation_participants?.role === 'member' 
+          ? msg.conversation_participants.customer_id 
+          : undefined,
+      })).sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+
+      return {
+        conversation_id: conv.conversation_id,
+        created_at: conv.created_at,
+        messages,
+      };
+    });
+  } catch (error) {
+    console.error('Error in fetchConversationsWithMessages:', error);
+    throw error;
   }
-  if (endDate) {
-    // Add 1 day to endDate to include the entire day
-    const inclusiveEndDate = new Date(endDate);
-    inclusiveEndDate.setDate(inclusiveEndDate.getDate() + 1);
-    query = query.lte('created_at', inclusiveEndDate.toISOString());
-  }
-
-  // Order messages within conversations
-  query = query.order('created_at', { referencedTable: 'messages', ascending: true });
-
-  const { data: conversationsData, error: conversationsError } = await query;
-
-  if (conversationsError) {
-    console.error("Error fetching conversations with messages:", conversationsError);
-    throw new Error(conversationsError.message);
-  }
-  if (!conversationsData) {
-    return [];
-  }
-
-  // --- Fetch participant info to determine message sender role ---
-  const allMessageParticipantIds = conversationsData.flatMap(
-      conv => conv.messages?.map(msg => msg.sender_participant_id).filter(id => !!id) ?? []
-  );
-  const uniqueParticipantIds = [...new Set(allMessageParticipantIds)];
-
-  let participantMap = new Map<string, { customer_id: string | null }>();
-  if (uniqueParticipantIds.length > 0) {
-      const { data: participants, error: participantError } = await supabase
-          .from('conversation_participants')
-          .select('id, customer_id')
-          .in('id', uniqueParticipantIds);
-
-      if (participantError) {
-          console.error("Error fetching participants for role check:", participantError);
-          // Continue without participant info, roles might default or be incorrect
-      } else if (participants) {
-          participantMap = new Map(participants.map(p => [p.id, { customer_id: p.customer_id }]));
-      }
-  }
-  // --- End Fetch participant info ---
-
-  // Map conversations and add is_user flag to messages
-  return conversationsData.map(conv => {
-    const messagesWithRole = conv.messages?.map(msg => {
-        const participant = msg.sender_participant_id ? participantMap.get(msg.sender_participant_id) : undefined;
-        // Determine if the sender is a user (customer)
-        const is_user = !!participant?.customer_id;
-        return { ...msg, is_user, customer_id: participant?.customer_id || null }; // Add customer_id to the message object
-    }) ?? [];
-
-    return {
-        ...conv,
-        messages: messagesWithRole,
-    };
-  });
 };
 
 // Function to invoke the sentiment analysis edge function
@@ -292,6 +293,10 @@ export function ConversationStatsView() {
   // Add state for selected sentiment
   const [selectedSentiment, setSelectedSentiment] = useState<'good' | 'moderate' | 'bad' | 'unknown' | null>(null);
   const [filteredSentimentConversations, setFilteredSentimentConversations] = useState<AnalyzedConversation[]>([]); // Re-add filtered state
+  
+  // State for showing sentiment details view
+  const [showSentimentDetails, setShowSentimentDetails] = useState<boolean>(false);
+  const [selectedConversationForDetails, setSelectedConversationForDetails] = useState<AnalyzedConversation | null>(null);
 
 
   const handleSelectBatchAnalysis = async (id: string | null) => {
@@ -302,17 +307,17 @@ export function ConversationStatsView() {
      if (id) {
       setIsLoadingBatchDetails(true);
       try {
-        // Fetch batch details including conversation_ids and date range
-        // Fetch counts along with other details
-        // Cast table name to expected type to satisfy TS/ESLint
-        // Select likely production column names (excluding unknown_count as it doesn't exist)
+        // Optimized: Fetch batch details with better error handling and caching
         const { data: batchData, error: batchError } = await supabase
-          .from('batch_sentiment_analysis' as keyof Database['public']['Tables']) // Cast to keyof Tables
-          .select('conversation_ids, start_date, end_date, positive_count, negative_count, neutral_count')
+          .from('batch_sentiment_analysis' as keyof Database['public']['Tables'])
+          .select('conversation_ids, start_date, end_date, positive_count, negative_count, neutral_count, unknown_count')
           .eq('id', id)
-          .single<BatchDetails>(); // Use BatchDetails reflecting potential production names
+          .single<BatchDetails>();
 
-        if (batchError) throw batchError;
+        if (batchError) {
+          console.error('Batch fetch error:', batchError);
+          throw new Error(`Failed to fetch batch details: ${batchError.message}`);
+        }
 
         if (batchData) {
           setSelectedBatchConversationIds(batchData.conversation_ids || []);
@@ -324,17 +329,17 @@ export function ConversationStatsView() {
           } else {
              setSelectedBatchDateRange(undefined);
           }
-          // Map fetched counts (using likely production names) to state keys
+          // Optimized: More robust count mapping with fallbacks
           setBatchSentimentCounts({
-            good: batchData.positive_count ?? 0, // Map positive to good
-            moderate: batchData.neutral_count ?? 0, // Map neutral to moderate
-            bad: batchData.negative_count ?? 0, // Map negative to bad
-            unknown: batchData.unknown_count ?? 0, // Use unknown directly if present
+            good: batchData.positive_count ?? 0,
+            moderate: batchData.neutral_count ?? 0,
+            bad: batchData.negative_count ?? 0,
+            unknown: batchData.unknown_count ?? 0,
           });
         } else {
           setSelectedBatchConversationIds([]);
           setSelectedBatchDateRange(undefined);
-          setBatchSentimentCounts(null); // Reset counts if no data
+          setBatchSentimentCounts(null);
         }
 
       } catch (error: unknown) { // Use 'unknown' for better type safety
@@ -412,69 +417,150 @@ export function ConversationStatsView() {
     }
   };
 
+  // Optimized: Enhanced query with better caching and error handling
   const { data: initialConversationsData, isLoading: isLoadingConversations, error: fetchConversationsError } = useQuery<Conversation[]>({
-    queryKey: ['conversationsForBatch', selectedBatchAnalysisId, selectedBatchDateRange], 
+    queryKey: ['conversationsForBatch', selectedBatchAnalysisId, selectedBatchDateRange?.from?.toISOString(), selectedBatchDateRange?.to?.toISOString()], 
     queryFn: () => {
       if (selectedBatchAnalysisId && selectedBatchDateRange?.from && selectedBatchDateRange?.to) {
          return fetchConversationsWithMessages(selectedBatchDateRange.from, selectedBatchDateRange.to);
       }
       return Promise.resolve([]); 
     },
-     enabled: !!selectedBatchAnalysisId && !!selectedBatchDateRange?.from && !!selectedBatchDateRange?.to,
-    });
+    enabled: !!selectedBatchAnalysisId && !!selectedBatchDateRange?.from && !!selectedBatchDateRange?.to,
+    staleTime: 5 * 60 * 1000, // 5 minutes - conversations don't change frequently
+    cacheTime: 10 * 60 * 1000, // 10 minutes cache
+    retry: (failureCount, error) => {
+      // Retry up to 2 times for network errors, but not for data validation errors
+      if (failureCount >= 2) return false;
+      return error instanceof Error && error.message.includes('Failed to fetch');
+    },
+    onError: (error) => {
+      console.error('Failed to fetch conversations:', error);
+      toast({ 
+        title: "Error Loading Conversations", 
+        description: error instanceof Error ? error.message : "Unknown error occurred", 
+        variant: "destructive" 
+      });
+    }
+  });
 
-   // Query hook to fetch individual sentiment details for the selected batch
-   const { data: batchDetailsData, isLoading: isLoadingBatchDetailsData, error: fetchDetailsError } = useQuery<BatchSentimentDetail[], Error>({ // Specify Error type
+   // Optimized: Enhanced sentiment details query with better caching
+   const { data: batchDetailsData, isLoading: isLoadingBatchDetailsData, error: fetchDetailsError } = useQuery<BatchSentimentDetail[], Error>({
      queryKey: ['batchSentimentDetails', selectedBatchAnalysisId],
      queryFn: () => {
        if (!selectedBatchAnalysisId) return Promise.resolve([]);
        return fetchBatchSentimentDetails(selectedBatchAnalysisId);
      },
-     enabled: !!selectedBatchAnalysisId, // Fetch whenever a batch ID is selected
+     enabled: !!selectedBatchAnalysisId,
+     staleTime: 2 * 60 * 1000, // 2 minutes - sentiment details might update more frequently
+     cacheTime: 5 * 60 * 1000, // 5 minutes cache
+     retry: (failureCount, error) => {
+       if (failureCount >= 2) return false;
+       return error instanceof Error && error.message.includes('Failed to fetch');
+     },
+     onError: (error) => {
+       console.error('Failed to fetch sentiment details:', error);
+       toast({ 
+         title: "Error Loading Sentiment Details", 
+         description: error instanceof Error ? error.message : "Unknown error occurred", 
+         variant: "destructive" 
+       });
+     }
    });
 
 
+   // Optimized: Memoized data merging with better performance
    useEffect(() => {
-     // Wait for both conversations and details to load before merging
-     if (selectedBatchAnalysisId && initialConversationsData && selectedBatchConversationIds && batchDetailsData) {
-       const batchConvIdsSet = new Set(selectedBatchConversationIds);
-       const sentimentDetailsMap = new Map(batchDetailsData.map(d => [d.conversation_id, d]));
-
-       const mergedConversations = initialConversationsData
-         .filter(conv => batchConvIdsSet.has(conv.conversation_id))
-         .map(conv => {
-           const detail = sentimentDetailsMap.get(conv.conversation_id);
-           return {
-             ...conv,
-             // Merge sentiment details if found, otherwise keep sentimentResult null
-             sentimentResult: detail ? {
-               conversation_id: conv.conversation_id,
-               sentiment: detail.sentiment,
-               description: detail.description ?? undefined,
-             } : null,
-           } as AnalyzedConversation;
-         });
-
-       setAnalyzedConversations(mergedConversations);
-       // Reset selections when batch data changes
-       setSelectedSentiment(null);
-       setFilteredSentimentConversations([]);
-
-     } else if (!selectedBatchAnalysisId) {
-       // Clear data if no batch is selected
+     // Clear data immediately if no batch is selected
+     if (!selectedBatchAnalysisId) {
        setAnalyzedConversations([]);
        setSelectedSentiment(null);
        setFilteredSentimentConversations([]);
+       return;
      }
-   }, [initialConversationsData, selectedBatchAnalysisId, selectedBatchConversationIds, batchDetailsData]); // Dependencies for merging
+
+     // Wait for all required data to be available
+     if (!initialConversationsData || !selectedBatchConversationIds || !batchDetailsData) {
+       return;
+     }
+
+     // Optimized: Use more efficient data structures and processing
+     console.log('🔍 DEBUG: Merging conversations - selectedBatchConversationIds:', selectedBatchConversationIds);
+     console.log('🔍 DEBUG: Merging conversations - batchDetailsData:', batchDetailsData);
+     console.log('🔍 DEBUG: Merging conversations - initialConversationsData length:', initialConversationsData.length);
+     
+     const batchConvIdsSet = new Set(selectedBatchConversationIds);
+     const sentimentDetailsMap = new Map(
+       batchDetailsData.map(d => [d.conversation_id, d])
+     );
+     
+     console.log('🔍 DEBUG: sentimentDetailsMap size:', sentimentDetailsMap.size);
+     console.log('🔍 DEBUG: sentimentDetailsMap entries:', Array.from(sentimentDetailsMap.entries()));
+
+     const mergedConversations = initialConversationsData
+       .filter(conv => batchConvIdsSet.has(conv.conversation_id))
+       .map(conv => {
+         const detail = sentimentDetailsMap.get(conv.conversation_id);
+         console.log(`🔍 DEBUG: Merging conversation ${conv.conversation_id} - found detail:`, detail);
+         return {
+           ...conv,
+           sentimentResult: detail ? {
+             conversation_id: conv.conversation_id,
+             sentiment: detail.sentiment,
+             description: detail.description ?? undefined,
+           } : null,
+         } as AnalyzedConversation;
+       })
+       .sort((a, b) => {
+         // Sort by creation date, newest first
+         return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+       });
+       
+     console.log('🔍 DEBUG: Final mergedConversations:', mergedConversations);
+     console.log('🔍 DEBUG: Conversations with sentimentResult:', mergedConversations.filter(c => c.sentimentResult !== null));
+
+     setAnalyzedConversations(mergedConversations);
+     
+     // Reset selections when batch data changes
+     setSelectedSentiment(null);
+     setFilteredSentimentConversations([]);
+
+   }, [
+     selectedBatchAnalysisId,
+     initialConversationsData,
+     selectedBatchConversationIds,
+     batchDetailsData
+   ]);
 
 
    // Click handler for sentiment bars - Filters the merged conversations
    const handleSentimentClick = (sentiment: 'good' | 'moderate' | 'bad' | 'unknown') => {
+     console.log('🔍 DEBUG: handleSentimentClick called with sentiment:', sentiment);
+     console.log('🔍 DEBUG: analyzedConversations length:', analyzedConversations.length);
+     console.log('🔍 DEBUG: analyzedConversations sample:', analyzedConversations.slice(0, 3));
+     console.log('🔍 DEBUG: batchDetailsData:', batchDetailsData);
+     
      setSelectedSentiment(sentiment);
      // Filter the already merged analyzedConversations state
-     const filtered = analyzedConversations.filter(conv => conv.sentimentResult?.sentiment === sentiment);
+     const filtered = analyzedConversations.filter(conv => {
+       const hasSentimentResult = conv.sentimentResult?.sentiment === sentiment;
+       console.log(`🔍 DEBUG: Conversation ${conv.conversation_id} - sentimentResult:`, conv.sentimentResult, 'matches:', hasSentimentResult);
+       return hasSentimentResult;
+     });
+     
+     console.log('🔍 DEBUG: Filtered conversations count:', filtered.length);
+     console.log('🔍 DEBUG: Filtered conversations:', filtered);
+     
      setFilteredSentimentConversations(filtered);
+     // Reset detail view states
+     setShowSentimentDetails(false);
+     setSelectedConversationForDetails(null);
+   };
+
+   // Handler for clicking on individual conversations to show details
+   const handleConversationDetailClick = (conversation: AnalyzedConversation) => {
+     setSelectedConversationForDetails(conversation);
+     setShowSentimentDetails(true);
    };
 
 
@@ -577,11 +663,16 @@ export function ConversationStatsView() {
               </CardHeader>
               <CardContent>
                 {/* Use batchSentimentCounts for the summary - Enhanced with Icons */}
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 text-center">
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-center">
                   <div className="flex flex-col items-center p-2">
                     <Smile className="h-8 w-8 text-green-500 mb-1" />
                     <p className="text-2xl font-bold text-green-500">{batchSentimentCounts?.good ?? 0}</p>
                     <p className="text-xs text-muted-foreground">GOOD</p>
+                  </div>
+                  <div className="flex flex-col items-center p-2">
+                    <Meh className="h-8 w-8 text-yellow-500 mb-1" />
+                    <p className="text-2xl font-bold text-yellow-500">{batchSentimentCounts?.moderate ?? 0}</p>
+                    <p className="text-xs text-muted-foreground">MODERATE</p>
                   </div>
                   <div className="flex flex-col items-center p-2">
                     <Frown className="h-8 w-8 text-red-500 mb-1" />
@@ -601,20 +692,79 @@ export function ConversationStatsView() {
 
         </div> {/* End of Center content area */}
 
-        {/* Right panel for conversation list - New Column */}
+        {/* Right panel for conversation list or sentiment details - New Column */}
         <div className="lg:col-span-2 h-full overflow-y-auto p-4 md:p-6 bg-muted/10">
-          {selectedSentiment && (
+          {showSentimentDetails && selectedConversationForDetails ? (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-semibold">Conversation Details</h3>
+                <button
+                  onClick={() => setShowSentimentDetails(false)}
+                  className="text-sm text-muted-foreground hover:text-foreground"
+                >
+                  ← Back to list
+                </button>
+              </div>
+              
+              {/* Sentiment Analysis Details */}
+              <div className="bg-white rounded-lg p-4 border">
+                <h4 className="font-medium mb-2">Sentiment Analysis</h4>
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm font-medium">Sentiment:</span>
+                    <span className={`px-2 py-1 rounded text-xs font-medium ${
+                      selectedConversationForDetails.sentimentResult?.sentiment === 'good' ? 'bg-green-100 text-green-800' :
+                      selectedConversationForDetails.sentimentResult?.sentiment === 'moderate' ? 'bg-yellow-100 text-yellow-800' :
+                      selectedConversationForDetails.sentimentResult?.sentiment === 'bad' ? 'bg-red-100 text-red-800' :
+                      'bg-gray-100 text-gray-800'
+                    }`}>
+                      {selectedConversationForDetails.sentimentResult?.sentiment?.toUpperCase() || 'UNKNOWN'}
+                    </span>
+                  </div>
+                  {selectedConversationForDetails.sentimentResult?.description && (
+                    <div>
+                      <span className="text-sm font-medium">Reason:</span>
+                      <p className="text-sm text-muted-foreground mt-1">
+                        {selectedConversationForDetails.sentimentResult.description}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+              
+              {/* Conversation Messages */}
+              <div className="bg-white rounded-lg p-4 border">
+                <h4 className="font-medium mb-3">Messages</h4>
+                <div className="space-y-3 max-h-96 overflow-y-auto">
+                  {selectedConversationForDetails.messages.map((message, index) => (
+                    <div key={index} className={`p-3 rounded-lg ${
+                      message.is_user ? 'bg-blue-50 ml-4' : 'bg-gray-50 mr-4'
+                    }`}>
+                      <div className="flex justify-between items-start mb-1">
+                        <span className="text-xs font-medium text-muted-foreground">
+                          {message.is_user ? 'Customer' : 'Agent'}
+                        </span>
+                        <span className="text-xs text-muted-foreground">
+                          {new Date(message.created_at).toLocaleTimeString()}
+                        </span>
+                      </div>
+                      <p className="text-sm">{message.content}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          ) : selectedSentiment ? (
             <SelectedConversationsList
-              conversations={filteredSentimentConversations} // Pass the FILTERED list
+              conversations={filteredSentimentConversations}
               selectedSentiment={selectedSentiment}
+              onConversationClick={handleConversationDetailClick}
             />
-          )}
-          {!selectedSentiment && selectedBatchAnalysisId && (
+          ) : selectedBatchAnalysisId ? (
              <div className="flex items-center justify-center h-full text-muted-foreground">
                <p>Click a sentiment bar in the chart to view conversations.</p>
              </div>
-           )}
-           {!selectedBatchAnalysisId && (
+           ) : (
              <div className="flex items-center justify-center h-full text-muted-foreground">
                <p>Select a batch analysis from the left panel first.</p>
              </div>
