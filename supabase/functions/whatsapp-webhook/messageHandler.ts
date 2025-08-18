@@ -1,5 +1,3 @@
-// deno-lint-ignore-file
-// @deno-types="https://esm.sh/@supabase/supabase-js@2.43.4"
 import { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.43.4";
 import { findOrCreateCustomer } from "./customerHandler.ts";
 import { findOrCreateConversation } from "./conversationHandler.ts";

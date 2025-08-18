@@ -1,4 +1,3 @@
-// deno-lint-ignore-file
 import { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.43.4";
 import { corsHeaders } from "../_shared/cors.ts";
 
@@ -6,13 +5,31 @@ import { corsHeaders } from "../_shared/cors.ts";
 export interface WebhookPayload {
   event: string;
   instance: string;
-  data: any;
+  data: WhatsAppMessageData;
 }
 
-export function extractMessageContent(data: any): string {
+interface WhatsAppMessageData {
+  key: {
+    remoteJid: string;
+    fromMe?: boolean;
+    id: string;
+  };
+  pushName?: string;
+  message?: any;
+  messageType?: string;
+  messageTimestamp?: number;
+}
+
+export function extractMessageContent(data: WhatsAppMessageData): string {
   if (data && data.message) {
+    if (typeof data.message === 'string') {
+      return data.message;
+    }
     if (data.message.conversation) {
       return data.message.conversation;
+    }
+    if (data.message.text) {
+      return data.message.text;
     }
     if (data.message.extendedTextMessage && data.message.extendedTextMessage.text) {
       return data.message.extendedTextMessage.text;

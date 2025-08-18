@@ -154,13 +154,14 @@ serve(async (req: Request) => {
         let knowledgeUsed: unknown = null;
 
         if (agentData.agent_type === 'chattalyst') {
-          // Simplified logic for Chattalyst agent - direct OpenAI call or knowledge base query
-          // This part needs to be fleshed out based on how 'chattalyst' agents are supposed to work.
-          // For now, let's assume a direct OpenAI call with the agent's prompt and user query.
-          
-          const apiKey = Deno.env.get("OPENAI_API_KEY");
-          if (!apiKey) throw new Error("OPENAI_API_KEY environment variable not set for internal query.");
-          const openai = new OpenAI({ apiKey });
+          try {
+            console.log(`[${requestStartTime}] Internal Query: Processing Chattalyst agent.`);
+            const apiKey = Deno.env.get("OPENAI_API_KEY");
+            if (!apiKey) {
+              console.error(`[${requestStartTime}] Internal Query: OPENAI_API_KEY not set.`);
+              throw new Error("OPENAI_API_KEY environment variable not set for internal query.");
+            }
+            const openai = new OpenAI({ apiKey });
 
           // Fetch knowledge documents if any
           const { data: knowledgeLinks } = await supabase
@@ -183,8 +184,11 @@ serve(async (req: Request) => {
             if (matchError) {
               console.error(`[${requestStartTime}] Internal Query: Error matching document chunks for agent ${agentId}:`, matchError.message);
             } else if (matchedChunks && matchedChunks.length > 0) {
+              console.log(`[${requestStartTime}] Internal Query: Found ${matchedChunks.length} matching chunks in knowledge base.`);
               contextText = matchedChunks.map(chunk => chunk.content).join("\n\n");
               knowledgeUsed = matchedChunks.map(chunk => ({ id: chunk.id, title: chunk.document_title, similarity: chunk.similarity }));
+            } else {
+              console.log(`[${requestStartTime}] Internal Query: No matching chunks found in knowledge base.`);
             }
           }
 
@@ -196,13 +200,19 @@ serve(async (req: Request) => {
           }
           messages.push({ role: "user", content: query });
           
+          console.log(`[${requestStartTime}] Internal Query: Calling OpenAI API.`);
           const completion = await openai.chat.completions.create({
             model: "gpt-3.5-turbo",
             messages: messages,
           });
           responseText = completion.choices[0]?.message?.content?.trim() || null;
-
-        } else if (agentData.agent_type === 'CustomAgent' && agentData.custom_agent_config?.webhook_url) {
+          console.log(`[${requestStartTime}] Internal Query: OpenAI API call successful. Response:`, responseText);
+        } catch (e) {
+            const error = e as Error;
+            console.error(`[${requestStartTime}] Internal Query: Error processing Chatalyst agent. Error: ${error.message}`);
+            return createJsonResponse({ error: `Failed to process Chatalyst agent: ${error.message}` }, 500);
+        }
+      } else if (agentData.agent_type === 'CustomAgent' && agentData.custom_agent_config?.webhook_url) {
           const webhookUrl = agentData.custom_agent_config.webhook_url;
           console.log(`[${requestStartTime}] Internal Query: Forwarding to Custom Agent webhook: ${webhookUrl} for agent ${agentId}`);
           
