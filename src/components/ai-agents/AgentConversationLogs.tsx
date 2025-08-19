@@ -257,22 +257,23 @@ const AgentConversationLogs: React.FC<AgentConversationLogsProps> = ({ sessionId
             {/* Display the full session ID */}
             {sessionId ? `Conversation Logs (Session: ${sessionId})` : 'Select a Session'}
           </CardTitle>
-            {sessionId && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={handleEndSession}
-                disabled={endSessionMutation.isPending}
-                className="ml-2"
-              >
-                {endSessionMutation.isPending ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <PowerOff className="h-4 w-4" />
-                )}
-                End Session
-              </Button>
-            )}
+          {sessionId && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleEndSession}
+              disabled={endSessionMutation.isPending || !sessionId}
+              aria-label="End Session"
+              className="text-red-600 border-red-600 hover:bg-red-50 hover:text-red-700"
+            >
+              {endSessionMutation.isPending ? (
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              ) : (
+                <PowerOff className="mr-2 h-4 w-4" />
+              )}
+              End Session
+            </Button>
+          )}
         </CardHeader>
         <CardContent className="flex-grow overflow-auto p-4">
            {!sessionId ? (
