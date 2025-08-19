@@ -107,6 +107,14 @@ export function DashboardStats({
         className="col-span-1 lg:col-span-3"
       />
 
+      <StatsCard
+        title="INCOMING LEADS"
+        value={leads.length}
+        // color will default to text-primary
+        subValue={`${leads.reduce((acc, lead) => acc + Number(lead.value || 0), 0)} RM Total Value`}
+        className="col-span-1 lg:col-span-3"
+      />
+
       {/* <LeadSourcesSection className="col-span-1 lg:col-span-3 lg:row-span-2" /> */} {/* Removed */}
 
       {/* Second row */}

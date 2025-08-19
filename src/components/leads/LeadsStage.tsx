@@ -83,16 +83,7 @@ export function LeadsStage({ name, id, index = 0, leads, onLeadClick }: LeadsSta
         </Droppable>
       </CardContent>
 
-      <CardFooter className="p-3 border-t">
-        <Button
-          variant="outline"
-          className="w-full text-sm"
-          onClick={() => setIsAddLeadOpen(true)}
-        >
-          <Plus className="h-4 w-4 mr-2" />
-          Add lead
-        </Button>
-      </CardFooter>
+
 
       <AddLeadDialog
         isOpen={isAddLeadOpen}
