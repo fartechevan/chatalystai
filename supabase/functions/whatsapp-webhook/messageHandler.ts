@@ -6,7 +6,6 @@ import { extractMessageContent } from "./utils.ts";
 interface AiAgentHandlerResult {
   response?: string;
   image?: string;
-  knowledge_used?: unknown;
 }
 
 interface WhatsAppMessageData {
@@ -231,21 +230,6 @@ export async function handleMessageEvent(supabaseClient: SupabaseClient, data: W
                 }
 
                 if (currentSessionId) {
-                    // Record user message to agent_conversations table
-                    const { error: userMessageError } = await supabaseClient
-                        .from('agent_conversations')
-                        .insert({
-                            session_id: currentSessionId,
-                            message_content: messageText,
-                            sender_type: 'user',
-                            message_timestamp: now.toISOString()
-                        });
-                    
-                    if (userMessageError) {
-                        console.error(`[MessageHandler] Error recording user message for session ${currentSessionId}:`, userMessageError.message);
-                    } else {
-                        console.log(`[MessageHandler] User message recorded for session ${currentSessionId}`);
-                    }
                     try {
                         const invokeUrl = `${Deno.env.get("SUPABASE_URL")}/functions/v1/ai-agent-handler`;
                         const response = await fetch(invokeUrl, {
@@ -269,25 +253,6 @@ export async function handleMessageEvent(supabaseClient: SupabaseClient, data: W
                         } else {
                             const result = await response.json() as AiAgentHandlerResult;
                             console.log(`[MessageHandler] AI Agent Handler response for session ${currentSessionId}:`, result);
-
-                            // Record AI response to agent_conversations table
-                            if (result && result.response) {
-                                const { error: aiMessageError } = await supabaseClient
-                                    .from('agent_conversations')
-                                    .insert({
-                                        session_id: currentSessionId,
-                                        message_content: result.response,
-                                        sender_type: 'ai',
-                                        message_timestamp: new Date().toISOString(),
-                                        knowledge_used: result.knowledge_used || null
-                                    });
-                                
-                                if (aiMessageError) {
-                                    console.error(`[MessageHandler] Error recording AI response for session ${currentSessionId}:`, aiMessageError.message);
-                                } else {
-                                    console.log(`[MessageHandler] AI response recorded for session ${currentSessionId}`);
-                                }
-                            }
 
                             if (result && result.response) {
                                 console.log(`[MessageHandler] Preparing to send message to ${remoteJid.split('@')[0]}`);

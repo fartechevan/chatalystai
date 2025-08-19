@@ -903,15 +903,7 @@ const AgentDetailsPanel: React.FC<AgentDetailsPanelProps> = ({ selectedAgentId, 
         >
           <Send className="h-4 w-4" />
         </Button>
-        <Button
-          variant="destructive"
-          onClick={handleEndSession}
-          disabled={endSessionMutation.isPending || testAgentMutation.isPending}
-          aria-label="End Session"
-          className="text-red-600 border-red-600 hover:bg-red-50 hover:text-red-700"
-        >
-          <Trash2 className="h-4 w-4" />
-        </Button>
+
       </div>
     </div>
   );

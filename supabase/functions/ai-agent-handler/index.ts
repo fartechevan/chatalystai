@@ -1,3 +1,4 @@
+// @deno-types="https://deno.land/std@0.168.0/http/server.ts"
 import { serve } from 'std/http/server.ts';
 import { corsHeaders } from '../_shared/cors.ts';
 import { createSupabaseClient, createSupabaseServiceRoleClient } from '../_shared/supabaseClient.ts';
@@ -68,11 +69,66 @@ interface AgentForUpdate {
 
 function createJsonResponse(body: unknown, status: number = 200): Response {
   const responseBody = status === 204 ? null : JSON.stringify(body);
-  const headers = { ...corsHeaders };
+  const headers = { ...corsHeaders } as Record<string, string>;
   if (status !== 204) {
     headers['Content-Type'] = 'application/json';
   }
   return new Response(responseBody, { status, headers });
+}
+
+// Validation function to check for channel conflicts
+async function validateChannelConflicts(
+  supabase: ReturnType<typeof createSupabaseServiceRoleClient>,
+  channelsToCheck: AgentChannelPayload[],
+  excludeAgentId?: string
+): Promise<{ hasConflicts: boolean; conflicts: Array<{ channel_id: string; agent_name: string; agent_id: string }> }> {
+  if (!channelsToCheck || channelsToCheck.length === 0) {
+    return { hasConflicts: false, conflicts: [] };
+  }
+
+  // Get channel IDs that are enabled
+  const enabledChannelIds = channelsToCheck
+    .filter(channel => channel.is_enabled_on_channel !== false)
+    .map(channel => channel.integrations_config_id);
+
+  if (enabledChannelIds.length === 0) {
+    return { hasConflicts: false, conflicts: [] };
+  }
+
+  // Query for existing enabled channels linked to other ENABLED agents
+  let query = supabase
+    .from('ai_agent_channels')
+    .select(`
+      integrations_config_id,
+      agent_id,
+      ai_agents!inner(name, is_enabled)
+    `)
+    .in('integrations_config_id', enabledChannelIds)
+    .eq('is_enabled_on_channel', true)
+    .eq('ai_agents.is_enabled', true);
+
+  // Exclude current agent if updating
+  if (excludeAgentId) {
+    query = query.neq('agent_id', excludeAgentId);
+  }
+
+  const { data: existingChannels, error } = await query;
+
+  if (error) {
+    console.error('Error checking channel conflicts:', error);
+    throw new Error('Failed to validate channel conflicts');
+  }
+
+  const conflicts = (existingChannels || []).map((channel: { integrations_config_id: string; agent_id: string; ai_agents: { name: string; is_enabled: boolean } }) => ({
+    channel_id: channel.integrations_config_id,
+    agent_name: channel.ai_agents.name,
+    agent_id: channel.agent_id
+  }));
+
+  return {
+    hasConflicts: conflicts.length > 0,
+    conflicts
+  };
 }
 
 async function generateEmbedding(text: string): Promise<number[]> {
@@ -171,7 +227,7 @@ serve(async (req: Request) => {
 
           let contextText = "";
           if (knowledgeLinks && knowledgeLinks.length > 0) {
-            const documentIds = knowledgeLinks.map(link => link.document_id);
+            const documentIds = knowledgeLinks.map((link: { document_id: string }) => link.document_id);
             const queryEmbedding = await generateEmbedding(query);
 
             const { data: matchedChunks, error: matchError } = await supabase.rpc('match_document_chunks', {
@@ -185,8 +241,8 @@ serve(async (req: Request) => {
               console.error(`[${requestStartTime}] Internal Query: Error matching document chunks for agent ${agentId}:`, matchError.message);
             } else if (matchedChunks && matchedChunks.length > 0) {
               console.log(`[${requestStartTime}] Internal Query: Found ${matchedChunks.length} matching chunks in knowledge base.`);
-              contextText = matchedChunks.map(chunk => chunk.content).join("\n\n");
-              knowledgeUsed = matchedChunks.map(chunk => ({ id: chunk.id, title: chunk.document_title, similarity: chunk.similarity }));
+              contextText = matchedChunks.map((chunk: { content: string }) => chunk.content).join("\n\n");
+              knowledgeUsed = matchedChunks.map((chunk: { id: string; document_title: string; similarity: number }) => ({ id: chunk.id, title: chunk.document_title, similarity: chunk.similarity }));
             } else {
               console.log(`[${requestStartTime}] Internal Query: No matching chunks found in knowledge base.`);
             }
@@ -307,6 +363,27 @@ serve(async (req: Request) => {
 
       const { knowledge_document_ids: knowledgeIdsToLink, channels: channelsToCreate, ...agentCorePayload } = payload;
       
+      // Validate channel conflicts before creating the agent
+      if (channelsToCreate && channelsToCreate.length > 0) {
+        try {
+          const { hasConflicts, conflicts } = await validateChannelConflicts(supabase, channelsToCreate);
+          if (hasConflicts) {
+            return createJsonResponse({
+              error: 'Channel conflict detected',
+              message: 'One or more selected channels are already linked to other agents. Please choose different channels or disable the conflicting agents first.',
+              conflicts: conflicts.map(conflict => ({
+                channel_id: conflict.channel_id,
+                conflicting_agent: conflict.agent_name,
+                agent_id: conflict.agent_id
+              }))
+            }, 409); // 409 Conflict status code
+          }
+        } catch (validationError) {
+          console.error('Channel validation error:', validationError);
+          return createJsonResponse({ error: 'Failed to validate channel conflicts', details: (validationError as Error).message }, 500);
+        }
+      }
+      
       const agentToCreateData: AgentForCreate = {
         name: agentCorePayload.name,
         prompt: (agentCorePayload.agent_type === 'chattalyst' && agentCorePayload.prompt) ? agentCorePayload.prompt : '',
@@ -326,7 +403,7 @@ serve(async (req: Request) => {
 
       // Link knowledge documents
       if (knowledgeIdsToLink && knowledgeIdsToLink.length > 0) {
-        const links = knowledgeIdsToLink.map(docId => ({ agent_id: newAgent.id, document_id: docId }));
+        const links = knowledgeIdsToLink.map((docId: string) => ({ agent_id: newAgent.id, document_id: docId }));
         await supabase.from('ai_agent_knowledge_documents').insert(links);
       }
 
@@ -392,7 +469,7 @@ serve(async (req: Request) => {
       
       const channelsMap = new Map<string, AgentChannelData[]>();
       if (channelsData) {
-        channelsData.forEach(channel => {
+        channelsData.forEach((channel: AgentChannelData) => {
           const existing = channelsMap.get(channel.agent_id) || [];
           channelsMap.set(channel.agent_id, [...existing, channel]);
         });
@@ -400,13 +477,13 @@ serve(async (req: Request) => {
 
       const knowledgeLinksMap = new Map<string, string[]>();
       if (knowledgeLinksData) {
-        knowledgeLinksData.forEach(link => {
+        knowledgeLinksData.forEach((link: { agent_id: string; document_id: string }) => {
           const existing = knowledgeLinksMap.get(link.agent_id) || [];
           knowledgeLinksMap.set(link.agent_id, [...existing, link.document_id]);
         });
       }
 
-      const agentsWithDetails: AgentWithDetails[] = agentsData.map(agent => {
+      const agentsWithDetails: AgentWithDetails[] = agentsData.map((agent: AIAgentDbRow) => {
         const agentChannels = channelsMap.get(agent.id) || [];
         // console.log(`Agent ${agent.id} has channels:`, agentChannels); // Debug log
         return {
@@ -446,7 +523,7 @@ serve(async (req: Request) => {
       const agentWithDetails: AgentWithDetails = {
         ...agentData,
         channels: channelsData || [],
-        knowledge_document_ids: knowledgeLinksData?.map(link => link.document_id) || [],
+        knowledge_document_ids: knowledgeLinksData?.map((link: { document_id: string }) => link.document_id) || [],
       };
       return createJsonResponse({ agent: agentWithDetails }, 200);
     }
@@ -532,13 +609,35 @@ serve(async (req: Request) => {
       if (knowledgeIdsToUpdate !== undefined) {
         await supabase.from('ai_agent_knowledge_documents').delete().eq('agent_id', agentIdFromPath);
         if (knowledgeIdsToUpdate && knowledgeIdsToUpdate.length > 0) {
-          const links = knowledgeIdsToUpdate.map(id => ({ agent_id: agentIdFromPath, document_id: id }));
+          const links = knowledgeIdsToUpdate.map((id: string) => ({ agent_id: agentIdFromPath, document_id: id }));
           await supabase.from('ai_agent_knowledge_documents').insert(links);
         }
       }
 
       if (channelsToUpdate !== undefined) {
         console.log(`[${requestStartTime}] Updating channels for agent ${agentIdFromPath}:`, JSON.stringify(channelsToUpdate, null, 2));
+        
+        // Validate channel conflicts before updating
+        if (channelsToUpdate && channelsToUpdate.length > 0) {
+          try {
+            const { hasConflicts, conflicts } = await validateChannelConflicts(supabase, channelsToUpdate, agentIdFromPath);
+            if (hasConflicts) {
+              return createJsonResponse({
+                error: 'Channel conflict detected',
+                message: 'One or more selected channels are already linked to other agents. Please choose different channels or disable the conflicting agents first.',
+                conflicts: conflicts.map(conflict => ({
+                  channel_id: conflict.channel_id,
+                  conflicting_agent: conflict.agent_name,
+                  agent_id: conflict.agent_id
+                }))
+              }, 409); // 409 Conflict status code
+            }
+          } catch (validationError) {
+            console.error('Channel validation error:', validationError);
+            return createJsonResponse({ error: 'Failed to validate channel conflicts', details: (validationError as Error).message }, 500);
+          }
+        }
+        
         // Simple strategy: delete all existing channels and re-create them from the payload.
         const { error: deleteError } = await supabase.from('ai_agent_channels').delete().eq('agent_id', agentIdFromPath);
         if (deleteError) {
@@ -572,7 +671,7 @@ serve(async (req: Request) => {
       const responseAgent: AgentWithDetails = {
         ...updatedAgent, 
         channels: finalChannels || [],
-        knowledge_document_ids: finalKnowledge?.map(l => l.document_id) || []
+        knowledge_document_ids: finalKnowledge?.map((l: { document_id: string }) => l.document_id) || []
       };
       return createJsonResponse({ agent: responseAgent }, 200);
     }
