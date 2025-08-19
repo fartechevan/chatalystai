@@ -87,3 +87,22 @@ export async function storeWebhookEventDb(supabase: SupabaseClient, payload: Web
     console.error(`Unexpected error storing webhook event (Instance: ${instance}, Event: ${event}):`, dbError);
   }
 }
+
+export async function updateWebhookEventStatus(
+  supabase: SupabaseClient, 
+  eventId: string, 
+  status: 'processed' | 'failed' | 'pending'
+): Promise<void> {
+  try {
+    const { error } = await supabase
+      .from('evolution_webhook_events')
+      .update({ processing_status: status })
+      .eq('id', eventId);
+    
+    if (error) {
+      console.error(`Error updating webhook event status:`, error);
+    }
+  } catch (dbError) {
+    console.error(`Unexpected error updating webhook event status:`, dbError);
+  }
+}

@@ -36,13 +36,16 @@ serve(async (req) => {
     // Create Supabase service role client
     supabaseClient = createSupabaseServiceRoleClient();
 
-    // Update the session status to 'closed'
+    // Update the session status to 'closed' (not 'ended')
     const { data, error } = await supabaseClient
       .from('ai_agent_sessions')
-      .update({ status: 'closed' }) // Set status to closed
+      .update({
+        status: 'closed',          // Use 'closed' instead of 'ended'
+        ended_at: new Date().toISOString()
+      })
       .eq('id', session_id)
-      .select('id') // Select ID to confirm update happened
-      .single(); // Expect one row to be updated
+      .select('id')
+      .single();
 
     if (error) {
       console.error(`Error updating session ${session_id} to closed:`, error);

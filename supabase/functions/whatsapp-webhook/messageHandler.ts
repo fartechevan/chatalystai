@@ -114,6 +114,7 @@ export async function handleMessageEvent(supabaseClient: SupabaseClient, data: W
     }
 
     if (!fromMe && messageText && messageText !== 'Media or unknown message type') {
+        // Option 1: Filter for enabled agents in the query
         const { data: agentSettingsData, error: agentSettingsError } = await supabaseClient
             .from('ai_agent_channels')
             .select(`
@@ -124,12 +125,15 @@ export async function handleMessageEvent(supabaseClient: SupabaseClient, data: W
                 integrations_config_id,
                 keyword_trigger,
                 activation_mode,
+                is_enabled_on_channel,
                 ai_agents (
                     id,
                     is_enabled
                 )
             `)
             .eq('integrations_config_id', config.id)
+            .eq('is_enabled_on_channel', true)  // ✅ Only get enabled channels
+            .eq('ai_agents.is_enabled', true)   // ✅ Only get enabled agents
             .limit(1)
             .maybeSingle();
 
@@ -146,10 +150,14 @@ export async function handleMessageEvent(supabaseClient: SupabaseClient, data: W
             const activationMode = agentSettingsData.activation_mode;
             const keywordTrigger = agentSettingsData.keyword_trigger;
 
+            // Fix stop keyword logic (around line 151)
             if (stopKeywords.some((keyword: string) => messageText!.toLowerCase().includes(keyword.toLowerCase()))) {
                 const { data: activeSession, error: endSessionError } = await supabaseClient
                     .from('ai_agent_sessions')
-                    .update({ status: 'ended', ended_at: new Date().toISOString() })
+                    .update({ 
+                        status: 'closed', 
+                        ended_at: new Date().toISOString()
+                    })
                     .eq('contact_identifier', remoteJid)
                     .eq('integrations_config_id', config.id)
                     .eq('status', 'active')
@@ -178,8 +186,12 @@ export async function handleMessageEvent(supabaseClient: SupabaseClient, data: W
 
             let currentSessionId: string | null = activeSession ? activeSession.id : null;
             const now = new Date();
+            // Fix session timeout logic (around line 181)
             if (activeSession && (now.getTime() - new Date(activeSession.created_at).getTime()) > sessionTimeoutMinutes * 60 * 1000) {
-                await supabaseClient.from('ai_agent_sessions').update({ status: 'ended', ended_at: now.toISOString() }).eq('id', activeSession.id);
+                await supabaseClient.from('ai_agent_sessions').update({ 
+                    status: 'closed', 
+                    ended_at: now.toISOString()
+                }).eq('id', activeSession.id);
                 currentSessionId = null;
             }
 
@@ -196,14 +208,12 @@ export async function handleMessageEvent(supabaseClient: SupabaseClient, data: W
                 if (!currentSessionId) {
                     const { data: newSession, error: newSessionError } = await supabaseClient
                         .from('ai_agent_sessions')
-                        .upsert({
+                        .insert({
                             agent_id: agentId,
                             contact_identifier: remoteJid,
                             integrations_config_id: config.id,
                             status: 'active',
                             created_at: now.toISOString()
-                        }, {
-                            onConflict: 'agent_id,contact_identifier,integrations_config_id'
                         })
                         .select('id')
                         .single();

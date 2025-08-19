@@ -176,7 +176,6 @@ export type Database = {
           created_at: string | null
           id: string
           integrations_config_id: string | null
-          is_active: boolean | null
           last_interaction_timestamp: string | null
           status: Database["public"]["Enums"]["ai_session_status"]
           updated_at: string | null
@@ -188,7 +187,6 @@ export type Database = {
           created_at?: string | null
           id?: string
           integrations_config_id?: string | null
-          is_active?: boolean | null
           last_interaction_timestamp?: string | null
           status?: Database["public"]["Enums"]["ai_session_status"]
           updated_at?: string | null
@@ -200,7 +198,6 @@ export type Database = {
           created_at?: string | null
           id?: string
           integrations_config_id?: string | null
-          is_active?: boolean | null
           last_interaction_timestamp?: string | null
           status?: Database["public"]["Enums"]["ai_session_status"]
           updated_at?: string | null

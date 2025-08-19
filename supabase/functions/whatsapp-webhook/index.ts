@@ -41,8 +41,31 @@ serve(async (req) => {
     storeWebhookEventDb(supabaseClient, payload).catch(err => console.error(`Background webhook event storage failed:`, err));
 
     let processingResult: true | string = true;
+    let eventId: string | null = null;
+
+    // Get the stored event ID for status updates
+    const { data: storedEvent } = await supabaseClient
+      .from('evolution_webhook_events')
+      .select('id')
+      .eq('event_type', event)
+      .eq('source_identifier', instance)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single();
+
+    eventId = storedEvent?.id || null;
+
     if ((event === 'messages.upsert' || event === 'send.message' || event === 'messages.set') && data) {
       processingResult = await handleMessageEvent(supabaseClient, data as WhatsAppMessageData, instance, integrationConfigId);
+    }
+
+    // Update processing status
+    if (eventId) {
+      const finalStatus = processingResult === true ? 'processed' : 'failed';
+      await supabaseClient
+        .from('evolution_webhook_events')
+        .update({ processing_status: finalStatus })
+        .eq('id', eventId);
     }
 
     const overallSuccess = processingResult === true;
