@@ -146,3 +146,17 @@ export const deleteAIAgent = async (agentId: string): Promise<void> => {
   }
   // No data expected on successful delete (204 No Content)
 };
+
+/**
+ * Ends an active AI agent session.
+ */
+export const endAIAgentSession = async (agentId: string): Promise<void> => {
+  const { error } = await supabase.functions.invoke('end-agent-session', {
+    body: { agentId },
+  });
+
+  if (error) {
+    console.error('Error ending AI agent session:', error);
+    throw new Error(error.message || 'Failed to end session');
+  }
+};

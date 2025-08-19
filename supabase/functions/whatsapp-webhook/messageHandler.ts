@@ -25,9 +25,13 @@ export async function handleMessageEvent(supabaseClient: SupabaseClient, data: W
         return 'Invalid message data structure';
     }
 
-    const remoteJid = data.key.remoteJid;
+    let remoteJid = data.key.remoteJid;
     if (remoteJid.includes('@g.us')) {
         return true;
+    }
+    // Ensure the JID is in the correct format for session handling
+    if (remoteJid.endsWith('@s.whatsapp.net')) {
+        remoteJid = remoteJid.replace('@s.whatsapp.net', '@c.us');
     }
 
     const fromMe = data.key.fromMe || false;

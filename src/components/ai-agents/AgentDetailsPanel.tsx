@@ -11,7 +11,7 @@ import { Switch } from "@/components/ui/switch";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"; // Import RadioGroup
 import { Terminal, Trash2, Sparkles, Send, Loader2 } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
-import { getAIAgent, createAIAgent, updateAIAgent, deleteAIAgent } from '@/services/aiAgents/agentService';
+import { getAIAgent, createAIAgent, updateAIAgent, deleteAIAgent, endAIAgentSession } from '@/services/aiAgents/agentService';
 import { listKnowledgeDocuments, KnowledgeDocument } from '@/services/knowledge/documentService';
 // Import the updated integration service and type
 import { listIntegrations, ConfiguredIntegration } from '@/services/integrations/integrationService';
@@ -452,6 +452,27 @@ const AgentDetailsPanel: React.FC<AgentDetailsPanelProps> = ({ selectedAgentId, 
     testAgentMutation.mutate({ agentId: selectedAgentId, query: testQuery });
   };
 
+  const endSessionMutation = useMutation({
+    mutationFn: endAIAgentSession,
+    onSuccess: () => {
+      toast({ title: "Success", description: "The agent session has been ended." });
+      setChatHistory([]); // Clear the chat history
+    },
+    onError: (error) => {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: `Failed to end session: ${error.message}`,
+      });
+    },
+  });
+
+  const handleEndSession = () => {
+    if (selectedAgentId) {
+      endSessionMutation.mutate(selectedAgentId);
+    }
+  };
+
 
   // --- Render Agent Details Form ---
   const renderAgentDetailsForm = () => (
@@ -881,6 +902,15 @@ const AgentDetailsPanel: React.FC<AgentDetailsPanelProps> = ({ selectedAgentId, 
           aria-label="Send message"
         >
           <Send className="h-4 w-4" />
+        </Button>
+        <Button
+          variant="destructive"
+          onClick={handleEndSession}
+          disabled={endSessionMutation.isPending || testAgentMutation.isPending}
+          aria-label="End Session"
+          className="text-red-600 border-red-600 hover:bg-red-50 hover:text-red-700"
+        >
+          <Trash2 className="h-4 w-4" />
         </Button>
       </div>
     </div>
