@@ -3,7 +3,7 @@ import { serve } from 'std/http/server.ts';
 import { corsHeaders } from '../_shared/cors.ts';
 import { createSupabaseClient, createSupabaseServiceRoleClient } from '../_shared/supabaseClient.ts';
 import { Database } from '../_shared/database.types.ts';
-import OpenAI from "openai"; // Use mapped import from import_map.json
+import { OpenAI } from "https://deno.land/x/openai@v4.24.1/mod.ts"; // Use direct URL import
 import { extractAppointmentFromMessage, validateAppointmentForBooking, generateAppointmentConfirmation } from '../_shared/appointmentExtractor.ts';
 
 // Define types based on database schema and expected payloads
