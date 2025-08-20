@@ -13,9 +13,10 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
+import { Switch } from "@/components/ui/switch";
 import { suggestAIPrompt } from '@/services/aiAgents/agentService';
 import { useToast } from '@/hooks/use-toast';
-import { Sparkles } from 'lucide-react';
+import { Sparkles, Calendar } from 'lucide-react';
 
 interface PromptSuggestionDialogProps {
   isOpen: boolean;
@@ -32,10 +33,11 @@ const PromptSuggestionDialog: React.FC<PromptSuggestionDialogProps> = ({
 }) => {
   const [userPurpose, setUserPurpose] = useState(''); // User input for purpose/context
   const [suggestedPrompt, setSuggestedPrompt] = useState('');
+  const [enableAppointmentBooking, setEnableAppointmentBooking] = useState(false); // New state for appointment booking toggle
   const { toast } = useToast();
 
   const suggestMutation = useMutation({
-    mutationFn: () => suggestAIPrompt(originalPrompt, userPurpose), // Use both original and user purpose
+    mutationFn: () => suggestAIPrompt(originalPrompt, userPurpose, enableAppointmentBooking), // Pass appointment booking flag
     onSuccess: (data) => {
       setSuggestedPrompt(data);
       toast({ title: 'Suggestion generated.' });
@@ -68,6 +70,7 @@ const PromptSuggestionDialog: React.FC<PromptSuggestionDialogProps> = ({
     if (!isOpen) {
       setUserPurpose('');
       setSuggestedPrompt('');
+      setEnableAppointmentBooking(false);
       suggestMutation.reset();
     }
     // Only depend on isOpen. suggestMutation.reset is stable.
@@ -98,6 +101,22 @@ const PromptSuggestionDialog: React.FC<PromptSuggestionDialogProps> = ({
               className="col-span-3"
               rows={3}
             />
+          </div>
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="appointment-booking" className="text-right col-span-1">
+              <Calendar className="inline w-4 h-4 mr-2" />
+              Appointment Booking
+            </Label>
+            <div className="col-span-3 flex items-center space-x-2">
+              <Switch
+                id="appointment-booking"
+                checked={enableAppointmentBooking}
+                onCheckedChange={setEnableAppointmentBooking}
+              />
+              <Label htmlFor="appointment-booking" className="text-sm text-muted-foreground">
+                Enable appointment booking capabilities in the suggested prompt
+              </Label>
+            </div>
           </div>
            <div className="flex justify-end">
              <Button onClick={handleGenerate} disabled={suggestMutation.isPending}>

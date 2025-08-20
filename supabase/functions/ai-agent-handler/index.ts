@@ -1,9 +1,10 @@
-// @deno-types="https://deno.land/std@0.168.0/http/server.ts"
+// @deno-types="https://deno.land/std@0.208.0/http/server.ts"
 import { serve } from 'std/http/server.ts';
 import { corsHeaders } from '../_shared/cors.ts';
 import { createSupabaseClient, createSupabaseServiceRoleClient } from '../_shared/supabaseClient.ts';
 import { Database } from '../_shared/database.types.ts';
 import OpenAI from "openai"; // Use mapped import from import_map.json
+import { extractAppointmentFromMessage, validateAppointmentForBooking, generateAppointmentConfirmation } from '../_shared/appointmentExtractor.ts';
 
 // Define types based on database schema and expected payloads
 type AIAgentDbRow = Database['public']['Tables']['ai_agents']['Row'];
@@ -248,21 +249,88 @@ serve(async (req: Request) => {
             }
           }
 
-          const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
-            { role: "system", content: agentData.prompt || "You are a helpful assistant." },
-          ];
-          if (contextText) {
-            messages.push({ role: "system", content: `Use the following context to answer the user's query:\n${contextText}` });
+          // Check for appointment booking requests
+          console.log(`[${requestStartTime}] Internal Query: Checking for appointment booking request.`);
+          const appointmentExtraction = await extractAppointmentFromMessage(
+            query,
+            contactIdentifier,
+            new Date().toISOString()
+          );
+
+          if (appointmentExtraction.has_appointment_request && appointmentExtraction.appointment) {
+            console.log(`[${requestStartTime}] Internal Query: Appointment request detected with confidence ${appointmentExtraction.appointment.confidence}.`);
+            
+            const validation = validateAppointmentForBooking(appointmentExtraction.appointment);
+            
+            if (validation.is_valid) {
+              // Book the appointment
+              console.log(`[${requestStartTime}] Internal Query: Booking appointment.`);
+              try {
+                const bookingResponse = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/book-appointment`, {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${Deno.env.get('SUPABASE_ANON_KEY')}`,
+                    'X-Internal-Call': 'true'
+                  },
+                  body: JSON.stringify({
+                    title: appointmentExtraction.appointment.title,
+                    start_time: appointmentExtraction.appointment.start_time,
+                    end_time: appointmentExtraction.appointment.end_time,
+                    contact_identifier: contactIdentifier,
+                    notes: appointmentExtraction.appointment.notes,
+                    source_channel: 'whatsapp',
+                    agent_id: agentId,
+                    session_id: sessionId
+                  })
+                });
+
+                const bookingResult = await bookingResponse.json();
+                
+                if (bookingResult.success) {
+                  console.log(`[${requestStartTime}] Internal Query: Appointment booked successfully with ID ${bookingResult.appointment_id}.`);
+                  responseText = generateAppointmentConfirmation(
+                    appointmentExtraction.appointment,
+                    bookingResult.appointment_id
+                  );
+                } else {
+                  console.error(`[${requestStartTime}] Internal Query: Failed to book appointment:`, bookingResult.error);
+                  responseText = `I apologize, but I encountered an issue while booking your appointment: ${bookingResult.error}. Please try again or contact us directly.`;
+                }
+              } catch (bookingError) {
+                console.error(`[${requestStartTime}] Internal Query: Error calling book-appointment function:`, bookingError);
+                responseText = "I apologize, but I'm currently unable to book appointments. Please try again later or contact us directly.";
+              }
+            } else {
+              // Need more information
+              console.log(`[${requestStartTime}] Internal Query: Appointment request needs clarification. Missing: ${validation.missing_fields.join(', ')}.`);
+              responseText = `I'd be happy to help you book an appointment! However, I need a bit more information:\n\n${validation.suggestions.join('\n')}\n\nPlease provide these details and I'll get your appointment scheduled right away.`;
+            }
+          } else if (appointmentExtraction.has_appointment_request) {
+            // Low confidence appointment request
+            console.log(`[${requestStartTime}] Internal Query: Low confidence appointment request detected.`);
+            responseText = appointmentExtraction.suggested_response || "I'd be happy to help you schedule an appointment. Could you please provide more details about what type of appointment you'd like and when you'd prefer to schedule it?";
+          } else {
+            // Regular query processing
+            console.log(`[${requestStartTime}] Internal Query: No appointment request detected, processing regular query.`);
+            
+            const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
+              { role: "system", content: (agentData.prompt || "You are a helpful assistant.") + "\n\nIMPORTANT: If the user asks about booking appointments, scheduling, or setting up meetings, let them know you can help them book appointments. Ask for the type of appointment, preferred date and time." },
+            ];
+            if (contextText) {
+              messages.push({ role: "system", content: `Use the following context to answer the user's query:\n${contextText}` });
+            }
+            messages.push({ role: "user", content: query });
+            
+            console.log(`[${requestStartTime}] Internal Query: Calling OpenAI API.`);
+            const completion = await openai.chat.completions.create({
+              model: "gpt-3.5-turbo",
+              messages: messages,
+            });
+            responseText = completion.choices[0]?.message?.content?.trim() || null;
+            console.log(`[${requestStartTime}] Internal Query: OpenAI API call successful. Response:`, responseText);
           }
-          messages.push({ role: "user", content: query });
-          
-          console.log(`[${requestStartTime}] Internal Query: Calling OpenAI API.`);
-          const completion = await openai.chat.completions.create({
-            model: "gpt-3.5-turbo",
-            messages: messages,
-          });
-          responseText = completion.choices[0]?.message?.content?.trim() || null;
-          console.log(`[${requestStartTime}] Internal Query: OpenAI API call successful. Response:`, responseText);
+
         } catch (e) {
             const error = e as Error;
             console.error(`[${requestStartTime}] Internal Query: Error processing Chatalyst agent. Error: ${error.message}`);
@@ -462,7 +530,7 @@ serve(async (req: Request) => {
       if (fetchAgentsError) return createJsonResponse({ error: 'Failed to fetch agents', details: fetchAgentsError.message }, 500);
       if (!agentsData) return createJsonResponse({ agents: [] }, 200);
 
-      const agentIds = agentsData.map(a => a.id);
+      const agentIds = agentsData.map((a: AIAgentDbRow) => a.id);
       // Fetch channels and knowledge links for all agents
       const { data: channelsData } = await supabase.from('ai_agent_channels').select('*').in('agent_id', agentIds);
       const { data: knowledgeLinksData } = await supabase.from('ai_agent_knowledge_documents').select('agent_id, document_id').in('agent_id', agentIds);

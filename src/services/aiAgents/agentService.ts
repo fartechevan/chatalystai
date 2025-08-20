@@ -62,11 +62,12 @@ export const getAIAgent = async (agentId: string): Promise<AIAgent | null> => {
 /**
  * Gets an AI-generated suggestion for a system prompt.
  */
-export const suggestAIPrompt = async (currentPrompt: string, agentPurpose?: string): Promise<string> => {
+export const suggestAIPrompt = async (currentPrompt: string, agentPurpose?: string, enableAppointmentBooking?: boolean): Promise<string> => {
   const { data, error } = await supabase.functions.invoke('suggest-ai-prompt', {
     body: {
       current_prompt: currentPrompt,
       agent_purpose: agentPurpose, // Optional
+      enable_appointment_booking: enableAppointmentBooking, // Optional
     },
   });
 
