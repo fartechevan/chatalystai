@@ -62,7 +62,8 @@ CREATE TABLE public.appointments (
     title text,
     end_time timestamptz,
     created_at timestamptz NOT NULL DEFAULT now(),
-    updated_at timestamptz DEFAULT now()
+    updated_at timestamptz DEFAULT now(),
+    customer_id UUID REFERENCES public.customers(id)
 );
 CREATE TABLE public.batch_sentiment_analysis (
     start_date date NOT NULL,

@@ -364,17 +364,12 @@ export function ImportDocumentForm({ onCancel, onSuccess }: ImportDocumentFormPr
       if(data.success){
         console.log(data.message);
         setIsConfirmingUpload(false);
-        updateVectorTable()
-          .then(() => {
-            toast({
-              variant: "default",
-              title: "Document Import successfully",
-              description: "Added the document to the knowledge base",
-            })
-          })
-          .catch((error) => {
-            console.log(error)
-          })
+        // updateVectorTable() - Removed as this flow is deprecated
+        toast({
+          variant: "default",
+          title: "Document Import successfully",
+          description: "Added the document to the knowledge base",
+        });
         
       }
     } catch (error) {
@@ -386,6 +381,7 @@ export function ImportDocumentForm({ onCancel, onSuccess }: ImportDocumentFormPr
 
   const updateVectorTable = async (documentId: string) => {
     try {
+      console.log("Calling updateVectorTable with documentId:", documentId);
       interface UpdateVectorTable {
         success: boolean,
         message: string,
@@ -413,10 +409,22 @@ export function ImportDocumentForm({ onCancel, onSuccess }: ImportDocumentFormPr
           title: "Document Import successful",
           description: "Added the document to the knowledge base",
         })
+      } else {
+        console.error("External service create_vector_table reported failure:", data.message);
+        toast({
+          variant: "destructive",
+          title: "Vector Table Update Failed",
+          description: data.message || "External service failed to update vector table.",
+        });
       }
 
     } catch (error) {
-      console.log("Failed to add chunks to vector table");
+      console.error("Failed to add chunks to vector table:", error);
+      toast({
+        variant: "destructive",
+        title: "Vector Table Update Failed",
+        description: error instanceof Error ? error.message : "An unknown error occurred during vector table update.",
+      });
     }
   };
 
@@ -483,7 +491,7 @@ export function ImportDocumentForm({ onCancel, onSuccess }: ImportDocumentFormPr
     }
   };
 
-  const onSubmit = async (values: FormValues): Promise<{ documentId: string } | void> => {
+  const onSubmit = async (values: FormValues): Promise<{ documentId: string }> => {
     if (!userId) {
       toast({
         variant: "destructive",
@@ -629,6 +637,7 @@ export function ImportDocumentForm({ onCancel, onSuccess }: ImportDocumentFormPr
         title: "Error importing document",
         description: error instanceof Error ? error.message : "An unknown error occurred",
       });
+      throw error; // Re-throw the error to be caught by the caller
     }
   };
 

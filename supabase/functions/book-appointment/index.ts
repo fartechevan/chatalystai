@@ -1,4 +1,4 @@
-// @deno-types="https://deno.land/std@0.208.0/http/server.ts"
+// @deno-types="https://deno.land/std@0.224.0/http/server.ts"
 import { serve } from 'std/http/server.ts';
 import { corsHeaders } from '../_shared/cors.ts';
 import { createSupabaseClient } from '../_shared/supabaseClient.ts';
@@ -214,10 +214,11 @@ serve(async (req: Request) => {
 
   } catch (error) {
     console.error('Error in book-appointment function:', error)
+    const errorMessage = error instanceof Error ? error.message : String(error);
     return new Response(
       JSON.stringify({ 
         success: false,
-        error: 'Internal server error' 
+        error: `Internal server error: ${errorMessage}` 
       }),
       { 
         status: 500, 

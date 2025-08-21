@@ -3,13 +3,13 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Switch } from "@/components/ui/switch";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"; // Import RadioGroup
-import { Terminal, Trash2, Sparkles, Send, Loader2 } from 'lucide-react';
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Textarea } from '@/components/ui/textarea'; // Add this missing import
+import { Terminal, Trash2, Send, Loader2 } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
 import { getAIAgent, createAIAgent, updateAIAgent, deleteAIAgent, endAIAgentSession } from '@/services/aiAgents/agentService';
 import { listKnowledgeDocuments, KnowledgeDocument } from '@/services/knowledge/documentService';
@@ -18,7 +18,7 @@ import { listIntegrations, ConfiguredIntegration } from '@/services/integrations
 import { AIAgent, NewAIAgent, UpdateAIAgent, AgentChannel } from '@/types/aiAgents';
 import { supabase } from '@/integrations/supabase/client'; // Import supabase client for function invocation
 import { useToast } from '@/hooks/use-toast';
-import PromptSuggestionDialog from './PromptSuggestionDialog';
+
 import DocumentSelector from '@/components/knowledge/DocumentSelector';
 import { ArrowLeft } from 'lucide-react';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable';
@@ -39,7 +39,8 @@ const AgentDetailsPanel: React.FC<AgentDetailsPanelProps> = ({ selectedAgentId, 
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [agentName, setAgentName] = useState('');
-  const [promptText, setPromptText] = useState('');
+  const [appointmentBookingEnabled, setAppointmentBookingEnabled] = useState<boolean>(true);
+
   const [keywordTrigger, setKeywordTrigger] = useState<string | null>(''); // Added state
   const [selectedDocumentIds, setSelectedDocumentIds] = useState<string[]>([]);
   const [selectedIntegrationIds, setSelectedIntegrationIds] = useState<string[]>([]);
@@ -48,7 +49,7 @@ const AgentDetailsPanel: React.FC<AgentDetailsPanelProps> = ({ selectedAgentId, 
   const [agentType, setAgentType] = useState<'chattalyst' | 'CustomAgent'>('chattalyst'); // Updated state for agent type
   const [n8nWebhookUrl, setN8nWebhookUrl] = useState(''); // This will store the webhook_url from custom_agent_config
   const [formStage, setFormStage] = useState<'selectType' | 'configureDetails'>('configureDetails'); // Added state for form stage
-  const [isSuggestDialogOpen, setIsSuggestDialogOpen] = useState(false);
+
   // --- State for Testing ---
   const [testQuery, setTestQuery] = useState('');
   // Replace testResponse/testError with chat history state
@@ -151,7 +152,6 @@ const AgentDetailsPanel: React.FC<AgentDetailsPanelProps> = ({ selectedAgentId, 
     if (selectedAgentId && selectedAgent) {
       // Populate form for editing
       setAgentName(selectedAgent.name || '');
-      setPromptText(selectedAgent.prompt || '');
       // The backend now sends the full channel objects
       const firstChannel = selectedAgent.channels?.[0];
       if (firstChannel) {
@@ -169,7 +169,6 @@ const AgentDetailsPanel: React.FC<AgentDetailsPanelProps> = ({ selectedAgentId, 
     } else if (!selectedAgentId) {
       // Reset form for creating
       setAgentName('');
-      setPromptText('');
       setKeywordTrigger('');
       setSelectedDocumentIds([]);
       setSelectedIntegrationIds([]);
@@ -184,10 +183,6 @@ const AgentDetailsPanel: React.FC<AgentDetailsPanelProps> = ({ selectedAgentId, 
 
 
   // --- Event Handlers ---
-  const handleApplySuggestion = (suggestion: string) => {
-    setPromptText(suggestion);
-    // Optionally trigger form validation if using react-hook-form
-  };
 
 
   // TODO: Add useMutation hooks for create, update, delete later
@@ -228,26 +223,7 @@ const AgentDetailsPanel: React.FC<AgentDetailsPanelProps> = ({ selectedAgentId, 
           <Label htmlFor="agent-name">Agent Name</Label>
           <Input id="agent-name" defaultValue={selectedAgent.name} placeholder="e.g., Customer Support Bot" />
         </div>
-        <div className="space-y-2">
-           <div className="flex justify-between items-center">
-             <Label htmlFor="agent-prompt">System Prompt</Label>
-             <Button
-               variant="outline"
-               size="sm"
-               onClick={() => setIsSuggestDialogOpen(true)} // Open the dialog
-             >
-               <Sparkles className="h-3 w-3 mr-1" />
-               Suggest
-             </Button>
-           </div>
-          <Textarea
-            id="agent-prompt"
-            value={promptText} // Controlled component
-            onChange={(e) => setPromptText(e.target.value)} // Update state on change
-            placeholder="Define the agent's role and instructions..."
-            rows={6}
-          />
-        </div>
+
          <div className="space-y-2">
            <Label>Knowledge Documents</Label>
            <DocumentSelector
@@ -277,27 +253,7 @@ const AgentDetailsPanel: React.FC<AgentDetailsPanelProps> = ({ selectedAgentId, 
              disabled={createMutation.isPending} // Disable while creating
            />
          </div>
-         <div className="space-y-2">
-            <div className="flex justify-between items-center">
-              <Label htmlFor="agent-prompt-create">System Prompt</Label>
-              <Button
-                 variant="outline"
-                 size="sm"
-                 onClick={() => setIsSuggestDialogOpen(true)} // Open the dialog
-               >
-                 <Sparkles className="h-3 w-3 mr-1" />
-                Suggest
-              </Button>
-            </div>
-           <Textarea
-             id="agent-prompt-create"
-             value={promptText} // Controlled component
-             onChange={(e) => setPromptText(e.target.value)} // Update state on change
-             placeholder="Define the agent's role and instructions..."
-             rows={6}
-             disabled={createMutation.isPending} // Disable while creating
-           />
-         </div>
+
          <div className="space-y-2">
            <Label>Knowledge Documents</Label>
             <DocumentSelector
@@ -324,8 +280,8 @@ const AgentDetailsPanel: React.FC<AgentDetailsPanelProps> = ({ selectedAgentId, 
         toast({ variant: "destructive", title: "Validation Error", description: "Agent name is required." });
         return;
       }
-      if (agentType === 'chattalyst' && !promptText.trim()) {
-        toast({ variant: "destructive", title: "Validation Error", description: "System prompt is required for Chattalyst agents." });
+      if (agentType === 'chattalyst' && selectedDocumentIds.length === 0) {
+        toast({ variant: "destructive", title: "Validation Error", description: "At least one knowledge document is required for Chattalyst agents." });
         return;
       }
       if (agentType === 'CustomAgent' && !n8nWebhookUrl.trim()) {
@@ -335,7 +291,7 @@ const AgentDetailsPanel: React.FC<AgentDetailsPanelProps> = ({ selectedAgentId, 
 
       const agentData: NewAIAgent = {
         name: agentName,
-        prompt: agentType === 'chattalyst' ? promptText : '',
+        prompt: '',
         knowledge_document_ids: agentType === 'chattalyst' ? selectedDocumentIds : [],
         is_enabled: isEnabled,
         agent_type: agentType,
@@ -355,8 +311,8 @@ const AgentDetailsPanel: React.FC<AgentDetailsPanelProps> = ({ selectedAgentId, 
         toast({ variant: "destructive", title: "Validation Error", description: "Agent name is required." });
         return;
       }
-      if (agentType === 'chattalyst' && !promptText.trim()) {
-        toast({ variant: "destructive", title: "Validation Error", description: "System prompt is required for Chattalyst agents." });
+      if (agentType === 'chattalyst' && selectedDocumentIds.length === 0) {
+        toast({ variant: "destructive", title: "Validation Error", description: "At least one knowledge document is required for Chattalyst agents." });
         return;
       }
       if (agentType === 'CustomAgent' && !n8nWebhookUrl.trim()) {
@@ -366,7 +322,7 @@ const AgentDetailsPanel: React.FC<AgentDetailsPanelProps> = ({ selectedAgentId, 
 
       const updates: UpdateAIAgent = {
         name: agentName.trim(),
-        prompt: agentType === 'chattalyst' ? promptText : '',
+        prompt: '',
         knowledge_document_ids: agentType === 'chattalyst' ? selectedDocumentIds : [],
         is_enabled: isEnabled,
         agent_type: agentType,
@@ -475,7 +431,7 @@ const AgentDetailsPanel: React.FC<AgentDetailsPanelProps> = ({ selectedAgentId, 
 
 
   // --- Render Agent Details Form ---
-  const renderAgentDetailsForm = () => (
+  const renderAgentDetailsForm = (): JSX.Element => (
     <div className="space-y-6"> {/* Increased spacing */}
        {/* Enable/Disable Switch */}
        <div className="flex items-center justify-between space-x-2 rounded-lg border p-4">
@@ -494,32 +450,6 @@ const AgentDetailsPanel: React.FC<AgentDetailsPanelProps> = ({ selectedAgentId, 
          />
        </div>
 
-       {/* Agent Type Selection (Disabled after creation) - Commented out as per request */}
-       {/*
-       <div className="space-y-3">
-         <Label>Agent Type</Label>
-         <RadioGroup
-           value={agentType}
-           // onValueChange should not be active for existing agents if type is immutable
-           // onValueChange={(value: 'chattalyst' | 'CustomAgent') => setAgentType(value)} 
-           className="flex space-x-4"
-           // Disable this field for existing agents
-           disabled={!isCreating || updateMutation.isPending || isLoadingAgent}
-         >
-           <div className="flex items-center space-x-2">
-             <RadioGroupItem value="chattalyst" id="type-chattalyst" />
-             <Label htmlFor="type-chattalyst" className="font-normal">Chattalyst Agent</Label>
-           </div>
-           <div className="flex items-center space-x-2">
-             <RadioGroupItem value="CustomAgent" id="type-custom" />
-             <Label htmlFor="type-custom" className="font-normal">Custom Agent</Label>
-           </div>
-         </RadioGroup>
-         <p className="text-sm text-muted-foreground">
-           The type of agent. This cannot be changed after creation.
-         </p>
-       </div>
-       */}
 
        {/* Agent Name */}
        <div className="space-y-2">
@@ -536,39 +466,32 @@ const AgentDetailsPanel: React.FC<AgentDetailsPanelProps> = ({ selectedAgentId, 
       {agentType === 'chattalyst' && (
         <>
           <div className="space-y-2">
-            <div className="flex justify-between items-center">
-              <Label htmlFor="agent-prompt">System Prompt</Label>
-              <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setIsSuggestDialogOpen(true)}
-            disabled={isCreating || updateMutation.isPending || isLoadingAgent}
-          >
-            <Sparkles className="h-3 w-3 mr-1" />
-            Suggest
-          </Button>
-        </div>
-        <Textarea
-          id="agent-prompt"
-          value={promptText}
-          onChange={(e) => setPromptText(e.target.value)}
-          placeholder="Define the agent's role and instructions..."
-          rows={6}
-          disabled={isCreating || updateMutation.isPending || isLoadingAgent}
-        />
-      </div>
-      <div className="space-y-2">
-        <Label>Knowledge Documents</Label>
-        <DocumentSelector
-          availableDocuments={availableDocuments}
-          selectedDocumentIds={selectedDocumentIds}
-          onSelectionChange={setSelectedDocumentIds}
-          isLoading={isLoadingDocuments}
-          isError={isDocumentsError}
-          error={documentsError}
-          disabled={isCreating || updateMutation.isPending || isLoadingAgent}
-        />
-      </div>
+            <Label>Knowledge Documents</Label>
+            <DocumentSelector
+              availableDocuments={availableDocuments}
+              selectedDocumentIds={selectedDocumentIds}
+              onSelectionChange={setSelectedDocumentIds}
+              isLoading={isLoadingDocuments}
+              isError={isDocumentsError}
+              error={documentsError}
+              disabled={isCreating || updateMutation.isPending || isLoadingAgent}
+            />
+          </div>
+          {/* Appointment Booking Checkbox */}
+          <div className="flex items-center justify-between space-x-2 rounded-lg border p-4">
+            <Label htmlFor="appointment-booking-enabled" className="flex flex-col space-y-1">
+              <span>Appointment Booking</span>
+              <span className="font-normal leading-snug text-muted-foreground">
+                Allow this agent to book appointments.
+              </span>
+            </Label>
+            <Switch
+              id="appointment-booking-enabled"
+              checked={appointmentBookingEnabled}
+              onCheckedChange={setAppointmentBookingEnabled}
+              disabled={isCreating || updateMutation.isPending || isLoadingAgent}
+            />
+          </div>
         </>
       )}
       {agentType === 'CustomAgent' && (
@@ -674,7 +597,7 @@ const AgentDetailsPanel: React.FC<AgentDetailsPanelProps> = ({ selectedAgentId, 
   );
 
   // --- Render Create Agent Form ---
-   const renderCreateAgentForm = () => (
+   const renderCreateAgentForm = (): JSX.Element => (
      <div className="space-y-4">
        <div className="space-y-2">
          <Label htmlFor="agent-name-create">Agent Name</Label>
@@ -689,39 +612,32 @@ const AgentDetailsPanel: React.FC<AgentDetailsPanelProps> = ({ selectedAgentId, 
        {agentType === 'chattalyst' && (
          <>
            <div className="space-y-2">
-             <div className="flex justify-between items-center">
-               <Label htmlFor="agent-prompt-create">System Prompt</Label>
-               <Button
-             variant="outline"
-             size="sm"
-             onClick={() => setIsSuggestDialogOpen(true)}
-             disabled={createMutation.isPending}
-           >
-             <Sparkles className="h-3 w-3 mr-1" />
-             Suggest
-           </Button>
-         </div>
-         <Textarea
-           id="agent-prompt-create"
-           value={promptText}
-           onChange={(e) => setPromptText(e.target.value)}
-           placeholder="Define the agent's role and instructions..."
-           rows={6}
-           disabled={createMutation.isPending}
-         />
-       </div>
-       <div className="space-y-2">
-         <Label>Knowledge Documents</Label>
-         <DocumentSelector
-           availableDocuments={availableDocuments}
-           selectedDocumentIds={selectedDocumentIds}
-           onSelectionChange={setSelectedDocumentIds}
-           isLoading={isLoadingDocuments}
-           isError={isDocumentsError}
-           error={documentsError}
-          disabled={createMutation.isPending}
-        />
-      </div>
+             <Label>Knowledge Documents</Label>
+             <DocumentSelector
+               availableDocuments={availableDocuments}
+               selectedDocumentIds={selectedDocumentIds}
+               onSelectionChange={setSelectedDocumentIds}
+               isLoading={isLoadingDocuments}
+               isError={isDocumentsError}
+               error={documentsError}
+               disabled={createMutation.isPending}
+             />
+           </div>
+           {/* Appointment Booking Checkbox */}
+           <div className="flex items-center justify-between space-x-2 rounded-lg border p-4">
+             <Label htmlFor="appointment-booking-enabled-create" className="flex flex-col space-y-1">
+               <span>Appointment Booking</span>
+               <span className="font-normal leading-snug text-muted-foreground">
+                 Allow this agent to book appointments.
+               </span>
+             </Label>
+             <Switch
+               id="appointment-booking-enabled-create"
+               checked={appointmentBookingEnabled}
+               onCheckedChange={setAppointmentBookingEnabled}
+               disabled={createMutation.isPending}
+             />
+           </div>
          </>
        )}
        {agentType === 'CustomAgent' && (
@@ -826,7 +742,7 @@ const AgentDetailsPanel: React.FC<AgentDetailsPanelProps> = ({ selectedAgentId, 
 
 
   // --- Render Test Agent Section (Chat Interface) ---
-  const renderTestAgentSection = () => (
+  const renderTestAgentSection = (): JSX.Element => (
     <div className="flex flex-col h-full">
       {/* Chat History Area */}
       <div className="flex-grow overflow-y-auto p-4 space-y-4 border rounded-md mb-4 bg-background">
@@ -1018,13 +934,7 @@ const AgentDetailsPanel: React.FC<AgentDetailsPanelProps> = ({ selectedAgentId, 
       </CardFooter>
       )} {/* Close the conditional rendering for CardFooter */}
 
-       {/* Render the Dialog */}
-       <PromptSuggestionDialog
-         isOpen={isSuggestDialogOpen}
-         onOpenChange={setIsSuggestDialogOpen}
-         originalPrompt={promptText}
-         onApplySuggestion={handleApplySuggestion}
-       />
+
     </Card>
   );
 };

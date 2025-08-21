@@ -309,7 +309,7 @@ export function ConversationStatsView() {
       try {
         // Optimized: Fetch batch details with better error handling and caching
         const { data: batchData, error: batchError } = await supabase
-          .from('batch_sentiment_analysis' as keyof Database['public']['Tables'])
+          .from('batch_sentiment_analysis')
           .select('conversation_ids, start_date, end_date, positive_count, negative_count, neutral_count, unknown_count')
           .eq('id', id)
           .single<BatchDetails>();
@@ -418,55 +418,63 @@ export function ConversationStatsView() {
   };
 
   // Optimized: Enhanced query with better caching and error handling
-  const { data: initialConversationsData, isLoading: isLoadingConversations, error: fetchConversationsError } = useQuery<Conversation[]>({
-    queryKey: ['conversationsForBatch', selectedBatchAnalysisId, selectedBatchDateRange?.from?.toISOString(), selectedBatchDateRange?.to?.toISOString()], 
-    queryFn: () => {
-      if (selectedBatchAnalysisId && selectedBatchDateRange?.from && selectedBatchDateRange?.to) {
-         return fetchConversationsWithMessages(selectedBatchDateRange.from, selectedBatchDateRange.to);
-      }
-      return Promise.resolve([]); 
-    },
-    enabled: !!selectedBatchAnalysisId && !!selectedBatchDateRange?.from && !!selectedBatchDateRange?.to,
-    staleTime: 5 * 60 * 1000, // 5 minutes - conversations don't change frequently
-    cacheTime: 10 * 60 * 1000, // 10 minutes cache
-    retry: (failureCount, error) => {
-      // Retry up to 2 times for network errors, but not for data validation errors
-      if (failureCount >= 2) return false;
-      return error instanceof Error && error.message.includes('Failed to fetch');
-    },
-    onError: (error) => {
-      console.error('Failed to fetch conversations:', error);
-      toast({ 
-        title: "Error Loading Conversations", 
-        description: error instanceof Error ? error.message : "Unknown error occurred", 
-        variant: "destructive" 
-      });
+  const { data: initialConversationsData, isLoading: isLoadingConversations, error: fetchConversationsError } = useQuery<Conversation[], Error, Conversation[], (string | Date | null | undefined)[]>(
+    {
+      queryKey: ['conversationsForBatch', selectedBatchAnalysisId, selectedBatchDateRange?.from?.toISOString(), selectedBatchDateRange?.to?.toISOString()], 
+      queryFn: async (): Promise<Conversation[]> => {
+        try {
+          if (selectedBatchAnalysisId && selectedBatchDateRange?.from && selectedBatchDateRange?.to) {
+             return await fetchConversationsWithMessages(selectedBatchDateRange.from, selectedBatchDateRange.to);
+          }
+          return [];
+        } catch (error) {
+          console.error('Failed to fetch conversations:', error);
+          toast({ 
+            title: "Error Loading Conversations", 
+            description: error instanceof Error ? error.message : "Unknown error occurred", 
+            variant: "destructive" 
+          });
+          throw error; // Re-throw to let React Query handle the error state
+        }
+      },
+      enabled: !!selectedBatchAnalysisId && !!selectedBatchDateRange?.from && !!selectedBatchDateRange?.to,
+      staleTime: 5 * 60 * 1000, // 5 minutes - conversations don't change frequently
+      gcTime: 10 * 60 * 1000, // 10 minutes cache
+      retry: (failureCount, error) => {
+        // Retry up to 2 times for network errors, but not for data validation errors
+        if (failureCount >= 2) return false;
+        return error instanceof Error && error.message.includes('Failed to fetch');
+      },
     }
-  });
+  );
 
    // Optimized: Enhanced sentiment details query with better caching
-   const { data: batchDetailsData, isLoading: isLoadingBatchDetailsData, error: fetchDetailsError } = useQuery<BatchSentimentDetail[], Error>({
-     queryKey: ['batchSentimentDetails', selectedBatchAnalysisId],
-     queryFn: () => {
-       if (!selectedBatchAnalysisId) return Promise.resolve([]);
-       return fetchBatchSentimentDetails(selectedBatchAnalysisId);
-     },
-     enabled: !!selectedBatchAnalysisId,
-     staleTime: 2 * 60 * 1000, // 2 minutes - sentiment details might update more frequently
-     cacheTime: 5 * 60 * 1000, // 5 minutes cache
-     retry: (failureCount, error) => {
-       if (failureCount >= 2) return false;
-       return error instanceof Error && error.message.includes('Failed to fetch');
-     },
-     onError: (error) => {
-       console.error('Failed to fetch sentiment details:', error);
-       toast({ 
-         title: "Error Loading Sentiment Details", 
-         description: error instanceof Error ? error.message : "Unknown error occurred", 
-         variant: "destructive" 
-       });
+   const { data: batchDetailsData, isLoading: isLoadingBatchDetailsData, error: fetchDetailsError } = useQuery<BatchSentimentDetail[], Error, BatchSentimentDetail[], (string | null)[]>(
+     {
+       queryKey: ['batchSentimentDetails', selectedBatchAnalysisId],
+       queryFn: async (): Promise<BatchSentimentDetail[]> => {
+         try {
+           if (!selectedBatchAnalysisId) return [];
+           return await fetchBatchSentimentDetails(selectedBatchAnalysisId);
+         } catch (error) {
+           console.error('Failed to fetch sentiment details:', error);
+           toast({ 
+             title: "Error Loading Sentiment Details", 
+             description: error instanceof Error ? error.message : "Unknown error occurred", 
+             variant: "destructive" 
+           });
+           throw error; // Re-throw to let React Query handle the error state
+         }
+       },
+       enabled: !!selectedBatchAnalysisId,
+       staleTime: 2 * 60 * 1000, // 2 minutes - sentiment details might update more frequently
+       gcTime: 5 * 60 * 1000, // 5 minutes cache
+       retry: (failureCount, error) => {
+         if (failureCount >= 2) return false;
+         return error instanceof Error && error.message.includes('Failed to fetch');
+       },
      }
-   });
+   );
 
 
    // Optimized: Memoized data merging with better performance
@@ -479,25 +487,30 @@ export function ConversationStatsView() {
        return;
      }
 
+     // Ensure data is not undefined before proceeding
+     const conversations: Conversation[] = initialConversationsData || [];
+     const batchConversationIds: string[] = selectedBatchConversationIds || [];
+     const detailsData: BatchSentimentDetail[] = batchDetailsData || [];
+
      // Wait for all required data to be available
-     if (!initialConversationsData || !selectedBatchConversationIds || !batchDetailsData) {
+     if (conversations.length === 0 || batchConversationIds.length === 0 || detailsData.length === 0) {
        return;
      }
 
      // Optimized: Use more efficient data structures and processing
-     console.log('🔍 DEBUG: Merging conversations - selectedBatchConversationIds:', selectedBatchConversationIds);
-     console.log('🔍 DEBUG: Merging conversations - batchDetailsData:', batchDetailsData);
-     console.log('🔍 DEBUG: Merging conversations - initialConversationsData length:', initialConversationsData.length);
+     console.log('🔍 DEBUG: Merging conversations - selectedBatchConversationIds:', batchConversationIds);
+     console.log('🔍 DEBUG: Merging conversations - batchDetailsData:', detailsData);
+     console.log('🔍 DEBUG: Merging conversations - initialConversationsData length:', conversations.length);
      
-     const batchConvIdsSet = new Set(selectedBatchConversationIds);
+     const batchConvIdsSet = new Set(batchConversationIds);
      const sentimentDetailsMap = new Map(
-       batchDetailsData.map(d => [d.conversation_id, d])
+       detailsData.map(d => [d.conversation_id, d])
      );
      
      console.log('🔍 DEBUG: sentimentDetailsMap size:', sentimentDetailsMap.size);
      console.log('🔍 DEBUG: sentimentDetailsMap entries:', Array.from(sentimentDetailsMap.entries()));
 
-     const mergedConversations = initialConversationsData
+     const mergedConversations = conversations
        .filter(conv => batchConvIdsSet.has(conv.conversation_id))
        .map(conv => {
          const detail = sentimentDetailsMap.get(conv.conversation_id);
@@ -506,7 +519,7 @@ export function ConversationStatsView() {
            ...conv,
            sentimentResult: detail ? {
              conversation_id: conv.conversation_id,
-             sentiment: detail.sentiment,
+             sentiment: detail.sentiment as 'good' | 'moderate' | 'bad' | 'unknown', // Type assertion
              description: detail.description ?? undefined,
            } : null,
          } as AnalyzedConversation;

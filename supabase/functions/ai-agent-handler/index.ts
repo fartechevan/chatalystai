@@ -1,14 +1,28 @@
-// @deno-types="https://deno.land/std@0.208.0/http/server.ts"
-import { serve } from 'std/http/server.ts';
+// @deno-options --import-map=./deno.json
+import { serve } from 'https://deno.land/std/http/mod.ts';
 import { corsHeaders } from '../_shared/cors.ts';
 import { createSupabaseClient, createSupabaseServiceRoleClient } from '../_shared/supabaseClient.ts';
-import { Database } from '../_shared/database.types.ts';
-import { OpenAI } from "https://deno.land/x/openai@v4.24.1/mod.ts"; // Use direct URL import
+import { Database, Json } from '../_shared/database.types.ts';
+import { OpenAI } from "openai";
 import { extractAppointmentFromMessage, validateAppointmentForBooking, generateAppointmentConfirmation } from '../_shared/appointmentExtractor.ts';
 
 // Define types based on database schema and expected payloads
 type AIAgentDbRow = Database['public']['Tables']['ai_agents']['Row'];
 type AgentChannelData = Database['public']['Tables']['ai_agent_channels']['Row'];
+
+// Hardcoded system prompt for Chatalyst agents
+const CHATALYST_SYSTEM_PROMPT = `You are a knowledgeable assistant that can only respond based on the provided knowledge base content and can help book appointments.
+
+IMPORTANT GUIDELINES:
+1. ONLY answer questions using information from the provided knowledge base context
+2. If the knowledge base doesn't contain information to answer a question, politely say you don't have that information available
+3. Never make up or invent information that isn't in the knowledge base
+4. You can help users book appointments when they request scheduling or meeting setup
+5. For appointment requests, ask for: type of appointment, preferred date and time
+6. Be helpful, professional, and concise in your responses
+7. Always prioritize accuracy over completeness - it's better to say you don't know than to provide incorrect information
+
+When users ask about booking appointments, scheduling, or setting up meetings, let them know you can help them book appointments and ask for the necessary details.`;
 
 // Payload for creating/updating a channel link
 interface AgentChannelPayload {
@@ -23,8 +37,8 @@ interface AgentChannelPayload {
 
 interface NewAgentPayload {
   name: string;
-  prompt?: string;
-  knowledge_document_ids?: string[];
+  // prompt field removed for Chatalyst agents - now uses hardcoded prompt
+  knowledge_document_ids?: string[]; // Required for Chatalyst agents
   is_enabled?: boolean;
   agent_type?: 'chattalyst' | 'CustomAgent';
   custom_agent_config?: { webhook_url?: string; [key: string]: unknown; } | null;
@@ -34,7 +48,7 @@ interface NewAgentPayload {
 
 interface UpdateAgentPayload {
   name?: string;
-  prompt?: string;
+  // prompt field removed for Chatalyst agents - now uses hardcoded prompt
   knowledge_document_ids?: string[];
   is_enabled?: boolean;
   agent_type?: 'chattalyst' | 'CustomAgent';
@@ -55,7 +69,7 @@ interface AgentForCreate {
   prompt: string; // Will be empty for CustomAgent
   is_enabled: boolean;
   agent_type: string; // Match DB type, will be 'chattalyst' or 'CustomAgent'
-  custom_agent_config: { webhook_url?: string; [key: string]: unknown; } | null;
+  custom_agent_config: Json | null;
   user_id: string;
 }
 // Explicit type for data to be used in updating ai_agents table
@@ -64,7 +78,7 @@ interface AgentForUpdate {
   prompt?: string;
   is_enabled?: boolean;
   agent_type?: string; // Match DB type
-  custom_agent_config?: { webhook_url?: string; [key: string]: unknown; } | null;
+  custom_agent_config?: Json | null;
 }
 
 
@@ -120,7 +134,7 @@ async function validateChannelConflicts(
     throw new Error('Failed to validate channel conflicts');
   }
 
-  const conflicts = (existingChannels || []).map((channel: { integrations_config_id: string; agent_id: string; ai_agents: { name: string; is_enabled: boolean } }) => ({
+  const conflicts = (existingChannels || []).map((channel: { integrations_config_id: string; agent_id: string; ai_agents: { name: string; is_enabled: boolean | null } }) => ({
     channel_id: channel.integrations_config_id,
     agent_name: channel.ai_agents.name,
     agent_id: channel.agent_id
@@ -226,29 +240,35 @@ serve(async (req: Request) => {
             .select('document_id')
             .eq('agent_id', agentId);
 
+          console.log(`[${requestStartTime}] Internal Query: Found ${knowledgeLinks?.length || 0} knowledge links for agent ${agentId}`);
+          if (knowledgeLinks && knowledgeLinks.length > 0) {
+            console.log(`[${requestStartTime}] Internal Query: Document IDs: ${knowledgeLinks.map(l => l.document_id).join(', ')}`);
+          }
           let contextText = "";
           if (knowledgeLinks && knowledgeLinks.length > 0) {
             const documentIds = knowledgeLinks.map((link: { document_id: string }) => link.document_id);
             const queryEmbedding = await generateEmbedding(query);
 
-            const { data: matchedChunks, error: matchError } = await supabase.rpc('match_document_chunks', {
-              query_embedding: queryEmbedding,
-              match_threshold: 0.75, // Example threshold
-              match_count: 5,       // Example count
-              document_ids_filter: documentIds
-            });
-
+            const { data: matchedChunks, error: matchError } = await supabase.rpc(
+              'match_chunks',
+              {
+                query_embedding: queryEmbedding,
+                match_threshold: 0.5,
+                match_count: 5,
+                filter_document_ids: documentIds
+              }
+            );
+            
             if (matchError) {
               console.error(`[${requestStartTime}] Internal Query: Error matching document chunks for agent ${agentId}:`, matchError.message);
-            } else if (matchedChunks && matchedChunks.length > 0) {
+            } else if (matchedChunks && Array.isArray(matchedChunks) && matchedChunks.length > 0) {
               console.log(`[${requestStartTime}] Internal Query: Found ${matchedChunks.length} matching chunks in knowledge base.`);
-              contextText = matchedChunks.map((chunk: { content: string }) => chunk.content).join("\n\n");
-              knowledgeUsed = matchedChunks.map((chunk: { id: string; document_title: string; similarity: number }) => ({ id: chunk.id, title: chunk.document_title, similarity: chunk.similarity }));
+              contextText = (matchedChunks as { content: string }[]).map((chunk: { content: string }) => chunk.content).join("\n\n");
+              knowledgeUsed = (matchedChunks as { id: string; document_title: string; similarity: number }[]).map((chunk: { id: string; document_title: string; similarity: number }) => ({ id: chunk.id, title: chunk.document_title, similarity: chunk.similarity }));
             } else {
               console.log(`[${requestStartTime}] Internal Query: No matching chunks found in knowledge base.`);
             }
           }
-
           // Check for appointment booking requests
           console.log(`[${requestStartTime}] Internal Query: Checking for appointment booking request.`);
           const appointmentExtraction = await extractAppointmentFromMessage(
@@ -295,7 +315,7 @@ serve(async (req: Request) => {
                   );
                 } else {
                   console.error(`[${requestStartTime}] Internal Query: Failed to book appointment:`, bookingResult.error);
-                  responseText = `I apologize, but I encountered an issue while booking your appointment: ${bookingResult.error}. Please try again or contact us directly.`;
+                  responseText = `I apologize, but I encountered an issue while booking your appointment: ${bookingResult.error ?? 'an unknown error'}. Please try again or contact us directly.`;
                 }
               } catch (bookingError) {
                 console.error(`[${requestStartTime}] Internal Query: Error calling book-appointment function:`, bookingError);
@@ -307,19 +327,46 @@ serve(async (req: Request) => {
               responseText = `I'd be happy to help you book an appointment! However, I need a bit more information:\n\n${validation.suggestions.join('\n')}\n\nPlease provide these details and I'll get your appointment scheduled right away.`;
             }
           } else if (appointmentExtraction.has_appointment_request) {
-            // Low confidence appointment request
+            // Low confidence appointment request - use hardcoded prompt with appointment context
             console.log(`[${requestStartTime}] Internal Query: Low confidence appointment request detected.`);
-            responseText = appointmentExtraction.suggested_response || "I'd be happy to help you schedule an appointment. Could you please provide more details about what type of appointment you'd like and when you'd prefer to schedule it?";
+            
+            const appointmentContext = `\n\nAPPOINTMENT CONTEXT: The user has made an appointment request but with low confidence. Detected appointment details: ${JSON.stringify(appointmentExtraction.appointment || {})}. Please help clarify the appointment details and guide them through the booking process.`;
+            
+            const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
+              { role: "system", content: CHATALYST_SYSTEM_PROMPT + appointmentContext },
+            ];
+            
+            // Add knowledge base context if available
+            if (contextText) {
+              messages.push({ role: "system", content: `KNOWLEDGE BASE CONTEXT:\n${contextText}\n\nPlease use ONLY the information from this knowledge base context to answer the user's question. If the answer is not in the knowledge base, politely say you don't have that information available.` });
+            } else {
+              messages.push({ role: "system", content: "No knowledge base context is available. Focus on helping with the appointment request using the appointment context provided." });
+            }
+            
+            messages.push({ role: "user", content: query });
+            
+            console.log(`[${requestStartTime}] Internal Query: Calling OpenAI API for low confidence appointment.`);
+            const completion = await openai.chat.completions.create({
+              model: "gpt-3.5-turbo",
+              messages: messages,
+            });
+            responseText = completion.choices[0]?.message?.content?.trim() || appointmentExtraction.suggested_response || "I'd be happy to help you schedule an appointment. Could you please provide more details about what type of appointment you'd like and when you'd prefer to schedule it?";
           } else {
             // Regular query processing
             console.log(`[${requestStartTime}] Internal Query: No appointment request detected, processing regular query.`);
             
+            // Use hardcoded system prompt for Chatalyst agents
             const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
-              { role: "system", content: (agentData.prompt || "You are a helpful assistant.") + "\n\nIMPORTANT: If the user asks about booking appointments, scheduling, or setting up meetings, let them know you can help them book appointments. Ask for the type of appointment, preferred date and time." },
+              { role: "system", content: CHATALYST_SYSTEM_PROMPT },
             ];
+            
+            // Add knowledge base context if available
             if (contextText) {
-              messages.push({ role: "system", content: `Use the following context to answer the user's query:\n${contextText}` });
+              messages.push({ role: "system", content: `KNOWLEDGE BASE CONTEXT:\n${contextText}\n\nPlease use ONLY the information from this knowledge base context to answer the user's question. If the answer is not in the knowledge base, politely say you don't have that information available.` });
+            } else {
+              messages.push({ role: "system", content: "No knowledge base context is available. You must inform the user that you don't have access to information to answer their question and suggest they contact support directly." });
             }
+            
             messages.push({ role: "user", content: query });
             
             console.log(`[${requestStartTime}] Internal Query: Calling OpenAI API.`);
@@ -336,8 +383,8 @@ serve(async (req: Request) => {
             console.error(`[${requestStartTime}] Internal Query: Error processing Chatalyst agent. Error: ${error.message}`);
             return createJsonResponse({ error: `Failed to process Chatalyst agent: ${error.message}` }, 500);
         }
-      } else if (agentData.agent_type === 'CustomAgent' && agentData.custom_agent_config?.webhook_url) {
-          const webhookUrl = agentData.custom_agent_config.webhook_url;
+      } else if (agentData.agent_type === 'CustomAgent' && agentData.custom_agent_config && typeof agentData.custom_agent_config === 'object' && 'webhook_url' in agentData.custom_agent_config) {
+          const webhookUrl = (agentData.custom_agent_config as { webhook_url: string }).webhook_url;
           console.log(`[${requestStartTime}] Internal Query: Forwarding to Custom Agent webhook: ${webhookUrl} for agent ${agentId}`);
           
           // Construct payload for custom agent. Ensure it matches what the custom agent expects.
@@ -353,7 +400,7 @@ serve(async (req: Request) => {
             sessionId: sessionId,
             phone_number: processedContactIdentifier, 
             // Potentially add other relevant info from agentData.custom_agent_config
-            ...(agentData.custom_agent_config.payload_template || {}) 
+            ...((agentData.custom_agent_config as { payload_template?: Record<string, unknown> }).payload_template || {})
           };
 
           const customAgentResponse = await fetch(webhookUrl, {
@@ -365,8 +412,8 @@ serve(async (req: Request) => {
           if (!customAgentResponse.ok) {
             const errorText = await customAgentResponse.text();
             console.error(`[${requestStartTime}] Internal Query: Custom Agent webhook for agent ${agentId} returned error ${customAgentResponse.status}: ${errorText}`);
-            // Fallback to a generic error or agent's configured error message if available
-            responseText = agentData.error_message || "Sorry, I encountered an issue with the custom service.";
+            // Fallback to a generic error message
+            responseText = "Sorry, I encountered an issue with the custom service.";
           } else {
             const responseBodyText = await customAgentResponse.text();
             console.log(`[${requestStartTime}] Internal Query: Custom Agent webhook for agent ${agentId} returned status ${customAgentResponse.status}. Raw response body: "${responseBodyText}"`);
@@ -391,12 +438,12 @@ serve(async (req: Request) => {
               }
             } else {
               console.warn(`[${requestStartTime}] Internal Query: Custom Agent webhook for agent ${agentId} returned an empty or whitespace-only response body.`);
-              responseText = agentData.error_message || "Sorry, the custom service returned an empty response.";
+              responseText = "Sorry, the custom service returned an empty response.";
             }
           }
         } else {
           console.warn(`[${requestStartTime}] Internal Query: Agent ${agentId} type ${agentData.agent_type} not supported or webhook_url missing.`);
-          responseText = agentData.error_message || "Sorry, this agent is not configured correctly.";
+          responseText = "Sorry, this agent is not configured correctly.";
         }
 
         return createJsonResponse({ response: responseText, image: imageUrl, knowledge_used: knowledgeUsed }, 200);
@@ -419,11 +466,19 @@ serve(async (req: Request) => {
       let payload: NewAgentPayload;
       try {
         payload = await req.json();
-        if (!payload.name ||
-            (payload.agent_type === 'chattalyst' && (payload.prompt === undefined || payload.prompt.trim() === '')) ||
-            (payload.agent_type === 'CustomAgent' && (!payload.custom_agent_config || !payload.custom_agent_config.webhook_url))
-           ) {
-          throw new Error("Missing required fields: name, and prompt (for chattalyst) or custom_agent_config.webhook_url (for CustomAgent)");
+        
+        // Validate required fields based on agent type
+        if (payload.agent_type === 'chattalyst') {
+          if (!payload.name) {
+            return createJsonResponse({ error: 'Name is required for chattalyst agents' }, 400);
+          }
+          if (!payload.knowledge_document_ids || payload.knowledge_document_ids.length === 0) {
+            return createJsonResponse({ error: 'At least one knowledge document must be linked for chattalyst agents' }, 400);
+          }
+        } else if (payload.agent_type === 'CustomAgent') {
+          if (!payload.name || !payload.custom_agent_config?.webhook_url) {
+            return createJsonResponse({ error: 'Name and webhook_url are required for CustomAgent agents' }, 400);
+          }
         }
       } catch (jsonError) {
         return createJsonResponse({ error: 'Invalid payload for agent creation', details: (jsonError as Error).message }, 400);
@@ -454,10 +509,10 @@ serve(async (req: Request) => {
       
       const agentToCreateData: AgentForCreate = {
         name: agentCorePayload.name,
-        prompt: (agentCorePayload.agent_type === 'chattalyst' && agentCorePayload.prompt) ? agentCorePayload.prompt : '',
+        prompt: agentCorePayload.agent_type === 'CustomAgent' ? '' : CHATALYST_SYSTEM_PROMPT,
         is_enabled: agentCorePayload.is_enabled ?? true,
         agent_type: agentCorePayload.agent_type || 'chattalyst',
-        custom_agent_config: (agentCorePayload.agent_type === 'CustomAgent' && agentCorePayload.custom_agent_config) ? agentCorePayload.custom_agent_config : null,
+        custom_agent_config: (agentCorePayload.agent_type === 'CustomAgent' && agentCorePayload.custom_agent_config) ? agentCorePayload.custom_agent_config as Json : null,
         user_id: userId!,
       };
 
@@ -628,32 +683,22 @@ serve(async (req: Request) => {
       if (agentTypeFromPayload) {
         agentToUpdateData.agent_type = agentTypeFromPayload;
         if (agentTypeFromPayload === 'chattalyst') {
+          // Chatalyst agents use hardcoded prompt - no custom prompt allowed
           agentToUpdateData.custom_agent_config = null;
-          if (agentCorePayload.prompt !== undefined) {
-            agentToUpdateData.prompt = agentCorePayload.prompt;
+          // Validate knowledge base requirement for Chatalyst agents
+          if (knowledgeIdsToUpdate !== undefined && (!knowledgeIdsToUpdate || knowledgeIdsToUpdate.length === 0)) {
+            return createJsonResponse({ error: 'At least one knowledge document must be linked for chattalyst agents' }, 400);
           }
         } else if (agentTypeFromPayload === 'CustomAgent') {
           agentToUpdateData.prompt = '';
           if (agentCorePayload.custom_agent_config !== undefined) { 
-            agentToUpdateData.custom_agent_config = agentCorePayload.custom_agent_config;
+            agentToUpdateData.custom_agent_config = agentCorePayload.custom_agent_config as Json;
           } else {
             agentToUpdateData.custom_agent_config = null; 
           }
         }
-      } else {
-        if (agentCorePayload.prompt !== undefined) {
-          agentToUpdateData.prompt = agentCorePayload.prompt;
-          if (agentCorePayload.custom_agent_config === undefined) {
-             agentToUpdateData.custom_agent_config = null;
-          }
-        }
-        if (agentCorePayload.custom_agent_config !== undefined) {
-          agentToUpdateData.custom_agent_config = agentCorePayload.custom_agent_config;
-          if (agentCorePayload.prompt === undefined || agentCorePayload.prompt === '') {
-            agentToUpdateData.prompt = '';
-          }
-        }
       }
+      // Note: Prompt field is no longer updatable for Chatalyst agents - they use hardcoded prompt
 
       console.log(`[${requestStartTime}] Update Agent: User ID for update: ${userId}`);
       console.log(`[${requestStartTime}] Update Agent: Data to be updated for agent ${agentIdFromPath}:`, JSON.stringify(agentToUpdateData, null, 2));

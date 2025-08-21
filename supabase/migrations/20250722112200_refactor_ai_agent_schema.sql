@@ -1,5 +1,5 @@
 -- Step 1: Create the new ai_agent_channels table
-CRETE TABLE public.ai_agent_channels (
+CREATE TABLE public.ai_agent_channels (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   agent_id UUID NOT NULL REFERENCES public.ai_agents(id) ON DELETE CASCADE,
   integrations_config_id UUID NOT NULL REFERENCES public.integrations_config(id) ON DELETE CASCADE,

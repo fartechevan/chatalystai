@@ -165,21 +165,84 @@ export function ChunkEditor() {
     }
   };
 
-  const deleteChunk = (id: string) => {
-    setChunks(chunks.filter(chunk => chunk.id !== id));
-    setSelectedChunks(prev => {
-      const newSet = new Set(prev);
-      newSet.delete(id);
-      return newSet;
-    });
+  const deleteChunk = async (id: string) => {
+    try {
+      setIsSaving(true); // Use isSaving to indicate an ongoing operation
+
+      // Delete from Supabase
+      const { error } = await supabase
+        .from("knowledge_chunks")
+        .delete()
+        .eq("id", id);
+
+      if (error) {
+        throw error;
+      }
+
+      // Update local state
+      setChunks(chunks.filter(chunk => chunk.id !== id));
+      setSelectedChunks(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(id);
+        return newSet;
+      });
+
+      queryClient.invalidateQueries({ queryKey: ["knowledge-chunks", documentId] });
+      toast({
+        title: "Chunk deleted",
+        description: "The chunk has been permanently removed.",
+      });
+    } catch (error) {
+      console.error("Error deleting chunk:", error);
+      toast({
+        variant: "destructive",
+        title: "Error deleting chunk",
+        description: error instanceof Error ? error.message : "An unknown error occurred",
+      });
+    } finally {
+      setIsSaving(false);
+    }
   };
 
-  const deleteSelectedChunks = () => {
+  const deleteSelectedChunks = async () => {
     if (selectedChunks.size === 0) return;
-    
-    setChunks(chunks.filter(chunk => !selectedChunks.has(chunk.id)));
-    setSelectedChunks(new Set());
-    setSelectAll(false);
+
+    try {
+      setIsSaving(true); // Use isSaving to indicate an ongoing operation
+
+      // Convert Set to Array for Supabase `in` filter
+      const idsToDelete = Array.from(selectedChunks);
+
+      // Delete from Supabase
+      const { error } = await supabase
+        .from("knowledge_chunks")
+        .delete()
+        .in("id", idsToDelete);
+
+      if (error) {
+        throw error;
+      }
+
+      // Update local state
+      setChunks(chunks.filter(chunk => !selectedChunks.has(chunk.id)));
+      setSelectedChunks(new Set());
+      setSelectAll(false);
+
+      queryClient.invalidateQueries({ queryKey: ["knowledge-chunks", documentId] });
+      toast({
+        title: "Selected chunks deleted",
+        description: `${idsToDelete.length} chunks have been permanently removed.`,
+      });
+    } catch (error) {
+      console.error("Error deleting selected chunks:", error);
+      toast({
+        variant: "destructive",
+        title: "Error deleting selected chunks",
+        description: error instanceof Error ? error.message : "An unknown error occurred",
+      });
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const moveChunk = (id: string, direction: "up" | "down") => {
