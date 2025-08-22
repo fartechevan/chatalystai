@@ -444,7 +444,26 @@ const AgentDetailsPanel: React.FC<AgentDetailsPanelProps> = ({ selectedAgentId, 
          <Switch
            id="agent-enabled"
            checked={isEnabled}
-           onCheckedChange={setIsEnabled}
+           onCheckedChange={(checked) => {
+             setIsEnabled(checked);
+             // Auto-save the change if editing an existing agent
+             if (selectedAgentId && selectedAgent) {
+               const updates: UpdateAIAgent = {
+                 name: agentName.trim(),
+                 prompt: '',
+                 knowledge_document_ids: agentType === 'chattalyst' ? selectedDocumentIds : [],
+                 is_enabled: checked, // Use the new checked value
+                 agent_type: agentType,
+                 custom_agent_config: agentType === 'CustomAgent' ? { webhook_url: n8nWebhookUrl.trim() } : null,
+                 channels: selectedIntegrationIds.map(id => ({
+                   integrations_config_id: id,
+                   activation_mode: activationMode,
+                   keyword_trigger: activationMode === 'keyword' ? keywordTrigger?.trim() || null : null,
+                 })),
+               };
+               updateMutation.mutate({ agentId: selectedAgentId, updates });
+             }
+           }}
            disabled={isCreating || updateMutation.isPending || isLoadingAgent}
            aria-readonly={isCreating || updateMutation.isPending || isLoadingAgent}
          />
