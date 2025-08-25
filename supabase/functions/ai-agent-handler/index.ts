@@ -526,6 +526,56 @@ serve(async (req: Request) => {
           responseText = "Sorry, this agent is not configured correctly.";
         }
 
+        // Log the conversation to agent_conversations table
+        try {
+          // Log user message
+          const userMessageLog = {
+            session_id: sessionId,
+            sender_type: 'user' as const,
+            message_content: query,
+            message_timestamp: new Date().toISOString(),
+            knowledge_used: null,
+            needs_review: true,
+            added_to_knowledge_base: false
+          };
+
+          const { error: userLogError } = await supabase
+            .from('agent_conversations')
+            .insert(userMessageLog);
+
+          if (userLogError) {
+            console.error(`[${requestStartTime}] Failed to log user message:`, userLogError.message);
+          } else {
+            console.log(`[${requestStartTime}] Successfully logged user message for session ${sessionId}`);
+          }
+
+          // Log agent response
+          if (responseText) {
+            const agentMessageLog = {
+              session_id: sessionId,
+              sender_type: 'ai' as const,
+              message_content: responseText,
+              message_timestamp: new Date().toISOString(),
+              knowledge_used: knowledgeUsed ? knowledgeUsed : null,
+              needs_review: true,
+              added_to_knowledge_base: false
+            };
+
+            const { error: agentLogError } = await supabase
+              .from('agent_conversations')
+              .insert(agentMessageLog);
+
+            if (agentLogError) {
+              console.error(`[${requestStartTime}] Failed to log agent response:`, agentLogError.message);
+            } else {
+              console.log(`[${requestStartTime}] Successfully logged agent response for session ${sessionId}`);
+            }
+          }
+        } catch (loggingError) {
+          // Don't let logging errors affect the main response flow
+          console.error(`[${requestStartTime}] Error during conversation logging:`, (loggingError as Error).message);
+        }
+
         return createJsonResponse({ response: responseText, image: imageUrl, knowledge_used: knowledgeUsed }, 200);
 
       } catch (e) {
