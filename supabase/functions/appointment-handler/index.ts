@@ -1,0 +1,1 @@
+console.error('Error in appointment-handler function:', error)

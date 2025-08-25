@@ -93,9 +93,6 @@ verify_jwt = false
 [functions.suggest-ai-prompt]
 verify_jwt = false
 
-[functions.test-secrets]
-verify_jwt = false
-
 [functions.vectorize-schema]
 verify_jwt = false
 

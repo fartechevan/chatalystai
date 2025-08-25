@@ -11,18 +11,23 @@ type AIAgentDbRow = Database['public']['Tables']['ai_agents']['Row'];
 type AgentChannelData = Database['public']['Tables']['ai_agent_channels']['Row'];
 
 // Hardcoded system prompt for Chatalyst agents
-const CHATALYST_SYSTEM_PROMPT = `You are a knowledgeable assistant that can only respond based on the provided knowledge base content and can help book appointments.
+const CHATALYST_SYSTEM_PROMPT = `You are a knowledgeable assistant that can only respond based on the provided knowledge base content and can help with appointments.
 
 IMPORTANT GUIDELINES:
 1. ONLY answer questions using information from the provided knowledge base context
 2. If the knowledge base doesn't contain information to answer a question, politely say you don't have that information available
 3. Never make up or invent information that isn't in the knowledge base
 4. You can help users book appointments when they request scheduling or meeting setup
-5. For appointment requests, ask for: type of appointment, preferred date and time
-6. Be helpful, professional, and concise in your responses
-7. Always prioritize accuracy over completeness - it's better to say you don't know than to provide incorrect information
+5. You can also help users check their existing appointments and upcoming bookings
+6. For appointment requests, ask for: type of appointment, preferred date and time
+7. For appointment inquiries, you can retrieve and display their current appointments
+8. Be helpful, professional, and concise in your responses
+9. Always prioritize accuracy over completeness - it's better to say you don't know than to provide incorrect information
 
-When users ask about booking appointments, scheduling, or setting up meetings, let them know you can help them book appointments and ask for the necessary details.`;
+When users ask about:
+- Booking appointments, scheduling, or setting up meetings: Help them book appointments and ask for necessary details
+- Their current appointments, scheduled meetings, or upcoming bookings: Retrieve and display their appointment information
+- Checking their calendar or appointment status: Show their existing appointments`;
 
 // Payload for creating/updating a channel link
 interface AgentChannelPayload {
@@ -148,21 +153,31 @@ async function validateChannelConflicts(
 
 async function generateEmbedding(text: string): Promise<number[]> {
   try {
-    const apiKey = Deno.env.get("OPENAI_API_KEY");
-    if (!apiKey) throw new Error("OPENAI_API_KEY environment variable not set.");
-    const openai = new OpenAI({ apiKey });
-    const embeddingResponse = await openai.embeddings.create({
-      model: "text-embedding-ada-002",
-      input: text.replaceAll("\n", " "),
+    const openai = new OpenAI({
+      apiKey: Deno.env.get('OPENAI_API_KEY'),
     });
-    if (embeddingResponse.data.length === 0 || !embeddingResponse.data[0].embedding) {
-        throw new Error("OpenAI embedding response did not contain embedding data.");
-    }
-    return embeddingResponse.data[0].embedding;
+    const response = await openai.embeddings.create({
+      model: 'text-embedding-3-small',
+      input: text,
+    });
+    return response.data[0].embedding;
   } catch (error) {
-      console.error("Error generating embedding:", error);
-      throw new Error(`Failed to generate embedding: ${(error as Error).message}`);
+    console.error('Error generating embedding:', error);
+    throw error;
   }
+}
+
+function detectAppointmentInquiry(message: string): boolean {
+  const inquiryKeywords = [
+    'my appointments', 'my bookings', 'scheduled appointments', 'upcoming appointments',
+    'check appointments', 'view appointments', 'show appointments', 'list appointments',
+    'appointment status', 'booking status', 'scheduled meetings', 'upcoming meetings',
+    'my calendar', 'what appointments', 'when is my', 'appointment schedule',
+    'booked appointments', 'reserved appointments', 'confirmed appointments'
+  ];
+  
+  const lowerMessage = message.toLowerCase();
+  return inquiryKeywords.some(keyword => lowerMessage.includes(keyword));
 }
 
 serve(async (req: Request) => {
@@ -234,59 +249,54 @@ serve(async (req: Request) => {
             }
             const openai = new OpenAI({ apiKey });
 
-          // Fetch knowledge documents if any
-          const { data: knowledgeLinks } = await supabase
-            .from('ai_agent_knowledge_documents')
-            .select('document_id')
-            .eq('agent_id', agentId);
+            // Fetch knowledge documents if any
+            const { data: knowledgeLinks } = await supabase
+              .from('ai_agent_knowledge_documents')
+              .select('document_id')
+              .eq('agent_id', agentId);
 
-          console.log(`[${requestStartTime}] Internal Query: Found ${knowledgeLinks?.length || 0} knowledge links for agent ${agentId}`);
-          if (knowledgeLinks && knowledgeLinks.length > 0) {
-            console.log(`[${requestStartTime}] Internal Query: Document IDs: ${knowledgeLinks.map(l => l.document_id).join(', ')}`);
-          }
-          let contextText = "";
-          if (knowledgeLinks && knowledgeLinks.length > 0) {
-            const documentIds = knowledgeLinks.map((link: { document_id: string }) => link.document_id);
-            const queryEmbedding = await generateEmbedding(query);
-
-            const { data: matchedChunks, error: matchError } = await supabase.rpc(
-              'match_chunks',
-              {
-                query_embedding: queryEmbedding,
-                match_threshold: 0.5,
-                match_count: 5,
-                filter_document_ids: documentIds
-              }
-            );
-            
-            if (matchError) {
-              console.error(`[${requestStartTime}] Internal Query: Error matching document chunks for agent ${agentId}:`, matchError.message);
-            } else if (matchedChunks && Array.isArray(matchedChunks) && matchedChunks.length > 0) {
-              console.log(`[${requestStartTime}] Internal Query: Found ${matchedChunks.length} matching chunks in knowledge base.`);
-              contextText = (matchedChunks as { content: string }[]).map((chunk: { content: string }) => chunk.content).join("\n\n");
-              knowledgeUsed = (matchedChunks as { id: string; document_title: string; similarity: number }[]).map((chunk: { id: string; document_title: string; similarity: number }) => ({ id: chunk.id, title: chunk.document_title, similarity: chunk.similarity }));
-            } else {
-              console.log(`[${requestStartTime}] Internal Query: No matching chunks found in knowledge base.`);
+            console.log(`[${requestStartTime}] Internal Query: Found ${knowledgeLinks?.length || 0} knowledge links for agent ${agentId}`);
+            if (knowledgeLinks && knowledgeLinks.length > 0) {
+              console.log(`[${requestStartTime}] Internal Query: Document IDs: ${knowledgeLinks.map(l => l.document_id).join(', ')}`);
             }
-          }
-          // Check for appointment booking requests
-          console.log(`[${requestStartTime}] Internal Query: Checking for appointment booking request.`);
-          const appointmentExtraction = await extractAppointmentFromMessage(
-            query,
-            contactIdentifier,
-            new Date().toISOString()
-          );
+            let contextText = "";
+            if (knowledgeLinks && knowledgeLinks.length > 0) {
+              const documentIds = knowledgeLinks.map((link: { document_id: string }) => link.document_id);
+              const queryEmbedding = await generateEmbedding(query);
 
-          if (appointmentExtraction.has_appointment_request && appointmentExtraction.appointment) {
-            console.log(`[${requestStartTime}] Internal Query: Appointment request detected with confidence ${appointmentExtraction.appointment.confidence}.`);
+              const { data: matchedChunks, error: matchError } = await supabase.rpc(
+                'match_chunks',
+                {
+                  query_embedding: queryEmbedding,
+                  match_threshold: 0.5,
+                  match_count: 5,
+                  filter_document_ids: documentIds
+                }
+              );
+              
+              if (matchError) {
+                console.error(`[${requestStartTime}] Internal Query: Error matching document chunks for agent ${agentId}:`, matchError.message);
+              } else if (matchedChunks && Array.isArray(matchedChunks) && matchedChunks.length > 0) {
+                console.log(`[${requestStartTime}] Internal Query: Found ${matchedChunks.length} matching chunks in knowledge base.`);
+                contextText = (matchedChunks as { content: string }[]).map((chunk: { content: string }) => chunk.content).join("\n\n");
+                knowledgeUsed = (matchedChunks as { id: string; document_title: string; similarity: number }[]).map((chunk: { id: string; document_title: string; similarity: number }) => ({ id: chunk.id, title: chunk.document_title, similarity: chunk.similarity }));
+              } else {
+                console.log(`[${requestStartTime}] Internal Query: No matching chunks found in knowledge base.`);
+              }
+            }
             
-            const validation = validateAppointmentForBooking(appointmentExtraction.appointment);
+            // Appointment extraction and handling
+            const appointmentExtraction = await extractAppointmentFromMessage(query);
             
-            if (validation.is_valid) {
-              // Book the appointment
-              console.log(`[${requestStartTime}] Internal Query: Booking appointment.`);
+            // Check for appointment inquiry (checking existing appointments)
+            const isAppointmentInquiry = detectAppointmentInquiry(query);
+            
+            if (isAppointmentInquiry && !appointmentExtraction.has_appointment_request) {
+              // User is asking about existing appointments, not booking new ones
+              console.log(`[${requestStartTime}] Internal Query: Appointment inquiry detected for contact ${contactIdentifier}.`);
+              
               try {
-                const bookingResponse = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/book-appointment`, {
+                const appointmentResponse = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/appointment-handler`, {
                   method: 'POST',
                   headers: {
                     'Content-Type': 'application/json',
@@ -294,96 +304,166 @@ serve(async (req: Request) => {
                     'X-Internal-Call': 'true'
                   },
                   body: JSON.stringify({
-                    title: appointmentExtraction.appointment.title,
-                    start_time: appointmentExtraction.appointment.start_time,
-                    end_time: appointmentExtraction.appointment.end_time,
+                    action: 'get',
                     contact_identifier: contactIdentifier,
-                    notes: appointmentExtraction.appointment.notes,
-                    source_channel: 'whatsapp',
-                    agent_id: agentId,
-                    session_id: sessionId
+                    limit: 10,
+                    include_past: false
                   })
                 });
-
-                const bookingResult = await bookingResponse.json();
                 
-                if (bookingResult.success) {
-                  console.log(`[${requestStartTime}] Internal Query: Appointment booked successfully with ID ${bookingResult.appointment_id}.`);
-                  responseText = generateAppointmentConfirmation(
-                    appointmentExtraction.appointment,
-                    bookingResult.appointment_id
-                  );
-                } else {
-                  console.error(`[${requestStartTime}] Internal Query: Failed to book appointment:`, bookingResult.error);
-                  responseText = `I apologize, but I encountered an issue while booking your appointment: ${bookingResult.error ?? 'an unknown error'}. Please try again or contact us directly.`;
+                const appointmentResult = await appointmentResponse.json();
+                
+                if (appointmentResult.success && appointmentResult.appointments) {
+                  const appointments = appointmentResult.appointments;
+                    
+                    if (appointments.length === 0) {
+                      responseText = "You don't have any upcoming appointments scheduled. Would you like to book a new appointment?";
+                    } else {
+                      // Format appointments for display
+                      let appointmentList = "Here are your upcoming appointments:\n\n";
+                      
+                      appointments.forEach((apt: any, index: number) => {
+                        const startDate = new Date(apt.start_time);
+                        const formattedDate = startDate.toLocaleDateString('en-US', {
+                          weekday: 'long',
+                          year: 'numeric',
+                          month: 'long',
+                          day: 'numeric'
+                        });
+                        const formattedTime = startDate.toLocaleTimeString('en-US', {
+                          hour: '2-digit',
+                          minute: '2-digit'
+                        });
+                        
+                        appointmentList += `${index + 1}. **${apt.title || 'Appointment'}**\n`;
+                        appointmentList += `   📅 ${formattedDate}\n`;
+                        appointmentList += `   🕐 ${formattedTime}\n`;
+                        if (apt.notes) {
+                          appointmentList += `   📝 ${apt.notes}\n`;
+                        }
+                        appointmentList += "\n";
+                      });
+                      
+                      responseText = appointmentList;
+                    }
+                  } else {
+                    console.error(`[${requestStartTime}] Internal Query: Failed to retrieve appointments:`, appointmentResult.error);
+                    responseText = "I apologize, but I'm currently unable to retrieve your appointment information. Please try again later or contact us directly.";
+                  }
+                } catch (retrievalError) {
+                  console.error(`[${requestStartTime}] Internal Query: Error calling appointment-handler for retrieval:`, retrievalError);
+                  responseText = "I apologize, but I'm currently unable to access your appointment information. Please try again later.";
                 }
-              } catch (bookingError) {
-                console.error(`[${requestStartTime}] Internal Query: Error calling book-appointment function:`, bookingError);
-                responseText = "I apologize, but I'm currently unable to book appointments. Please try again later or contact us directly.";
+            }
+            // Check for appointment booking requests
+            else if (appointmentExtraction.has_appointment_request && appointmentExtraction.appointment) {
+              console.log(`[${requestStartTime}] Internal Query: Appointment request detected with confidence ${appointmentExtraction.appointment.confidence}.`);
+              
+              const validation = validateAppointmentForBooking(appointmentExtraction.appointment);
+              
+              if (validation.is_valid) {
+                // Book the appointment using the new appointment-handler function
+                console.log(`[${requestStartTime}] Internal Query: Booking appointment.`);
+                try {
+                  const bookingResponse = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/appointment-handler`, {
+                    method: 'POST',
+                    headers: {
+                      'Content-Type': 'application/json',
+                      'Authorization': `Bearer ${Deno.env.get('SUPABASE_ANON_KEY')}`,
+                      'X-Internal-Call': 'true'
+                    },
+                    body: JSON.stringify({
+                      action: 'create',
+                      title: appointmentExtraction.appointment.title,
+                      start_time: appointmentExtraction.appointment.start_time,
+                      end_time: appointmentExtraction.appointment.end_time,
+                      contact_identifier: contactIdentifier,
+                      notes: appointmentExtraction.appointment.notes,
+                      source_channel: 'whatsapp',
+                      agent_id: agentId,
+                      session_id: sessionId
+                    })
+                  });
+                  
+                  const bookingResult = await bookingResponse.json();
+                  
+                  if (bookingResult.success) {
+                    console.log(`[${requestStartTime}] Internal Query: Appointment booked successfully with ID ${bookingResult.appointment_id}.`);
+                    responseText = generateAppointmentConfirmation(
+                      appointmentExtraction.appointment,
+                      bookingResult.appointment_id
+                    );
+                  } else {
+                    console.error(`[${requestStartTime}] Internal Query: Failed to book appointment:`, bookingResult.error);
+                    responseText = `I apologize, but I encountered an issue while booking your appointment: ${bookingResult.error ?? 'an unknown error'}. Please try again or contact us directly.`;
+                  }
+                } catch (bookingError) {
+                  console.error(`[${requestStartTime}] Internal Query: Error calling appointment-handler function:`, bookingError);
+                  responseText = "I apologize, but I'm currently unable to book appointments. Please try again later or contact us directly.";
+                }
+              } else {
+                // Need more information
+                console.log(`[${requestStartTime}] Internal Query: Appointment request needs clarification. Missing: ${validation.missing_fields.join(', ')}.`);
+                responseText = `I'd be happy to help you book an appointment! However, I need a bit more information:\n\n${validation.suggestions.join('\n')}\n\nPlease provide these details and I'll get your appointment scheduled right away.`;
               }
+            } else if (appointmentExtraction.has_appointment_request) {
+              // Low confidence appointment request - use hardcoded prompt with appointment context
+              console.log(`[${requestStartTime}] Internal Query: Low confidence appointment request detected.`);
+              
+              const appointmentContext = `\n\nAPPOINTMENT CONTEXT: The user has made an appointment request but with low confidence. Detected appointment details: ${JSON.stringify(appointmentExtraction.appointment || {})}. Please help clarify the appointment details and guide them through the booking process.`;
+              
+              const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
+                { role: "system", content: CHATALYST_SYSTEM_PROMPT + appointmentContext },
+              ];
+              
+              // Add knowledge base context if available
+              if (contextText) {
+                messages.push({ role: "system", content: `KNOWLEDGE BASE CONTEXT:\n${contextText}\n\nPlease use ONLY the information from this knowledge base context to answer the user's question. If the answer is not in the knowledge base, politely say you don't have that information available.` });
+              } else {
+                messages.push({ role: "system", content: "No knowledge base context is available. Focus on helping with the appointment request using the appointment context provided." });
+              }
+              
+              messages.push({ role: "user", content: query });
+              
+              console.log(`[${requestStartTime}] Internal Query: Calling OpenAI API for low confidence appointment.`);
+              const completion = await openai.chat.completions.create({
+                model: "gpt-3.5-turbo",
+                messages: messages,
+              });
+              responseText = completion.choices[0]?.message?.content?.trim() || appointmentExtraction.suggested_response || "I'd be happy to help you schedule an appointment. Could you please provide more details about what type of appointment you'd like and when you'd prefer to schedule it?";
             } else {
-              // Need more information
-              console.log(`[${requestStartTime}] Internal Query: Appointment request needs clarification. Missing: ${validation.missing_fields.join(', ')}.`);
-              responseText = `I'd be happy to help you book an appointment! However, I need a bit more information:\n\n${validation.suggestions.join('\n')}\n\nPlease provide these details and I'll get your appointment scheduled right away.`;
+              // Regular query processing
+              console.log(`[${requestStartTime}] Internal Query: No appointment request detected, processing regular query.`);
+              
+              // Use hardcoded system prompt for Chatalyst agents
+              const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
+                { role: "system", content: CHATALYST_SYSTEM_PROMPT },
+              ];
+              
+              // Add knowledge base context if available
+              if (contextText) {
+                messages.push({ role: "system", content: `KNOWLEDGE BASE CONTEXT:\n${contextText}\n\nPlease use ONLY the information from this knowledge base context to answer the user's question. If the answer is not in the knowledge base, politely say you don't have that information available.` });
+              } else {
+                messages.push({ role: "system", content: "No knowledge base context is available. You must inform the user that you don't have access to information to answer their question and suggest they contact support directly." });
+              }
+              
+              messages.push({ role: "user", content: query });
+              
+              console.log(`[${requestStartTime}] Internal Query: Calling OpenAI API.`);
+              const completion = await openai.chat.completions.create({
+                model: "gpt-3.5-turbo",
+                messages: messages,
+              });
+              responseText = completion.choices[0]?.message?.content?.trim() || null;
+              console.log(`[${requestStartTime}] Internal Query: OpenAI API call successful. Response:`, responseText);
             }
-          } else if (appointmentExtraction.has_appointment_request) {
-            // Low confidence appointment request - use hardcoded prompt with appointment context
-            console.log(`[${requestStartTime}] Internal Query: Low confidence appointment request detected.`);
-            
-            const appointmentContext = `\n\nAPPOINTMENT CONTEXT: The user has made an appointment request but with low confidence. Detected appointment details: ${JSON.stringify(appointmentExtraction.appointment || {})}. Please help clarify the appointment details and guide them through the booking process.`;
-            
-            const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
-              { role: "system", content: CHATALYST_SYSTEM_PROMPT + appointmentContext },
-            ];
-            
-            // Add knowledge base context if available
-            if (contextText) {
-              messages.push({ role: "system", content: `KNOWLEDGE BASE CONTEXT:\n${contextText}\n\nPlease use ONLY the information from this knowledge base context to answer the user's question. If the answer is not in the knowledge base, politely say you don't have that information available.` });
-            } else {
-              messages.push({ role: "system", content: "No knowledge base context is available. Focus on helping with the appointment request using the appointment context provided." });
-            }
-            
-            messages.push({ role: "user", content: query });
-            
-            console.log(`[${requestStartTime}] Internal Query: Calling OpenAI API for low confidence appointment.`);
-            const completion = await openai.chat.completions.create({
-              model: "gpt-3.5-turbo",
-              messages: messages,
-            });
-            responseText = completion.choices[0]?.message?.content?.trim() || appointmentExtraction.suggested_response || "I'd be happy to help you schedule an appointment. Could you please provide more details about what type of appointment you'd like and when you'd prefer to schedule it?";
-          } else {
-            // Regular query processing
-            console.log(`[${requestStartTime}] Internal Query: No appointment request detected, processing regular query.`);
-            
-            // Use hardcoded system prompt for Chatalyst agents
-            const messages: OpenAI.Chat.Completions.ChatCompletionMessageParam[] = [
-              { role: "system", content: CHATALYST_SYSTEM_PROMPT },
-            ];
-            
-            // Add knowledge base context if available
-            if (contextText) {
-              messages.push({ role: "system", content: `KNOWLEDGE BASE CONTEXT:\n${contextText}\n\nPlease use ONLY the information from this knowledge base context to answer the user's question. If the answer is not in the knowledge base, politely say you don't have that information available.` });
-            } else {
-              messages.push({ role: "system", content: "No knowledge base context is available. You must inform the user that you don't have access to information to answer their question and suggest they contact support directly." });
-            }
-            
-            messages.push({ role: "user", content: query });
-            
-            console.log(`[${requestStartTime}] Internal Query: Calling OpenAI API.`);
-            const completion = await openai.chat.completions.create({
-              model: "gpt-3.5-turbo",
-              messages: messages,
-            });
-            responseText = completion.choices[0]?.message?.content?.trim() || null;
-            console.log(`[${requestStartTime}] Internal Query: OpenAI API call successful. Response:`, responseText);
-          }
 
-        } catch (e) {
+          } catch (e) {
             const error = e as Error;
             console.error(`[${requestStartTime}] Internal Query: Error processing Chatalyst agent. Error: ${error.message}`);
             return createJsonResponse({ error: `Failed to process Chatalyst agent: ${error.message}` }, 500);
-        }
-      } else if (agentData.agent_type === 'CustomAgent' && agentData.custom_agent_config && typeof agentData.custom_agent_config === 'object' && 'webhook_url' in agentData.custom_agent_config) {
+          }
+        } else if (agentData.agent_type === 'CustomAgent' && agentData.custom_agent_config && typeof agentData.custom_agent_config === 'object' && 'webhook_url' in agentData.custom_agent_config) {
           const webhookUrl = (agentData.custom_agent_config as { webhook_url: string }).webhook_url;
           console.log(`[${requestStartTime}] Internal Query: Forwarding to Custom Agent webhook: ${webhookUrl} for agent ${agentId}`);
           
@@ -424,8 +504,8 @@ serve(async (req: Request) => {
 
                 // Handle double-stringified JSON
                 if (typeof parsedData === 'string') {
-                    console.log(`[${requestStartTime}] Internal Query: Response body is a string, attempting to parse again.`);
-                    parsedData = JSON.parse(parsedData);
+                  console.log(`[${requestStartTime}] Internal Query: Response body is a string, attempting to parse again.`);
+                  parsedData = JSON.parse(parsedData);
                 }
                 
                 responseText = parsedData.output || parsedData.response || parsedData.message || null;
@@ -608,7 +688,6 @@ serve(async (req: Request) => {
 
       const agentsWithDetails: AgentWithDetails[] = agentsData.map((agent: AIAgentDbRow) => {
         const agentChannels = channelsMap.get(agent.id) || [];
-        // console.log(`Agent ${agent.id} has channels:`, agentChannels); // Debug log
         return {
           ...agent,
           channels: agentChannels,
@@ -663,10 +742,10 @@ serve(async (req: Request) => {
       let payload: UpdateAgentPayload;
       try {
         const rawBody = await req.text(); // Try reading as text first for debugging
-        console.log(`[${requestStartTime}] Update Agent: Raw request body for ID ${agentIdFromPath}: ${rawBody.substring(0, 500)}`); // Log first 500 chars
+        console.log(`[${requestStartTime}] Update Agent: Raw request body for ID ${agentIdFromPath}: ${rawBody.substring(0, 200)}...`);
         payload = JSON.parse(rawBody); // Then parse
       } catch (e) {
-        console.error(`[${requestStartTime}] Update Agent: Invalid JSON for update for ID ${agentIdFromPath}. Error: ${(e as Error).message}. Raw body snippet: ${(await req.text()).substring(0,200)}`);
+        console.error(`[${requestStartTime}] Update Agent: Invalid JSON for update for ID ${agentIdFromPath}. Error: ${(e as Error).message}.`);
         return createJsonResponse({ error: 'Invalid JSON for update', details: (e as Error).message }, 400);
       }
       console.log(`[${requestStartTime}] Update Agent: Successfully parsed JSON payload for ID ${agentIdFromPath}`);
@@ -713,9 +792,9 @@ serve(async (req: Request) => {
         }
         updatedAgent = data;
       } else { 
-         const { data, error } = await supabase.from('ai_agents').select('*').eq('id', agentIdFromPath).eq('user_id', userId!).single<AIAgentDbRow>();
-         if (error || !data) return createJsonResponse({ error: 'Agent not found for update', details: error?.message }, 404);
-         updatedAgent = data;
+        const { data, error } = await supabase.from('ai_agents').select('*').eq('id', agentIdFromPath).eq('user_id', userId!).single<AIAgentDbRow>();
+        if (error || !data) return createJsonResponse({ error: 'Agent not found for update', details: error?.message }, 404);
+        updatedAgent = data;
       }
       if (!updatedAgent) return createJsonResponse({ error: 'Agent not found or update failed' }, 404);
 
@@ -754,8 +833,8 @@ serve(async (req: Request) => {
         // Simple strategy: delete all existing channels and re-create them from the payload.
         const { error: deleteError } = await supabase.from('ai_agent_channels').delete().eq('agent_id', agentIdFromPath);
         if (deleteError) {
-            console.error(`[${requestStartTime}] Error deleting old channels for agent ${agentIdFromPath}:`, deleteError.message);
-            // Decide if you should stop or continue. For now, we'll log and continue.
+          console.error(`[${requestStartTime}] Error deleting old channels for agent ${agentIdFromPath}:`, deleteError.message);
+          // Decide if you should stop or continue. For now, we'll log and continue.
         }
         if (channelsToUpdate && channelsToUpdate.length > 0) {
           const channelLinks = channelsToUpdate.map(channel => ({
@@ -771,9 +850,9 @@ serve(async (req: Request) => {
           console.log(`[${requestStartTime}] Inserting new channels for agent ${agentIdFromPath}:`, JSON.stringify(channelLinks, null, 2));
           const { error: insertError } = await supabase.from('ai_agent_channels').insert(channelLinks);
           if (insertError) {
-              console.error(`[${requestStartTime}] Error inserting new channels for agent ${agentIdFromPath}:`, insertError.message);
-              // If insert fails, the agent is left in an inconsistent state (no channels).
-              // Depending on requirements, you might want to return an error here.
+            console.error(`[${requestStartTime}] Error inserting new channels for agent ${agentIdFromPath}:`, insertError.message);
+            // If insert fails, the agent is left in an inconsistent state (no channels).
+            // Depending on requirements, you might want to return an error here.
           }
         }
       }
@@ -832,7 +911,7 @@ serve(async (req: Request) => {
     console.error(`[${requestStartTime}] Unhandled Top-Level Error:`, (error as Error).message, (error as Error).stack);
     return createJsonResponse({ error: 'Internal server error', details: (error as Error).message }, 500);
   } finally {
-      const requestEndTime = Date.now();
-      console.log(`[${requestStartTime}] Request finished in ${requestEndTime - requestStartTime}ms`);
+    const requestEndTime = Date.now();
+    console.log(`[${requestStartTime}] Request finished in ${requestEndTime - requestStartTime}ms`);
   }
 });
