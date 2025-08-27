@@ -1,11 +1,18 @@
-# Welcome to your Lovable project: Chat Lead Gen
+# Chatalyst - Agentic AI Communication Platform
 
-This project is a lead generation application built with React, Vite, TypeScript, shadcn-ui, Tailwind CSS, and Supabase.
+Chatalyst is an advanced AI-powered communication platform designed to help businesses communicate smarter and respond faster. Built with modern web technologies, it provides intelligent conversation management, lead generation, and automated customer engagement capabilities.
 
-## Project Info
+## Features
 
-**Lovable URL**: https://lovable.dev/projects/4635a83f-0521-4e36-aad2-54c5f62f3359
-**Supabase Project ID**: `vezdxxqzzcjkunoaxcxc`
+- **AI Agents**: Intelligent conversation handling with automated responses
+- **Lead Generation**: Advanced lead capture and management system
+- **Contact Management**: Comprehensive customer relationship management
+- **WhatsApp Integration**: Direct integration with WhatsApp Business API
+- **Knowledge Base**: AI-powered knowledge management and retrieval
+- **Appointment Scheduling**: Automated booking and calendar management
+- **Broadcast Messaging**: Bulk messaging with segmentation
+- **Team Collaboration**: Multi-user workspace with role-based access
+- **Analytics Dashboard**: Real-time insights and performance metrics
 
 ## Prerequisites
 
@@ -24,7 +31,7 @@ Before you begin, ensure you have the following installed:
 1.  **Clone the repository:**
     ```sh
     git clone <YOUR_GIT_URL>
-    cd <YOUR_PROJECT_DIRECTORY>
+    cd Chatalyst
     ```
 2.  **Install dependencies:** (Using npm as an example)
     ```sh
@@ -40,13 +47,13 @@ You can run the project in two ways:
 
 ### 1. Frontend Only (Against Remote Supabase)
 
-This is the quickest way to run the frontend UI, but it connects to the **live, remote Supabase project** (`vezdxxqzzcjkunoaxcxc.supabase.co`). Use this mode for UI changes only. You cannot test Supabase function or database changes locally with this method.
+This is the quickest way to run the frontend UI, but it connects to the **live, remote Supabase project**. Use this mode for UI changes only. You cannot test Supabase function or database changes locally with this method.
 
 ```sh
 npm run dev
 ```
 
-The application will be available at `http://localhost:5173` (or another port if 5173 is busy).
+The application will be available at `http://localhost:8080` (or another port if 8080 is busy).
 
 ### 2. Full Stack (Frontend + Local Supabase) - Recommended for Development
 
@@ -64,7 +71,7 @@ This method runs the entire stack (frontend, database, auth, functions) locally 
         ```sh
         supabase start
         ```
-    *   This command will download Docker images (on the first run) and start the local Supabase services. It will output local Supabase URLs and keys (including the `service_role` key needed for `.env.local`). **Note:** The frontend uses hardcoded keys for the *remote* instance, but the Supabase CLI intelligently proxies requests when `supabase start` is running, so the frontend will correctly interact with your *local* Supabase instance without code changes.
+    *   This command will download Docker images (on the first run) and start the local Supabase services. It will output local Supabase URLs and keys (including the `service_role` key needed for `.env.local`).
 
 3.  **Deploy Supabase Functions Locally:** (Optional, but needed to test functions)
     *   Deploy all functions:
@@ -82,7 +89,7 @@ This method runs the entire stack (frontend, database, auth, functions) locally 
     npm run dev
     ```
 
-Now, your frontend at `http://localhost:5173` will interact with your local Supabase instance running in Docker.
+Now, your frontend at `http://localhost:8080` will interact with your local Supabase instance running in Docker.
 
 ## Environment Variables (for Local Supabase Functions)
 
@@ -122,25 +129,50 @@ Here are some useful Supabase CLI commands (run from the project root or `supaba
 
 ## Technologies Used
 
-*   Vite
-*   TypeScript
-*   React
-*   shadcn-ui
-*   Tailwind CSS
-*   Supabase (Database, Auth, Functions, Storage)
+*   **Frontend**: React, TypeScript, Vite
+*   **UI Framework**: shadcn-ui, Tailwind CSS
+*   **Backend**: Supabase (Database, Auth, Functions, Storage)
+*   **AI Integration**: OpenAI API for intelligent responses
+*   **Communication**: WhatsApp Business API, Evolution API
+*   **Database**: PostgreSQL (via Supabase)
+*   **Authentication**: Supabase Auth with license-based signup
+
+## Architecture
+
+Chatalyst follows a modern serverless architecture:
+
+- **Frontend**: React SPA with TypeScript and Tailwind CSS
+- **Backend**: Supabase Edge Functions for serverless API endpoints
+- **Database**: PostgreSQL with real-time subscriptions
+- **AI Processing**: OpenAI integration for intelligent conversation handling
+- **File Storage**: Supabase Storage for media and documents
+- **Authentication**: Row-level security with team-based access control
 
 ## Deployment
 
 You can deploy this project using:
 
-*   **Lovable:** Open the [Lovable Project](https://lovable.dev/projects/4635a83f-0521-4e36-aad2-54c5f62f3359) and click on Share -> Publish.
-*   **Other Platforms (e.g., Netlify, Vercel):** Build the static assets (`npm run build`) and deploy the resulting `dist` folder. You will need to configure environment variables (e.g., `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`) on your hosting platform if you modify the frontend to use them instead of the hardcoded values. See [Lovable Docs: Custom Domains](https://docs.lovable.dev/tips-tricks/custom-domain/) for more guidance.
+*   **Vercel/Netlify**: Build the static assets (`npm run build`) and deploy the resulting `dist` folder. Configure environment variables for your production Supabase instance.
+*   **Docker**: Use the included Dockerfile for containerized deployment.
+*   **Supabase**: Deploy functions directly to your Supabase project using the CLI.
 
-## Editing Code
+## Development Workflow
 
-You can edit the code using:
+1. **Local Development**: Use `supabase start` + `npm run dev` for full-stack development
+2. **Function Testing**: Deploy functions locally with `supabase functions deploy`
+3. **Database Changes**: Use migrations in the `supabase/migrations` directory
+4. **Production Deployment**: Deploy functions and migrations to production Supabase instance
 
-*   **Lovable:** Visit the [Lovable Project](https://lovable.dev/projects/4635a83f-0521-4e36-aad2-54c5f62f3359). Changes are committed automatically.
-*   **Local IDE:** Clone the repo, make changes, commit, and push.
-*   **GitHub:** Edit files directly on GitHub.
-*   **GitHub Codespaces:** Use a cloud-based development environment.
+## Contributing
+
+When contributing to Chatalyst:
+
+1. Follow the existing code style and TypeScript conventions
+2. Test all changes locally using the full-stack development setup
+3. Ensure all Supabase functions work correctly
+4. Update documentation as needed
+5. Test authentication and authorization flows
+
+## License
+
+This project uses a license-based authentication system. Contact the development team for licensing information.
