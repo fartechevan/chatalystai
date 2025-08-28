@@ -1,5 +1,5 @@
 import React from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose } from "@/components/ui/dialog"; // Assuming shadcn/ui dialog
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogClose, DialogDescription } from "@/components/ui/dialog"; // Assuming shadcn/ui dialog
 import { Button } from "@/components/ui/button"; // Assuming shadcn/ui button
 import { X, Loader2, Download, FileQuestion } from 'lucide-react'; // Assuming lucide-react for icons
 
@@ -25,9 +25,16 @@ export function MediaPreviewPopup({
   }
 
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+    <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[80vw] md:max-w-[70vw] lg:max-w-[60vw] xl:max-w-[50vw] p-0 overflow-hidden hide-default-dialog-close">
-        {/* Removed pr-16 and relative as the absolute close button is removed, added 'hide-default-dialog-close' class */}
+        <DialogDescription className="sr-only">
+          {isLoading 
+            ? "Loading media preview" 
+            : error 
+            ? "Error loading media preview" 
+            : `Media preview: ${mediaType || 'unknown type'}`
+          }
+        </DialogDescription>
         <DialogHeader className="p-4 border-b">
           <DialogTitle className="flex justify-between items-center">
             <span>Media Preview</span>
@@ -53,6 +60,11 @@ export function MediaPreviewPopup({
               </DialogClose>
             </div>
           </DialogTitle>
+          <DialogDescription className="sr-only">
+            {isLoading ? "Loading media content" : 
+             error ? `Error loading media: ${error}` :
+             mediaType ? `Viewing ${mediaType} content` : "Media preview dialog"}
+          </DialogDescription>
         </DialogHeader>
         {/* Content div max-height reverted, padding adjustments for close button no longer needed */}
         <div className="p-4 min-h-[300px] max-h-[80vh] overflow-y-auto flex items-center justify-center bg-black/80">

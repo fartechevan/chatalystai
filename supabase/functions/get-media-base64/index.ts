@@ -1,11 +1,11 @@
 import { corsHeaders } from '../_shared/cors.ts';
-import { createClient, SupabaseClient } from '@supabase/supabase-js'; // Use import map alias
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
 console.log("get-media-base64 function initializing");
 
 interface RequestPayload {
   messageId: string;
-  integrationId: string; // Expecting FK to 'integrations' table
+  integrationId: string; // This is integrations_config.id from the frontend
 }
 
 let supabaseAdmin: SupabaseClient;
@@ -19,12 +19,6 @@ try {
     }
     supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey);
     console.log("Supabase client initialized for get-media-base64 (using service role).");
-    // Log to confirm service key presence (DO NOT log the key itself)
-    if (supabaseServiceKey && supabaseServiceKey.length > 20) { // Basic check
-      console.log("Service role key appears to be loaded by the function environment.");
-    } else {
-      console.error("Service role key DOES NOT appear to be loaded or is too short!");
-    }
 } catch (e) {
     console.error("Failed to initialize Supabase client (service role):", e);
 }
@@ -53,15 +47,32 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    // 1. Fetch the main integration record for API URL and Key using the provided integrationId
+    // 1. First fetch the integrations_config to get the actual integration_id
+    console.log(`[get-media-base64] Fetching integrations_config for ID: ${integrationId}`);
+    const { data: configData, error: configError } = await supabaseAdmin
+      .from('integrations_config')
+      .select('integration_id, instance_id, instance_display_name')
+      .eq('id', integrationId) // integrationId is integrations_config.id from frontend
+      .single();
+    
+    if (configError || !configData) {
+      console.error(`Error fetching integrations_config for ID ${integrationId}:`, configError);
+      return new Response(JSON.stringify({ error: `Failed to fetch integration config: ${configError?.message || 'Not found'}` }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 404,
+      });
+    }
+    
+    // 2. Now fetch the integration details using the actual integration_id
+    console.log(`[get-media-base64] Fetching integration details for integration_id: ${configData.integration_id}`);
     const { data: integrationDetails, error: integrationError } = await supabaseAdmin
       .from('integrations')
       .select('base_url, api_key')
-      .eq('id', integrationId) // Use the provided integrationId (FK from conversations table)
+      .eq('id', configData.integration_id) // Use the actual integration_id
       .single();
 
     if (integrationError || !integrationDetails) {
-      console.error(`Error fetching integration details for ID ${integrationId}:`, integrationError);
+      console.error(`Error fetching integration details for integration_id ${configData.integration_id}:`, integrationError);
       return new Response(JSON.stringify({ error: `Failed to fetch integration details: ${integrationError?.message || 'Not found'}` }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 404,
@@ -72,59 +83,28 @@ Deno.serve(async (req: Request) => {
     const evolutionApiKey = integrationDetails.api_key;
 
     if (!evolutionApiUrl || !evolutionApiKey) {
-      console.error("Evolution API URL or Key missing from fetched integration details for integration ID:", integrationId);
-      return new Response(JSON.stringify({ error: 'Server configuration error: API URL or Key not found in DB for the given integration' }), {
+      console.error("Evolution API URL or Key missing from integration details");
+      return new Response(JSON.stringify({ error: 'Server configuration error: API URL or Key not found' }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 500,
       });
     }
 
-    // 2. Fetch the instance_id from integrations_config using the main integrationId
-    console.log(`[get-media-base64] About to query 'integrations_config' for integration_id: ${integrationId}`);
-    const { data: configResults, error: configQueryError } = await supabaseAdmin
-      .from('integrations_config')
-      .select('instance_id, id, instance_display_name')  // Select instance_display_name
-      .eq('integration_id', integrationId); 
-      // Removed .limit(1).single() to inspect results more broadly first
-
-    if (configQueryError) {
-      console.error(`[get-media-base64] Error querying 'integrations_config' for integration_id ${integrationId}:`, JSON.stringify(configQueryError, null, 2));
-      return new Response(JSON.stringify({ error: `Database error fetching instance configuration: ${configQueryError.message}` }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 500, 
-      });
-    }
-
-    if (!configResults || configResults.length === 0) {
-      console.error(`No integrations_config found for integration_id ${integrationId}. Result count: ${configResults?.length}`);
-      return new Response(JSON.stringify({ error: `No instance configuration found for integration_id ${integrationId}.` }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 404, 
-      });
-    }
-    
-    if (configResults.length > 1) {
-      console.warn(`Multiple integrations_config found for integration_id ${integrationId}. Using the first one. Results:`, configResults);
-      // Potentially add logic here if multiple configs are valid and need specific selection
-    }
-
-    const configData = configResults[0]; // Use the first result
-
-    // Use instance_display_name for the API path, fall back to instance_id if display name is missing
-    let instanceNameForApi = configData.instance_display_name || configData.instance_id;
+    // 3. Use instance_display_name or instance_id for the API call
+    const instanceNameForApi = configData.instance_display_name || configData.instance_id;
 
     if (!instanceNameForApi) {
-       console.error(`Fetched integrations_config for integration_id ${integrationId}, but both instance_display_name and instance_id are missing. Config data:`, configData);
-       return new Response(JSON.stringify({ error: `Instance identifier missing in fetched instance configuration for integration_id ${integrationId}.` }), {
+       console.error(`Instance identifier missing in config data:`, configData);
+       return new Response(JSON.stringify({ error: 'Instance identifier missing in configuration' }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 500, // Internal configuration error
+        status: 500,
       });
     }
     
     // URL-encode the instance name in case it contains spaces or special characters
     const encodedInstanceName = encodeURIComponent(instanceNameForApi);
 
-    console.log(`For integrationId ${integrationId}: Using instance name '${instanceNameForApi}' (encoded: '${encodedInstanceName}') from config. Evolution API URL: ${evolutionApiUrl}`);
+    console.log(`Using instance name '${instanceNameForApi}' (encoded: '${encodedInstanceName}')`);
     
     const apiUrl = `${evolutionApiUrl}/chat/getBase64FromMediaMessage/${encodedInstanceName}`;
     console.log(`Calling Evolution API: ${apiUrl} for message ID: ${messageId}`);

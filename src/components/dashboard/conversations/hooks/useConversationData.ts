@@ -42,16 +42,24 @@ export function useConversationData(selectedConversation: Conversation | null, s
     },
     initialPageParam: 1, // Start with page 1
     getNextPageParam: (lastPageData, allPagesData) => {
-      console.log('getNextPageParam called: lastPageData.length:', lastPageData.length, 'pageSize:', pageSize, 'allPagesData.length:', allPagesData.length);
-      // lastPageData is Message[]
-      // allPagesData is Message[][]
-      if (lastPageData.length === pageSize) {
-        const nextPage = allPagesData.length + 1;
-        console.log('Returning next page:', nextPage);
-        return nextPage; // Next page number
+      // Only log in development to reduce console noise
+      if (process.env.NODE_ENV === 'development') {
+        console.log('getNextPageParam called: lastPageData.length:', lastPageData.length, 'pageSize:', pageSize, 'allPagesData.length:', allPagesData.length);
       }
-      console.log('No next page, returning undefined');
-      return undefined; // No more pages
+      
+      // More efficient check - if we got fewer items than requested, we're at the end
+      if (lastPageData.length < pageSize) {
+        if (process.env.NODE_ENV === 'development') {
+          console.log('No next page, returning undefined (got fewer items than pageSize)');
+        }
+        return undefined;
+      }
+      
+      const nextPage = allPagesData.length + 1;
+      if (process.env.NODE_ENV === 'development') {
+        console.log('Returning next page:', nextPage);
+      }
+      return nextPage;
     },
     enabled: !!selectedConversation,
   });
