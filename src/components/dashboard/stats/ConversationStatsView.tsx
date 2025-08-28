@@ -589,13 +589,13 @@ export function ConversationStatsView() {
         </Card>
       </div>
     );
-     }
+    } // Closing brace for the loading `if` block
 
      // Handle errors for both queries
      if (fetchConversationsError || fetchDetailsError) {
        const errorMsg = fetchConversationsError?.message || fetchDetailsError?.message || "An unknown error occurred";
        return <div className="p-4 text-red-500">Error loading data: {errorMsg}</div>;
-     }
+     } // Closing brace for the error `if` block
 
      // This check might need adjustment depending on whether sentimentResult can be null even after merging
      const hasAnalysisRun = analyzedConversations.some(c => c.sentimentResult !== null);
