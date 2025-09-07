@@ -1,8 +1,8 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.5";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.43.4";
 import { corsHeaders } from "../_shared/cors.ts"; // Assuming cors.ts is in _shared
 
-serve(async (req) => {
+serve(async (req: Request) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
@@ -19,7 +19,7 @@ serve(async (req) => {
 
     const supabaseClient = createClient(
       Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_ANON_KEY") ?? "",
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "", // Use service role key for admin functions
       {
         auth: {
           persistSession: false,
@@ -63,15 +63,10 @@ serve(async (req) => {
     phoneNumber = phoneNumber.replace(/\D/g, ''); 
 
     // 3. Find user by phone number
-    // Note: Supabase Auth does not directly support phone number login for magic links.
-    // We'll simulate it by finding a user and then generating a session.
-    // This assumes you have a way to link phone numbers to user accounts,
-    // e.g., storing phone_number in user_metadata or a separate profile table.
-
     let user;
     const { data: users, error: userLookupError } = await supabaseClient
       .from("profiles") // Assuming you have a profiles table linked to auth.users
-      .select("id") // Select 'id' which is the user's UUID in the profiles table
+      .select("id, email") // Select 'id' and 'email'
       .eq("phone_number", phoneNumber);
 
     if (userLookupError) {
@@ -82,28 +77,70 @@ serve(async (req) => {
     if (users && users.length > 0) {
       // User found
       user = users[0];
+      if (!user.email) {
+        throw new Error("User profile found but email is missing. Email is required for login.");
+      }
     } else {
       // User not found, return an error as per new requirement
       throw new Error("User not found. Please ensure your WhatsApp number is linked to an existing account.");
     }
 
-    // 4. Generate a session for the user
-    // This is a simplified approach. In a production environment, you might use
-    // `supabase.auth.admin.generateLink` or similar admin-level functions
-    // if you need to create a session directly without password.
-    // For this example, we'll assume the client-side will handle the session
-    // after receiving a success response.
-    // The `setSession` call on the client side will effectively log them in.
+    // 4. Generate a real session for the user using admin.generateLink
+    const userEmail = user.email; // Use the email from the profiles table
+    const appUrl = Deno.env.get("APP_URL"); // Get APP_URL from environment variables
 
-    // Return a success message or user info (without sensitive data)
-    return new Response(JSON.stringify({ message: "Login successful!", session: { access_token: "dummy", refresh_token: "dummy" } }), { // Dummy session for client to set
+    console.log(`Attempting to generate magic link for user ID: ${user.id}, email: ${userEmail}, redirect to: ${appUrl}`);
+    console.log(`DEBUG: APP_URL from Deno.env: ${appUrl}`); // Log the actual env var value
+    console.log(`DEBUG: user.id: ${user.id}`);
+    console.log(`DEBUG: userEmail: ${userEmail}`);
+
+    const { data: authLink, error: generateLinkError } = await supabaseClient.auth.admin.generateLink({
+      type: 'magiclink',
+      email: userEmail,
+      options: {
+        redirectTo: appUrl,
+        data: { user_id: user.id }
+      }
+    });
+
+    if (generateLinkError) {
+      console.error("Error generating magic link:", generateLinkError.message);
+      throw new Error(`Failed to generate login session: ${generateLinkError.message}`);
+    }
+    if (!authLink?.properties?.email_redirect_to) {
+      console.error("Error generating magic link: No redirect URL returned.");
+      throw new Error("Failed to generate login session: No redirect URL.");
+    }
+
+    console.log("Magic link generated successfully. Redirect URL:", authLink.properties.email_redirect_to);
+
+    // The generated link contains the access_token and refresh_token in its URL parameters
+    // We need to extract them.
+    const redirectUrl = new URL(authLink.properties.email_redirect_to);
+    const accessToken = redirectUrl.searchParams.get('access_token');
+    const refreshToken = redirectUrl.searchParams.get('refresh_token');
+
+    if (!accessToken || !refreshToken) {
+      console.error("Failed to extract session tokens from generated link. AccessToken:", accessToken, "RefreshToken:", refreshToken);
+      throw new Error("Failed to extract session tokens from generated link.");
+    }
+
+    return new Response(JSON.stringify({
+      message: "Login successful!",
+      session: {
+        access_token: accessToken,
+        refresh_token: refreshToken,
+        user: { id: user.id, phone_number: phoneNumber } // Include user info for client
+      }
+    }), {
       headers: { "Content-Type": "application/json" },
       status: 200,
     });
 
-  } catch (error) {
-    console.error("Function error:", error.message);
-    return new Response(JSON.stringify({ error: error.message }), {
+
+  } catch (error: unknown) {
+    console.error("Function error:", (error as Error).message);
+    return new Response(JSON.stringify({ error: (error as Error).message }), {
       headers: { "Content-Type": "application/json" },
       status: 500,
     });
