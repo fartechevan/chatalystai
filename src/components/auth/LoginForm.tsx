@@ -3,6 +3,7 @@ import { ThemeSupa } from "@supabase/auth-ui-shared";
 import { supabase } from "@/integrations/supabase/client";
 import { useEffect, useState, FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
+import { WhatsAppLoginButton } from "./WhatsAppLoginButton";
 
 interface LicenseDetails {
   license_type?: string;
@@ -137,6 +138,11 @@ export const LoginForm = () => {
           </div>
         </div>
         {content}
+        {authView === 'signIn' && (
+          <div className="mt-6">
+            <WhatsAppLoginButton phoneNumber="601157774301" prefillText="/login" />
+          </div>
+        )}
         <div className="mt-8 text-center text-sm text-muted-foreground space-y-2">
           {authView === 'signIn' && (
             <>

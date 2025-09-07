@@ -203,8 +203,11 @@ export async function handleMessageEvent(supabaseClient: SupabaseClient, data: W
             if (!currentSessionId) {
                 if (activationMode === 'always_on') {
                     shouldTrigger = true;
-                } else if (activationMode === 'keyword' && keywordTrigger && messageText!.toLowerCase().includes(keywordTrigger.toLowerCase())) {
-                    shouldTrigger = true;
+                } else if (activationMode === 'keyword' && keywordTrigger) {
+                    console.log(`[MessageHandler] Debug: messageText='${messageText}', keywordTrigger='${keywordTrigger}'`);
+                    if (messageText!.toLowerCase().includes(keywordTrigger.toLowerCase())) {
+                        shouldTrigger = true;
+                    }
                 }
             }
 

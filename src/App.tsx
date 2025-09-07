@@ -10,6 +10,7 @@ import { LoginForm } from "./components/auth/LoginForm";
 import Main from "./pages/Main";
 import Settings from "./pages/Settings";
 import { AuthProvider } from "./components/auth/AuthProvider";
+import { WhatsAppLoginValidationPage } from "./pages/WhatsAppLoginValidationPage";
 // import { TeamProvider } from "./context/TeamContext"; // Removed TeamProvider
 // PageActionProvider is now in DashboardLayout, so remove from here
 import { ProtectedRoute } from "./components/auth/ProtectedRoute";
@@ -64,6 +65,7 @@ const App = () => {
                   <Route path="/login" element={<LoginForm />} />
                   {/* <Route path="/signup" element={<LicensedSignupForm />} /> */} {/* Removed separate signup route */}
                   <Route path="/auth/confirm-invite" element={<ConfirmInvitePage />} /> {/* Add route for ConfirmInvitePage */}
+                  <Route path="/whatsapp-login" element={<WhatsAppLoginValidationPage />} /> {/* Add route for WhatsApp Login Validation */}
                   <Route
                     path="/dashboard"
                     element={
