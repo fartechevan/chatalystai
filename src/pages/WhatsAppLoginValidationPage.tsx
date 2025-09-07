@@ -14,14 +14,17 @@ export const WhatsAppLoginValidationPage: React.FC = () => {
       const token = params.get('token');
 
       if (!token) {
-        setError('No login token found.');
+        setError('No login token found in URL.');
         setMessage('Login failed.');
+        console.error('WhatsAppLoginValidationPage: No token found in URL parameters.');
         return;
       }
 
+      console.log('WhatsAppLoginValidationPage: Attempting to validate token:', token);
+
       try {
         const { data, error: invokeError } = await supabase.functions.invoke('validate-whatsapp-login', {
-          body: { token },
+          body: { token: token }, // Ensure token is explicitly passed in the body
         });
 
         if (invokeError) throw invokeError;

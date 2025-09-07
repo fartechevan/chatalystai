@@ -1,7 +1,12 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.5";
+import { corsHeaders } from "../_shared/cors.ts"; // Assuming cors.ts is in _shared
 
 serve(async (req) => {
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: corsHeaders });
+  }
+
   try {
     const { token } = await req.json();
 
@@ -66,7 +71,7 @@ serve(async (req) => {
     let user;
     const { data: users, error: userLookupError } = await supabaseClient
       .from("profiles") // Assuming you have a profiles table linked to auth.users
-      .select("id, user_id")
+      .select("id") // Select 'id' which is the user's UUID in the profiles table
       .eq("phone_number", phoneNumber);
 
     if (userLookupError) {
@@ -95,6 +100,19 @@ serve(async (req) => {
       if (signUpError || !newUserData?.user) {
         console.error("User signup error:", signUpError);
         throw new Error("Failed to create new user.");
+      }
+      // When a new user is signed up, their ID is in newUserData.user.id
+      // We need to ensure the 'profiles' table is updated with this new user's phone number
+      // This assumes an RLS policy allows this insert or it's handled by a trigger
+      const { error: profileInsertError } = await supabaseClient
+        .from("profiles")
+        .insert({ id: newUserData.user.id, phone_number: phoneNumber, email: dummyEmail }); // Insert into profiles table
+      
+      if (profileInsertError) {
+        console.error("Error inserting new profile:", profileInsertError);
+        // Attempt to delete the auth user if profile creation fails to prevent orphaned users
+        await supabaseClient.auth.admin.deleteUser(newUserData.user.id);
+        throw new Error("Failed to create user profile.");
       }
       user = newUserData.user;
     }
