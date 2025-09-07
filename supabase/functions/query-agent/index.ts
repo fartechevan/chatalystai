@@ -1,14 +1,13 @@
 // Follow https://supabase.com/docs/guides/functions/quickstart#create-a-function
 
-// Use imports based on import_map.json
-import { serve } from "std/http/server.ts"; // Use alias from import_map.json
+import { serve } from "std/http/server.ts";
 import { corsHeaders } from "../_shared/cors.ts";
 import { createSupabaseServiceRoleClient } from "../_shared/supabaseClient.ts";
 import { openai, generateEmbedding } from "../_shared/openaiUtils.ts"; // Reverted to original import
 // Import type using the alias defined in import_map.json - Reverted to original import path
 import type { ChatCompletionMessageParam } from "openai/resources/chat/completions";
 
-const MATCH_THRESHOLD = 0.70; // Lowered similarity threshold
+const MATCH_THRESHOLD = 0.30; // Lowered similarity threshold
 const MATCH_COUNT = 10;      // Max number of chunks to retrieve (Increased from 5)
 
 // Updated interface to match the new function return structure
@@ -77,11 +76,11 @@ serve(async (req) => {
     console.log(`Attempting to match chunks for agent ID: ${agentId}`);
     
     // Call the new RPC function with agent_id directly
-    const { data: chunks, error: matchError } = await supabaseClient.rpc('match_vector_db_v1_for_agent', {
-      query_embedding: queryEmbedding,    // vector(1536)
-      agent_id: agentId,                  // UUID - Pass the agent ID directly
-      match_count: MATCH_COUNT,           // INT
-      filter: {}                          // JSONB - Empty filter object
+    const { data: chunks, error: matchError } = await supabaseClient.rpc('match_knowledge_chunks_for_agent', {
+      p_agent_id: agentId,
+      p_query_embedding: queryEmbedding,
+      p_match_threshold: MATCH_THRESHOLD,
+      p_match_count: MATCH_COUNT
     });
 
     if (matchError) {
@@ -89,22 +88,14 @@ serve(async (req) => {
       // Context retrieval failed - Keep flag as false
       contextText = "Error: Could not retrieve relevant context."; // Internal message for logging
     } else if (chunks && chunks.length > 0) {
-      // Filter chunks by similarity threshold (since the new function doesn't have this built-in)
-      const filteredChunks = chunks.filter((chunk: MatchedChunk) => chunk.similarity >= MATCH_THRESHOLD);
+      contextFound = true; // Set flag to true only when chunks are found
+      const returnedDocIds = chunks.map((c: MatchedChunk) => c.document_id);
+      console.log(`Found ${chunks.length} relevant chunks. Document IDs returned: [${[...new Set(returnedDocIds)].join(', ')}]`);
       
-      if (filteredChunks.length > 0) {
-        contextFound = true; // Set flag to true only when chunks are found
-        const returnedDocIds = filteredChunks.map((c: MatchedChunk) => c.document_id);
-        console.log(`Found ${filteredChunks.length} relevant chunks above threshold (${MATCH_THRESHOLD}). Document IDs returned: [${[...new Set(returnedDocIds)].join(', ')}]`);
-        
-        // Apply the MatchedChunk type here
-        contextText = filteredChunks
-          .map((chunk: MatchedChunk) => `Context from document ${chunk.document_id}:\n${chunk.content}`)
-          .join("\n\n---\n\n");
-      } else {
-        console.log(`Found ${chunks.length} chunks but none above similarity threshold ${MATCH_THRESHOLD}.`);
-        contextText = "Info: No sufficiently relevant context found for this query.";
-      }
+      // Apply the MatchedChunk type here
+      contextText = chunks
+        .map((chunk: MatchedChunk) => `Context from document ${chunk.document_id}:\n${chunk.content}`)
+        .join("\n\n---\n\n");
     } else {
       console.log("No chunks found for the agent.");
       contextText = "Info: No context found for this query.";
@@ -114,20 +105,17 @@ serve(async (req) => {
     console.log("Internal Context State:", contextText); // Log the internal message
     console.log("Context Found Flag:", contextFound);
 
-    // --- START: Custom Response for No Context ---
-    // Check the flag instead of the text content
     if (!contextFound) {
-      console.log("Context not found or error retrieving. Returning custom response.");
-      const customResponse = "I'll get back to you on this. Are there any other questions you would like to know?";
+      console.log("Context not found or error retrieving. Returning a standardized message.");
+      const noContextResponse = "I'm sorry, but I don't have information about that. For details, I recommend reaching out to customer support or visiting the official website for more information.";
       return new Response(
-        JSON.stringify({ response: customResponse }),
+        JSON.stringify({ response: noContextResponse }),
         {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
           status: 200,
         }
       );
     }
-    // --- END: Custom Response for No Context ---
 
     // 6. Construct the final prompt (Only if context was found)
     // Use the directly imported type
@@ -178,12 +166,13 @@ Query: ${query}`,
     );
 
   } catch (error) {
-    console.error("Error in query-agent function:", error.message);
+    const message = error instanceof Error ? error.message : "An unexpected error occurred.";
+    console.error("Error in query-agent function:", message);
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: message }),
       {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: 500, // Use 400 for specific client errors later
+        status: 500,
       }
     );
   }

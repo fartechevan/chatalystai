@@ -73,7 +73,7 @@ const fetchConversationLogs = async (
       )
     `, { count: 'exact' }) // Removed comments from select string
     .eq('session_id', sessionId) // Filter by session ID
-    .order('message_timestamp', { ascending: true })
+    .order('message_timestamp', { ascending: false })
     .range(from, to);
 
   // Let Supabase infer the result type

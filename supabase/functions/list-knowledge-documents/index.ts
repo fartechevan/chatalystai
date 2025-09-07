@@ -1,6 +1,6 @@
-import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
+import { serve } from 'std/http/server.ts';
 import { corsHeaders } from '../_shared/cors.ts';
-import { createSupabaseClient } from '../_shared/supabaseClient.ts';
+import { createSupabaseServiceRoleClient } from '../_shared/supabaseClient.ts';
 import { Database } from '../_shared/database.types.ts';
 
 // Use the correct table name and 'title' field from the regenerated types
@@ -21,15 +21,22 @@ serve(async (req: Request) => {
   }
 
   try {
-    // Create Supabase client with auth context
-    const supabase = createSupabaseClient(req);
-    const {
-      data: { user },
-      error: userError,
-    } = await supabase.auth.getUser();
+    // Use the service role client to bypass RLS for this internal operation
+    const supabase = createSupabaseServiceRoleClient();
+    
+    // We still need to get the user to scope the document listing when no agent_id is provided
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      return new Response(JSON.stringify({ error: 'Authorization header is missing' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+    const jwt = authHeader.replace('Bearer ', '');
+    const { data: { user }, error: userError } = await supabase.auth.getUser(jwt);
 
     if (userError || !user) {
-      console.error('User auth error:', userError);
+      console.error('User auth error:', userError?.message);
       return new Response(JSON.stringify({ error: 'User authentication failed' }), {
         status: 401,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -37,11 +44,41 @@ serve(async (req: Request) => {
     }
 
     // Fetch documents for the authenticated user
-    // Fetch documents for the authenticated user using the correct table name
-    const { data: documents, error: fetchError } = await supabase
-      .from('knowledge_documents') // Use correct table name
-      .select('id, title') // Select 'title' instead of 'name'
-      .eq('user_id', user.id); // Filter by user ID (RLS should also enforce this)
+    const url = new URL(req.url);
+    const agentId = url.searchParams.get('agent_id');
+
+    let query = supabase.from('knowledge_documents').select('id, title');
+
+    if (agentId) {
+      // If agent_id is provided, fetch the agent to get its linked document IDs
+      const { data: agent, error: agentError } = await supabase
+        .from('ai_agents')
+        .select('knowledge_document_ids')
+        .eq('id', agentId)
+        .single();
+
+      if (agentError) {
+        console.error(`Error fetching agent ${agentId}:`, agentError);
+        throw new Error(`Failed to fetch agent details: ${agentError.message}`);
+      }
+
+      const documentIds = agent?.knowledge_document_ids || [];
+      
+      if (documentIds.length === 0) {
+        // If no documents are linked, return an empty array immediately
+        return new Response(JSON.stringify({ documents: [] }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 200,
+        });
+      }
+      
+      query = query.in('id', documentIds);
+    } else {
+      // Otherwise, fetch all documents for the user
+      query = query.eq('user_id', user.id);
+    }
+
+    const { data: documents, error: fetchError } = await query;
 
     if (fetchError) {
       console.error('Error fetching knowledge documents:', fetchError);
@@ -52,15 +89,16 @@ serve(async (req: Request) => {
     }
 
     // Map title to name for consistency with the frontend component expectation (or update component later)
-    const mappedDocuments = (documents || []).map(doc => ({ id: doc.id, name: doc.title }));
+    const mappedDocuments = (documents || []).map((doc: { id: string; title: string }) => ({ id: doc.id, name: doc.title }));
 
     return new Response(JSON.stringify({ documents: mappedDocuments as { id: string; name: string }[] }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,
     });
   } catch (error) {
-    console.error('Unexpected error:', error);
-    return new Response(JSON.stringify({ error: 'Internal server error', details: error.message }), {
+    const message = error instanceof Error ? error.message : "An unexpected error occurred.";
+    console.error('Unexpected error:', message);
+    return new Response(JSON.stringify({ error: 'Internal server error', details: message }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });

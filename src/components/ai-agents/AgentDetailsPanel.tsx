@@ -70,7 +70,7 @@ const AgentDetailsPanel: React.FC<AgentDetailsPanelProps> = ({ selectedAgentId, 
     error: documentsError,
   } = useQuery<KnowledgeDocument[], Error>({
     queryKey: ['knowledgeDocuments'],
-    queryFn: listKnowledgeDocuments,
+    queryFn: () => listKnowledgeDocuments(),
   });
 
   // Placeholder: Fetch available integrations
@@ -355,9 +355,8 @@ const AgentDetailsPanel: React.FC<AgentDetailsPanelProps> = ({ selectedAgentId, 
   // --- Test Agent Mutation ---
   const testAgentMutation = useMutation({
     mutationFn: async ({ agentId, query }: { agentId: string; query: string }) => {
-      // TODO: Replace 'query-agent' with the actual Supabase function name when created
       const { data, error } = await supabase.functions.invoke('query-agent', {
-        body: { agentId, query },
+        body: { agent_id: agentId, query: query },
       });
 
       if (error) {
@@ -365,7 +364,6 @@ const AgentDetailsPanel: React.FC<AgentDetailsPanelProps> = ({ selectedAgentId, 
         throw new Error(error.message || 'Failed to query agent.');
       }
       
-      // Return the full data object to handle in onSuccess
       return data;
     },
     onMutate: (variables) => {

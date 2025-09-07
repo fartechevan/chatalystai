@@ -45,7 +45,7 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.ai-agent-handler]
-verify_jwt = true
+verify_jwt = false
 import_map = "./functions/import_map.json"
 
 [functions.analyze-sentiment-batch]
