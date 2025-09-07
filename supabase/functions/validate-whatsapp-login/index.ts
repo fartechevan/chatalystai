@@ -58,16 +58,16 @@ serve(async (req) => {
       throw new Error("Failed to update token status.");
     }
 
-    const phoneNumber = loginData.phone_number;
+    let phoneNumber = loginData.phone_number;
+    // Normalize phone number to digits only for lookup in profiles table
+    phoneNumber = phoneNumber.replace(/\D/g, ''); 
 
-    // 3. Find or create user by phone number
+    // 3. Find user by phone number
     // Note: Supabase Auth does not directly support phone number login for magic links.
-    // We'll simulate it by finding/creating a user and then generating a session.
+    // We'll simulate it by finding a user and then generating a session.
     // This assumes you have a way to link phone numbers to user accounts,
     // e.g., storing phone_number in user_metadata or a separate profile table.
 
-    // For simplicity, let's assume we create a user if not found, and then sign them in.
-    // In a real app, you might want to associate the phone number with an existing user.
     let user;
     const { data: users, error: userLookupError } = await supabaseClient
       .from("profiles") // Assuming you have a profiles table linked to auth.users
@@ -83,38 +83,8 @@ serve(async (req) => {
       // User found
       user = users[0];
     } else {
-      // User not found, create a new one (or link to an existing one if possible)
-      // This part is highly dependent on your user management strategy.
-      // For this example, we'll create a new auth user with a dummy email and link phone number.
-      const dummyEmail = `${phoneNumber.replace(/\D/g, '')}@whatsapp.chattalyst.com`;
-      const dummyPassword = crypto.randomUUID(); // Generate a strong random password
-
-      const { data: newUserData, error: signUpError } = await supabaseClient.auth.signUp({
-        email: dummyEmail,
-        password: dummyPassword,
-        options: {
-          data: { phone_number: phoneNumber }, // Store phone number in user_metadata
-        },
-      });
-
-      if (signUpError || !newUserData?.user) {
-        console.error("User signup error:", signUpError);
-        throw new Error("Failed to create new user.");
-      }
-      // When a new user is signed up, their ID is in newUserData.user.id
-      // We need to ensure the 'profiles' table is updated with this new user's phone number
-      // This assumes an RLS policy allows this insert or it's handled by a trigger
-      const { error: profileInsertError } = await supabaseClient
-        .from("profiles")
-        .insert({ id: newUserData.user.id, phone_number: phoneNumber, email: dummyEmail }); // Insert into profiles table
-      
-      if (profileInsertError) {
-        console.error("Error inserting new profile:", profileInsertError);
-        // Attempt to delete the auth user if profile creation fails to prevent orphaned users
-        await supabaseClient.auth.admin.deleteUser(newUserData.user.id);
-        throw new Error("Failed to create user profile.");
-      }
-      user = newUserData.user;
+      // User not found, return an error as per new requirement
+      throw new Error("User not found. Please ensure your WhatsApp number is linked to an existing account.");
     }
 
     // 4. Generate a session for the user
