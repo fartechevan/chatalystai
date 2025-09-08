@@ -1,14 +1,34 @@
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.43.4";
-import { corsHeaders } from "../_shared/cors.ts"; // Assuming cors.ts is in _shared
+import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { createSupabaseServiceRoleClient } from "../_shared/supabaseClient.ts";
+import { corsHeaders } from "../_shared/cors.ts";
 
-serve(async (req: Request) => {
-  if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders });
+// @ts-ignore
+Deno.serve(async (req: Request) => {
+  console.log("Function started - validate-whatsapp-login");
+  console.log("Request method:", req.method);
+  const body = await req.text();
+  console.log("Raw request body:", body);
+  
+  // Quick test to check APP_URL availability
+  const testAppUrl = Deno.env.get("APP_URL");
+  console.log("TEST: APP_URL value:", testAppUrl);
+  
+  if (!testAppUrl) {
+    return new Response(
+      JSON.stringify({ error: "APP_URL environment variable not found", debug: "Environment variable is missing" }),
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
   }
-
+  
   try {
-    const { token } = await req.json();
+    // Handle CORS preflight requests
+    if (req.method === 'OPTIONS') {
+      return new Response('ok', { headers: corsHeaders });
+    }
+
+    // Parse the request body
+    const { token } = JSON.parse(body);
+    console.log("Extracted token:", token);
 
     if (!token) {
       return new Response(JSON.stringify({ error: "Token is required." }), {
@@ -17,23 +37,26 @@ serve(async (req: Request) => {
       });
     }
 
-    const supabaseClient = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "", // Use service role key for admin functions
-      {
-        auth: {
-          persistSession: false,
-        },
-      },
-    );
+    const supabaseClient = createSupabaseServiceRoleClient();
 
     // 1. Validate the token
+    console.log("Looking up token in database:", token);
     const { data: loginData, error: loginError } = await supabaseClient
       .from("whatsapp_logins")
       .select("phone_number, expires_at, used_at")
       .eq("token", token)
       .single();
 
+    console.log("Token lookup result:", { loginData, loginError });
+    
+    if (loginError) {
+      console.error("Database error during token lookup:", loginError);
+      return new Response(
+        JSON.stringify({ error: "Database error: " + loginError.message }),
+        { status: 500, headers: { "Content-Type": "application/json" } }
+      );
+    }
+    
     if (loginError || !loginData) {
       console.error("Token lookup error:", loginError);
       throw new Error("Invalid or expired token.");
@@ -51,7 +74,7 @@ serve(async (req: Request) => {
     const { error: updateError } = await supabaseClient
       .from("whatsapp_logins")
       .update({ used_at: new Date().toISOString() })
-      .eq("token", token);
+      .eq("id", token);
 
     if (updateError) {
       console.error("Error marking token as used:", updateError);
@@ -62,61 +85,60 @@ serve(async (req: Request) => {
     // Normalize phone number to digits only for lookup in profiles table
     phoneNumber = phoneNumber.replace(/\D/g, ''); 
 
-    // 3. Find user by phone number
-    let user;
-    const { data: users, error: userLookupError } = await supabaseClient
-      .from("profiles") // Assuming you have a profiles table linked to auth.users
-      .select("id, email") // Select 'id' and 'email'
-      .eq("phone_number", phoneNumber);
+    // 3. Find user by phone number (temporarily mocked for testing)
+    console.log("Looking up user for phone:", phoneNumber);
+    
+    // TODO: Implement proper user lookup when profiles table has phone_number column
+    // For now, create a mock user for testing
+    const user = {
+      id: "00000000-0000-0000-0000-000000000000", // Mock user ID
+      email: "test@example.com"
+    };
+    
+    console.log("Using mock user for testing:", user);
 
-    if (userLookupError) {
-      console.error("User lookup error:", userLookupError);
-      throw new Error("Failed to look up user.");
-    }
-
-    if (users && users.length > 0) {
-      // User found
-      user = users[0];
-      if (!user.email) {
-        throw new Error("User profile found but email is missing. Email is required for login.");
-      }
-    } else {
-      // User not found, return an error as per new requirement
-      throw new Error("User not found. Please ensure your WhatsApp number is linked to an existing account.");
-    }
-
-    // 4. Generate a real session for the user using admin.generateLink
+    // 4. Generate magic link using Supabase admin
     const userEmail = user.email; // Use the email from the profiles table
-    const appUrl = Deno.env.get("APP_URL"); // Get APP_URL from environment variables
-
-    console.log(`Attempting to generate magic link for user ID: ${user.id}, email: ${userEmail}, redirect to: ${appUrl}`);
-    console.log(`DEBUG: APP_URL from Deno.env: ${appUrl}`); // Log the actual env var value
-    console.log(`DEBUG: user.id: ${user.id}`);
-    console.log(`DEBUG: userEmail: ${userEmail}`);
-
+    const rawAppUrl = Deno.env.get("APP_URL");
+    console.log("[Debug] APP_URL:", rawAppUrl);
+    console.log("[Debug] APP_URL type:", typeof rawAppUrl);
+    
+    const appUrl = rawAppUrl || "http://localhost:5173";
+    console.log("[Debug] Final appUrl:", appUrl);
+    
+    // Try a simpler generateLink call first
     const { data: authLink, error: generateLinkError } = await supabaseClient.auth.admin.generateLink({
-      type: 'magiclink',
-      email: userEmail,
-      options: {
-        redirectTo: appUrl,
-        data: { user_id: user.id }
-      }
+      type: "magiclink",
+      email: user.email!,
     });
+    
+    console.log("[Debug] Simple authLink:", JSON.stringify(authLink, null, 2));
+    console.log("[Debug] Simple generateLinkError:", JSON.stringify(generateLinkError, null, 2));
+
+    console.log(`DEBUG: generateLink response:`, JSON.stringify(authLink, null, 2));
+    console.log(`DEBUG: generateLink error:`, generateLinkError);
 
     if (generateLinkError) {
       console.error("Error generating magic link:", generateLinkError.message);
       throw new Error(`Failed to generate login session: ${generateLinkError.message}`);
     }
-    if (!authLink?.properties?.email_redirect_to) {
-      console.error("Error generating magic link: No redirect URL returned.");
-      throw new Error("Failed to generate login session: No redirect URL.");
+    
+    // Check for the correct response structure based on Supabase documentation
+    const actionLink = authLink?.properties?.action_link || authLink?.action_link;
+    const hashedToken = authLink?.properties?.hashed_token || authLink?.hashed_token;
+    
+    if (!actionLink) {
+      console.error("Error generating magic link: No action link returned.");
+      console.error("DEBUG: authLink structure:", JSON.stringify(authLink, null, 2));
+      throw new Error("Failed to generate login session: No action link.");
     }
 
-    console.log("Magic link generated successfully. Redirect URL:", authLink.properties.email_redirect_to);
+    console.log("Magic link generated successfully. Action Link:", actionLink);
+    console.log("Hashed Token:", hashedToken);
 
     // The generated link contains the access_token and refresh_token in its URL parameters
     // We need to extract them.
-    const redirectUrl = new URL(authLink.properties.email_redirect_to);
+    const redirectUrl = new URL(actionLink);
     const accessToken = redirectUrl.searchParams.get('access_token');
     const refreshToken = redirectUrl.searchParams.get('refresh_token');
 
