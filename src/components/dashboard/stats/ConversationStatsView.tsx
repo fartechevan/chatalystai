@@ -625,9 +625,9 @@ export function ConversationStatsView() {
         />
 
         {/* Center content area - Changed to span 3, added border */}
-        <div className="lg:col-span-3 h-full overflow-y-auto p-4 md:p-6 border-r">
+        <div className="lg:col-span-3 h-full overflow-y-auto px-6 py-4 border-r flex flex-col">
           {/* Center Panel Content */}
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-4">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
               <div className="flex-grow">
                 <h1 className="text-2xl font-semibold">Conversation Analysis</h1>
                 {selectedBatchAnalysisId && selectedBatchDateRange?.from && selectedBatchDateRange?.to && (
@@ -706,9 +706,9 @@ export function ConversationStatsView() {
         </div> {/* End of Center content area */}
 
         {/* Right panel for conversation list or sentiment details - New Column */}
-        <div className="lg:col-span-2 h-full overflow-y-auto p-4 md:p-6 bg-muted/10">
+        <div className="lg:col-span-2 h-full overflow-y-auto px-6 py-4 bg-muted/10 flex flex-col">
           {showSentimentDetails && selectedConversationForDetails ? (
-            <div className="space-y-4">
+            <div className="space-y-4 flex-1">
               <div className="flex items-center justify-between">
                 <h3 className="text-lg font-semibold">Conversation Details</h3>
                 <button
@@ -774,12 +774,12 @@ export function ConversationStatsView() {
               onConversationClick={handleConversationDetailClick}
             />
           ) : selectedBatchAnalysisId ? (
-             <div className="flex items-center justify-center h-full text-muted-foreground">
-               <p>Click a sentiment bar in the chart to view conversations.</p>
+             <div className="flex items-center justify-center flex-1 text-muted-foreground">
+               <p className="text-center">Click a sentiment bar in the chart to view conversations.</p>
              </div>
            ) : (
-             <div className="flex items-center justify-center h-full text-muted-foreground">
-               <p>Select a batch analysis from the left panel first.</p>
+             <div className="flex items-center justify-center flex-1 text-muted-foreground">
+               <p className="text-center">Select a batch analysis from the left panel first.</p>
              </div>
            )}
         </div> {/* End of Right panel */}

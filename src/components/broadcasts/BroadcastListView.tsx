@@ -49,14 +49,11 @@ interface BroadcastFilters {
   // Add other filter properties as needed
 }
 
-// Mock data for now - replace with API call
+// Fetch broadcasts with recipient count from broadcast_recipients table
 const fetchBroadcastsFromAPI = async (page: number, pageSize: number, searchTerm: string, filters: BroadcastFilters): Promise<{ data: Broadcast[], totalCount: number }> => {
-  // Simulate API call
   console.log(`Fetching broadcasts: page=${page}, pageSize=${pageSize}, search=${searchTerm}, filters=`, filters);
   
-  // Basic Supabase query (will need to be enhanced for actual pagination and filtering)
-  // Select necessary columns including those for linking to integration_config
-  // and the actual status from the broadcasts table.
+  // First, get the broadcasts with pagination and filtering
   const selectColumns = 'id, message_text, created_at, integration_id, instance_id, status'; 
   let query = supabase
     .from('broadcasts')
@@ -64,7 +61,7 @@ const fetchBroadcastsFromAPI = async (page: number, pageSize: number, searchTerm
     .order('created_at', { ascending: false });
 
   if (searchTerm) {
-    query = query.ilike('message_text', `%${searchTerm}%`); // or 'name'
+    query = query.ilike('message_text', `%${searchTerm}%`);
   }
 
   // Apply status filter if present
@@ -139,6 +136,26 @@ const fetchBroadcastsFromAPI = async (page: number, pageSize: number, searchTerm
     });
   }
 
+  // Get recipient counts for all broadcasts in this page
+  const broadcastIds = rawItems.map(item => item.id);
+  const { data: recipientCounts, error: recipientCountError } = await supabase
+    .from('broadcast_recipients')
+    .select('broadcast_id')
+    .in('broadcast_id', broadcastIds);
+
+  if (recipientCountError) {
+    console.error("Error fetching recipient counts:", recipientCountError);
+  }
+
+  // Create a map of broadcast_id to recipient count
+  const recipientCountMap = new Map<string, number>();
+  if (recipientCounts) {
+    recipientCounts.forEach(recipient => {
+      const currentCount = recipientCountMap.get(recipient.broadcast_id) || 0;
+      recipientCountMap.set(recipient.broadcast_id, currentCount + 1);
+    });
+  }
+
   const formattedData = rawItems.map((item: ExactSupabaseDataItem): Broadcast => {
     let displayName = 'Unknown Sender (no instance_id from broadcast)';
     if (item.instance_id) {
@@ -156,7 +173,7 @@ const fetchBroadcastsFromAPI = async (page: number, pageSize: number, searchTerm
       created_at: item.created_at,
       name: `Broadcast ${item.id.substring(0, 4)}`, // Default name, consider removing if not used
       status: (item.status || 'pending') as NonNullable<Broadcast['status']>, // Use actual status, ensure it fits the updated Broadcast['status'] type
-      recipient_count: 0, // This likely needs to be calculated or fetched differently if required
+      recipient_count: recipientCountMap.get(item.id) || 0, // Get actual recipient count from broadcast_recipients table
       instance_id: item.instance_id || undefined,
       integration_id: item.integration_id || undefined,
       senderDisplayName: displayName,
