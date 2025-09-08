@@ -101,10 +101,28 @@ const ContactsPage: React.FC = () => {
   };
 
   const handleDeleteContact = async (contactId: string) => {
-    if (!window.confirm('Are you sure you want to delete this contact?')) return;
+    if (!window.confirm('Are you sure you want to delete this contact? This will also delete associated appointments, leads, and conversation participants.')) return;
     try {
+      // Delete from referencing tables first
+      const { error: appointmentsError } = await supabase.from('appointments').delete().eq('customer_id', contactId);
+      if (appointmentsError) throw new Error(`Failed to delete appointments: ${appointmentsError.message}`);
+
+      const { error: convError } = await supabase.from('conversation_participants').delete().eq('customer_id', contactId);
+      if (convError) throw new Error(`Failed to delete conversation participants: ${convError.message}`);
+
+      const { error: leadsError } = await supabase.from('leads').delete().eq('customer_id', contactId);
+      if (leadsError) throw new Error(`Failed to delete leads: ${leadsError.message}`);
+
+      const { error: broadcastError } = await supabase.from('broadcast_recipients').delete().eq('customer_id', contactId);
+      if (broadcastError) throw new Error(`Failed to delete broadcast recipients: ${broadcastError.message}`);
+
+      const { error: segmentError } = await supabase.from('segment_contacts').delete().eq('contact_id', contactId);
+      if (segmentError) throw new Error(`Failed to delete segment contacts: ${segmentError.message}`);
+
+      // Now delete from customers table
       const { error: deleteError } = await supabase.from('customers').delete().match({ id: contactId });
       if (deleteError) throw deleteError;
+      
       toast({ title: 'Success', description: 'Contact deleted successfully.' });
       fetchCustomers();
     } catch (err) {
