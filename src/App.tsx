@@ -10,6 +10,7 @@ import { LoginForm } from "./components/auth/LoginForm";
 import Main from "./pages/Main";
 import Settings from "./pages/Settings";
 import { AuthProvider } from "./components/auth/AuthProvider";
+import { WhatsAppLoginValidationPage } from "./pages/WhatsAppLoginValidationPage";
 // import { TeamProvider } from "./context/TeamContext"; // Removed TeamProvider
 // PageActionProvider is now in DashboardLayout, so remove from here
 import { ProtectedRoute } from "./components/auth/ProtectedRoute";
@@ -20,6 +21,7 @@ import { ListsView } from "./components/lists/ListsView";
 import { TaskBoard } from "./components/lists/TaskBoard";
 import Leads from "./pages/Leads"; // Removed Leads import
 import ComingSoon from "@/pages/ComingSoon"; // Keep this for placeholder
+import { Appointments } from "@/pages/Appointments";
 import { ConversationStatsView } from "./components/dashboard/stats/ConversationStatsView"; // Import the new stats view
 import KnowledgeBase from "./pages/KnowledgeBase";
 import { ChunkView } from "./components/knowledge/ChunkView";
@@ -33,6 +35,9 @@ import SegmentsPage from "./pages/SegmentsPage"; // Import Segments page
 // import ReplyConfiguration from "./pages/Automation"; // Removed import for Automation/ReplyConfiguration page
 // Removed import for BatchSentimentAnalysisLayout as it will be rendered within ConversationStatsView
 import ConfirmInvitePage from "./pages/ConfirmInvitePage"; // Import the ConfirmInvitePage
+import NewAppointmentPage from "./pages/NewAppointmentPage"; // Import the new appointment page
+import EditAppointmentPage from "./pages/EditAppointmentPage"; // Import the edit appointment page
+import ViewAppointmentPage from "./pages/ViewAppointmentPage"; // Import the view appointment page
 
 const App = () => {
   const queryClient = new QueryClient({
@@ -60,6 +65,7 @@ const App = () => {
                   <Route path="/login" element={<LoginForm />} />
                   {/* <Route path="/signup" element={<LicensedSignupForm />} /> */} {/* Removed separate signup route */}
                   <Route path="/auth/confirm-invite" element={<ConfirmInvitePage />} /> {/* Add route for ConfirmInvitePage */}
+                  <Route path="/whatsapp-login" element={<WhatsAppLoginValidationPage />} /> {/* Add route for WhatsApp Login Validation */}
                   <Route
                     path="/dashboard"
                     element={
@@ -81,6 +87,10 @@ const App = () => {
                     </Route>
                     <Route path="lists" element={<ListsView />} />
                     <Route path="leads" element={<Leads />} /> {/* Removed Leads route */}
+                    <Route path="leads/appointments" element={<Appointments />} /> {/* Updated to use Appointments component */}
+                    <Route path="leads/appointments/new" element={<NewAppointmentPage />} /> {/* New appointment form route */}
+                    <Route path="leads/appointments/edit/:id" element={<EditAppointmentPage />} /> {/* Edit appointment form route */}
+                    <Route path="leads/appointments/view/:id" element={<ViewAppointmentPage />} /> {/* View appointment details route */}
                     <Route path="calendar" element={<TaskBoard />} />
                     <Route path="conversations" element={<ConversationView />} />
                     <Route path="broadcasts" element={<BroadcastsPage />} /> 
@@ -88,7 +98,7 @@ const App = () => {
                     <Route path="stats" element={<ConversationStatsView />} /> {/* Use the new stats view */}
                     <Route path="help" element={<ComingSoon />} />
                     <Route path="mail" element={<ComingSoon />} />
-                    <Route path="knowledge" element={<KnowledgeBase />} />
+                    <Route path="knowledge/*" element={<KnowledgeBase />} />
                     <Route path="ai-agents" element={<AIAgentsPage />} /> {/* Add AI Agents route */}
                     {/* The route path "teams" is kept for now to avoid breaking existing navigation,
                         but it now renders UsersPage. Consider renaming path to "/users" or "/manage-users" later. */}

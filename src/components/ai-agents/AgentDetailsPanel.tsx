@@ -3,22 +3,22 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Switch } from "@/components/ui/switch";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"; // Import RadioGroup
-import { Terminal, Trash2, Sparkles, Send, Loader2 } from 'lucide-react';
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Textarea } from '@/components/ui/textarea'; // Add this missing import
+import { Terminal, Trash2, Send, Loader2 } from 'lucide-react';
 import { Separator } from '@/components/ui/separator';
-import { getAIAgent, createAIAgent, updateAIAgent, deleteAIAgent } from '@/services/aiAgents/agentService';
+import { getAIAgent, createAIAgent, updateAIAgent, deleteAIAgent, endAIAgentSession } from '@/services/aiAgents/agentService';
 import { listKnowledgeDocuments, KnowledgeDocument } from '@/services/knowledge/documentService';
 // Import the updated integration service and type
 import { listIntegrations, ConfiguredIntegration } from '@/services/integrations/integrationService';
-import { AIAgent, NewAIAgent, UpdateAIAgent } from '@/types/aiAgents';
+import { AIAgent, NewAIAgent, UpdateAIAgent, AgentChannel } from '@/types/aiAgents';
 import { supabase } from '@/integrations/supabase/client'; // Import supabase client for function invocation
 import { useToast } from '@/hooks/use-toast';
-import PromptSuggestionDialog from './PromptSuggestionDialog';
+
 import DocumentSelector from '@/components/knowledge/DocumentSelector';
 import { ArrowLeft } from 'lucide-react';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@/components/ui/resizable';
@@ -39,7 +39,8 @@ const AgentDetailsPanel: React.FC<AgentDetailsPanelProps> = ({ selectedAgentId, 
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [agentName, setAgentName] = useState('');
-  const [promptText, setPromptText] = useState('');
+  const [appointmentBookingEnabled, setAppointmentBookingEnabled] = useState<boolean>(true);
+
   const [keywordTrigger, setKeywordTrigger] = useState<string | null>(''); // Added state
   const [selectedDocumentIds, setSelectedDocumentIds] = useState<string[]>([]);
   const [selectedIntegrationIds, setSelectedIntegrationIds] = useState<string[]>([]);
@@ -48,7 +49,7 @@ const AgentDetailsPanel: React.FC<AgentDetailsPanelProps> = ({ selectedAgentId, 
   const [agentType, setAgentType] = useState<'chattalyst' | 'CustomAgent'>('chattalyst'); // Updated state for agent type
   const [n8nWebhookUrl, setN8nWebhookUrl] = useState(''); // This will store the webhook_url from custom_agent_config
   const [formStage, setFormStage] = useState<'selectType' | 'configureDetails'>('configureDetails'); // Added state for form stage
-  const [isSuggestDialogOpen, setIsSuggestDialogOpen] = useState(false);
+
   // --- State for Testing ---
   const [testQuery, setTestQuery] = useState('');
   // Replace testResponse/testError with chat history state
@@ -69,7 +70,7 @@ const AgentDetailsPanel: React.FC<AgentDetailsPanelProps> = ({ selectedAgentId, 
     error: documentsError,
   } = useQuery<KnowledgeDocument[], Error>({
     queryKey: ['knowledgeDocuments'],
-    queryFn: listKnowledgeDocuments,
+    queryFn: () => listKnowledgeDocuments(),
   });
 
   // Placeholder: Fetch available integrations
@@ -101,10 +102,11 @@ const AgentDetailsPanel: React.FC<AgentDetailsPanelProps> = ({ selectedAgentId, 
     mutationFn: ({ agentId, updates }: { agentId: string; updates: UpdateAIAgent }) =>
       updateAIAgent(agentId, updates),
     onSuccess: (updatedAgent) => {
-      queryClient.invalidateQueries({ queryKey: ['aiAgents'] }); // Refresh list
-      queryClient.invalidateQueries({ queryKey: ['aiAgent', updatedAgent.id] }); // Refresh details view
+      // Manually update the cache for the single agent query
+      queryClient.setQueryData(['aiAgent', updatedAgent.id], updatedAgent);
+      // Invalidate the list query to ensure it's refetched
+      queryClient.invalidateQueries({ queryKey: ['aiAgents'] });
       toast({ title: "Success", description: `Agent "${updatedAgent.name}" updated.` });
-      // Remove onAgentUpdate() call here - let query invalidation handle UI update via useEffect
     },
     onError: (error, variables) => {
       toast({
@@ -115,7 +117,21 @@ const AgentDetailsPanel: React.FC<AgentDetailsPanelProps> = ({ selectedAgentId, 
     },
   });
 
-   // TODO: Add deleteMutation later
+  const deleteMutation = useMutation({
+    mutationFn: deleteAIAgent,
+    onSuccess: (_, deletedAgentId) => {
+      queryClient.invalidateQueries({ queryKey: ['aiAgents'] });
+      toast({ title: "Success", description: "Agent deleted." });
+      onAgentUpdate(); // Navigate back to the list
+    },
+    onError: (error: Error, deletedAgentId) => {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: `Failed to delete agent ${deletedAgentId}: ${error.message}`,
+      });
+    },
+  });
 
    // --- Queries ---
   const {
@@ -131,15 +147,21 @@ const AgentDetailsPanel: React.FC<AgentDetailsPanelProps> = ({ selectedAgentId, 
 
   // Effect to update form state when selected agent changes or when creating new
   useEffect(() => {
+    console.log("selectedAgent", selectedAgent);
+    console.log("isLoadingAgent", isLoadingAgent);
     if (selectedAgentId && selectedAgent) {
       // Populate form for editing
       setAgentName(selectedAgent.name || '');
-      setPromptText(selectedAgent.prompt || '');
-      setKeywordTrigger(selectedAgent.keyword_trigger || '');
+      // The backend now sends the full channel objects
+      const firstChannel = selectedAgent.channels?.[0];
+      if (firstChannel) {
+        setKeywordTrigger(firstChannel.keyword_trigger || '');
+        setActivationMode(firstChannel.activation_mode || 'keyword');
+      }
       setSelectedDocumentIds(selectedAgent.knowledge_document_ids || []);
-      setSelectedIntegrationIds(selectedAgent.integrations_config_ids || []);
+      // Extract integration config IDs from the channels
+      setSelectedIntegrationIds(selectedAgent.channels?.map(c => c.integrations_config_id) || []);
       setIsEnabled(selectedAgent.is_enabled ?? true);
-      setActivationMode(selectedAgent.activation_mode || 'keyword');
       setAgentType(selectedAgent.agent_type || 'chattalyst'); // DB migration already handled 'n8n' to 'CustomAgent'
       setN8nWebhookUrl(selectedAgent.custom_agent_config?.webhook_url || ''); // Use new field
       // setSelectedReplyInstanceId(selectedAgent.reply_evolution_instance_id || null); // Removed
@@ -147,7 +169,6 @@ const AgentDetailsPanel: React.FC<AgentDetailsPanelProps> = ({ selectedAgentId, 
     } else if (!selectedAgentId) {
       // Reset form for creating
       setAgentName('');
-      setPromptText('');
       setKeywordTrigger('');
       setSelectedDocumentIds([]);
       setSelectedIntegrationIds([]);
@@ -162,10 +183,6 @@ const AgentDetailsPanel: React.FC<AgentDetailsPanelProps> = ({ selectedAgentId, 
 
 
   // --- Event Handlers ---
-  const handleApplySuggestion = (suggestion: string) => {
-    setPromptText(suggestion);
-    // Optionally trigger form validation if using react-hook-form
-  };
 
 
   // TODO: Add useMutation hooks for create, update, delete later
@@ -206,26 +223,7 @@ const AgentDetailsPanel: React.FC<AgentDetailsPanelProps> = ({ selectedAgentId, 
           <Label htmlFor="agent-name">Agent Name</Label>
           <Input id="agent-name" defaultValue={selectedAgent.name} placeholder="e.g., Customer Support Bot" />
         </div>
-        <div className="space-y-2">
-           <div className="flex justify-between items-center">
-             <Label htmlFor="agent-prompt">System Prompt</Label>
-             <Button
-               variant="outline"
-               size="sm"
-               onClick={() => setIsSuggestDialogOpen(true)} // Open the dialog
-             >
-               <Sparkles className="h-3 w-3 mr-1" />
-               Suggest
-             </Button>
-           </div>
-          <Textarea
-            id="agent-prompt"
-            value={promptText} // Controlled component
-            onChange={(e) => setPromptText(e.target.value)} // Update state on change
-            placeholder="Define the agent's role and instructions..."
-            rows={6}
-          />
-        </div>
+
          <div className="space-y-2">
            <Label>Knowledge Documents</Label>
            <DocumentSelector
@@ -255,27 +253,7 @@ const AgentDetailsPanel: React.FC<AgentDetailsPanelProps> = ({ selectedAgentId, 
              disabled={createMutation.isPending} // Disable while creating
            />
          </div>
-         <div className="space-y-2">
-            <div className="flex justify-between items-center">
-              <Label htmlFor="agent-prompt-create">System Prompt</Label>
-              <Button
-                 variant="outline"
-                 size="sm"
-                 onClick={() => setIsSuggestDialogOpen(true)} // Open the dialog
-               >
-                 <Sparkles className="h-3 w-3 mr-1" />
-                Suggest
-              </Button>
-            </div>
-           <Textarea
-             id="agent-prompt-create"
-             value={promptText} // Controlled component
-             onChange={(e) => setPromptText(e.target.value)} // Update state on change
-             placeholder="Define the agent's role and instructions..."
-             rows={6}
-             disabled={createMutation.isPending} // Disable while creating
-           />
-         </div>
+
          <div className="space-y-2">
            <Label>Knowledge Documents</Label>
             <DocumentSelector
@@ -293,18 +271,17 @@ const AgentDetailsPanel: React.FC<AgentDetailsPanelProps> = ({ selectedAgentId, 
   }
 
 
-  // TODO: Implement handleSave and handleDelete using mutations
   const handleSave = () => {
-    // Logging removed
+    console.log('handleSave triggered');
 
     if (isCreating) {
-      // --- Create Agent ---
+      console.log('Executing create logic...');
       if (!agentName.trim()) {
         toast({ variant: "destructive", title: "Validation Error", description: "Agent name is required." });
         return;
       }
-      if (agentType === 'chattalyst' && !promptText.trim()) {
-        toast({ variant: "destructive", title: "Validation Error", description: "System prompt is required for Chattalyst agents." });
+      if (agentType === 'chattalyst' && selectedDocumentIds.length === 0) {
+        toast({ variant: "destructive", title: "Validation Error", description: "At least one knowledge document is required for Chattalyst agents." });
         return;
       }
       if (agentType === 'CustomAgent' && !n8nWebhookUrl.trim()) {
@@ -314,26 +291,28 @@ const AgentDetailsPanel: React.FC<AgentDetailsPanelProps> = ({ selectedAgentId, 
 
       const agentData: NewAIAgent = {
         name: agentName,
-        prompt: agentType === 'chattalyst' ? promptText : '', // Only save prompt for chattalyst
-        knowledge_document_ids: agentType === 'chattalyst' && selectedDocumentIds.length > 0 ? selectedDocumentIds : null,
-        keyword_trigger: keywordTrigger?.trim() || null,
-        integrations_config_ids: selectedIntegrationIds.length > 0 ? selectedIntegrationIds : [],
+        prompt: '',
+        knowledge_document_ids: agentType === 'chattalyst' ? selectedDocumentIds : [],
         is_enabled: isEnabled,
-        activation_mode: activationMode,
-        agent_type: agentType, // Will be 'chattalyst' or 'CustomAgent'
+        agent_type: agentType,
         custom_agent_config: agentType === 'CustomAgent' ? { webhook_url: n8nWebhookUrl.trim() } : null,
-        // reply_evolution_instance_id: selectedReplyInstanceId, // Removed
+        channels: selectedIntegrationIds.map(id => ({
+          integrations_config_id: id,
+          activation_mode: activationMode,
+          keyword_trigger: activationMode === 'keyword' ? keywordTrigger?.trim() || null : null,
+        })),
       };
+      console.log('Calling createMutation with:', agentData);
       createMutation.mutate(agentData);
 
     } else if (selectedAgentId && selectedAgent) {
-      // --- Update Agent ---
+      console.log('Executing update logic...');
       if (!agentName.trim()) {
         toast({ variant: "destructive", title: "Validation Error", description: "Agent name is required." });
         return;
       }
-      if (agentType === 'chattalyst' && !promptText.trim()) {
-        toast({ variant: "destructive", title: "Validation Error", description: "System prompt is required for Chattalyst agents." });
+      if (agentType === 'chattalyst' && selectedDocumentIds.length === 0) {
+        toast({ variant: "destructive", title: "Validation Error", description: "At least one knowledge document is required for Chattalyst agents." });
         return;
       }
       if (agentType === 'CustomAgent' && !n8nWebhookUrl.trim()) {
@@ -343,57 +322,41 @@ const AgentDetailsPanel: React.FC<AgentDetailsPanelProps> = ({ selectedAgentId, 
 
       const updates: UpdateAIAgent = {
         name: agentName.trim(),
-        prompt: agentType === 'chattalyst' ? promptText : '', // Only save prompt for chattalyst
-        knowledge_document_ids: agentType === 'chattalyst' && selectedDocumentIds.length > 0 ? selectedDocumentIds : null,
-        keyword_trigger: keywordTrigger?.trim() || null,
-        integrations_config_ids: selectedIntegrationIds.length > 0 ? selectedIntegrationIds : [],
+        prompt: '',
+        knowledge_document_ids: agentType === 'chattalyst' ? selectedDocumentIds : [],
         is_enabled: isEnabled,
-        activation_mode: activationMode,
-        agent_type: agentType, // Will be 'chattalyst' or 'CustomAgent'
+        agent_type: agentType,
         custom_agent_config: agentType === 'CustomAgent' ? { webhook_url: n8nWebhookUrl.trim() } : null,
-        // reply_evolution_instance_id: selectedReplyInstanceId, // Removed
+        channels: selectedIntegrationIds.map(id => ({
+          integrations_config_id: id,
+          activation_mode: activationMode,
+          keyword_trigger: activationMode === 'keyword' ? keywordTrigger?.trim() || null : null,
+        })),
       };
-
-       // Only send update if something actually changed (optional optimization)
-       // Consider comparing keyword_trigger and integration_ids as well
-       // const hasChanged = updates.name !== selectedAgent.name ||
-       //                    updates.prompt !== selectedAgent.prompt ||
-       //                    JSON.stringify(updates.knowledge_document_ids?.sort()) !== JSON.stringify(selectedAgent.knowledge_document_ids?.sort());
-       // if (!hasChanged) {
-       //   toast({ title: "Info", description: "No changes detected." });
-       //   return;
-       // }
-
-       // Logging removed
-       // console.log("Updating agent", selectedAgentId, "with data:", updates); // Remove this log as well
-       
-       console.log('[CLIENT DEBUG] Attempting to update agent. ID:', selectedAgentId);
-       console.log('[CLIENT DEBUG] Update payload:', JSON.stringify(updates, null, 2)); // Pretty print JSON
 
        if (!selectedAgentId) {
          toast({ variant: "destructive", title: "Critical Error", description: "Agent ID is missing before update attempt. Please refresh." });
          console.error('[CLIENT DEBUG] CRITICAL: selectedAgentId is null or undefined before mutate call.');
          return;
        }
-
+       console.log('Calling updateMutation with:', updates);
        updateMutation.mutate({ agentId: selectedAgentId, updates });
     }
   };
 
   const handleDelete = () => {
     if (selectedAgentId) {
-      // TODO: Implement delete mutation
-      // Call deleteAIAgent mutation here
-      // On success, invalidate queries and call onAgentUpdate()
+      if (window.confirm("Are you sure you want to delete this agent? This action cannot be undone.")) {
+        deleteMutation.mutate(selectedAgentId);
+      }
     }
   };
 
   // --- Test Agent Mutation ---
   const testAgentMutation = useMutation({
     mutationFn: async ({ agentId, query }: { agentId: string; query: string }) => {
-      // TODO: Replace 'query-agent' with the actual Supabase function name when created
       const { data, error } = await supabase.functions.invoke('query-agent', {
-        body: { agentId, query },
+        body: { agent_id: agentId, query: query },
       });
 
       if (error) {
@@ -401,7 +364,6 @@ const AgentDetailsPanel: React.FC<AgentDetailsPanelProps> = ({ selectedAgentId, 
         throw new Error(error.message || 'Failed to query agent.');
       }
       
-      // Return the full data object to handle in onSuccess
       return data;
     },
     onMutate: (variables) => {
@@ -444,9 +406,30 @@ const AgentDetailsPanel: React.FC<AgentDetailsPanelProps> = ({ selectedAgentId, 
     testAgentMutation.mutate({ agentId: selectedAgentId, query: testQuery });
   };
 
+  const endSessionMutation = useMutation({
+    mutationFn: endAIAgentSession,
+    onSuccess: () => {
+      toast({ title: "Success", description: "The agent session has been ended." });
+      setChatHistory([]); // Clear the chat history
+    },
+    onError: (error) => {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: `Failed to end session: ${error.message}`,
+      });
+    },
+  });
+
+  const handleEndSession = () => {
+    if (selectedAgentId) {
+      endSessionMutation.mutate(selectedAgentId);
+    }
+  };
+
 
   // --- Render Agent Details Form ---
-  const renderAgentDetailsForm = () => (
+  const renderAgentDetailsForm = (): JSX.Element => (
     <div className="space-y-6"> {/* Increased spacing */}
        {/* Enable/Disable Switch */}
        <div className="flex items-center justify-between space-x-2 rounded-lg border p-4">
@@ -459,38 +442,31 @@ const AgentDetailsPanel: React.FC<AgentDetailsPanelProps> = ({ selectedAgentId, 
          <Switch
            id="agent-enabled"
            checked={isEnabled}
-           onCheckedChange={setIsEnabled}
+           onCheckedChange={(checked) => {
+             setIsEnabled(checked);
+             // Auto-save the change if editing an existing agent
+             if (selectedAgentId && selectedAgent) {
+               const updates: UpdateAIAgent = {
+                 name: agentName.trim(),
+                 prompt: '',
+                 knowledge_document_ids: agentType === 'chattalyst' ? selectedDocumentIds : [],
+                 is_enabled: checked, // Use the new checked value
+                 agent_type: agentType,
+                 custom_agent_config: agentType === 'CustomAgent' ? { webhook_url: n8nWebhookUrl.trim() } : null,
+                 channels: selectedIntegrationIds.map(id => ({
+                   integrations_config_id: id,
+                   activation_mode: activationMode,
+                   keyword_trigger: activationMode === 'keyword' ? keywordTrigger?.trim() || null : null,
+                 })),
+               };
+               updateMutation.mutate({ agentId: selectedAgentId, updates });
+             }
+           }}
            disabled={isCreating || updateMutation.isPending || isLoadingAgent}
            aria-readonly={isCreating || updateMutation.isPending || isLoadingAgent}
          />
        </div>
 
-       {/* Agent Type Selection (Disabled after creation) - Commented out as per request */}
-       {/*
-       <div className="space-y-3">
-         <Label>Agent Type</Label>
-         <RadioGroup
-           value={agentType}
-           // onValueChange should not be active for existing agents if type is immutable
-           // onValueChange={(value: 'chattalyst' | 'CustomAgent') => setAgentType(value)} 
-           className="flex space-x-4"
-           // Disable this field for existing agents
-           disabled={!isCreating || updateMutation.isPending || isLoadingAgent}
-         >
-           <div className="flex items-center space-x-2">
-             <RadioGroupItem value="chattalyst" id="type-chattalyst" />
-             <Label htmlFor="type-chattalyst" className="font-normal">Chattalyst Agent</Label>
-           </div>
-           <div className="flex items-center space-x-2">
-             <RadioGroupItem value="CustomAgent" id="type-custom" />
-             <Label htmlFor="type-custom" className="font-normal">Custom Agent</Label>
-           </div>
-         </RadioGroup>
-         <p className="text-sm text-muted-foreground">
-           The type of agent. This cannot be changed after creation.
-         </p>
-       </div>
-       */}
 
        {/* Agent Name */}
        <div className="space-y-2">
@@ -507,39 +483,32 @@ const AgentDetailsPanel: React.FC<AgentDetailsPanelProps> = ({ selectedAgentId, 
       {agentType === 'chattalyst' && (
         <>
           <div className="space-y-2">
-            <div className="flex justify-between items-center">
-              <Label htmlFor="agent-prompt">System Prompt</Label>
-              <Button
-            variant="outline"
-            size="sm"
-            onClick={() => setIsSuggestDialogOpen(true)}
-            disabled={isCreating || updateMutation.isPending || isLoadingAgent}
-          >
-            <Sparkles className="h-3 w-3 mr-1" />
-            Suggest
-          </Button>
-        </div>
-        <Textarea
-          id="agent-prompt"
-          value={promptText}
-          onChange={(e) => setPromptText(e.target.value)}
-          placeholder="Define the agent's role and instructions..."
-          rows={6}
-          disabled={isCreating || updateMutation.isPending || isLoadingAgent}
-        />
-      </div>
-      <div className="space-y-2">
-        <Label>Knowledge Documents</Label>
-        <DocumentSelector
-          availableDocuments={availableDocuments}
-          selectedDocumentIds={selectedDocumentIds}
-          onSelectionChange={setSelectedDocumentIds}
-          isLoading={isLoadingDocuments}
-          isError={isDocumentsError}
-          error={documentsError}
-          disabled={isCreating || updateMutation.isPending || isLoadingAgent}
-        />
-      </div>
+            <Label>Knowledge Documents</Label>
+            <DocumentSelector
+              availableDocuments={availableDocuments}
+              selectedDocumentIds={selectedDocumentIds}
+              onSelectionChange={setSelectedDocumentIds}
+              isLoading={isLoadingDocuments}
+              isError={isDocumentsError}
+              error={documentsError}
+              disabled={isCreating || updateMutation.isPending || isLoadingAgent}
+            />
+          </div>
+          {/* Appointment Booking Checkbox */}
+          <div className="flex items-center justify-between space-x-2 rounded-lg border p-4">
+            <Label htmlFor="appointment-booking-enabled" className="flex flex-col space-y-1">
+              <span>Appointment Booking</span>
+              <span className="font-normal leading-snug text-muted-foreground">
+                Allow this agent to book appointments.
+              </span>
+            </Label>
+            <Switch
+              id="appointment-booking-enabled"
+              checked={appointmentBookingEnabled}
+              onCheckedChange={setAppointmentBookingEnabled}
+              disabled={isCreating || updateMutation.isPending || isLoadingAgent}
+            />
+          </div>
         </>
       )}
       {agentType === 'CustomAgent' && (
@@ -554,6 +523,8 @@ const AgentDetailsPanel: React.FC<AgentDetailsPanelProps> = ({ selectedAgentId, 
           />
           <p className="text-sm text-muted-foreground">
             The webhook URL your custom agent will receive requests at.
+            <br />
+            <strong>Important:</strong> Use the <strong>Production URL</strong> from n8n, not the Test URL. The Test URL is for one-time tests only and will not work for continuous operation.
           </p>
         </div>
       )}
@@ -643,7 +614,7 @@ const AgentDetailsPanel: React.FC<AgentDetailsPanelProps> = ({ selectedAgentId, 
   );
 
   // --- Render Create Agent Form ---
-   const renderCreateAgentForm = () => (
+   const renderCreateAgentForm = (): JSX.Element => (
      <div className="space-y-4">
        <div className="space-y-2">
          <Label htmlFor="agent-name-create">Agent Name</Label>
@@ -658,39 +629,32 @@ const AgentDetailsPanel: React.FC<AgentDetailsPanelProps> = ({ selectedAgentId, 
        {agentType === 'chattalyst' && (
          <>
            <div className="space-y-2">
-             <div className="flex justify-between items-center">
-               <Label htmlFor="agent-prompt-create">System Prompt</Label>
-               <Button
-             variant="outline"
-             size="sm"
-             onClick={() => setIsSuggestDialogOpen(true)}
-             disabled={createMutation.isPending}
-           >
-             <Sparkles className="h-3 w-3 mr-1" />
-             Suggest
-           </Button>
-         </div>
-         <Textarea
-           id="agent-prompt-create"
-           value={promptText}
-           onChange={(e) => setPromptText(e.target.value)}
-           placeholder="Define the agent's role and instructions..."
-           rows={6}
-           disabled={createMutation.isPending}
-         />
-       </div>
-       <div className="space-y-2">
-         <Label>Knowledge Documents</Label>
-         <DocumentSelector
-           availableDocuments={availableDocuments}
-           selectedDocumentIds={selectedDocumentIds}
-           onSelectionChange={setSelectedDocumentIds}
-           isLoading={isLoadingDocuments}
-           isError={isDocumentsError}
-           error={documentsError}
-          disabled={createMutation.isPending}
-        />
-      </div>
+             <Label>Knowledge Documents</Label>
+             <DocumentSelector
+               availableDocuments={availableDocuments}
+               selectedDocumentIds={selectedDocumentIds}
+               onSelectionChange={setSelectedDocumentIds}
+               isLoading={isLoadingDocuments}
+               isError={isDocumentsError}
+               error={documentsError}
+               disabled={createMutation.isPending}
+             />
+           </div>
+           {/* Appointment Booking Checkbox */}
+           <div className="flex items-center justify-between space-x-2 rounded-lg border p-4">
+             <Label htmlFor="appointment-booking-enabled-create" className="flex flex-col space-y-1">
+               <span>Appointment Booking</span>
+               <span className="font-normal leading-snug text-muted-foreground">
+                 Allow this agent to book appointments.
+               </span>
+             </Label>
+             <Switch
+               id="appointment-booking-enabled-create"
+               checked={appointmentBookingEnabled}
+               onCheckedChange={setAppointmentBookingEnabled}
+               disabled={createMutation.isPending}
+             />
+           </div>
          </>
        )}
        {agentType === 'CustomAgent' && (
@@ -705,6 +669,8 @@ const AgentDetailsPanel: React.FC<AgentDetailsPanelProps> = ({ selectedAgentId, 
           />
           <p className="text-sm text-muted-foreground">
             The webhook URL your custom agent will receive requests at.
+            <br />
+            <strong>Important:</strong> Use the <strong>Production URL</strong> from n8n, not the Test URL. The Test URL is for one-time tests only and will not work for continuous operation.
           </p>
         </div>
        )}
@@ -793,7 +759,7 @@ const AgentDetailsPanel: React.FC<AgentDetailsPanelProps> = ({ selectedAgentId, 
 
 
   // --- Render Test Agent Section (Chat Interface) ---
-  const renderTestAgentSection = () => (
+  const renderTestAgentSection = (): JSX.Element => (
     <div className="flex flex-col h-full">
       {/* Chat History Area */}
       <div className="flex-grow overflow-y-auto p-4 space-y-4 border rounded-md mb-4 bg-background">
@@ -870,6 +836,7 @@ const AgentDetailsPanel: React.FC<AgentDetailsPanelProps> = ({ selectedAgentId, 
         >
           <Send className="h-4 w-4" />
         </Button>
+
       </div>
     </div>
   );
@@ -975,23 +942,16 @@ const AgentDetailsPanel: React.FC<AgentDetailsPanelProps> = ({ selectedAgentId, 
               size="icon"
               onClick={handleDelete}
                // Disable only during mutations/loading
-              disabled={/* deleteMutation.isPending || */ updateMutation.isPending || isLoadingAgent}
+              disabled={deleteMutation.isPending || updateMutation.isPending || isLoadingAgent}
               aria-label="Delete Agent"
             >
-             {/* TODO: Add loading spinner for delete */}
-             <Trash2 className="h-4 w-4" />
+             {deleteMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
            </Button>
          )}
       </CardFooter>
       )} {/* Close the conditional rendering for CardFooter */}
 
-       {/* Render the Dialog */}
-       <PromptSuggestionDialog
-         isOpen={isSuggestDialogOpen}
-         onOpenChange={setIsSuggestDialogOpen}
-         originalPrompt={promptText}
-         onApplySuggestion={handleApplySuggestion}
-       />
+
     </Card>
   );
 };

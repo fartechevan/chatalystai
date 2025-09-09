@@ -1,7 +1,7 @@
 
-import { serve } from 'https://deno.land/std@0.190.0/http/server.ts';
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { v4 as uuidv4 } from 'https://esm.sh/uuid@9.0.0';
+import { serve } from 'std/http/server.ts';
+import { createClient } from '@supabase/supabase-js';
+import { v4 as uuidv4 } from 'uuid';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL');
 const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY');
@@ -17,7 +17,7 @@ async function generateEmbedding(content: string): Promise<number[]> {
   }
 
   try {
-    console.log('Calling OpenAI API to generate embedding');
+    console.log('Calling OpenAI API to generate embedding for content (first 100 chars):', content.substring(0, 100));
     const response = await fetch('https://api.openai.com/v1/embeddings', {
       method: 'POST',
       headers: {
@@ -33,12 +33,16 @@ async function generateEmbedding(content: string): Promise<number[]> {
 
     if (!response.ok) {
       const errorData = await response.json();
-      console.error('OpenAI API error:', errorData);
-      throw new Error(`OpenAI API error: ${errorData.error?.message || 'Unknown error'}`);
+      console.error('OpenAI API error:', response.status, response.statusText, errorData);
+      throw new Error(`OpenAI API error: ${response.status} - ${errorData.error?.message || 'Unknown error'}`);
     }
 
     const responseData = await response.json();
-    console.log('Successfully generated embedding');
+    if (!responseData.data || responseData.data.length === 0 || !responseData.data[0].embedding) {
+      console.error('OpenAI API returned no embedding data:', responseData);
+      throw new Error('OpenAI API returned no embedding data.');
+    }
+    console.log('Successfully generated embedding of length:', responseData.data[0].embedding.length);
     return responseData.data[0].embedding;
   } catch (error) {
     console.error('Error generating embedding:', error);
@@ -52,7 +56,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-serve(async (req) => {
+serve(async (req: Request) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -73,6 +77,8 @@ serve(async (req) => {
       }
 
       console.log('Received save_chunk request for document_id:', document_id);
+      console.log('Content length for embedding generation:', content.length);
+
 
       if (!OPENAI_API_KEY) {
         console.error('OPENAI_API_KEY is not set in edge function environment');
@@ -88,15 +94,24 @@ serve(async (req) => {
       // --- Removed fetching full document content ---
 
       // Generate embedding for the *individual chunk content*
-      console.log('Generating embedding for chunk content...');
+      console.log('Attempting to generate embedding for chunk content...');
       // Ensure content is not empty before generating embedding
       if (!content || typeof content !== 'string' || content.trim().length === 0) {
          throw new Error("Chunk content is empty or invalid, cannot generate embedding.");
       }
       const contentEmbedding = await generateEmbedding(content); // <<< Use chunk content here
 
-      // Convert the embedding to a string for storage
-      const embeddingString = JSON.stringify(contentEmbedding);
+      if (!contentEmbedding || contentEmbedding.length === 0) {
+        console.error('Generated embedding is null or empty.');
+        return new Response(
+          JSON.stringify({ error: 'Failed to generate valid embedding for chunk content.' }),
+          {
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          }
+        );
+      }
+
       console.log('Generated embedding of length:', contentEmbedding.length);
 
       // Insert the chunk into the knowledge_chunks table
@@ -107,7 +122,7 @@ serve(async (req) => {
           id: uuidv4(),
           content: content, 
           document_id: document_id, 
-          embedding: embeddingString,
+          embedding: contentEmbedding,
           metadata: JSON.stringify({}),
           sequence: 0,
         }]);

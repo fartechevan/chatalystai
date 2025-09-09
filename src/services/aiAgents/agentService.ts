@@ -59,30 +59,6 @@ export const getAIAgent = async (agentId: string): Promise<AIAgent | null> => {
   return data.agent as AIAgent;
 };
 
-/**
- * Gets an AI-generated suggestion for a system prompt.
- */
-export const suggestAIPrompt = async (currentPrompt: string, agentPurpose?: string): Promise<string> => {
-  const { data, error } = await supabase.functions.invoke('suggest-ai-prompt', {
-    body: {
-      current_prompt: currentPrompt,
-      agent_purpose: agentPurpose, // Optional
-    },
-  });
-
-  if (error) {
-    console.error('Error suggesting AI prompt:', error);
-    throw new Error(error.message || 'Failed to get prompt suggestion');
-  }
-
-  if (!data || typeof data.suggested_prompt !== 'string') {
-    console.error('Invalid data structure returned from suggest-ai-prompt:', data);
-    throw new Error('Invalid response format from server.');
-  }
-
-  return data.suggested_prompt;
-};
-
 
 /**
  * Creates a new AI agent.
@@ -145,4 +121,18 @@ export const deleteAIAgent = async (agentId: string): Promise<void> => {
     throw error; // Throw original error
   }
   // No data expected on successful delete (204 No Content)
+};
+
+/**
+ * Ends an active AI agent session.
+ */
+export const endAIAgentSession = async (agentId: string): Promise<void> => {
+  const { error } = await supabase.functions.invoke('end-agent-session', {
+    body: { agentId },
+  });
+
+  if (error) {
+    console.error('Error ending AI agent session:', error);
+    throw new Error(error.message || 'Failed to end session');
+  }
 };

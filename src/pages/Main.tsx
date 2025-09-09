@@ -6,7 +6,7 @@ import { useAuthUser } from "@/hooks/useAuthUser";
 import { PageHeaderContextType, TabValue } from "@/components/dashboard/DashboardLayout"; // Import context type and TabValue
 
 export default function Main() {
-  const [timeFilter, setTimeFilter] = useState<'today' | 'yesterday' | 'week' | 'month'>('month');
+  const [timeFilter, setTimeFilter] = useState<'today' | 'yesterday' | 'week' | 'month' | 'custom'>('month');
   const [userFilter, setUserFilter] = useState<string>('all');
   const { userData } = useAuthUser();
   

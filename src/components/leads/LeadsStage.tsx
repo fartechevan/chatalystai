@@ -1,12 +1,8 @@
-import { Card, CardHeader, CardTitle, CardContent, CardFooter } from "@/components/ui/card"; // Import Card parts
-import { Button } from "@/components/ui/button";
-import { useState } from "react";
-import { AddLeadDialog } from "./AddLeadDialog";
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card"; // Import Card parts
 import { cn } from "@/lib/utils";
 import { Draggable, Droppable } from "@hello-pangea/dnd";
 import type { Lead } from "@/components/dashboard/conversations/types";
 import { LeadCard } from "./components/LeadCard"; // Import the new component
-import { Plus } from "lucide-react"; // Import Plus for the button
 
 interface LeadsStageProps {
   name: string;
@@ -24,11 +20,6 @@ const stageColors = {
 };
 
 export function LeadsStage({ name, id, index = 0, leads, onLeadClick }: LeadsStageProps) {
-  const [isAddLeadOpen, setIsAddLeadOpen] = useState(false);
-
-  const handleLeadAdded = () => {
-    setIsAddLeadOpen(false);
-  };
 
   return (
     <Card className="min-w-[280px] w-[280px] h-full flex flex-col bg-muted/60"> {/* Stage as a Card */}
@@ -83,23 +74,7 @@ export function LeadsStage({ name, id, index = 0, leads, onLeadClick }: LeadsSta
         </Droppable>
       </CardContent>
 
-      <CardFooter className="p-3 border-t">
-        <Button
-          variant="outline"
-          className="w-full text-sm"
-          onClick={() => setIsAddLeadOpen(true)}
-        >
-          <Plus className="h-4 w-4 mr-2" />
-          Add lead
-        </Button>
-      </CardFooter>
 
-      <AddLeadDialog
-        isOpen={isAddLeadOpen}
-        onClose={() => setIsAddLeadOpen(false)}
-        pipelineStageId={id}
-        onLeadAdded={handleLeadAdded}
-      />
     </Card>
   );
 }

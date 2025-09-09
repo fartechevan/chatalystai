@@ -242,17 +242,21 @@ serve(async (req: Request) => {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         status: 200
       });
-    } else if (action === 'sendText' || action === 'send-media') { 
+    } else if (action === 'sendText' || action === 'send-media' || action === 'send-buttons') { 
       console.log(`evolution-api-handler: '${action}' action received. Body parsed:`, JSON.stringify(bodyParsed, null, 2));
       const {
         integrationConfigId,
         number, // For sendText
         text,   // For sendText or caption for sendMedia
-        recipientJid, // For sendMedia
+        recipientJid, // For sendMedia and send-buttons
         mediaData,    // For sendMedia (URL or base64)
         mimeType,     // For sendMedia
         filename,     // For sendMedia
-        caption       // For sendMedia (alternative to text)
+        caption,      // For sendMedia (alternative to text)
+        title,        // For send-buttons
+        description,  // For send-buttons
+        footer,       // For send-buttons
+        buttons       // For send-buttons
       } = bodyParsed as {
         integrationConfigId?: string;
         number?: string;
@@ -262,11 +266,20 @@ serve(async (req: Request) => {
         mimeType?: string;
         filename?: string;
         caption?: string;
+        title?: string;
+        description?: string;
+        footer?: string;
+        buttons?: Array<{
+          title: string;
+          displayText: string;
+          id: string;
+        }>;
       };
 
       if (!integrationConfigId ||
           (action === 'sendText' && (!number || !text)) ||
-          (action === 'send-media' && (!recipientJid || !mediaData || !mimeType || !filename))
+          (action === 'send-media' && (!recipientJid || !mediaData || !mimeType || !filename)) ||
+          (action === 'send-buttons' && (!recipientJid || !title || !description || !buttons || buttons.length === 0))
       ) {
         console.error(`evolution-api-handler: '${action}' missing parameters. Body:`, bodyParsed);
         return new Response(JSON.stringify({ error: `Missing required parameters for ${action}` }), {
@@ -338,9 +351,31 @@ serve(async (req: Request) => {
           caption: caption || text || undefined, 
         };
         console.log(`Action: sendMedia to ${recipientJid} via instance name: ${evolutionInstanceName} (DB config ID: ${integrationConfigId}) Final Payload for API:`, JSON.stringify(payload, null, 2));
+      } else if (action === 'send-buttons') {
+        console.log(`send-buttons action: Received body keys: ${Object.keys(bodyParsed).join(', ')}`);
+        console.log(`send-buttons action: Values - integrationConfigId: ${integrationConfigId}, recipientJid: ${recipientJid}, title: ${title}, description: ${description}, buttons: ${JSON.stringify(buttons)}`);
+
+        evolutionApiUrl = `${config.integration.base_url}/message/sendButtons/${evolutionInstanceName}`;
+        
+        // Format the recipient number the same way as sendText
+        const recipientNumber = recipientJid!.includes('@') ? recipientJid : `${recipientJid}@c.us`;
+        
+        payload = {
+          number: recipientNumber,
+          title: title!,
+          description: description!,
+          footer: footer || undefined,
+          buttons: buttons!.map(btn => ({
+            title: btn.title,
+            displayText: btn.displayText,
+            id: btn.id
+          })),
+          delay: 1200
+        };
+        console.log(`Action: sendButtons to ${recipientNumber} via instance name: ${evolutionInstanceName} (DB config ID: ${integrationConfigId}) Final Payload for API:`, JSON.stringify(payload, null, 2));
       } else {
-        // This case should ideally not be reached if the outer 'if/else if' is correct for 'sendText' or 'send-media'
-        console.error(`Internal logic error: Action '${action}' was expected to be 'sendText' or 'send-media' but was not handled.`);
+        // This case should ideally not be reached if the outer 'if/else if' is correct for 'sendText', 'send-media', or 'send-buttons'
+        console.error(`Internal logic error: Action '${action}' was expected to be 'sendText', 'send-media', or 'send-buttons' but was not handled.`);
         return new Response(JSON.stringify({ error: "Internal server error: Unhandled message action." }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500
         });

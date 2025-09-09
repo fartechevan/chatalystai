@@ -149,21 +149,21 @@ export async function createEvolutionInstance(
         // Decide if this should be treated as an error or just a warning
         // For now, let's proceed but log a warning. The connection step might fail later.
     } else {
-        const { error: updateError } = await supabase
+        const { error: upsertError } = await supabase
             .from('integrations_config')
-            .update({
+            .upsert({
+                integration_id: integrationId,
                 instance_id: instanceId,
                 token: token,
                 instance_display_name: instanceName, // Use the name provided for creation
                 status: 'created' // Set an initial status, 'connecting' or 'open' will be set later
-            })
-            .eq('integration_id', integrationId);
+            }, { onConflict: 'integration_id' });
 
-        if (updateError) {
-            console.error("[createEvolutionInstance] Failed to update integrations_config after instance creation:", updateError);
+        if (upsertError) {
+            console.error("[createEvolutionInstance] Failed to upsert integrations_config after instance creation:", upsertError);
             // Consider if this should throw an error or just be logged
             // Throwing might be better to indicate the full process wasn't successful
-            throw new Error(`Failed to update configuration after instance creation: ${updateError.message}`);
+            throw new Error(`Failed to upsert configuration after instance creation: ${upsertError.message}`);
         }
     }
     // --- END: Update integrations_config ---

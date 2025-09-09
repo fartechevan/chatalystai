@@ -769,34 +769,51 @@ export function useIntegrationConnectionState(
     if (localConnectionState === 'open') {
       console.log("[Open State Effect] State is 'open'.");
       setIsConnected(true);
-      setIsPollingForConnection(false); 
+      setIsPollingForConnection(false);
       setQrCodeBase64(null);
       setPairingCode(null);
       if (onConnectionEstablished) {
         onConnectionEstablished();
       }
-       if (selectedIntegration?.id) {
-         const handleOpenState = async () => {
-           const setupWebhook = async () => {
-             try {
-               const { data: integrationData, error: integrationError } = await supabase.from('integrations').select('webhook_url, webhook_events').eq('id', selectedIntegration.id).single();
-             if (integrationError || !integrationData) throw new Error(`Failed to fetch integration details: ${integrationError?.message || 'No data'}`);
-             const { data: configData, error: configError } = await supabase.from('integrations_config').select('instance_display_name').eq('integration_id', selectedIntegration.id).maybeSingle();
-             if (configError) console.error(`Error fetching config for webhook: ${configError.message}`);
-             const instanceDisplayName = configData?.instance_display_name || selectedInstanceName; 
-             const webhookEventsValid = Array.isArray(integrationData.webhook_events) && integrationData.webhook_events.length > 0;
-             if (!integrationData.webhook_url || !webhookEventsValid || !instanceDisplayName) {
-               console.warn(`[Webhook Setup] Skipping: Missing URL, Events, or Display Name.`); return;
-             }
-             await setEvolutionWebhook(selectedIntegration.id, instanceDisplayName, integrationData.webhook_url, integrationData.webhook_events as string[]);
-             toast({ title: "Webhook Configured", description: "Webhook settings applied." });
-           } catch (error) { console.error("[Webhook Setup] Error:", error); toast({ title: "Webhook Setup Error", description: (error as Error).message, variant: "destructive" }); }
+      if (selectedIntegration?.id) {
+        const handleOpenState = async () => {
+          const setupWebhook = async () => {
+            try {
+              const { data: integrationData, error: integrationError } = await supabase.from('integrations').select('webhook_url, webhook_events').eq('id', selectedIntegration.id).single();
+              if (integrationError || !integrationData) throw new Error(`Failed to fetch integration details: ${integrationError?.message || 'No data'}`);
+
+              const { data: configData, error: configError } = await supabase.from('integrations_config').select('id, instance_display_name').eq('integration_id', selectedIntegration.id).maybeSingle();
+              if (configError) {
+                console.error(`Error fetching config for webhook: ${configError.message}`);
+                // Do not proceed if we can't get the config
+                return;
+              }
+
+              const instanceDisplayName = configData?.instance_display_name || selectedInstanceName;
+              const integrationConfigId = configData?.id;
+              const webhookEventsValid = Array.isArray(integrationData.webhook_events) && integrationData.webhook_events.length > 0;
+
+              if (!integrationData.webhook_url || !webhookEventsValid || !instanceDisplayName || !integrationConfigId) {
+                console.warn(`[Webhook Setup] Skipping: Missing URL, Events, Display Name, or Config ID.`);
+                return;
+              }
+
+              // Append the integration config ID to the webhook URL
+              const webhookUrlWithConfig = `${integrationData.webhook_url}?config=${integrationConfigId}`;
+              console.log(`[Webhook Setup] Setting webhook to: ${webhookUrlWithConfig}`);
+
+              await setEvolutionWebhook(selectedIntegration.id, instanceDisplayName, webhookUrlWithConfig, integrationData.webhook_events as string[]);
+              toast({ title: "Webhook Configured", description: "Webhook settings applied successfully." });
+            } catch (error) {
+              console.error("[Webhook Setup] Error:", error);
+              toast({ title: "Webhook Setup Error", description: (error as Error).message, variant: "destructive" });
+            }
           };
-           
-           await Promise.all([
-             setupWebhook(),
-             fetchAndUpdateDetails(selectedIntegration.id) 
-           ]);
+
+          await Promise.all([
+            setupWebhook(),
+            fetchAndUpdateDetails(selectedIntegration.id)
+          ]);
 
           if (currentPipelineId) {
             console.log(`[Open State Effect] Updating pipeline_id to ${currentPipelineId} for integration ${selectedIntegration.id}`);
@@ -804,26 +821,26 @@ export function useIntegrationConnectionState(
               .from('integrations_config')
               .update({ pipeline_id: currentPipelineId })
               .eq('integration_id', selectedIntegration.id);
- 
-             if (pipelineUpdateError) {
-               console.error(`[Open State Effect] Error updating pipeline_id:`, pipelineUpdateError);
-               toast({
+
+            if (pipelineUpdateError) {
+              console.error(`[Open State Effect] Error updating pipeline_id:`, pipelineUpdateError);
+              toast({
                 title: "Error Saving Pipeline",
                 description: `Failed to save selected pipeline: ${pipelineUpdateError.message}`,
                 variant: "destructive",
               });
             } else {
               console.log(`[Open State Effect] Successfully updated pipeline_id for integration ${selectedIntegration.id}`);
-             }
-           } else {
-              console.log(`[Open State Effect] No currentPipelineId set, skipping pipeline update for integration ${selectedIntegration.id}`);
-           }
-         }; 
+            }
+          } else {
+            console.log(`[Open State Effect] No currentPipelineId set, skipping pipeline update for integration ${selectedIntegration.id}`);
+          }
+        };
 
-         handleOpenState();
-       }
-     }
-   }, [localConnectionState, selectedIntegration, onConnectionEstablished, selectedInstanceName, fetchAndUpdateDetails, currentPipelineId]);
+        handleOpenState();
+      }
+    }
+  }, [localConnectionState, selectedIntegration, onConnectionEstablished, selectedInstanceName, fetchAndUpdateDetails, currentPipelineId]);
 
 
   // --- Connection/Creation Handlers ---

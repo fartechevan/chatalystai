@@ -40,7 +40,7 @@ const DocumentTableActions: React.FC<DocumentColumnActionsProps> = ({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" className="h-8 w-8 p-0">
+        <Button variant="ghost" className="h-8 w-8 p-0" onClick={(e) => e.stopPropagation()}>
           <span className="sr-only">Open menu</span>
           <MoreHorizontal className="h-4 w-4" />
         </Button>
@@ -48,13 +48,17 @@ const DocumentTableActions: React.FC<DocumentColumnActionsProps> = ({
       <DropdownMenuContent align="end">
         <DropdownMenuLabel>Actions</DropdownMenuLabel>
         {document.file_type === 'pdf' && document.file_path && (
-          <DropdownMenuItem onClick={() => onViewOriginal(document)}>
+          <DropdownMenuItem onClick={(e) => {
+            e.stopPropagation();
+            window.open(document.file_path, '_blank');
+          }}>
             <ExternalLink className="mr-2 h-4 w-4" />
             View Original
           </DropdownMenuItem>
         )}
-        <DropdownMenuItem onClick={() => {
-            onDelete(document.id)
+        <DropdownMenuItem onClick={(e) => {
+            e.stopPropagation(); // Prevent row click event
+            onDelete(document.id);
             console.log(document.title);
         }} className="text-red-600 hover:!text-red-700">
           <Trash2 className="mr-2 h-4 w-4" />

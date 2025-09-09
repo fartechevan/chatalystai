@@ -13,6 +13,8 @@ import { BroadcastTableToolbar } from "./list/BroadcastTableToolbar"; // Import 
 import { PlusCircle } from 'lucide-react'; // Icon for Create button
 import { DataTableFacetedFilter } from "@/components/ui/data-table-faceted-filter"; // Import Faceted Filter
 import { Cross2Icon } from "@radix-ui/react-icons"; // Import Reset Icon
+import { useWhatsAppBlastLimit } from '@/hooks/useWhatsAppBlastLimit'; // Import WhatsApp blast limit hook
+import { Alert, AlertDescription } from "@/components/ui/alert"; // Import Alert components
 import {
   useReactTable,
   getCoreRowModel,
@@ -47,14 +49,11 @@ interface BroadcastFilters {
   // Add other filter properties as needed
 }
 
-// Mock data for now - replace with API call
+// Fetch broadcasts with recipient count from broadcast_recipients table
 const fetchBroadcastsFromAPI = async (page: number, pageSize: number, searchTerm: string, filters: BroadcastFilters): Promise<{ data: Broadcast[], totalCount: number }> => {
-  // Simulate API call
   console.log(`Fetching broadcasts: page=${page}, pageSize=${pageSize}, search=${searchTerm}, filters=`, filters);
   
-  // Basic Supabase query (will need to be enhanced for actual pagination and filtering)
-  // Select necessary columns including those for linking to integration_config
-  // and the actual status from the broadcasts table.
+  // First, get the broadcasts with pagination and filtering
   const selectColumns = 'id, message_text, created_at, integration_id, instance_id, status'; 
   let query = supabase
     .from('broadcasts')
@@ -62,7 +61,7 @@ const fetchBroadcastsFromAPI = async (page: number, pageSize: number, searchTerm
     .order('created_at', { ascending: false });
 
   if (searchTerm) {
-    query = query.ilike('message_text', `%${searchTerm}%`); // or 'name'
+    query = query.ilike('message_text', `%${searchTerm}%`);
   }
 
   // Apply status filter if present
@@ -137,6 +136,26 @@ const fetchBroadcastsFromAPI = async (page: number, pageSize: number, searchTerm
     });
   }
 
+  // Get recipient counts for all broadcasts in this page
+  const broadcastIds = rawItems.map(item => item.id);
+  const { data: recipientCounts, error: recipientCountError } = await supabase
+    .from('broadcast_recipients')
+    .select('broadcast_id')
+    .in('broadcast_id', broadcastIds);
+
+  if (recipientCountError) {
+    console.error("Error fetching recipient counts:", recipientCountError);
+  }
+
+  // Create a map of broadcast_id to recipient count
+  const recipientCountMap = new Map<string, number>();
+  if (recipientCounts) {
+    recipientCounts.forEach(recipient => {
+      const currentCount = recipientCountMap.get(recipient.broadcast_id) || 0;
+      recipientCountMap.set(recipient.broadcast_id, currentCount + 1);
+    });
+  }
+
   const formattedData = rawItems.map((item: ExactSupabaseDataItem): Broadcast => {
     let displayName = 'Unknown Sender (no instance_id from broadcast)';
     if (item.instance_id) {
@@ -154,7 +173,7 @@ const fetchBroadcastsFromAPI = async (page: number, pageSize: number, searchTerm
       created_at: item.created_at,
       name: `Broadcast ${item.id.substring(0, 4)}`, // Default name, consider removing if not used
       status: (item.status || 'pending') as NonNullable<Broadcast['status']>, // Use actual status, ensure it fits the updated Broadcast['status'] type
-      recipient_count: 0, // This likely needs to be calculated or fetched differently if required
+      recipient_count: recipientCountMap.get(item.id) || 0, // Get actual recipient count from broadcast_recipients table
       instance_id: item.instance_id || undefined,
       integration_id: item.integration_id || undefined,
       senderDisplayName: displayName,
@@ -165,12 +184,39 @@ const fetchBroadcastsFromAPI = async (page: number, pageSize: number, searchTerm
 };
 
 
+// WhatsApp Blast Limit Info component
+const WhatsAppBlastLimitInfo = () => {
+  const { blastLimitInfo, isLoading } = useWhatsAppBlastLimit();
+
+  if (isLoading) {
+    return <div className="text-sm text-muted-foreground">Loading blast limit...</div>;
+  }
+
+  if (!blastLimitInfo) {
+    return null;
+  }
+
+  return (
+    <Alert className="bg-blue-50 border-blue-200 py-2 px-3">
+      <AlertDescription className="text-sm flex items-center justify-between">
+        <span>WhatsApp Daily Limit:</span>
+        <span className="font-medium ml-2">
+          {blastLimitInfo.remaining} of {blastLimitInfo.limit} remaining
+        </span>
+      </AlertDescription>
+    </Alert>
+  );
+};
+
 const BroadcastListView = () => {
   const navigate = useNavigate();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [broadcasts, setBroadcasts] = useState<Broadcast[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  
+  // Use the WhatsApp blast limit hook
+  const { blastLimitInfo, refetchBlastLimit } = useWhatsAppBlastLimit();
   
   // Pagination state
   const [page, setPage] = useState(1);
@@ -290,6 +336,31 @@ const BroadcastListView = () => {
   });
 
 
+  const handleDeleteSelected = async () => {
+    const selectedRows = table.getFilteredSelectedRowModel().rows;
+    const idsToDelete = selectedRows.map(row => row.original.id);
+
+    if (idsToDelete.length === 0) {
+      return;
+    }
+
+    const { error: deleteError } = await supabase
+      .from('broadcasts')
+      .delete()
+      .in('id', idsToDelete);
+
+    if (deleteError) {
+      setError(deleteError.message);
+    } else {
+      // Refetch data
+      const filters = { status: statusFilter };
+      const { data, totalCount: fetchedTotalCount } = await fetchBroadcastsFromAPI(page, pageSize, searchTerm, filters);
+      setBroadcasts(data);
+      setTotalCount(fetchedTotalCount);
+      table.resetRowSelection();
+    }
+  };
+
   const outletContext = useOutletContext<PageHeaderContextType | undefined>();
 
   useEffect(() => {
@@ -297,8 +368,11 @@ const BroadcastListView = () => {
       const isFiltered = table.getState().columnFilters.length > 0;
       const actions = (
         <div className="flex items-center space-x-2">
+          {/* WhatsApp Blast Limit Info right now no need to show*/}
+          {/* <WhatsAppBlastLimitInfo /> */}
+          
           {/* BroadcastTableToolbar now only contains search and view options */}
-          <BroadcastTableToolbar table={table as Table<Broadcast>} /> 
+          <BroadcastTableToolbar table={table as Table<Broadcast>} onDeleteSelected={handleDeleteSelected} /> 
           
           {/* Moved Status Filter and Reset Button here */}
           {table.getColumn("status") && (
@@ -319,7 +393,11 @@ const BroadcastListView = () => {
             </Button>
           )}
 
-          <Button onClick={() => handleOpenModal()}>
+          <Button 
+            onClick={() => handleOpenModal()} 
+            disabled={blastLimitInfo && blastLimitInfo.remaining === 0}
+            title={blastLimitInfo && blastLimitInfo.remaining === 0 ? "Daily WhatsApp blast limit reached" : "Create new broadcast"}
+          >
             <PlusCircle className="mr-2 h-4 w-4" /> Create Broadcast
           </Button>
         </div>
@@ -356,6 +434,7 @@ const BroadcastListView = () => {
         isOpen={isModalOpen}
         onClose={handleCloseModal}
         initialMessage={messageToDuplicate ?? undefined}
+        onBroadcastSent={refetchBlastLimit} // Refresh blast limit when a broadcast is sent
       />
     </div>
   );

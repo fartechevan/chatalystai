@@ -10,6 +10,8 @@ import type { Customer } from "./types/customer";
 import { BroadcastModal } from "./BroadcastModal";
 import { cn } from "@/lib/utils";
 import { filterConversations } from "./utils/conversationProcessing";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Label } from "@/components/ui/label";
 
 interface ConversationLeftPanelProps {
   conversations: Conversation[];
@@ -17,6 +19,9 @@ interface ConversationLeftPanelProps {
   selectedConversation: Conversation | null;
   setSelectedConversation: (conversation: Conversation | null) => void;
   onConversationSelect?: () => void;
+  integrationsConfig: { id: string; instance_display_name: string | null }[];
+  selectedIntegrationIds: string[];
+  setSelectedIntegrationIds: (ids: string[]) => void;
 }
 
 export function ConversationLeftPanel({
@@ -25,6 +30,9 @@ export function ConversationLeftPanel({
   selectedConversation,
   setSelectedConversation,
   onConversationSelect,
+  integrationsConfig,
+  selectedIntegrationIds,
+  setSelectedIntegrationIds,
 }: ConversationLeftPanelProps) {
   const [internalSearchQuery, setInternalSearchQuery] = useState("");
   const [isBroadcastModalOpen, setIsBroadcastModalOpen] = useState(false);
@@ -98,6 +106,27 @@ export function ConversationLeftPanel({
             value={internalSearchQuery}
             onChange={(e) => setInternalSearchQuery(e.target.value)}
           />
+        </div>
+        <div className="px-2 pt-2">
+          <Label htmlFor="integration-filter">Filter by Integration</Label>
+          <Select
+            value={selectedIntegrationIds[0] || "all"}
+            onValueChange={(value) => {
+              setSelectedIntegrationIds(value === "all" ? [] : [value]);
+            }}
+          >
+            <SelectTrigger id="integration-filter" className="w-full">
+              <SelectValue placeholder="Select an integration" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">All Integrations</SelectItem>
+              {integrationsConfig.map((config) => (
+                <SelectItem key={config.id} value={config.id}>
+                  {config.instance_display_name || "Unnamed Instance"}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
       </div>
 

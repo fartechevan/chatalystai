@@ -1,0 +1,17 @@
+CREATE TYPE public.agent_activation_mode AS ENUM ('keyword', 'always_on');
+CREATE TYPE public.ai_session_status AS ENUM ('active', 'closed', 'error');
+CREATE TYPE public.app_role AS ENUM ('admin', 'user', 'customer');
+CREATE TYPE public.day_of_week AS ENUM ('monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday');
+CREATE TYPE public.integration_status AS ENUM ('available', 'coming_soon');
+CREATE TYPE public.message_log_status AS ENUM ('pending', 'sent', 'delivered', 'read', 'failed', 'blocked_quota', 'blocked_rule');
+CREATE TYPE public.message_log_type AS ENUM ('text', 'image', 'video', 'audio', 'document', 'template', 'interactive_buttons', 'interactive_list', 'location', 'contact', 'sticker', 'unknown');
+CREATE TYPE public.new_app_role AS ENUM ('user', 'admin');
+CREATE TYPE public.role_enum AS ENUM ('admin', 'member');
+CREATE TYPE public.sender_type AS ENUM ('user', 'ai');
+CREATE TYPE public.sentiment_enum AS ENUM ('good', 'moderate', 'bad', 'unknown');
+CREATE TYPE public.sentiment_level AS ENUM ('bad', 'moderate', 'good');
+CREATE TYPE public.sentiment_type AS ENUM ('bad', 'moderate', 'good');
+CREATE TYPE public.subscription_status AS ENUM ('active', 'trialing', 'past_due', 'canceled', 'incomplete', 'incomplete_expired', 'unpaid');
+CREATE TYPE public.sync_status AS ENUM ('pending', 'completed', 'failed');
+CREATE TYPE public.task_status AS ENUM ('follow-up', 'meeting');
+CREATE TYPE public.team_role AS ENUM ('owner', 'admin', 'member');

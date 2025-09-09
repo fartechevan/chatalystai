@@ -49,10 +49,9 @@ export function LeadsContent({ pipelineId, selectedTagIds, onSelectedTagIdsChang
   }
 
   return (
-    // Change main container to horizontal flex
-    <div className="flex h-full"> 
-      {/* Wrap Header and Board in a flex-1 container */}
-      <div className="flex-1 flex flex-col h-full overflow-hidden">
+    <div className="relative h-full"> 
+      {/* Main content area - now takes full width */}
+      <div className="flex flex-col h-full overflow-hidden">
         {/* LeadsHeader component has been removed */}
         {/* PipelineBoard needs flex-1 to take remaining vertical space */}
         <PipelineBoard
@@ -63,17 +62,29 @@ export function LeadsContent({ pipelineId, selectedTagIds, onSelectedTagIdsChang
         />
       </div>
       
-      {/* Conditionally render the details panel */}
+      {/* Floating slide-in panel with backdrop */}
       {selectedLead && (
-        <div className="w-96 border-l bg-background flex-shrink-0 h-full overflow-hidden"> {/* Use overflow-hidden here */}
-          {/* Replace placeholder with the actual component */}
-          <LeadPipelineDetailsPanel 
-            key={selectedLead.id} // Add key prop here
-            lead={selectedLead} 
-            onClose={() => setSelectedLead(null)} 
-            queryClient={queryClient} // Pass queryClient
+        <>
+          {/* Backdrop overlay */}
+          <div 
+            className="fixed inset-0 bg-black/20 backdrop-blur-sm z-40 transition-opacity duration-300 ease-in-out"
+            onClick={() => setSelectedLead(null)}
           />
-        </div>
+          
+          {/* Sliding panel */}
+          <div className={`
+            fixed top-0 right-0 h-full w-96 z-50
+            transform transition-transform duration-300 ease-in-out
+            ${selectedLead ? 'translate-x-0' : 'translate-x-full'}
+          `}>
+            <LeadPipelineDetailsPanel 
+              key={selectedLead.id} // Add key prop here
+              lead={selectedLead} 
+              onClose={() => setSelectedLead(null)} 
+              queryClient={queryClient} // Pass queryClient
+            />
+          </div>
+        </>
       )}
     </div>
   );

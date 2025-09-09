@@ -11,7 +11,7 @@ import { useState } from "react"; // Removed useCallback, useEffect for now, wil
 import type { Conversation, Message } from "../types";
 import { useToast } from "@/components/ui/use-toast";
 
-export function useConversationData(selectedConversation?: Conversation | null) {
+export function useConversationData(selectedConversation: Conversation | null, selectedIntegrationIds: string[]) {
   const queryClient = useQueryClient();
   const [newMessage, setNewMessage] = useState("");
   const { toast } = useToast();
@@ -28,8 +28,8 @@ export function useConversationData(selectedConversation?: Conversation | null) 
   
   // Fetch conversations list
   const conversationsQuery = useQuery({
-    queryKey: ['conversations'],
-    queryFn: fetchConversationsWithParticipants
+    queryKey: ['conversations', selectedIntegrationIds],
+    queryFn: () => fetchConversationsWithParticipants(selectedIntegrationIds),
   });
 
   // Fetch messages for the selected conversation using useInfiniteQuery
@@ -42,16 +42,24 @@ export function useConversationData(selectedConversation?: Conversation | null) 
     },
     initialPageParam: 1, // Start with page 1
     getNextPageParam: (lastPageData, allPagesData) => {
-      console.log('getNextPageParam called: lastPageData.length:', lastPageData.length, 'pageSize:', pageSize, 'allPagesData.length:', allPagesData.length);
-      // lastPageData is Message[]
-      // allPagesData is Message[][]
-      if (lastPageData.length === pageSize) {
-        const nextPage = allPagesData.length + 1;
-        console.log('Returning next page:', nextPage);
-        return nextPage; // Next page number
+      // Only log in development to reduce console noise
+      if (process.env.NODE_ENV === 'development') {
+        console.log('getNextPageParam called: lastPageData.length:', lastPageData.length, 'pageSize:', pageSize, 'allPagesData.length:', allPagesData.length);
       }
-      console.log('No next page, returning undefined');
-      return undefined; // No more pages
+      
+      // More efficient check - if we got fewer items than requested, we're at the end
+      if (lastPageData.length < pageSize) {
+        if (process.env.NODE_ENV === 'development') {
+          console.log('No next page, returning undefined (got fewer items than pageSize)');
+        }
+        return undefined;
+      }
+      
+      const nextPage = allPagesData.length + 1;
+      if (process.env.NODE_ENV === 'development') {
+        console.log('Returning next page:', nextPage);
+      }
+      return nextPage;
     },
     enabled: !!selectedConversation,
   });
@@ -91,31 +99,31 @@ export function useConversationData(selectedConversation?: Conversation | null) 
 
           // Get instance_id from integrations_config table
           const { data: integrationConfigData, error: integrationConfigError } = await supabase
-            .from('integrations_config') // TODO: Should this table name also change? Assuming not for now.
-            .select('id, instance_id') // Select both 'id' (PK) and 'instance_id'
-            .eq('integration_id', selectedConversation.integrations_id) // Assuming the column to match on integrations_config is integration_id
+            .from('integrations_config')
+            .select('id, instance_id')
+            .eq('id', selectedConversation.integrations_id)
             .single();
 
           if (integrationConfigError) {
-            console.error(`Error fetching integration config for integration_id ${selectedConversation.integrations_id}:`, integrationConfigError);
+            console.error(`Error fetching integration config for integrations_id ${selectedConversation.integrations_id}:`, integrationConfigError);
             throw new Error(`Failed to fetch integration configuration: ${integrationConfigError.message}`);
           }
-          
+
           if (!integrationConfigData) {
-            console.error(`No integration config found in 'integrations_config' for integration_id: ${selectedConversation.integrations_id}`);
+            console.error(`No integration config found for integrations_id: ${selectedConversation.integrations_id}`);
             throw new Error("Integration configuration not found for this conversation.");
           }
 
           if (!integrationConfigData.instance_id) {
-            console.error(`Integration config found for integration_id ${selectedConversation.integrations_id}, but 'instance_id' is missing:`, integrationConfigData);
+            console.error(`Integration config found for integrations_id ${selectedConversation.integrations_id}, but 'instance_id' is missing:`, integrationConfigData);
             throw new Error("Instance ID is missing from the integration configuration.");
           }
 
           const instanceId = integrationConfigData.instance_id;
-          const actualIntegrationConfigId = integrationConfigData.id; // This is the PK of integrations_config
+          const actualIntegrationConfigId = integrationConfigData.id;
 
           if (!actualIntegrationConfigId) {
-            console.error(`Integration config found for integration_id ${selectedConversation.integrations_id}, but its own 'id' (PK) is missing:`, integrationConfigData);
+            console.error(`Integration config found for integrations_id ${selectedConversation.integrations_id}, but its own 'id' (PK) is missing:`, integrationConfigData);
             throw new Error("Primary key 'id' is missing from the fetched integration configuration record.");
           }
 

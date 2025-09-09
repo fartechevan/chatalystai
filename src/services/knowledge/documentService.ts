@@ -9,13 +9,22 @@ export interface KnowledgeDocument {
 }
 
 /**
- * Fetches all knowledge documents for the authenticated user.
- * Assumes a Supabase function named 'list-knowledge-documents' exists.
+ * Fetches knowledge documents. If an agentId is provided, it fetches documents
+ * associated with that agent. Otherwise, it fetches all documents for the user.
  */
-export const listKnowledgeDocuments = async (): Promise<KnowledgeDocument[]> => {
-  const { data, error } = await supabase.functions.invoke('list-knowledge-documents', {
+export const listKnowledgeDocuments = async (agentId?: string): Promise<KnowledgeDocument[]> => {
+  const invokeOptions: any = {
     method: 'GET',
-  });
+  };
+
+  // The body is constructed to be compatible with how the Edge Function
+  // will read the URL parameters. The actual URL will be constructed like:
+  // `/list-knowledge-documents?agent_id=...`
+  if (agentId) {
+    invokeOptions.body = { agent_id: agentId };
+  }
+
+  const { data, error } = await supabase.functions.invoke('list-knowledge-documents', invokeOptions);
 
   if (error) {
     console.error('Error listing knowledge documents:', error);

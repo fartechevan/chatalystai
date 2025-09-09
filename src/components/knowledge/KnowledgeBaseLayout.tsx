@@ -21,6 +21,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
+import { ArrowLeft } from "lucide-react";
 
 interface Document {
   id: string;
@@ -99,39 +100,58 @@ export function KnowledgeBaseLayout() {
     enabled: !!selectedDocumentId,
   });
 
+  const handleBackToDocuments = () => {
+    setSelectedDocumentId(null);
+    setSelectedDocument(null);
+    setIsDocumentSelected(false);
+  };
+
   return (
     <div className="container mx-auto p-4">
       {/* The div that held the title and add document button is removed */}
       {/* ImportDocumentForm rendering removed */}
       {/* CreateDocumentDialog rendering removed */}
 
-      <div className="flex pt-0"> {/* Adjusted pt-0 here, or remove if p-4 on parent is enough */}
-        {isDocumentSelected ? (
-          <>
-            <div className="w-1/4 pr-4">
-              {/* <h2 className="text-xl font-semibold mb-4">Documents</h2> */}
-              <DocumentList
-                onSelectDocument={handleSelectDocument}
-                selectedDocumentId={selectedDocumentId}
-              />
+      {isDocumentSelected ? (
+        // Chunks view - full page
+        <div className="w-full">
+          <div className="flex items-center gap-4 mb-6">
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              onClick={handleBackToDocuments}
+              className="flex items-center gap-2"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Back to Documents
+            </Button>
+            <div className="flex-1">
+              <h2 className="text-xl font-semibold">
+                {selectedDocument?.title || 'Document Chunks'}
+              </h2>
+              <p className="text-sm text-muted-foreground">
+                Manage and edit document chunks
+              </p>
             </div>
-
-            <div className="w-3/4">
-              <h2 className="text-xl font-semibold mb-4">Document Chunks</h2>
-              <Button className="mb-4" onClick={handleAddChunk}>Add Chunk</Button>
-              <ChunksList documentId={selectedDocumentId} />
-            </div>
-          </>
-        ) : (
-          <div className="w-full">
-            {/* <h2 className="text-xl font-semibold mb-4">Documents</h2> */}
-            <DocumentList
-              onSelectDocument={handleSelectDocument}
-              selectedDocumentId={selectedDocumentId}
-            />
+            <Button onClick={handleAddChunk}>Add Chunk</Button>
           </div>
-        )}
-      </div>
+          <ChunksList documentId={selectedDocumentId} />
+        </div>
+      ) : (
+        // Documents list view - full page
+        <div className="w-full">
+          <div className="mb-6">
+            <h2 className="text-xl font-semibold mb-2">Knowledge Base</h2>
+            <p className="text-sm text-muted-foreground">
+              Select a document to view and manage its chunks
+            </p>
+          </div>
+          <DocumentList
+            onSelectDocument={handleSelectDocument}
+            selectedDocumentId={selectedDocumentId}
+          />
+        </div>
+      )}
 
       <Dialog open={isChunkFormOpen} onOpenChange={setIsChunkFormOpen}>
         <ChunkForm

@@ -63,7 +63,15 @@ export const menuItems: MenuItem[] = [
   { id: "dashboard", title: "Dashboard", icon: Home, path: "/dashboard" },
   { id: "chat", title: "Chat", icon: MessageSquare, path: "/dashboard/conversations" },
   { id: "broadcasts", title: "Broadcasts", icon: RadioTower, path: "/dashboard/broadcasts" },
-  { id: "leads", title: "Leads", icon: Target, path: "/dashboard/leads" },
+  {
+    id: "leads",
+    title: "Leads",
+    icon: Target,
+    subItems: [
+      { title: "Pipeline", icon: Target, path: "/dashboard/leads" },
+      { title: "Appointments", icon: Calendar, path: "/dashboard/leads/appointments" },
+    ],
+  },
   { id: "contacts", title: "Contacts", icon: Users, path: "/dashboard/contacts" }, // Re-adding Contacts, will point to customers data
   // { 
   //   id: "lists", 
@@ -98,7 +106,6 @@ export const menuItems: MenuItem[] = [
       { title: "Database", icon: Database, path: "/dashboard/settings/database" },
     ],
   },
-  { id: "help", title: "Help", icon: HelpCircle, path: "/dashboard/help" },
 ];
 
 export function DashboardSidebar() {
@@ -107,6 +114,7 @@ export function DashboardSidebar() {
   const { toggleSidebar, setOpenMobile, isMobile, state } = useSidebar();
   const { user } = useAuth();
   const [openCollapsibles, setOpenCollapsibles] = React.useState<Record<string, boolean>>({
+    "leads": false,
     "management": false,
     "settings": false, // Added settings to collapsible state
   });

@@ -5,10 +5,10 @@ import { MessagesSection } from "./MessagesSection";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tables } from "@/integrations/supabase/types"; // Import Tables type
 import { LeadsTrendChart } from "./chart/LeadsTrendChart";
-import { ConversationsTrendChart } from "./chart/ConversationsTrendChart";
+import { DateRange } from "react-day-picker";
 
 interface DashboardStatsProps {
-  timeFilter: 'today' | 'yesterday' | 'week' | 'month';
+  timeFilter: 'today' | 'yesterday' | 'week' | 'month' | 'custom';
   userFilter: string;
   leads: Tables<'leads'>[]; // Use Tables<'leads'> type
   conversations: Tables<'conversations'>[]; // Use Tables<'conversations'> type
@@ -19,6 +19,7 @@ interface DashboardStatsProps {
   whatsappWebMessages?: Tables<'messages'>[]; // Added new prop
   planMessageUsage?: { messages_sent_this_cycle: number } | null; // Added new prop
   isLoading?: boolean;
+  dateRange?: DateRange;
 }
 
 export function DashboardStats({
@@ -32,7 +33,8 @@ export function DashboardStats({
   broadcastRecipients = [],
   whatsappWebMessages = [], // Added default for new prop
   planMessageUsage = null, // Added default for new prop
-  isLoading = false
+  isLoading = false,
+  dateRange
 }: DashboardStatsProps) {
   if (isLoading) {
     return (
@@ -75,13 +77,13 @@ export function DashboardStats({
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-4"> {/* Removed lg:grid-rows-3 */}
       {/* Top row */}
-      <StatsCard
+      {/* <StatsCard
         title="ACTIVE LEADS"
         value={activeLeads}
         // color will default to text-primary
         subValue={`${leads.reduce((acc, lead) => acc + Number(lead.value || 0), 0)} RM`}
         className="col-span-1 lg:col-span-3"
-      />
+      /> */}
 
       <StatsCard
         title="ONGOING CONVERSATIONS"
@@ -108,12 +110,12 @@ export function DashboardStats({
       {/* <LeadSourcesSection className="col-span-1 lg:col-span-3 lg:row-span-2" /> */} {/* Removed */}
 
       {/* Second row */}
-      <StatsCard
+      {/* <StatsCard
         title="WON LEADS"
         value={wonLeads}
         color="text-success" // Using theme's success color
         className="col-span-1 lg:col-span-3"
-      />
+      /> */}
 
       <StatsCard
         title="LONGEST AWAITING REPLY"
@@ -123,12 +125,12 @@ export function DashboardStats({
       />
 
       {/* Third row */}
-      <StatsCard
+      {/* <StatsCard
         title="LOST LEADS"
         value={lostLeads}
         color="text-destructive" // Using theme's destructive color
         className="col-span-1 lg:col-span-3"
-      />
+      /> */}
 
       {/* <TasksSection
         tasks={tasks}
@@ -140,20 +142,6 @@ export function DashboardStats({
         timeFilter={timeFilter} // Pass timeFilter for context
         planMessageUsage={planMessageUsage} // Pass the new prop
         className="col-span-1 lg:col-span-3 lg:row-span-1"
-      />
-
-      {/* Leads Trend Chart */}
-      <LeadsTrendChart
-        leads={leads}
-        timeFilter={timeFilter}
-        className="col-span-1 lg:col-span-12"
-      />
-
-      {/* Conversations Trend Chart */}
-      <ConversationsTrendChart
-        conversations={conversations}
-        timeFilter={timeFilter}
-        className="col-span-1 lg:col-span-12"
       />
     </div>
   );

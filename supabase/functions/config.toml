@@ -1,3 +1,10 @@
 
-project_id = "vezdxxqzzcjkunoaxcxc"
 import_map = "./import_map.json" # Explicitly set import map path
+
+[functions.whatsapp-webhook]
+  path = "whatsapp-webhook/messageHandler.ts"
+  entrypoint = "whatsapp-webhook/messageHandler.ts"
+
+[functions.ai-agent-handler]
+  path = "ai-agent-handler/index.ts"
+  entrypoint = "ai-agent-handler/index.ts"

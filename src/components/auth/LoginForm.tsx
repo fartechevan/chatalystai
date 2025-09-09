@@ -3,6 +3,7 @@ import { ThemeSupa } from "@supabase/auth-ui-shared";
 import { supabase } from "@/integrations/supabase/client";
 import { useEffect, useState, FormEvent } from "react";
 import { useNavigate } from "react-router-dom";
+import { WhatsAppLoginButton } from "./WhatsAppLoginButton";
 
 interface LicenseDetails {
   license_type?: string;
@@ -27,20 +28,23 @@ export const LoginForm = () => {
   // State for login/general auth errors
   const [authError, setAuthError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const checkSessionAndLicense = async () => {
-      const { data: { session }, error: sessionError } = await supabase.auth.getSession();
-      if (sessionError) {
-        console.error("Error getting session:", sessionError);
-        return;
-      }
-      if (session?.user) {
-        const userMetaData = session.user.user_metadata;
-        // License check removed as per new requirement
-        console.log("User signed in, navigating to dashboard (license check skipped here). User:", session.user.id);
-        navigate("/dashboard");
-      }
-    };
+    useEffect(() => {
+        const checkSessionAndLicense = async () => {
+            const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+            if (sessionError) {
+                console.error("Error getting session:", sessionError);
+                if (sessionError.message.includes("Invalid Refresh Token")) {
+                    await supabase.auth.signOut();
+                }
+                return;
+            }
+            if (session?.user) {
+                const userMetaData = session.user.user_metadata;
+                // License check removed as per new requirement
+                console.log("User signed in, navigating to dashboard (license check skipped here). User:", session.user.id);
+                navigate("/dashboard");
+            }
+        };
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       setAuthError(null);
@@ -104,7 +108,12 @@ export const LoginForm = () => {
   const commonUiWrapper = (content: JSX.Element, currentViewTitle: string) => (
      <div 
       className="min-h-screen flex flex-col items-center justify-center bg-cover bg-center"
-      style={{ backgroundImage: `url('https://vezdxxqzzcjkunoaxcxc.supabase.co/storage/v1/object/sign/fartech/Chatalyst_BG.png?token=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1cmwiOiJmYXJ0ZWNoL0NoYXRhbHlzdF9CRy5wbmciLCJpYXQiOjE3NDU4MTk2NDIsImV4cCI6NDg2Nzg4MzY0Mn0.czUQsVuBqH4Ge7-ME48fiL1TBdC_racgRHDcE2zmd5k')` }}
+      style={{
+        backgroundImage: `url('${
+          supabase.storage.from('assets').getPublicUrl('bg_chattalyst.png').data
+            .publicUrl
+        }')`,
+      }}
     >
       <div className="w-full max-w-md px-8 py-12 rounded-xl bg-card/90 backdrop-blur-sm shadow-2xl animate-enter">
         <div className="flex flex-col items-center mb-8 space-y-4">
@@ -261,6 +270,6 @@ export const LoginForm = () => {
       />
       {authError && <p className="mt-4 text-center text-sm text-red-600">{authError}</p>}
     </>,
-    authView === "forgotPassword" ? "Reset Password" : "Chattalyst Login"
+    authView === "forgotPassword" ? "Reset Password" : "Chattalyst"
   );
 };

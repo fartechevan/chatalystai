@@ -115,11 +115,17 @@ CREATE TYPE "public"."ai_session_status" AS ENUM (
 ALTER TYPE "public"."ai_session_status" OWNER TO "postgres";
 
 
-CREATE TYPE "public"."app_role" AS ENUM (
-    'admin',
-    'user',
-    'customer'
-);
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'app_role') THEN
+        CREATE TYPE "public"."app_role" AS ENUM (
+            'admin',
+            'user',
+            'customer'
+        );
+    END IF;
+END
+$$;
 
 
 ALTER TYPE "public"."app_role" OWNER TO "postgres";

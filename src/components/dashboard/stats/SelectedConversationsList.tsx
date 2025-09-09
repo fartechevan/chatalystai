@@ -14,7 +14,8 @@ import { cn } from "@/lib/utils"; // Import cn
 
 interface SelectedConversationsListProps {
   conversations: AnalyzedConversation[];
-  selectedSentiment: 'good' | 'moderate' | 'bad' | 'unknown' | null; // Add the new prop
+  selectedSentiment: 'good' | 'moderate' | 'bad' | 'unknown' | null;
+  onConversationClick?: (conversation: AnalyzedConversation) => void;
 }
 
 // Helper function to get sentiment color
@@ -38,13 +39,20 @@ const formatMessageTime = (timestamp: string) => {
 };
 
 
-export function SelectedConversationsList({ conversations, selectedSentiment }: SelectedConversationsListProps) {
+export function SelectedConversationsList({ conversations, selectedSentiment, onConversationClick }: SelectedConversationsListProps) {
   const [selectedConversationId, setSelectedConversationId] = useState<string | null>(null);
   const [isCreateSegmentDialogOpen, setIsCreateSegmentDialogOpen] = useState(false);
   const [isCreatingSegment, setIsCreatingSegment] = useState(false);
   const { userData: user, isLoading: isLoadingUser } = useAuthUser(); // Correctly destructure and get user
 
   const handleConversationClick = (id: string) => {
+    if (onConversationClick) {
+      const conversation = conversations.find(conv => conv.conversation_id === id);
+      if (conversation) {
+        onConversationClick(conversation);
+        return;
+      }
+    }
     setSelectedConversationId(prevId => (prevId === id ? null : id)); // Toggle selection
   };
 
