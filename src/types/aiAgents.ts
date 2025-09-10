@@ -30,6 +30,7 @@ export interface AIAgent {
   is_enabled?: boolean;
   agent_type: 'chattalyst' | 'CustomAgent';
   custom_agent_config?: { webhook_url?: string; [key: string]: unknown; } | null;
+  commands?: Record<string, string>; // Key-value pairs for keyword-URL/response mappings
   created_at: string;
   updated_at: string;
   // This property holds the full channel-specific settings
@@ -45,6 +46,7 @@ export interface AIAgent {
 export type NewAIAgent = Omit<AIAgent, 'id' | 'created_at' | 'updated_at' | 'channels' | 'prompt' | 'appointment_booking_enabled'> & {
   channels: AgentChannelPayload[];
   prompt?: string; // Optional - only needed for CustomAgent types
+  commands?: Record<string, string>; // Key-value pairs for keyword-URL/response mappings
   appointment_booking_enabled?: boolean; // Added for new agents
 };
 
@@ -56,5 +58,6 @@ export type NewAIAgent = Omit<AIAgent, 'id' | 'created_at' | 'updated_at' | 'cha
 export type UpdateAIAgent = Partial<Omit<AIAgent, 'id' | 'created_at' | 'updated_at' | 'channels' | 'prompt' | 'appointment_booking_enabled'>> & {
   channels?: AgentChannelPayload[];
   prompt?: string; // Optional - only needed for CustomAgent types
+  commands?: Record<string, string>; // Key-value pairs for keyword-URL/response mappings
   appointment_booking_enabled?: boolean; // Added for updating agents
 };

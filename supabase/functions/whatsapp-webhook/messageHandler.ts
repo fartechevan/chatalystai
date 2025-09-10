@@ -132,7 +132,8 @@ export async function handleMessageEvent(supabaseClient: SupabaseClient, data: W
                 is_enabled_on_channel,
                 ai_agents (
                     id,
-                    is_enabled
+                    is_enabled,
+                    commands
                 )
             `)
             .eq('integrations_config_id', config.id)
@@ -153,6 +154,40 @@ export async function handleMessageEvent(supabaseClient: SupabaseClient, data: W
             const sessionTimeoutMinutes = agentSettingsData.session_timeout_minutes || 10;
             const activationMode = agentSettingsData.activation_mode;
             const keywordTrigger = agentSettingsData.keyword_trigger;
+            const commands = agent.commands || {};
+
+            // Check for direct command matches first (exact match only)
+            const messageTextLower = messageText!.toLowerCase().trim();
+            for (const [keyword, response] of Object.entries(commands)) {
+                if (messageTextLower === keyword.toLowerCase().trim()) {
+                    console.log(`[MessageHandler] Direct command match found: ${keyword} -> ${response}`);
+                    
+                    // Send direct response immediately
+                    const messageApiUrl = `${evolutionApiUrl}/message/sendText/${fetchedConfig.instance_display_name}`;
+                    const payload = {
+                        number: remoteJid.split('@')[0],
+                        text: response
+                    };
+                    
+                    const sendResponse = await fetch(messageApiUrl, {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'apikey': evolutionApiKey
+                        },
+                        body: JSON.stringify(payload)
+                    });
+                    
+                    if (!sendResponse.ok) {
+                        const errorBody = await sendResponse.text();
+                        console.error(`[MessageHandler] Error sending direct command response:`, errorBody);
+                        return `Failed to send command response: ${errorBody}`;
+                    }
+                    
+                    console.log(`[MessageHandler] Direct command response sent successfully`);
+                    return true;
+                }
+            }
 
             // Fix stop keyword logic (around line 151)
             if (stopKeywords.some((keyword: string) => messageText!.toLowerCase().includes(keyword.toLowerCase()))) {

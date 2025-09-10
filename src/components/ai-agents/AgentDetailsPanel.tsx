@@ -40,6 +40,18 @@ const AgentDetailsPanel: React.FC<AgentDetailsPanelProps> = ({ selectedAgentId, 
   const { toast } = useToast();
   const [agentName, setAgentName] = useState('');
   const [appointmentBookingEnabled, setAppointmentBookingEnabled] = useState<boolean>(true);
+  // Change commands to use stable IDs for better React key management
+  const [commandEntries, setCommandEntries] = useState<Array<{id: string, keyword: string, response: string}>>([]);
+  
+  // Computed property to convert commandEntries back to the expected format for API
+  const commands = React.useMemo(() => {
+    return commandEntries.reduce((acc, entry) => {
+      if (entry.keyword.trim()) {
+        acc[entry.keyword] = entry.response;
+      }
+      return acc;
+    }, {} as Record<string, string>);
+  }, [commandEntries]);
 
   const [keywordTrigger, setKeywordTrigger] = useState<string | null>(''); // Added state
   const [selectedDocumentIds, setSelectedDocumentIds] = useState<string[]>([]);
@@ -164,6 +176,13 @@ const AgentDetailsPanel: React.FC<AgentDetailsPanelProps> = ({ selectedAgentId, 
       setIsEnabled(selectedAgent.is_enabled ?? true);
       setAgentType(selectedAgent.agent_type || 'chattalyst'); // DB migration already handled 'n8n' to 'CustomAgent'
       setN8nWebhookUrl(selectedAgent.custom_agent_config?.webhook_url || ''); // Use new field
+      // Initialize commandEntries from the commands object
+      const entries = Object.entries(selectedAgent.commands || {}).map(([keyword, response]) => ({
+        id: `cmd_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        keyword,
+        response
+      }));
+      setCommandEntries(entries);
       // setSelectedReplyInstanceId(selectedAgent.reply_evolution_instance_id || null); // Removed
       setFormStage('configureDetails'); // For existing agents, go straight to details
     } else if (!selectedAgentId) {
@@ -176,6 +195,7 @@ const AgentDetailsPanel: React.FC<AgentDetailsPanelProps> = ({ selectedAgentId, 
       setActivationMode('keyword');
       setAgentType('chattalyst'); // Default for new agent
       setN8nWebhookUrl('');
+      setCommandEntries([]); // Reset commands
       // setSelectedReplyInstanceId(null); // Removed
       setFormStage('selectType'); // For new agents, start with type selection
     }
@@ -296,6 +316,7 @@ const AgentDetailsPanel: React.FC<AgentDetailsPanelProps> = ({ selectedAgentId, 
         is_enabled: isEnabled,
         agent_type: agentType,
         custom_agent_config: agentType === 'CustomAgent' ? { webhook_url: n8nWebhookUrl.trim() } : null,
+        commands: commands,
         channels: selectedIntegrationIds.map(id => ({
           integrations_config_id: id,
           activation_mode: activationMode,
@@ -327,6 +348,7 @@ const AgentDetailsPanel: React.FC<AgentDetailsPanelProps> = ({ selectedAgentId, 
         is_enabled: isEnabled,
         agent_type: agentType,
         custom_agent_config: agentType === 'CustomAgent' ? { webhook_url: n8nWebhookUrl.trim() } : null,
+        commands: commands,
         channels: selectedIntegrationIds.map(id => ({
           integrations_config_id: id,
           activation_mode: activationMode,
@@ -356,7 +378,7 @@ const AgentDetailsPanel: React.FC<AgentDetailsPanelProps> = ({ selectedAgentId, 
   const testAgentMutation = useMutation({
     mutationFn: async ({ agentId, query }: { agentId: string; query: string }) => {
       const { data, error } = await supabase.functions.invoke('query-agent', {
-        body: { agent_id: agentId, query: query },
+        body: { agentId: agentId, query: query },
       });
 
       if (error) {
@@ -508,6 +530,91 @@ const AgentDetailsPanel: React.FC<AgentDetailsPanelProps> = ({ selectedAgentId, 
               onCheckedChange={setAppointmentBookingEnabled}
               disabled={isCreating || updateMutation.isPending || isLoadingAgent}
             />
+          </div>
+          
+          {/* Add on Commands Section */}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <Label className="text-base font-medium">Add on Commands</Label>
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  const newEntry = {
+                    id: `cmd_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+                    keyword: '',
+                    response: ''
+                  };
+                  setCommandEntries(prev => [...prev, newEntry]);
+                }}
+                disabled={isCreating || updateMutation.isPending || isLoadingAgent}
+              >
+                Add Command
+              </Button>
+            </div>
+            <p className="text-sm text-muted-foreground">
+              Configure keyword-response pairs. When users type these keywords, the agent will respond directly with the configured response or URL.
+            </p>
+            
+            {commandEntries.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                No commands configured. Click "Add Command" to create your first command.
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {commandEntries.map((entry) => (
+                  <div key={entry.id} className="flex gap-2 items-start p-3 border rounded-lg">
+                    <div className="flex-1 space-y-2">
+                      <div className="flex gap-2">
+                        <div className="flex-1">
+                          <Label className="text-xs text-muted-foreground">Keyword</Label>
+                          <Input
+                            value={entry.keyword}
+                            onChange={(e) => {
+                              setCommandEntries(prev => prev.map(cmd => 
+                                cmd.id === entry.id 
+                                  ? { ...cmd, keyword: e.target.value }
+                                  : cmd
+                              ));
+                            }}
+                            placeholder="e.g., /attachment, /website"
+                            disabled={isCreating || updateMutation.isPending || isLoadingAgent}
+                          />
+                        </div>
+                        <div className="flex-1">
+                          <Label className="text-xs text-muted-foreground">Response/URL</Label>
+                          <Input
+                            value={entry.response}
+                            onChange={(e) => {
+                              setCommandEntries(prev => prev.map(cmd => 
+                                cmd.id === entry.id 
+                                  ? { ...cmd, response: e.target.value }
+                                  : cmd
+                              ));
+                            }}
+                            placeholder="https://example.com/file.pdf or direct response"
+                            disabled={isCreating || updateMutation.isPending || isLoadingAgent}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        setCommandEntries(prev => prev.filter(cmd => cmd.id !== entry.id));
+                      }}
+                      disabled={isCreating || updateMutation.isPending || isLoadingAgent}
+                      className="text-destructive hover:text-destructive"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         </>
       )}

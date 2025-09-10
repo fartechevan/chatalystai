@@ -1,3 +1,77 @@
+-- Merged migration: SCHEMA
+-- Consolidates 4 migrations:
+-- - 20250722112200_refactor_ai_agent_schema.sql
+-- - 20250722112300_schema_from_source.sql
+-- - 20250820063021_add_customer_id_to_appointments_final.sql
+-- - 20250909114041_remote_schema.sql
+-- Generated on: 2025-09-09T16:27:43.109Z
+
+-- ============================================================================
+-- Migration 1/4: 20250722112200_refactor_ai_agent_schema.sql
+-- ============================================================================
+
+-- Step 1: Create the new ai_agent_channels table
+CREATE TABLE public.ai_agent_channels (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  agent_id UUID NOT NULL REFERENCES public.ai_agents(id) ON DELETE CASCADE,
+  integrations_config_id UUID NOT NULL REFERENCES public.integrations_config(id) ON DELETE CASCADE,
+  is_enabled_on_channel BOOLEAN DEFAULT TRUE,
+  activation_mode TEXT CHECK (activation_mode IN ('keyword', 'always_on')),
+  keyword_trigger TEXT,
+  stop_keywords TEXT[],
+  session_timeout_minutes INTEGER DEFAULT 60,
+  error_message TEXT DEFAULT 'Sorry, I can''t help with that right now, we''ll get in touch with you shortly.',
+  created_at TIMESTAMPTZ DEFAULT now(),
+  updated_at TIMESTAMPTZ DEFAULT now()
+);
+
+-- Step 2: Migrate data from ai_agent_integrations to ai_agent_channels with proper type casting
+INSERT INTO public.ai_agent_channels (agent_id, integrations_config_id, activation_mode, stop_keywords, session_timeout_minutes, error_message, created_at, updated_at)
+SELECT
+  agent_id,
+  integration_id,
+  activation_mode,
+  stop_keywords,
+  session_timeout_minutes,
+  error_message,
+  created_at,
+  updated_at
+FROM public.ai_agent_integrations;
+
+-- Step 3: Drop the old ai_agent_integrations table
+DROP TABLE public.ai_agent_integrations;
+
+-- Step 4: Alter the ai_agents table
+ALTER TABLE public.ai_agents
+DROP COLUMN IF EXISTS activation_mode,
+DROP COLUMN IF EXISTS keyword_trigger,
+DROP COLUMN IF EXISTS knowledge_document_ids;
+
+
+-- ============================================================================
+-- Migration 2/4: 20250722112300_schema_from_source.sql
+-- ============================================================================
+
+
+
+-- ============================================================================
+-- Migration 3/4: 20250820063021_add_customer_id_to_appointments_final.sql
+-- ============================================================================
+
+-- Only add customer_id column if appointments table exists
+DO $$
+BEGIN
+    IF EXISTS (SELECT FROM information_schema.tables WHERE table_schema = 'public' AND table_name = 'appointments') THEN
+        ALTER TABLE public.appointments
+        ADD COLUMN IF NOT EXISTS customer_id UUID REFERENCES public.customers(id);
+    END IF;
+END $$;
+
+
+-- ============================================================================
+-- Migration 4/4: 20250909114041_remote_schema.sql
+-- ============================================================================
+
 create type "public"."message_log_status" as enum ('pending', 'sent', 'delivered', 'read', 'failed', 'blocked_quota', 'blocked_rule');
 
 create type "public"."message_log_type" as enum ('text', 'image', 'video', 'audio', 'document', 'template', 'interactive_buttons', 'interactive_list', 'location', 'contact', 'sticker', 'unknown');
@@ -3150,5 +3224,7 @@ CREATE TRIGGER on_broadcasts_updated_at BEFORE UPDATE ON public.broadcasts FOR E
 CREATE TRIGGER handle_message_logs_updated_at BEFORE UPDATE ON public.message_logs FOR EACH ROW EXECUTE FUNCTION handle_updated_at();
 
 CREATE TRIGGER handle_plan_message_usage_updated_at BEFORE UPDATE ON public.plan_message_usage FOR EACH ROW EXECUTE FUNCTION handle_updated_at();
+
+
 
 

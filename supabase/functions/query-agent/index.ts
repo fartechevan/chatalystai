@@ -1,10 +1,10 @@
 // Follow https://supabase.com/docs/guides/functions/quickstart#create-a-function
 
-import { serve } from "std/http/server.ts";
+import { serve } from "https://deno.land/std@0.224.0/http/server.ts";
 import { corsHeaders } from "../_shared/cors.ts";
 import { createSupabaseServiceRoleClient } from "../_shared/supabaseClient.ts";
 import { openai, generateEmbedding } from "../_shared/openaiUtils.ts"; // Reverted to original import
-// Import type using the alias defined in import_map.json - Reverted to original import path
+// Import the ChatCompletionMessageParam type
 import type { ChatCompletionMessageParam } from "openai/resources/chat/completions";
 
 const MATCH_THRESHOLD = 0.30; // Lowered similarity threshold
@@ -22,7 +22,7 @@ interface MatchedChunk {
 
 console.log("Function 'query-agent' v1.1 up and running!");
 
-serve(async (req) => {
+serve(async (req: Request) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response("ok", { headers: corsHeaders });
@@ -78,9 +78,10 @@ serve(async (req) => {
     // Call the new RPC function with agent_id directly
     const { data: chunks, error: matchError } = await supabaseClient.rpc('match_knowledge_chunks_for_agent', {
       p_agent_id: agentId,
-      p_query_embedding: queryEmbedding,
+      p_filter: null, // Add the missing p_filter parameter
+      p_match_count: MATCH_COUNT,
       p_match_threshold: MATCH_THRESHOLD,
-      p_match_count: MATCH_COUNT
+      p_query_embedding: queryEmbedding
     });
 
     if (matchError) {

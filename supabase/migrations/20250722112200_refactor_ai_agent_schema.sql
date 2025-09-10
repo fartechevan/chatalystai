@@ -17,14 +17,9 @@ CREATE TABLE public.ai_agent_channels (
 INSERT INTO public.ai_agent_channels (agent_id, integrations_config_id, activation_mode, stop_keywords, session_timeout_minutes, error_message, created_at, updated_at)
 SELECT
   agent_id,
-  integrations_config_id,
+  integration_id,
   activation_mode,
-  CASE 
-    WHEN stop_keywords IS NULL THEN NULL
-    WHEN jsonb_typeof(stop_keywords::jsonb) = 'array' THEN 
-      ARRAY(SELECT jsonb_array_elements_text(stop_keywords::jsonb))
-    ELSE stop_keywords
-  END as stop_keywords,
+  stop_keywords,
   session_timeout_minutes,
   error_message,
   created_at,

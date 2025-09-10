@@ -46,6 +46,7 @@ interface NewAgentPayload {
   is_enabled?: boolean;
   agent_type?: 'chattalyst' | 'CustomAgent';
   custom_agent_config?: { webhook_url?: string; [key: string]: unknown; } | null;
+  commands?: Record<string, string>; // Key-value pairs for keyword-response mappings
   channels?: AgentChannelPayload[];
 }
 
@@ -55,6 +56,7 @@ interface UpdateAgentPayload {
   is_enabled?: boolean;
   agent_type?: 'chattalyst' | 'CustomAgent';
   custom_agent_config?: { webhook_url?: string; [key: string]: unknown; } | null;
+  commands?: Record<string, string>; // Key-value pairs for keyword-response mappings
   channels?: AgentChannelPayload[];
 }
 
@@ -70,6 +72,7 @@ interface AgentForCreate {
   is_enabled: boolean;
   agent_type: string;
   custom_agent_config: Json | null;
+  commands?: Json; // JSONB field for keyword-response mappings
   user_id: string;
   knowledge_document_ids?: string[];
 }
@@ -80,6 +83,7 @@ interface AgentForUpdate {
   is_enabled?: boolean;
   agent_type?: string;
   custom_agent_config?: Json | null;
+  commands?: Json; // JSONB field for keyword-response mappings
   knowledge_document_ids?: string[];
 }
 
@@ -649,6 +653,7 @@ serve(async (req: Request) => {
         is_enabled: agentCorePayload.is_enabled ?? true,
         agent_type: agentCorePayload.agent_type || 'chattalyst',
         custom_agent_config: (agentCorePayload.agent_type === 'CustomAgent' && agentCorePayload.custom_agent_config) ? agentCorePayload.custom_agent_config as Json : null,
+        commands: agentCorePayload.commands ? agentCorePayload.commands as Json : null,
         user_id: userId!,
         knowledge_document_ids: knowledgeIdsToLink || [],
       };
@@ -792,6 +797,7 @@ serve(async (req: Request) => {
 
       if (agentCorePayload.name !== undefined) agentToUpdateData.name = agentCorePayload.name;
       if (agentCorePayload.is_enabled !== undefined) agentToUpdateData.is_enabled = agentCorePayload.is_enabled;
+      if (agentCorePayload.commands !== undefined) agentToUpdateData.commands = agentCorePayload.commands as Json;
       if (knowledgeIdsToUpdate !== undefined) {
         agentToUpdateData.knowledge_document_ids = knowledgeIdsToUpdate;
       }

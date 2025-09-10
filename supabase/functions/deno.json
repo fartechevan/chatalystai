@@ -1,6 +1,14 @@
 {
-  "compilerOptions": {
-    "lib": ["deno.ns", "dom", "esnext"]
+  "imports": {
+    "std/": "https://deno.land/std@0.224.0/",
+    "std/http/server.ts": "https://deno.land/std@0.224.0/http/server.ts",
+    "uuid": "https://esm.sh/uuid@9.0.0",
+    "openai": "https://esm.sh/openai@5.8.2",
+    "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@2.45.4"
   },
-  "importMap": "./import_map.json"
+  "compilerOptions": {
+    "lib": ["deno.ns", "dom", "esnext"],
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true
+  }
 }
