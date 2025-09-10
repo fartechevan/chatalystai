@@ -1,3 +1,5 @@
+// deno-lint-ignore-file no-explicit-any
+// @ts-ignore: Ignore TypeScript errors for Supabase modules
 import { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.43.4";
 import { corsHeaders } from "../_shared/cors.ts";
 
@@ -8,7 +10,7 @@ export interface WebhookPayload {
   data: WhatsAppMessageData;
 }
 
-interface WhatsAppMessageData {
+export interface WhatsAppMessageData {
   key: {
     remoteJid: string;
     fromMe?: boolean;
@@ -71,20 +73,58 @@ export async function parseAndValidateWebhookRequest(req: Request): Promise<Webh
   return requestBody as WebhookPayload;
 }
 
-export async function storeWebhookEventDb(supabase: SupabaseClient, payload: WebhookPayload): Promise<void> {
+export async function storeWebhookEventDb(supabase: SupabaseClient, payload: WebhookPayload, integrationConfigId?: string | null): Promise<void> {
   const { event, instance, data } = payload;
   try {
-    const { error } = await supabase.from('evolution_webhook_events').insert({
+    // Create the base record data
+    const recordData: any = {
       event_type: event,
       payload: data,
       processing_status: 'received',
       source_identifier: instance,
-    });
-    if (error) {
-      console.error(`Error storing webhook event (Instance: ${instance}, Event: ${event}):`, error);
+    };
+
+    // Add integration_config_id if provided
+    if (integrationConfigId) {
+      // First check if the column exists to avoid errors
+      try {
+        // Try to add the integration_config_id to the record
+        recordData.integration_config_id = integrationConfigId;
+        console.log(`[storeWebhookEventDb] Attempting to store event with integration_config_id: ${integrationConfigId}`);
+        
+        const { error } = await supabase.from('evolution_webhook_events').insert(recordData);
+        if (error) {
+          // If there's an error, it might be because the column doesn't exist yet
+          if (error.message && error.message.includes('column "integration_config_id" of relation "evolution_webhook_events" does not exist')) {
+            console.warn(`[storeWebhookEventDb] The integration_config_id column doesn't exist yet. Storing without it.`);
+            // Remove the integration_config_id and try again
+            delete recordData.integration_config_id;
+            const { error: retryError } = await supabase.from('evolution_webhook_events').insert(recordData);
+            if (retryError) {
+              console.error(`[storeWebhookEventDb] Error on retry: ${retryError.message}`);
+            }
+          } else {
+            console.error(`Error storing webhook event (Instance: ${instance}, Event: ${event}, ConfigID: ${integrationConfigId || 'none'}):`, error);
+          }
+        }
+      } catch (columnError) {
+        // If there's an error with the column, fall back to storing without it
+        console.warn(`[storeWebhookEventDb] Error with integration_config_id, storing without it:`, columnError);
+        delete recordData.integration_config_id;
+        const { error } = await supabase.from('evolution_webhook_events').insert(recordData);
+        if (error) {
+          console.error(`Error storing webhook event without config ID:`, error);
+        }
+      }
+    } else {
+      // No integration_config_id provided, just insert the record
+      const { error } = await supabase.from('evolution_webhook_events').insert(recordData);
+      if (error) {
+        console.error(`Error storing webhook event (Instance: ${instance}, Event: ${event}):`, error);
+      }
     }
   } catch (dbError) {
-    console.error(`Unexpected error storing webhook event (Instance: ${instance}, Event: ${event}):`, dbError);
+    console.error(`Unexpected error storing webhook event (Instance: ${instance}, Event: ${event}, ConfigID: ${integrationConfigId || 'none'}):`, dbError);
   }
 }
 

@@ -1,9 +1,14 @@
-// deno-lint-ignore-file
+// deno-lint-ignore-file no-explicit-any
+// @ts-ignore: Ignore TypeScript errors for Deno-specific modules
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.43.4";
-import { parseAndValidateWebhookRequest, storeWebhookEventDb, createErrorResponse } from './utils.ts';
+// @ts-ignore: Ignore TypeScript errors for Supabase modules
+import { createClient, SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.43.4";
+import { parseAndValidateWebhookRequest, storeWebhookEventDb, createErrorResponse, WebhookPayload } from './utils.ts';
 import { corsHeaders } from '../_shared/cors.ts';
 import { handleMessageEvent } from './messageHandler.ts';
+
+// Define Request type to match Deno's serve function
+type DenoRequest = Request;
 
 interface WhatsAppMessageData {
   key: {
@@ -17,10 +22,13 @@ interface WhatsAppMessageData {
   messageTimestamp?: number;
 }
 
-serve(async (req) => {
+serve(async (req: DenoRequest) => {
   const { url } = req;
   const urlParams = new URL(url).searchParams;
   const integrationConfigId = urlParams.get('config');
+
+  // Log the incoming request with config ID for debugging
+  console.log(`[WhatsApp Webhook] Received request with config ID: ${integrationConfigId || 'none'}`);
 
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -38,7 +46,8 @@ serve(async (req) => {
       Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
     );
 
-    storeWebhookEventDb(supabaseClient, payload).catch(err => console.error(`Background webhook event storage failed:`, err));
+    // Store webhook event with integration config ID for better tracking
+    storeWebhookEventDb(supabaseClient, payload, integrationConfigId).catch(err => console.error(`Background webhook event storage failed:`, err));
 
     let processingResult: true | string = true;
     let eventId: string | null = null;
@@ -72,7 +81,13 @@ serve(async (req) => {
     const responseBody = overallSuccess ? { success: true, processed: true } : { success: true, processed: false, error: `Main processing failed: ${processingResult}` };
 
     return new Response(JSON.stringify(responseBody), { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 200 });
-  } catch (error) {
-    return createErrorResponse(error, error.message.includes("Not Allowed") ? 405 : 400);
+  } catch (error: unknown) {
+    // Type guard for error object
+    if (error instanceof Error) {
+      return createErrorResponse(error, error.message.includes("Not Allowed") ? 405 : 400);
+    } else {
+      // Handle case where error is not an Error object
+      return createErrorResponse(new Error(String(error)), 400);
+    }
   }
 });

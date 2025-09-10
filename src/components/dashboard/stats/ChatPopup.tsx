@@ -46,7 +46,13 @@ type ChatMessage = {
 };
 
 export function ChatPopup({ isOpen, onOpenChange }: ChatPopupProps) {
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [messages, setMessages] = useState<ChatMessage[]>([
+    {
+      id: 'welcome',
+      sender: 'bot',
+      text: 'Hello! I\'m your Chattalyst AI assistant. I can help you analyze your conversation data, answer questions about sentiment analysis, and provide insights about your customer interactions.\n\nTry asking me:\n• "Show me conversations with bad sentiment"\n• "What\'s the overall sentiment trend?"\n• "Summarize recent customer feedback"\n• "How many conversations do I have today?"'
+    }
+  ]);
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false); // To show loading state
 

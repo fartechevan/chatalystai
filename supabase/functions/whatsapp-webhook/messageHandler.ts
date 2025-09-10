@@ -1,3 +1,5 @@
+// deno-lint-ignore-file no-explicit-any
+// @ts-ignore: Ignore TypeScript errors for Supabase modules
 import { SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2.43.4";
 import { findOrCreateCustomer } from "./customerHandler.ts";
 import { findOrCreateConversation } from "./conversationHandler.ts";
@@ -8,6 +10,7 @@ interface AiAgentHandlerResult {
   image?: string;
 }
 
+// Define WhatsAppMessageData locally to avoid import conflicts
 interface WhatsAppMessageData {
   key: {
     remoteJid: string;
@@ -67,16 +70,36 @@ export async function handleMessageEvent(supabaseClient: SupabaseClient, data: W
     }
 
     let fetchedConfig;
+    // First try to get the config by the provided config ID (preferred method)
     if (integrationConfigId) {
-        const { data } = await supabaseClient.from('integrations_config').select('id, user_reference_id, integration_id, instance_id, instance_display_name').eq('id', integrationConfigId).single();
-        fetchedConfig = data;
-    } else {
-        const { data } = await supabaseClient.from('integrations_config').select('id, user_reference_id, integration_id, instance_id, instance_display_name').eq('instance_id', instanceId).maybeSingle();
-        fetchedConfig = data;
+        console.log(`[MessageHandler] Looking up integration config by ID: ${integrationConfigId}`);
+        const { data, error } = await supabaseClient.from('integrations_config').select('id, user_reference_id, integration_id, instance_id, instance_display_name').eq('id', integrationConfigId).single();
+        
+        if (error) {
+            console.error(`[MessageHandler] Error fetching integration config by ID ${integrationConfigId}:`, error.message);
+        } else {
+            fetchedConfig = data;
+            console.log(`[MessageHandler] Found config by ID: ${integrationConfigId}, instance: ${fetchedConfig?.instance_display_name}`);
+        }
+    }
+    
+    // If no config found by ID or no ID provided, fall back to instance ID
+    if (!fetchedConfig && instanceId) {
+        console.log(`[MessageHandler] Looking up integration config by instance ID: ${instanceId}`);
+        const { data, error } = await supabaseClient.from('integrations_config').select('id, user_reference_id, integration_id, instance_id, instance_display_name').eq('instance_id', instanceId).maybeSingle();
+        
+        if (error) {
+            console.error(`[MessageHandler] Error fetching integration config by instance ID ${instanceId}:`, error.message);
+        } else {
+            fetchedConfig = data;
+            if (fetchedConfig) {
+                console.log(`[MessageHandler] Found config by instance ID: ${instanceId}, config ID: ${fetchedConfig.id}`);
+            }
+        }
     }
 
     if (!fetchedConfig) {
-        return `No integration config found for instance "${instanceId}" or config ID "${integrationConfigId}"`;
+        return `No integration config found for instance "${instanceId}" or config ID "${integrationConfigId}". Please ensure the webhook URL includes a valid ?config=<UUID> parameter.`;
     }
 
     const { data: integrationData, error: integrationError } = await supabaseClient
