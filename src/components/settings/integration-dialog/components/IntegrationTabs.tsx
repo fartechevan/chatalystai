@@ -157,21 +157,56 @@ export function IntegrationTabs({
       }
 
       const integrationConfigIds = integrationConfigs.map(config => config.id);
+      let deletedItemsCount = 0;
 
       // 2. Get all conversations related to these integration configs
       const { data: conversations, error: conversationsError } = await supabase
         .from('conversations')
         .select('conversation_id')
-        .in('integrations_id', integrationConfigIds); // Use .in() with the config IDs
+        .in('integrations_id', integrationConfigIds);
 
       if (conversationsError) {
         throw conversationsError;
       }
 
+      let conversationIds: string[] = [];
       if (conversations && conversations.length > 0) {
-        const conversationIds = conversations.map(c => c.conversation_id);
+        conversationIds = conversations.map(c => c.conversation_id);
+        deletedItemsCount += conversations.length;
+      }
 
-        // 3. Delete all messages related to these conversations
+      // 3. Get all AI agent sessions related to these integration configs
+      const { data: aiSessions, error: aiSessionsError } = await supabase
+        .from('ai_agent_sessions')
+        .select('id')
+        .in('integrations_config_id', integrationConfigIds);
+
+      if (aiSessionsError) {
+        throw aiSessionsError;
+      }
+
+      let sessionIds: string[] = [];
+      if (aiSessions && aiSessions.length > 0) {
+        sessionIds = aiSessions.map(s => s.id);
+        deletedItemsCount += aiSessions.length;
+      }
+
+      // 4. Delete in proper order to avoid foreign key constraint violations
+      
+      // Delete agent conversations (references ai_agent_sessions)
+      if (sessionIds.length > 0) {
+        const { error: agentConversationsError } = await supabase
+          .from('agent_conversations')
+          .delete()
+          .in('session_id', sessionIds);
+
+        if (agentConversationsError) {
+          throw agentConversationsError;
+        }
+      }
+
+      // Delete messages (references conversations)
+      if (conversationIds.length > 0) {
         const { error: messagesError } = await supabase
           .from('messages')
           .delete()
@@ -180,8 +215,10 @@ export function IntegrationTabs({
         if (messagesError) {
           throw messagesError;
         }
+      }
 
-        // 4. Delete all participants related to these conversations
+      // Delete conversation participants (references conversations)
+      if (conversationIds.length > 0) {
         const { error: participantsError } = await supabase
           .from('conversation_participants')
           .delete()
@@ -190,18 +227,22 @@ export function IntegrationTabs({
         if (participantsError) {
           throw participantsError;
         }
+      }
 
-        // 5. Delete all conversation summaries related to these conversations
+      // Delete conversation summaries (references conversations)
+      if (conversationIds.length > 0) {
         const { error: summariesError } = await supabase
           .from('conversation_summaries')
           .delete()
           .in('conversation_id', conversationIds);
 
-        if (summariesError && summariesError.code !== 'PGRST116') { // Ignore if table doesn't exist
+        if (summariesError && summariesError.code !== 'PGRST116') {
           throw summariesError;
         }
+      }
 
-        // 6. Delete all batch sentiment analysis details related to these conversations
+      // Delete batch sentiment analysis details (references conversations)
+      if (conversationIds.length > 0) {
         const { error: sentimentDetailsError } = await supabase
           .from('batch_sentiment_analysis_details')
           .delete()
@@ -210,8 +251,69 @@ export function IntegrationTabs({
         if (sentimentDetailsError && sentimentDetailsError.code !== 'PGRST116') {
           throw sentimentDetailsError;
         }
+      }
 
-        // 7. Finally, delete the conversations themselves
+      // Delete broadcast recipients (references broadcasts)
+      const { data: broadcasts, error: broadcastsQueryError } = await supabase
+        .from('broadcasts')
+        .select('id')
+        .in('integration_config_id', integrationConfigIds);
+
+      if (broadcastsQueryError) {
+        throw broadcastsQueryError;
+      }
+
+      if (broadcasts && broadcasts.length > 0) {
+        const broadcastIds = broadcasts.map(b => b.id);
+        
+        const { error: broadcastRecipientsError } = await supabase
+          .from('broadcast_recipients')
+          .delete()
+          .in('broadcast_id', broadcastIds);
+
+        if (broadcastRecipientsError) {
+          throw broadcastRecipientsError;
+        }
+        
+        deletedItemsCount += broadcasts.length;
+      }
+
+      // Delete broadcasts (references integrations_config)
+      const { error: broadcastsError } = await supabase
+        .from('broadcasts')
+        .delete()
+        .in('integration_config_id', integrationConfigIds);
+
+      if (broadcastsError) {
+        throw broadcastsError;
+      }
+
+      // Delete message logs (references integrations_config)
+      const { error: messageLogsError } = await supabase
+        .from('message_logs')
+        .delete()
+        .in('integration_config_id', integrationConfigIds);
+
+      if (messageLogsError && messageLogsError.code !== 'PGRST116') {
+        throw messageLogsError;
+      }
+
+      // Note: ai_agent_channels table may not exist in current schema
+
+      // Delete AI agent sessions (references integrations_config)
+      if (sessionIds.length > 0) {
+        const { error: aiSessionsDeleteError } = await supabase
+          .from('ai_agent_sessions')
+          .delete()
+          .in('id', sessionIds);
+
+        if (aiSessionsDeleteError) {
+          throw aiSessionsDeleteError;
+        }
+      }
+
+      // Delete conversations (references integrations_config)
+      if (conversationIds.length > 0) {
         const { error: deleteConversationsError } = await supabase
           .from('conversations')
           .delete()
@@ -220,15 +322,69 @@ export function IntegrationTabs({
         if (deleteConversationsError) {
           throw deleteConversationsError;
         }
+      }
 
+      // Get and delete leads that were associated with the conversations
+      if (conversationIds.length > 0) {
+        // First get the lead IDs from conversations
+        const { data: conversationsWithLeads, error: conversationsLeadsError } = await supabase
+          .from('conversations')
+          .select('lead_id')
+          .in('conversation_id', conversationIds)
+          .not('lead_id', 'is', null);
+
+        if (conversationsLeadsError) {
+          throw conversationsLeadsError;
+        }
+
+        if (conversationsWithLeads && conversationsWithLeads.length > 0) {
+          const leadIds = conversationsWithLeads.map(c => c.lead_id).filter(Boolean);
+          
+          if (leadIds.length > 0) {
+            // Delete lead tags first (references leads)
+            const { error: leadTagsError } = await supabase
+              .from('lead_tags')
+              .delete()
+              .in('lead_id', leadIds);
+
+            if (leadTagsError && leadTagsError.code !== 'PGRST116') {
+              throw leadTagsError;
+            }
+
+            // Delete lead pipeline entries (references leads)
+            const { error: leadPipelineError } = await supabase
+              .from('lead_pipeline')
+              .delete()
+              .in('lead_id', leadIds);
+
+            if (leadPipelineError && leadPipelineError.code !== 'PGRST116') {
+              throw leadPipelineError;
+            }
+
+            // Delete leads
+            const { error: leadsError } = await supabase
+              .from('leads')
+              .delete()
+              .in('id', leadIds);
+
+            if (leadsError) {
+              throw leadsError;
+            }
+            
+            deletedItemsCount += leadIds.length;
+          }
+        }
+      }
+
+      if (deletedItemsCount > 0) {
         toast({
           title: "Success",
-          description: `Cleared ${conversations.length} conversations and related data`,
+          description: `Cleared all related data including ${deletedItemsCount} main records (conversations, sessions, broadcasts, leads) and their associated data`,
         });
       } else {
         toast({
           title: "No data to clear",
-          description: "No conversations found for this integration",
+          description: "No data found for this integration",
         });
       }
     } catch (error) {
