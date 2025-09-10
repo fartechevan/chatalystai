@@ -250,51 +250,34 @@ export function useIntegrationConnectionState(
       if (validInstances.length > 0) {
         console.log("[refetchInstances] Inserting fetched instances into DB...");
         console.log(`[DEBUG DUPLICATE CHECK][refetchInstances] Preparing to insert/update ${validInstances.length} instances. Current profileId for these operations:`, profileId);
-        const insertPromises = validInstances.map(async (instance) => {
+        
+        // Process each instance individually using instance_id as unique identifier
+        // After migration removes unique constraint on integration_id, this will store all instances
+        for (const instance of validInstances) {
           const instanceId = instance.id;
           const instanceDisplayName = instance.name;
-          const ownerId = instance.ownerJid; // May be undefined
+          const ownerId = instance.ownerJid;
           const userReferenceId = ownerId ? ownerId.replace(/@s\.whatsapp\.net$/, '') : null;
 
           try {
-            const insertPayload = {
-              integration_id: integrationId,
-              instance_id: instanceId,
-              instance_display_name: instanceDisplayName,
-              owner_id: ownerId,
-              user_reference_id: userReferenceId,
-              pipeline_id: currentPipelineId || null,
-              token: instance.token,
-              profile_id: profileId, // Changed tenant_id to profile_id
-            };
-            console.log(`[DEBUG DUPLICATE CHECK][refetchInstances] Attempting to call upsert_integration_config RPC for instance_id: ${instanceId}, profile_id: ${profileId}.`);
-            const rpcArgs = {
-              p_integration_id: integrationId,
-              p_instance_id: instanceId,
-              // p_tenant_id: profileId, // Removed p_tenant_id
-              p_instance_display_name: instanceDisplayName,
-              p_token: instance.token,
-              p_owner_id: profileId, // Assign profileId to p_owner_id
-              p_user_reference_id: userReferenceId,
-              p_pipeline_id: currentPipelineId || null,
-              p_status: instance.connectionStatus // Pass connectionStatus as p_status
-            };
-            console.log('[DEBUG DUPLICATE CHECK][refetchInstances] RPC Args:', rpcArgs);
+            console.log(`[DEBUG DUPLICATE CHECK][refetchInstances] Processing instance: ${instanceId}, profile_id: ${profileId}.`);
+            
+            // Check if this specific instance already exists
             const { data: existingConfig, error: checkError } = await supabase
               .from('integrations_config')
               .select('id')
-              .eq('integration_id', integrationId)
+              .eq('instance_id', instanceId)
               .maybeSingle();
 
             if (checkError) {
               console.error(`[DEBUG DUPLICATE CHECK][refetchInstances] ERROR checking for existing config for instance ${instanceId} (profile: ${profileId}):`, checkError);
-              return;
+              continue;
             }
 
             if (existingConfig) {
-              // Update existing config
+              // Update existing config for this instance
               const updateArgs = {
-                instance_id: instanceId,
+                integration_id: integrationId,
                 instance_display_name: instanceDisplayName,
                 owner_id: ownerId,
                 user_reference_id: userReferenceId,
@@ -305,81 +288,77 @@ export function useIntegrationConnectionState(
               const { error: updateError } = await supabase
                 .from('integrations_config')
                 .update(updateArgs)
-                .eq('id', existingConfig.id);
+                .eq('instance_id', instanceId);
               if (updateError) {
-                console.error(`[DEBUG DUPLICATE CHECK][refetchInstances] ERROR updating existing config for instance ${instanceId} (profile: ${profileId}):`, updateError, 'Args were:', rpcArgs);
+                console.error(`[DEBUG DUPLICATE CHECK][refetchInstances] ERROR updating existing config for instance ${instanceId} (profile: ${profileId}):`, updateError, 'Args were:', updateArgs);
               } else {
                 console.log(`[refetchInstances] Successfully updated existing config for instance ${instanceId} (profile: ${profileId}).`);
               }
             } else {
-              // Insert new config
-              const { error: rpcError } = await supabase.rpc('upsert_integration_config', rpcArgs);
+              // Insert new config for this instance
+              const insertData = {
+                integration_id: integrationId,
+                instance_id: instanceId,
+                instance_display_name: instanceDisplayName,
+                token: instance.token,
+                owner_id: ownerId,
+                user_reference_id: userReferenceId,
+                pipeline_id: currentPipelineId || null,
+                status: instance.connectionStatus
+              };
+              const { error: insertError } = await supabase
+                .from('integrations_config')
+                .insert(insertData);
 
-              if (rpcError) {
-                console.error(`[DEBUG DUPLICATE CHECK][refetchInstances] ERROR calling upsert_integration_config RPC for instance ${instanceId} (profile: ${profileId}):`, rpcError, 'Args were:', rpcArgs);
+              if (insertError) {
+                console.error(`[DEBUG DUPLICATE CHECK][refetchInstances] ERROR inserting integration config for instance ${instanceId} (profile: ${profileId}):`, insertError, 'Data was:', insertData);
               } else {
-                 console.log(`[refetchInstances] Successfully called upsert_integration_config RPC for instance ${instanceId} (profile: ${profileId}).`);
+                console.log(`[refetchInstances] Successfully inserted integration config for instance ${instanceId} (profile: ${profileId}).`);
               }
             }
           } catch (err) {
-            console.error(`[refetchInstances] Exception during insert for instance ${instanceId}:`, err);
+            console.error(`[refetchInstances] Exception during upsert for instance ${instanceId}:`, err);
           }
-        });
-        await Promise.all(insertPromises);
-        console.log("[refetchInstances] Finished upserting instances via RPC.");
-
-        // --- BEGIN: Delete stale instances from DB ---
-        if (validInstances.length > 0) { // Only run deletion if we have a valid list of live instances
-          const liveInstanceIds = validInstances.map(inst => inst.id);
-          console.log(`[refetchInstances] Live instance IDs from API for integration ${integrationId} (profile: ${profileId}):`, liveInstanceIds);
-
-          const { data: dbInstances, error: fetchDbError } = await supabase
-            .from('integrations_config')
-            .select('instance_id')
-            .eq('integration_id', integrationId)
-            .eq('owner_id', profileId); // Ensure we only check against the current profile's owner_id
-
-          if (fetchDbError) {
-            console.error(`[refetchInstances] Error fetching DB instance_ids for deletion check:`, fetchDbError);
-          } else if (dbInstances) {
-            const dbInstanceIds = dbInstances.map(dbInst => dbInst.instance_id).filter(id => id !== null) as string[];
-            console.log(`[refetchInstances] DB instance IDs for integration ${integrationId} (profile: ${profileId}):`, dbInstanceIds);
-            
-            const staleInstanceIds = dbInstanceIds.filter(dbId => !liveInstanceIds.includes(dbId));
-
-            if (staleInstanceIds.length > 0) {
-              console.log(`[refetchInstances] Stale instance IDs to delete for integration ${integrationId} (profile: ${profileId}):`, staleInstanceIds);
-              const { error: deleteError } = await supabase
-                .from('integrations_config')
-                .delete()
-                .eq('integration_id', integrationId)
-                .eq('owner_id', profileId) // Changed tenant_id to profile_id, then profile_id to owner_id
-                .in('instance_id', staleInstanceIds);
-
-              if (deleteError) {
-                console.error(`[refetchInstances] Error deleting stale instances for integration ${integrationId} (profile: ${profileId}):`, deleteError);
-              } else {
-                console.log(`[refetchInstances] Successfully deleted ${staleInstanceIds.length} stale instances for integration ${integrationId} (profile: ${profileId}).`);
-              }
-            } else {
-              console.log(`[refetchInstances] No stale instances to delete for integration ${integrationId} (profile: ${profileId}).`);
-            }
-          }
-        } else { // If validInstances is empty, it implies all existing instances for this integration_id/profile_id might be stale
-            console.log(`[refetchInstances] API returned no live instances for integration ${integrationId} (profile: ${profileId}). Deleting all associated DB instances.`);
-            const { error: deleteAllError } = await supabase
-                .from('integrations_config')
-                .delete()
-                .eq('integration_id', integrationId)
-                .eq('owner_id', profileId); // Make sure to scope by owner_id
-
-            if (deleteAllError) {
-                console.error(`[refetchInstances] Error deleting all instances for integration ${integrationId} (profile: ${profileId}) when API returned none:`, deleteAllError);
-            } else {
-                console.log(`[refetchInstances] Successfully deleted all instances for integration ${integrationId} (profile: ${profileId}) as API returned none.`);
-            }
         }
-        // --- END: Delete stale instances from DB ---
+        console.log("[refetchInstances] Finished upserting integration configs.");
+
+        // --- BEGIN: Handle stale instances ---
+        // Get all existing instances for this integration from the database
+        const { data: existingInstances, error: fetchError } = await supabase
+          .from('integrations_config')
+          .select('instance_id')
+          .eq('integration_id', integrationId);
+
+        if (fetchError) {
+          console.error(`[refetchInstances] Error fetching existing instances for integration ${integrationId}:`, fetchError);
+        } else if (existingInstances) {
+          // Get instance IDs from API response
+          const apiInstanceIds = validInstances.map(inst => inst.id);
+          
+          // Find stale instances (exist in DB but not in API response)
+          const staleInstanceIds = existingInstances
+            .map(record => record.instance_id)
+            .filter(instanceId => !apiInstanceIds.includes(instanceId));
+
+          if (staleInstanceIds.length > 0) {
+            console.log(`[refetchInstances] Found ${staleInstanceIds.length} stale instances to delete:`, staleInstanceIds);
+            
+            // Delete stale instances
+            const { error: deleteError } = await supabase
+              .from('integrations_config')
+              .delete()
+              .in('instance_id', staleInstanceIds);
+
+            if (deleteError) {
+              console.error(`[refetchInstances] Error deleting stale instances:`, deleteError);
+            } else {
+              console.log(`[refetchInstances] Successfully deleted ${staleInstanceIds.length} stale instances.`);
+            }
+          } else {
+            console.log(`[refetchInstances] No stale instances found for integration ${integrationId}.`);
+          }
+        }
+        // --- END: Handle stale instances ---
       }
       // --- END: Insert fetched instances ---
 
@@ -396,7 +375,7 @@ export function useIntegrationConnectionState(
     } finally {
       setIsFetchingInstances(false);
     }
-  }, [selectedIntegration?.id, selectedInstanceName, profileId, currentPipelineId, config]); // Dependency array is correct
+  }, [selectedIntegration?.id, selectedInstanceName, profileId, currentPipelineId]);
 
 
   // --- Instance Fetching ---
@@ -779,19 +758,33 @@ export function useIntegrationConnectionState(
         const handleOpenState = async () => {
           const setupWebhook = async () => {
             try {
+              console.log(`[Webhook Setup] Starting webhook configuration for integration ID: ${selectedIntegration.id}`);
+              
               const { data: integrationData, error: integrationError } = await supabase.from('integrations').select('webhook_url, webhook_events').eq('id', selectedIntegration.id).single();
-              if (integrationError || !integrationData) throw new Error(`Failed to fetch integration details: ${integrationError?.message || 'No data'}`);
+              if (integrationError || !integrationData) {
+                console.error(`[Webhook Setup] Failed to fetch integration details:`, integrationError);
+                throw new Error(`Failed to fetch integration details: ${integrationError?.message || 'No data'}`);
+              }
+              
+              console.log(`[Webhook Setup] Fetched integration data:`, integrationData);
 
-              const { data: configData, error: configError } = await supabase.from('integrations_config').select('id, instance_display_name').eq('integration_id', selectedIntegration.id).maybeSingle();
+              const { data: configData, error: configError } = await supabase.from('integrations_config').select('id, instance_display_name, instance_id').eq('integration_id', selectedIntegration.id).maybeSingle();
               if (configError) {
-                console.error(`Error fetching config for webhook: ${configError.message}`);
+                console.error(`[Webhook Setup] Error fetching config for webhook:`, configError);
                 // Do not proceed if we can't get the config
                 return;
               }
+              
+              console.log(`[Webhook Setup] Fetched config data:`, configData);
 
               const instanceDisplayName = configData?.instance_display_name || selectedInstanceName;
               const integrationConfigId = configData?.id;
               const webhookEventsValid = Array.isArray(integrationData.webhook_events) && integrationData.webhook_events.length > 0;
+
+              console.log(`[Webhook Setup] Instance Display Name: ${instanceDisplayName}`);
+              console.log(`[Webhook Setup] Integration Config ID: ${integrationConfigId}`);
+              console.log(`[Webhook Setup] Webhook URL: ${integrationData.webhook_url}`);
+              console.log(`[Webhook Setup] Webhook Events Valid: ${webhookEventsValid}`, integrationData.webhook_events);
 
               if (!integrationData.webhook_url || !webhookEventsValid || !instanceDisplayName || !integrationConfigId) {
                 console.warn(`[Webhook Setup] Skipping: Missing URL, Events, Display Name, or Config ID.`);

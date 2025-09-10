@@ -7,8 +7,8 @@ interface SetWebhookPayload {
     enabled: boolean;
     url: string;
     headers: Record<string, string>; // Allow for custom headers if needed later
-    byEvents: boolean; // Renamed from webhookByEvents
-    base64: boolean;
+    webhook_by_events: boolean; // Match Evolution API expected property name
+    webhook_base64: boolean; // Match Evolution API expected property name
     events: string[];
   };
 }
@@ -45,26 +45,34 @@ export async function setEvolutionWebhook(
         enabled: true, // Default to enabled
          url: webhookUrl,
          headers: {}, // Default to empty headers
-         byEvents: false, // Explicitly set to false as requested
-         base64: false, // Explicitly set to false as requested (was already default)
+         webhook_by_events: false, // Explicitly set to false as requested
+         webhook_base64: false, // Explicitly set to false as requested (was already default)
          events: webhookEvents,
       }
      };
 
-     // --- Added Log ---
-     // --- End Added Log ---
+     // Add detailed logging for debugging
+     console.log(`[setEvolutionWebhook] Setting webhook for instance ${instanceName}:`);
+     console.log(`[setEvolutionWebhook] URL: ${setWebhookUrl}`);
+     console.log(`[setEvolutionWebhook] API Key: ${apiKey.substring(0, 4)}...${apiKey.substring(apiKey.length - 4)}`);
+     console.log(`[setEvolutionWebhook] Webhook URL: ${webhookUrl}`);
+     console.log(`[setEvolutionWebhook] Events: ${webhookEvents.join(', ')}`);
+     console.log(`[setEvolutionWebhook] Payload: ${JSON.stringify(payload)}`);
 
      // 4. Make request using ApiService
     // Assuming the API returns a simple success/failure or specific structure
     // Adjust response type if needed based on actual API response
-    await apiServiceInstance.request<unknown>(setWebhookUrl, { // Changed any to unknown
+    const response = await apiServiceInstance.request<unknown>(setWebhookUrl, { // Changed any to unknown
       method: 'POST',
       headers: {
         'apikey': apiKey,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(payload),
+      logRequests: true, // Enable logging for this request
     });
+    
+    console.log(`[setEvolutionWebhook] Response:`, response);
 
     return true;
 

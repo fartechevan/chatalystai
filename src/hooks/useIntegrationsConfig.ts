@@ -7,7 +7,8 @@ export const useIntegrationsConfig = () => {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("integrations_config")
-        .select("id, instance_display_name");
+        .select("id, instance_display_name, status")
+        .eq("status", "open"); // Only fetch active/connected integrations
       if (error) {
         console.error("Error fetching integrations_config:", error);
         return [];

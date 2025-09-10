@@ -20,6 +20,7 @@ import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "@
 import { Input } from "@/components/ui/input"; // Import Input
 // import { logoutInstance } from "@/integrations/evolution-api/services/instanceLogoutService"; // Remove logout import
 import { deleteEvolutionInstance } from "@/integrations/evolution-api/services/deleteInstanceService"; // Import the delete service
+import { refreshWebhookSetupWithToast } from "@/integrations/evolution-api/services/refreshWebhookService"; // Import refresh webhook service
 
 interface IntegrationTabsProps {
   selectedIntegration: Integration | null;
@@ -44,6 +45,7 @@ export function IntegrationTabs({
   const [activeTab, setActiveTab] = useState<"settings" | "authorization">("settings");
   const [isClearing, setIsClearing] = useState(false);
   const { toast } = useToast();
+  const [isRefreshingWebhooks, setIsRefreshingWebhooks] = useState(false); // Track webhook refresh state
   // const [isLogoutLoading, setIsLogoutLoading] = useState<string | null>(null); // Remove logout state
   const [isDeleteLoading, setIsDeleteLoading] = useState<string | null>(null); // Instance name being deleted
   const [selectedPipelineId, setSelectedPipelineId] = useState<string | undefined>(undefined); // State for pipeline ID
@@ -241,6 +243,28 @@ export function IntegrationTabs({
     }
   };
 
+  const handleRefreshWebhooks = async () => {
+    if (!selectedIntegration?.id) return;
+    
+    setIsRefreshingWebhooks(true);
+    try {
+      await refreshWebhookSetupWithToast(selectedIntegration.id);
+      // Optionally refresh instances after webhook setup
+      if (typeof refetchInstances === 'function') {
+        refetchInstances();
+      }
+    } catch (error) {
+      console.error('Error refreshing webhooks:', error);
+      toast({
+        title: "Webhook Refresh Error",
+        description: "Failed to refresh webhook setup. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsRefreshingWebhooks(false);
+    }
+  };
+
   // --- Helper function to render instance status ---
   const renderStatus = (status: ConnectionState | undefined) => {
     let statusText = "Unknown";
@@ -409,10 +433,41 @@ export function IntegrationTabs({
               // Instances Exist State
               return (
                 <div className="space-y-4 pt-4">
-                  <h3 className="text-lg font-semibold">Available WhatsApp Instances</h3>
-                  <p className="text-sm text-muted-foreground">
-                    Select an instance below to connect or manage.
-                  </p>
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="text-lg font-semibold">Available WhatsApp Instances</h3>
+                      <p className="text-sm text-muted-foreground">
+                        Select an instance below to connect or manage.
+                      </p>
+                    </div>
+                    <div className="flex gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={handleRefreshWebhooks}
+                        disabled={isRefreshingWebhooks}
+                        title="Refresh Webhook Setup"
+                      >
+                        {isRefreshingWebhooks ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
+                        Refresh Webhooks
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => {
+                          console.log('[IntegrationTabs] Refresh instances button clicked');
+                          if (typeof refetchInstances === 'function') {
+                            refetchInstances();
+                          }
+                        }}
+                        disabled={isFetchingInstances}
+                        title="Refresh Instances"
+                      >
+                        {isFetchingInstances ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
+                        Refresh
+                      </Button>
+                    </div>
+                  </div>
                   <div className="border rounded-lg overflow-hidden"> {/* Added container for consistent styling */}
                     <Table>
                       <TableHeader>
