@@ -55,7 +55,7 @@ export function IntegrationDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleDialogChange}>
-      <DialogContent className="max-w-5xl w-4/5 flex space-x-4">
+      <DialogContent className="max-w-6xl w-[90%] max-h-[85vh] flex space-x-4 overflow-hidden">
         {/* Left Column - Now only needs selectedIntegration */}
         <DialogMain
           selectedIntegration={selectedIntegration}

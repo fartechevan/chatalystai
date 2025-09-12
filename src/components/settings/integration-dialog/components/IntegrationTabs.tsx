@@ -454,7 +454,7 @@ export function IntegrationTabs({
 
       {/* --- Render content for WhatsApp types (Evolution API) --- */}
       <>
-        <TabsContent value="settings" className="space-y-6 h-96 overflow-y-auto"> {/* Added overflow */}
+        <TabsContent value="settings" className="space-y-6 max-h-[60vh] overflow-y-auto flex flex-col"> {/* Improved height and flex layout */}
           {/* --- Conditional Rendering Logic (Moved from WhatsAppBusinessSettings) --- */}
           {(() => {
               // Loading State
@@ -528,60 +528,68 @@ export function IntegrationTabs({
               // No Instances State
               if (!isFetchingInstances && fetchedInstances.length === 0) {
                  return (
-                   <div className="space-y-4 pt-4">
-                     <h3 className="text-lg font-semibold">Create WhatsApp Instance</h3>
-                     <p className="text-sm text-muted-foreground">
-                       No WhatsApp instances found. Enter a name to create your first instance.
-                     </p>
-                     <Input
-                       value={newInstanceName}
-                       onChange={e => handleNewInstanceNameChange(e.target.value)}
-                       placeholder="Enter instance name"
-                       className="w-full"
-                       disabled={isLoading}
-                     />
-                     {/* Pipeline Selection Dropdown - Added Here for first instance */}
-                     <div className="space-y-2 pt-4">
-                       <Label htmlFor="pipeline-select-evo-first">Assign to Pipeline (Optional)</Label>
-                       <Select
-                         value={selectedPipelineId}
-                         onValueChange={setSelectedPipelineId}
-                         disabled={isLoadingPipelines} // Disable while loading pipelines
-                       >
-                         <SelectTrigger id="pipeline-select-evo-first" className="w-full">
-                           <SelectValue placeholder="Select a pipeline..." />
-                         </SelectTrigger>
-                         <SelectContent>
-                           {isLoadingPipelines ? (
-                             <SelectItem value="loading" disabled>Loading pipelines...</SelectItem>
-                           ) : pipelineError ? (
-                             <SelectItem value="error" disabled>Error loading pipelines</SelectItem>
-                           ) : pipelines.length === 0 ? (
-                             <SelectItem value="no-pipelines" disabled>No pipelines found</SelectItem> // Simplified placeholder
-                           ) : (
-                             pipelines.map((pipeline) => (
-                               <SelectItem key={pipeline.id} value={pipeline.id.toString()}>
-                                 {pipeline.name}
-                               </SelectItem>
-                             ))
-                           )}
-                         </SelectContent>
-                       </Select>
-                       <p className="text-sm text-muted-foreground">
-                         Select a pipeline to automatically assign new leads from this WhatsApp instance.
-                       </p>
+                   <div className="flex flex-col h-full">
+                     <div className="flex-1 space-y-4 pt-4">
+                       <div className="text-center mb-6">
+                         <h3 className="text-xl font-semibold mb-2">Create WhatsApp Instance</h3>
+                         <p className="text-sm text-muted-foreground">
+                           No WhatsApp instances found. Enter a name to create your first instance.
+                         </p>
+                       </div>
+                       <div className="space-y-4 max-w-md mx-auto">
+                         <Input
+                           value={newInstanceName}
+                           onChange={e => handleNewInstanceNameChange(e.target.value)}
+                           placeholder="Enter instance name"
+                           className="w-full text-center"
+                           disabled={isLoading}
+                         />
+                         {/* Pipeline Selection Dropdown - Added Here for first instance */}
+                         <div className="space-y-2">
+                           <Label htmlFor="pipeline-select-evo-first" className="text-center block">Assign to Pipeline (Optional)</Label>
+                           <Select
+                             value={selectedPipelineId}
+                             onValueChange={setSelectedPipelineId}
+                             disabled={isLoadingPipelines} // Disable while loading pipelines
+                           >
+                             <SelectTrigger id="pipeline-select-evo-first" className="w-full">
+                               <SelectValue placeholder="Select a pipeline..." />
+                             </SelectTrigger>
+                             <SelectContent>
+                               {isLoadingPipelines ? (
+                                 <SelectItem value="loading" disabled>Loading pipelines...</SelectItem>
+                               ) : pipelineError ? (
+                                 <SelectItem value="error" disabled>Error loading pipelines</SelectItem>
+                               ) : pipelines.length === 0 ? (
+                                 <SelectItem value="no-pipelines" disabled>No pipelines found</SelectItem> // Simplified placeholder
+                               ) : (
+                                 pipelines.map((pipeline) => (
+                                   <SelectItem key={pipeline.id} value={pipeline.id.toString()}>
+                                     {pipeline.name}
+                                   </SelectItem>
+                                 ))
+                               )}
+                             </SelectContent>
+                           </Select>
+                           <p className="text-xs text-muted-foreground text-center">
+                             Select a pipeline to automatically assign new leads from this WhatsApp instance.
+                           </p>
+                         </div>
+                       </div>
                      </div>
-                     {/* Create Button */}
-                     <Button
-                       variant="default"
-                       size="lg"
-                       onClick={() => handleCreateAndConnect(selectedPipelineId)} // Wrap in arrow function and pass ID
-                       className="mt-2 w-full"
-                       disabled={!newInstanceName.trim() || isLoading}
-                     >
-                       {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Plus className="mr-2 h-4 w-4" />}
-                       Create & Connect
-                     </Button>
+                     {/* Create Button - Fixed at bottom */}
+                     <div className="mt-6 pt-4 border-t">
+                       <Button
+                         variant="default"
+                         size="lg"
+                         onClick={() => handleCreateAndConnect(selectedPipelineId)} // Wrap in arrow function and pass ID
+                         className="w-full h-12 text-lg font-semibold"
+                         disabled={!newInstanceName.trim() || isLoading}
+                       >
+                         {isLoading ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <Plus className="mr-2 h-5 w-5" />}
+                         Create & Connect
+                       </Button>
+                     </div>
                    </div>
                  );
                }
@@ -745,8 +753,13 @@ export function IntegrationTabs({
             {/* --- End Conditional Rendering --- */}
           </TabsContent>
 
-          <TabsContent value="authorization" className="space-y-6 h-96">
-             {/* Keep Authorization content */}
+          <TabsContent value="authorization" className="mt-0 pt-4 max-h-[60vh] overflow-y-auto flex flex-col justify-start">
+            <div className="space-y-2">
+              <h2 className="text-xl font-semibold">WhatsApp Business Authorization</h2>
+              <p className="text-sm text-muted-foreground">
+                Manage the API key for your WhatsApp connection. This key is required to authenticate with the WhatsApp Business API.
+              </p>
+            </div>
             <WhatsAppBusinessAuthorization selectedIntegration={selectedIntegration} />
           </TabsContent>
         </>
