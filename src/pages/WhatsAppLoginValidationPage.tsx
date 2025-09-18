@@ -30,14 +30,13 @@ export const WhatsAppLoginValidationPage: React.FC = () => {
         if (invokeError) throw invokeError;
         if (data?.error) throw new Error(data.error);
 
-        // Assuming the function returns a session or success indicator
-        if (data?.session) {
-          setMessage('Login successful! Redirecting to dashboard...');
-          // Supabase client should automatically handle session, but we can force a refresh
-          await supabase.auth.setSession(data.session);
-          navigate('/dashboard');
+        // The function returns a magic_link for authentication
+        if (data?.magic_link) {
+          setMessage('Login successful! Redirecting to complete authentication...');
+          // Redirect to the magic link to complete the authentication process
+          window.location.href = data.magic_link;
         } else {
-          setError('Validation failed: No session returned.');
+          setError('Validation failed: No magic link returned.');
           setMessage('Login failed.');
         }
       } catch (err) {
