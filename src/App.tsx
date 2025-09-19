@@ -65,7 +65,8 @@ const App = () => {
                   <Route path="/login" element={<LoginForm />} />
                   {/* <Route path="/signup" element={<LicensedSignupForm />} /> */} {/* Removed separate signup route */}
                   <Route path="/auth/confirm-invite" element={<ConfirmInvitePage />} /> {/* Add route for ConfirmInvitePage */}
-                  <Route path="/whatsapp-login" element={<WhatsAppLoginValidationPage />} /> {/* Add route for WhatsApp Login Validation */}
+                  <Route path="/whatsapp-login" element={<WhatsAppLoginValidationPage />} /> {/* Add route for WhatsApp Login */}
+                  <Route path="/whatsapp-login-validation" element={<WhatsAppLoginValidationPage />} /> {/* Add route for WhatsApp Login Validation */}
                   <Route
                     path="/dashboard"
                     element={

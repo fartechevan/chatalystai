@@ -6,12 +6,15 @@ export const WhatsAppLoginValidationPage: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const [message, setMessage] = useState('Validating your login...');
+  const [debugInfo, setDebugInfo] = useState('');
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     const validateLogin = async () => {
       const params = new URLSearchParams(location.search);
       const token = params.get('token');
+      
+      setDebugInfo(`URL: ${window.location.href}\nToken: ${token || 'NOT FOUND'}`);
 
       if (!token) {
         setError('No login token found in URL.');
@@ -21,6 +24,8 @@ export const WhatsAppLoginValidationPage: React.FC = () => {
       }
 
       console.log('WhatsAppLoginValidationPage: Attempting to validate token:', token);
+      console.log('WhatsAppLoginValidationPage: Current URL:', window.location.href);
+      setMessage('Token found, validating...');
 
       try {
         const { data, error: invokeError } = await supabase.functions.invoke('validate-whatsapp-login', {
@@ -57,6 +62,11 @@ export const WhatsAppLoginValidationPage: React.FC = () => {
     <div className="min-h-screen flex items-center justify-center bg-gray-100">
       <div className="bg-white p-8 rounded-lg shadow-md text-center">
         <h1 className="text-2xl font-bold mb-4">WhatsApp Login</h1>
+        {debugInfo && (
+          <div className="mb-4 p-2 bg-gray-100 text-xs text-left whitespace-pre-wrap">
+            <strong>Debug Info:</strong>\n{debugInfo}
+          </div>
+        )}
         {error ? (
           <p className="text-red-500">{error}</p>
         ) : (
