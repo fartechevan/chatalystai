@@ -17,4 +17,7 @@ export default defineConfig(({ mode }) => ({
       '@supabase/supabase-js': path.resolve(__dirname, 'node_modules/@supabase/supabase-js/dist/main/index.js'),
     },
   },
+  optimizeDeps: {
+    exclude: ['chunk-P5ANHNM6.js'],
+  },
 }));

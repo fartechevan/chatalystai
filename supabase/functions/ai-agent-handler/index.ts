@@ -1,4 +1,6 @@
 // @deno-options --import-map=./deno.json
+// deno-lint-ignore-file no-explicit-any
+// @ts-ignore: Ignore TypeScript errors for Deno-specific modules
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 import { corsHeaders } from '../_shared/cors.ts';
 import { createSupabaseClient, createSupabaseServiceRoleClient } from '../_shared/supabaseClient.ts';
@@ -11,7 +13,7 @@ type AIAgentDbRow = Database['public']['Tables']['ai_agents']['Row'];
 type AgentChannelData = Database['public']['Tables']['ai_agent_channels']['Row'];
 
 // Hardcoded system prompt for Chatalyst agents
-const CHATALYST_SYSTEM_PROMPT = `You are a knowledgeable assistant for Chattalyst that can help with questions about our services and appointments.
+const CHATALYST_SYSTEM_PROMPT = `You are a knowledgeable assistant for Chattalyst that can help with questions about our services, appointments, and account access.
 
 IMPORTANT GUIDELINES:
 1. Use the provided knowledge base content to answer questions about Chattalyst services, pricing, and features
@@ -19,15 +21,18 @@ IMPORTANT GUIDELINES:
 3. Be helpful, professional, and informative in your responses
 4. You can help users book appointments when they request scheduling or meeting setup
 5. You can also help users check their existing appointments and upcoming bookings
-6. For appointment requests, ask for: type of appointment, preferred date and time
-7. For appointment inquiries, you can retrieve and display their current appointments
-8. Always prioritize being helpful while maintaining accuracy
+6. You can help users access their Chatalyst account by providing secure login links
+7. For appointment requests, ask for: type of appointment, preferred date and time
+8. For appointment inquiries, you can retrieve and display their current appointments
+9. For login requests, you can generate secure magic links for account access
+10. Always prioritize being helpful while maintaining accuracy
 
 When users ask about:
 - Chattalyst pricing, plans, or features: Use the knowledge base to provide detailed information
 - Booking appointments, scheduling, or setting up meetings: Help them book appointments and ask for necessary details
 - Their current appointments, scheduled meetings, or upcoming bookings: Retrieve and display their appointment information
-- Checking their calendar or appointment status: Show their existing appointments`;
+- Checking their calendar or appointment status: Show their existing appointments
+- Logging in, accessing their account, or needing a login link: Generate a secure magic link for account access`;
 
 // Payload for creating/updating a channel link
 interface AgentChannelPayload {
@@ -178,6 +183,17 @@ function detectAppointmentInquiry(message: string): boolean {
   return inquiryKeywords.some(keyword => lowerMessage.includes(keyword));
 }
 
+function detectLoginRequest(message: string): boolean {
+  const loginKeywords = [
+    'login', 'log in', 'sign in', 'signin', 'access', 'dashboard',
+    'account', 'portal', 'authenticate', 'magic link', 'link to login',
+    'send me a link', 'login link', 'access link', 'get access'
+  ];
+  
+  const lowerMessage = message.toLowerCase();
+  return loginKeywords.some(keyword => lowerMessage.includes(keyword));
+}
+
 serve(async (req: Request) => {
   const initialRequestTime = Date.now();
   console.log(`[${initialRequestTime}] RAW REQUEST RECEIVED: ${req.method} ${req.url}, User-Agent: ${req.headers.get('User-Agent')}`);
@@ -326,8 +342,39 @@ serve(async (req: Request) => {
             
             const appointmentExtraction = await extractAppointmentFromMessage(query, contactIdentifier);
             const isAppointmentInquiry = detectAppointmentInquiry(query);
+            const isLoginRequest = detectLoginRequest(query);
             
-            if (isAppointmentInquiry && !appointmentExtraction.has_appointment_request) {
+            // Handle login requests
+            if (isLoginRequest) {
+              console.log(`[${requestStartTime}] Internal Query: Login request detected for contact ${contactIdentifier}.`);
+              
+              try {
+                const loginResponse = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/generate-login-link`, {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')}`,
+                  },
+                  body: JSON.stringify({
+                    phone_number: contactIdentifier
+                  })
+                });
+                
+                const loginResult = await loginResponse.json();
+                
+                if (loginResult.success && loginResult.magic_link) {
+                  console.log(`[${requestStartTime}] Internal Query: Magic link generated successfully.`);
+                  responseText = `Here's your login link: ${loginResult.magic_link}\n\nClick the link to access your Chatalyst account. The link will expire in 1 hour for security.`;
+                } else {
+                  console.error(`[${requestStartTime}] Internal Query: Failed to generate magic link:`, loginResult.error);
+                  responseText = "I apologize, but I'm currently unable to generate a login link. Please try again later or contact support.";
+                }
+              } catch (loginError) {
+                console.error(`[${requestStartTime}] Internal Query: Error calling generate-login-link function:`, loginError);
+                responseText = "I apologize, but I'm currently unable to process login requests. Please try again later.";
+              }
+            }
+            else if (isAppointmentInquiry && !appointmentExtraction.has_appointment_request) {
               console.log(`[${requestStartTime}] Internal Query: Appointment inquiry detected for contact ${contactIdentifier}.`);
               
               try {
