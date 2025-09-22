@@ -89,17 +89,30 @@ Deno.serve(async (req: Request) => {
     // Normalize phone number to digits only for lookup in profiles table
     phoneNumber = phoneNumber.replace(/\D/g, ''); 
 
-    // 3. Find user by phone number (temporarily mocked for testing)
+    // 3. Find user by phone number in profiles table
     console.log("Looking up user for phone:", phoneNumber);
     
-    // TODO: Implement proper user lookup when profiles table has phone_number column
-    // For now, create a mock user for testing with the correct email
-    const user = {
-      id: "00000000-0000-0000-0000-000000000000", // Mock user ID
-      email: "imexlight@gmail.com"
-    };
+    const { data: user, error: userLookupError } = await supabaseClient
+      .from("profiles")
+      .select("id, email, phone_number")
+      .eq("phone_number", phoneNumber)
+      .single();
+
+    if (userLookupError || !user) {
+      console.error("User lookup error:", userLookupError);
+      return new Response(
+        JSON.stringify({ 
+          error: "User not found", 
+          message: "No user found with this phone number. Please ensure you have an account registered with this phone number." 
+        }),
+        { 
+          status: 404, 
+          headers: { ...corsHeaders, "Content-Type": "application/json" } 
+        }
+      );
+    }
     
-    console.log("Using mock user for testing:", user);
+    console.log("Found user:", { id: user.id, email: user.email, phone: user.phone_number });
 
     // 4. Generate magic link using Supabase admin
     const userEmail = user.email; // Use the email from the profiles table
