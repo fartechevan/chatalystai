@@ -20,7 +20,7 @@ import {
 } from "@/components/ui/select";
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Upload, ListChecks, Users as UsersIcon, X as Cross2Icon, FileText, ImagePlus, Loader2 } from 'lucide-react';
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -605,197 +605,184 @@ export function BroadcastModal({
 
         {step === 'selectTarget' && (
           <div className="space-y-6">
-            <div>
-              <Label className="text-base font-medium">Target Audience</Label>
-              <RadioGroup value={targetMode} onValueChange={(value) => setTargetMode(value as TargetMode)} className="mt-2">
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="customers" id="customers" />
-                  <Label htmlFor="customers" className="flex items-center space-x-2 cursor-pointer">
-                    <UsersIcon className="w-4 h-4" />
-                    <span>Select Customers</span>
-                  </Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="segment" id="segment" />
-                  <Label htmlFor="segment" className="flex items-center space-x-2 cursor-pointer">
-                    <ListChecks className="w-4 h-4" />
-                    <span>Select Segment</span>
-                  </Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <RadioGroupItem value="csv" id="csv" />
-                  <Label htmlFor="csv" className="flex items-center space-x-2 cursor-pointer">
-                    <Upload className="w-4 h-4" />
-                    <span>Import CSV</span>
-                  </Label>
-                </div>
-              </RadioGroup>
-            </div>
-
-            {targetMode === 'customers' && (
-              <div>
-                <Label className="text-sm font-medium">Select Customers</Label>
-                {isLoadingCustomers ? (
-                  <div className="flex items-center justify-center py-4">
-                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-gray-900"></div>
-                  </div>
-                ) : (
-                  <ScrollArea className="h-64 mt-2 border rounded-md p-4">
-                    <div className="space-y-2">
-                      {customers.map((customer) => (
-                        <div key={customer.id} className="flex items-center space-x-2">
-                          <input
-                            type="checkbox"
-                            id={customer.id}
-                            checked={selectedCustomers.includes(customer.id)}
-                            onChange={(e) => {
-                              if (e.target.checked) {
-                                setSelectedCustomers([...selectedCustomers, customer.id]);
-                              } else {
-                                setSelectedCustomers(selectedCustomers.filter(id => id !== customer.id));
-                              }
-                            }}
-                            className="rounded border-gray-300"
-                          />
-                          <Label htmlFor={customer.id} className="text-sm cursor-pointer">
-                            {customer.name} ({customer.phone_number})
-                          </Label>
-                        </div>
-                      ))}
-                    </div>
-                  </ScrollArea>
-                )}
-                <p className="text-sm text-gray-500 mt-2">
-                  {selectedCustomers.length} customer(s) selected
-                </p>
-              </div>
-            )}
-
-            {targetMode === 'segment' && (
-              <div>
-                <Label className="text-sm font-medium">Select Segment</Label>
-                {isLoadingSegments ? (
-                  <div className="flex items-center justify-center py-4">
-                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-gray-900"></div>
-                  </div>
-                ) : (
-                  <Select value={selectedSegmentId} onValueChange={setSelectedSegmentId}>
-                    <SelectTrigger className="mt-2">
-                      <SelectValue placeholder="Choose a segment" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {availableSegments.map((segment) => (
-                        <SelectItem key={segment.id} value={segment.id}>
-                          {segment.name} ({segment.member_count || 0} customers)
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                )}
-              </div>
-            )}
-
-            {targetMode === 'csv' && (
-              <div className="space-y-4">
+            <Tabs value={targetMode} onValueChange={(value) => setTargetMode(value as TargetMode)} className="w-full">
+              <TabsList className="grid w-full grid-cols-3">
+                <TabsTrigger value="customers">
+                  <UsersIcon className="w-4 h-4 mr-2" />
+                  Select Customers
+                </TabsTrigger>
+                <TabsTrigger value="segment">
+                  <ListChecks className="w-4 h-4 mr-2" />
+                  Select Segment
+                </TabsTrigger>
+                <TabsTrigger value="csv">
+                  <Upload className="w-4 h-4 mr-2" />
+                  Import CSV
+                </TabsTrigger>
+              </TabsList>
+              <TabsContent value="customers" className="pt-4">
                 <div>
-                  <Label className="text-sm font-medium">Import CSV File</Label>
-                  <p className="text-xs text-gray-500 mt-1">
-                    CSV must contain a 'phone_number' column header
+                  <Label className="text-sm font-medium">Select Customers</Label>
+                  {isLoadingCustomers ? (
+                    <div className="flex items-center justify-center py-4">
+                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-gray-900"></div>
+                    </div>
+                  ) : (
+                    <ScrollArea className="h-96 mt-2 border p-4">
+                      <div className="space-y-2">
+                        {customers.map((customer) => (
+                          <div key={customer.id} className="flex items-center space-x-2">
+                            <input
+                              type="checkbox"
+                              id={customer.id}
+                              checked={selectedCustomers.includes(customer.id)}
+                              onChange={(e) => {
+                                if (e.target.checked) {
+                                  setSelectedCustomers([...selectedCustomers, customer.id]);
+                                } else {
+                                  setSelectedCustomers(selectedCustomers.filter(id => id !== customer.id));
+                                }
+                              }}
+                              className="h-5 w-5 rounded border-gray-300"
+                            />
+                            <Label htmlFor={customer.id} className="text-sm cursor-pointer">
+                              {customer.name} ({customer.phone_number})
+                            </Label>
+                          </div>
+                        ))}
+                      </div>
+                    </ScrollArea>
+                  )}
+                  <p className="text-sm text-gray-500 mt-2">
+                    {selectedCustomers.length} customer(s) selected
                   </p>
-                  <div className="mt-2">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={handleImportClick}
-                      disabled={isProcessingCsv}
-                      className="w-full"
-                    >
-                      <Upload className="w-4 h-4 mr-2" />
-                      {isProcessingCsv ? 'Processing...' : 'Choose CSV File'}
-                    </Button>
-                    <Input ref={fileInputRef} type="file" accept=".csv" onChange={handleCsvFileChange} className="hidden" />
-                  </div>
                 </div>
-
-                {csvFileName && (
-                  <Alert>
-                    <AlertDescription>
-                      <strong>File:</strong> {csvFileName}<br />
-                      <strong>Recipients:</strong> {csvRecipients.length} phone numbers<br />
-                      <strong>Existing Customers:</strong> {existingContactIdsFromCsv.length}<br />
-                      <strong>New Numbers:</strong> {newContactsFromCsv.length}
-                    </AlertDescription>
-                  </Alert>
-                )}
-
-                {showAddContactsPrompt && (
-                  <Alert>
-                    <AlertDescription>
-                      <div className="space-y-2">
-                        <p>{newContactsFromCsv.length} new phone numbers found. Would you like to add them as customers?</p>
-                        <div className="flex space-x-2">
-                          <Button
-                            size="sm"
-                            onClick={handleAddContacts}
-                            disabled={isAddingContacts}
-                          >
-                            {isAddingContacts ? 'Adding...' : 'Add Contacts'}
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => setShowAddContactsPrompt(false)}
-                          >
-                            Skip
-                          </Button>
-                        </div>
-                      </div>
-                    </AlertDescription>
-                  </Alert>
-                )}
-
-                {(existingContactIdsFromCsv.length > 0 || addedCustomerIdsFromCsv.length > 0) && (
-                  <div className="space-y-2">
-                    <Button
-                      variant="outline"
-                      onClick={() => setShowCreateSegmentPrompt(true)}
-                      className="w-full"
-                    >
-                      Create Segment from CSV
-                    </Button>
-
-                    {showCreateSegmentPrompt && (
-                      <div className="space-y-2">
-                        <Input
-                          placeholder="Enter segment name"
-                          value={newSegmentName}
-                          onChange={(e) => setNewSegmentName(e.target.value)}
-                        />
-                        <div className="flex space-x-2">
-                          <Button
-                            size="sm"
-                            onClick={handleCreateSegment}
-                            disabled={isCreatingSegment || !newSegmentName.trim()}
-                          >
-                            {isCreatingSegment ? 'Creating...' : 'Create Segment'}
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => {
-                              setShowCreateSegmentPrompt(false);
-                              setNewSegmentName('');
-                            }}
-                          >
-                            Cancel
-                          </Button>
-                        </div>
-                      </div>
-                    )}
+              </TabsContent>
+              <TabsContent value="segment" className="pt-4">
+                <div>
+                  <Label className="text-sm font-medium">Select Segment</Label>
+                  {isLoadingSegments ? (
+                    <div className="flex items-center justify-center py-4">
+                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-gray-900"></div>
+                    </div>
+                  ) : (
+                    <Select value={selectedSegmentId} onValueChange={setSelectedSegmentId}>
+                      <SelectTrigger className="mt-2">
+                        <SelectValue placeholder="Choose a segment" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {availableSegments.map((segment) => (
+                          <SelectItem key={segment.id} value={segment.id}>
+                            {segment.name} ({segment.member_count || 0} customers)
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  )}
+                </div>
+              </TabsContent>
+              <TabsContent value="csv" className="pt-4">
+                <div className="space-y-4">
+                  <div>
+                    <Label className="text-sm font-medium">Import CSV File</Label>
+                    <p className="text-xs text-gray-500 mt-1">
+                      CSV must contain a 'phone_number' column header
+                    </p>
+                    <div className="mt-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={handleImportClick}
+                        disabled={isProcessingCsv}
+                        className="w-full"
+                      >
+                        <Upload className="w-4 h-4 mr-2" />
+                        {isProcessingCsv ? 'Processing...' : 'Choose CSV File'}
+                      </Button>
+                      <Input ref={fileInputRef} type="file" accept=".csv" onChange={handleCsvFileChange} className="hidden" />
+                    </div>
                   </div>
-                )}
-              </div>
-            )}
+
+                  {csvFileName && (
+                    <Alert>
+                      <AlertDescription>
+                        <strong>File:</strong> {csvFileName}<br />
+                        <strong>Recipients:</strong> {csvRecipients.length} phone numbers<br />
+                        <strong>Existing Customers:</strong> {existingContactIdsFromCsv.length}<br />
+                        <strong>New Numbers:</strong> {newContactsFromCsv.length}
+                      </AlertDescription>
+                    </Alert>
+                  )}
+
+                  {showAddContactsPrompt && (
+                    <Alert>
+                      <AlertDescription>
+                        <div className="space-y-2">
+                          <p>{newContactsFromCsv.length} new phone numbers found. Would you like to add them as customers?</p>
+                          <div className="flex space-x-2">
+                            <Button
+                              size="sm"
+                              onClick={handleAddContacts}
+                              disabled={isAddingContacts}
+                            >
+                              {isAddingContacts ? 'Adding...' : 'Add Contacts'}
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => setShowAddContactsPrompt(false)}
+                            >
+                              Skip
+                            </Button>
+                          </div>
+                        </div>
+                      </AlertDescription>
+                    </Alert>
+                  )}
+
+                  {(existingContactIdsFromCsv.length > 0 || addedCustomerIdsFromCsv.length > 0) && (
+                    <div className="space-y-2">
+                      <Button
+                        variant="outline"
+                        onClick={() => setShowCreateSegmentPrompt(true)}
+                        className="w-full"
+                      >
+                        Create Segment from CSV
+                      </Button>
+
+                      {showCreateSegmentPrompt && (
+                        <div className="space-y-2">
+                          <Input
+                            placeholder="Enter segment name"
+                            value={newSegmentName}
+                            onChange={(e) => setNewSegmentName(e.target.value)}
+                          />
+                          <div className="flex space-x-2">
+                            <Button
+                              size="sm"
+                              onClick={handleCreateSegment}
+                              disabled={isCreatingSegment || !newSegmentName.trim()}
+                            >
+                              {isCreatingSegment ? 'Creating...' : 'Create Segment'}
+                            </Button>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() => {
+                                setShowCreateSegmentPrompt(false);
+                                setNewSegmentName('');
+                              }}
+                            >
+                              Cancel
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              </TabsContent>
+            </Tabs>
           </div>
         )}
 
