@@ -1,4 +1,4 @@
-import { serve } from "std/http/server.ts"; // Use import map alias
+import { serve } from "https://deno.land/std@0.192.0/http/server.ts"; // Use import map alias
 import { corsHeaders } from "../_shared/cors.ts";
 import { createSupabaseServiceRoleClient } from "../_shared/supabaseClient.ts";
 import { fetchIntegrationCredentialsById } from "../_shared/integrationUtils.ts";
@@ -177,7 +177,7 @@ serve(async (req: Request) => {
           });
       }
 
-      const instancesWithLiveStatus = await Promise.all(dbInstances.map(async (instance) => {
+      const instancesWithLiveStatus = await Promise.all(dbInstances.map(async (instance: { id: string; name: string; base_url: string }) => {
         const { data: configData } = await supabaseClient
           .from('integrations_config')
           .select('instance_display_name, status, owner_id')
@@ -328,15 +328,29 @@ serve(async (req: Request) => {
         console.log(`send-media action: Values - integrationConfigId: ${integrationConfigId}, recipientJid: ${recipientJid}, mimeType: ${mimeType}, filename: ${filename}, mediaData (present): ${!!mediaData}, caption: ${caption}, text: ${text}`);
 
         evolutionApiUrl = `${config.integration.base_url}/message/sendMedia/${evolutionInstanceName}`;
-        const determinedMediatype = mimeType!.startsWith('image') ? 'image'
-                                  : mimeType!.startsWith('video') ? 'video'
-                                  : mimeType!.startsWith('audio') ? 'audio'
-                                  : 'document';
+        let determinedMediatype: string;
+        if (mimeType === 'application/pdf') {
+          determinedMediatype = 'document';
+        } else if (mimeType!.startsWith('image/')) {
+          determinedMediatype = 'image';
+        } else if (mimeType!.startsWith('video/')) {
+          determinedMediatype = 'video';
+        } else if (mimeType!.startsWith('audio/')) {
+          determinedMediatype = 'audio';
+        } else {
+          determinedMediatype = 'document'; // Default to document for other types
+        }
         console.log(`send-media action: Determined mediatype: '${determinedMediatype}' from mimeType: '${mimeType}'`);
 
         let finalMediaData = mediaData!;
-        // Check if mediaData is a data URL and strip the prefix
-        if (mediaData && mediaData.startsWith('data:') && mediaData.includes(';base64,')) {
+        let isUrl = false;
+        
+        // Always treat mediaData as a URL for documents, if it's a URL.
+        // For other media types, handle base64 if present.
+        if (mediaData && (mediaData.startsWith('http://') || mediaData.startsWith('https://'))) {
+          isUrl = true;
+          console.log(`send-media action: Media data is a URL: ${mediaData}`);
+        } else if (determinedMediatype !== 'document' && mediaData && mediaData.startsWith('data:') && mediaData.includes(';base64,')) {
           finalMediaData = mediaData.substring(mediaData.indexOf(';base64,') + ';base64,'.length);
           console.log(`send-media action: Stripped data URL prefix. Media data is now raw base64.`);
         }
@@ -344,13 +358,14 @@ serve(async (req: Request) => {
         payload = {
           number: recipientJid!,
           options: { presence: "composing", delay: 1200 },
-          mediatype: determinedMediatype, 
-          media: finalMediaData,          // Use potentially stripped base64 data
-          mimetype: mimeType!,            
+          mediatype: determinedMediatype,
+          mimetype: mimeType!,
+          media: isUrl ? mediaData! : finalMediaData,
           fileName: filename!,            
-          caption: caption || text || undefined, 
+          caption: caption || text || undefined
         };
-        console.log(`Action: sendMedia to ${recipientJid} via instance name: ${evolutionInstanceName} (DB config ID: ${integrationConfigId}) Final Payload for API:`, JSON.stringify(payload, null, 2));
+        console.log(`Action: sendMedia to ${recipientJid} via instance name: ${evolutionInstanceName} (DB config ID: ${integrationConfigId})`);
+        console.log(`Final Payload for Evolution API (sendMedia):`, JSON.stringify(payload, null, 2));
       } else if (action === 'send-buttons') {
         console.log(`send-buttons action: Received body keys: ${Object.keys(bodyParsed).join(', ')}`);
         console.log(`send-buttons action: Values - integrationConfigId: ${integrationConfigId}, recipientJid: ${recipientJid}, title: ${title}, description: ${description}, buttons: ${JSON.stringify(buttons)}`);

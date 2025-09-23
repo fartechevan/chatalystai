@@ -1,4 +1,6 @@
 import { Avatar } from "@/components/ui/avatar";
+import { File, FileText, FileVideo, FileAudio, Download } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import type { Conversation, Message as MessageType } from "../types";
 // import { useState, useEffect } from "react"; // useEffect and some useState hooks removed
 // import { supabase } from "@/integrations/supabase/client"; // supabase client will be used in parent
@@ -22,23 +24,65 @@ export function MessageItem({ message, conversation, onMediaPreviewRequest }: Me
   
   const isImageMessage = message.media_type === 'image' && message.media_data;
   const isVideoMessage = message.media_type === 'video' && message.media_data;
+  const isAudioMessage = message.media_type === 'audio' && message.media_data;
+  const isDocumentMessage = message.media_type === 'document' && message.media_data;
   const hasCaption = !!message.content;
+
+  const getFileIcon = (mimeType?: string) => {
+    if (!mimeType) return <File className="h-6 w-6" />;
+    if (mimeType.startsWith('image/')) return <FileText className="h-6 w-6" />;
+    if (mimeType.startsWith('video/')) return <FileVideo className="h-6 w-6" />;
+    if (mimeType.startsWith('audio/')) return <FileAudio className="h-6 w-6" />;
+    if (mimeType.includes('text/') || mimeType.includes('document')) return <FileText className="h-6 w-6" />;
+    return <File className="h-6 w-6" />;
+  };
+
+  const handleFileDownload = (url: string, fileName?: string) => {
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = fileName || 'download';
+    link.target = '_blank';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
 
   let mediaThumbnailSrc: string | undefined = undefined;
   let mediaAltText = "Media content";
 
   if (isImageMessage) {
-    const mediaInfo = message.media_data as { jpegThumbnail?: string; mimetype?: string };
-    if (mediaInfo.jpegThumbnail) {
+    const mediaInfo = message.media_data as { 
+      url?: string; 
+      jpegThumbnail?: string; 
+      mimetype?: string; 
+      fileName?: string;
+    };
+    
+    // Priority: Use Supabase Storage URL if available (new system)
+    if (mediaInfo.url) {
+      mediaThumbnailSrc = mediaInfo.url;
+      mediaAltText = mediaInfo.fileName || "Image";
+    }
+    // Fallback: Use base64 thumbnail if available (old system)
+    else if (mediaInfo.jpegThumbnail) {
       mediaThumbnailSrc = `data:${mediaInfo.mimetype || 'image/jpeg'};base64,${mediaInfo.jpegThumbnail}`;
       mediaAltText = "Image thumbnail";
     }
   } else if (isVideoMessage) {
-    // For videos, we might show a play icon or a generic video thumbnail if available
-    // For now, let's just make a clickable area.
-    // Thumbnails for videos might also be in `jpegThumbnail` if provided by Evolution API.
-    const mediaInfo = message.media_data as { jpegThumbnail?: string; mimetype?: string };
-     if (mediaInfo.jpegThumbnail) {
+    const mediaInfo = message.media_data as { 
+      url?: string; 
+      jpegThumbnail?: string; 
+      mimetype?: string; 
+      fileName?: string;
+    };
+    
+    // Priority: Use Supabase Storage URL if available (new system)
+    if (mediaInfo.url) {
+      mediaThumbnailSrc = mediaInfo.url;
+      mediaAltText = mediaInfo.fileName || "Video";
+    }
+    // Fallback: Use base64 thumbnail if available (old system)
+    else if (mediaInfo.jpegThumbnail) {
       mediaThumbnailSrc = `data:${mediaInfo.mimetype || 'image/jpeg'};base64,${mediaInfo.jpegThumbnail}`;
       mediaAltText = "Video thumbnail";
     }
@@ -55,7 +99,7 @@ export function MessageItem({ message, conversation, onMediaPreviewRequest }: Me
   };
 
   const mediaContainerClass = `rounded-lg ${
-    (isImageMessage || isVideoMessage) && !hasCaption && mediaThumbnailSrc ? 'p-0' : 'p-3'
+    (isImageMessage || isVideoMessage || isAudioMessage || isDocumentMessage) && !hasCaption && mediaThumbnailSrc ? 'p-0' : 'p-3'
   } ${isAdmin ? "bg-primary text-primary-foreground" : "bg-muted"}`;
 
   return (
@@ -111,15 +155,67 @@ export function MessageItem({ message, conversation, onMediaPreviewRequest }: Me
               </div>
             )}
             
+            {/* Audio Message */}
+            {isAudioMessage && (
+              <div className={`flex items-center gap-3 p-3 ${hasCaption ? 'mb-1' : ''}`}>
+                <FileAudio className="h-8 w-8 text-muted-foreground" />
+                <div className="flex-1">
+                  <p className="text-sm font-medium">Audio Message</p>
+                  {message.media_data && typeof message.media_data === 'object' && 'fileName' in message.media_data && (
+                    <p className="text-xs text-muted-foreground">{(message.media_data as any).fileName}</p>
+                  )}
+                </div>
+                {message.media_data && typeof message.media_data === 'object' && 'url' in message.media_data && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleFileDownload((message.media_data as any).url, (message.media_data as any).fileName)}
+                  >
+                    <Download className="h-4 w-4" />
+                  </Button>
+                )}
+              </div>
+            )}
+
+            {/* Document Message */}
+            {isDocumentMessage && (
+              <div className={`flex items-center gap-3 p-3 ${hasCaption ? 'mb-1' : ''}`}>
+                {message.media_data && typeof message.media_data === 'object' && 'mimetype' in message.media_data ? (
+                  getFileIcon((message.media_data as any).mimetype)
+                ) : (
+                  <File className="h-8 w-8 text-muted-foreground" />
+                )}
+                <div className="flex-1">
+                  <p className="text-sm font-medium">
+                    {message.media_data && typeof message.media_data === 'object' && 'fileName' in message.media_data 
+                      ? (message.media_data as any).fileName 
+                      : 'Document'}
+                  </p>
+                  {message.media_data && typeof message.media_data === 'object' && 'mimetype' in message.media_data && (
+                    <p className="text-xs text-muted-foreground">{(message.media_data as any).mimetype}</p>
+                  )}
+                </div>
+                {message.media_data && typeof message.media_data === 'object' && 'url' in message.media_data && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => handleFileDownload((message.media_data as any).url, (message.media_data as any).fileName)}
+                  >
+                    <Download className="h-4 w-4" />
+                  </Button>
+                )}
+              </div>
+            )}
+            
             {hasCaption && (
               <p className="text-sm whitespace-pre-wrap mt-1 break-all">{message.content}</p>
             )}
             {/* Fallback for non-media text messages or media without thumbnail/caption */}
-            {!(isImageMessage || isVideoMessage) && !hasCaption && (
+            {!(isImageMessage || isVideoMessage || isAudioMessage || isDocumentMessage) && !hasCaption && (
                  <p className="text-sm whitespace-pre-wrap break-all">{message.content || "[Empty message]"}</p>
             )}
              {/* If it's media but no thumbnail and no caption, show media type */}
-            {(isImageMessage || isVideoMessage) && !mediaThumbnailSrc && !hasCaption && (
+            {(isImageMessage || isVideoMessage || isAudioMessage || isDocumentMessage) && !mediaThumbnailSrc && !hasCaption && (
               <div 
                 className="text-sm p-2 cursor-pointer"
                 onClick={handleMediaClick}

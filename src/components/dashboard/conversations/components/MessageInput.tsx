@@ -1,5 +1,5 @@
 import { useState, useRef, ChangeEvent } from "react"; // Added useRef, ChangeEvent
-import { Loader2, Send, ImagePlus, X } from "lucide-react"; // Removed Plus, Paperclip
+import { Loader2, Send, ImagePlus, X, File, FileText, FileVideo, FileAudio } from "lucide-react"; // Added file type icons
 import { UseMutationResult } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 // Input component from Shadcn is not used in the new structure directly, using raw input
@@ -25,14 +25,14 @@ export function MessageInput({
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null); // For image preview
+  const [filePreviewUrl, setFilePreviewUrl] = useState<string | null>(null); // For image preview
 
   const internalHandleSend = () => {
     if (!newMessage.trim() && !selectedFile) return;
     handleSendMessage(newMessage, selectedFile || undefined);
     // setNewMessage(""); // Parent should handle this if needed after successful send
     setSelectedFile(null);
-    setImagePreviewUrl(null); // Clear preview
+    setFilePreviewUrl(null); // Clear preview
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
@@ -46,24 +46,32 @@ export function MessageInput({
       if (file.type.startsWith("image/")) {
         const reader = new FileReader();
         reader.onloadend = () => {
-          setImagePreviewUrl(reader.result as string);
+          setFilePreviewUrl(reader.result as string);
         };
         reader.readAsDataURL(file);
       } else {
-        setImagePreviewUrl(null); // Not an image, no preview
+        setFilePreviewUrl(null); // Not an image, no preview
       }
     } else {
       setSelectedFile(null);
-      setImagePreviewUrl(null);
+      setFilePreviewUrl(null);
     }
   };
 
   const clearSelectedFile = () => {
     setSelectedFile(null);
-    setImagePreviewUrl(null);
+    setFilePreviewUrl(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
+  };
+
+  const getFileIcon = (mimeType: string) => {
+    if (mimeType.startsWith('image/')) return <ImagePlus className="h-4 w-4" />;
+    if (mimeType.startsWith('video/')) return <FileVideo className="h-4 w-4" />;
+    if (mimeType.startsWith('audio/')) return <FileAudio className="h-4 w-4" />;
+    if (mimeType.includes('text/') || mimeType.includes('document')) return <FileText className="h-4 w-4" />;
+    return <File className="h-4 w-4" />;
   };
 
   const handleAttachmentClick = () => {
@@ -74,26 +82,33 @@ export function MessageInput({
 
   return (
     <div className="border-t p-2 sm:p-3">
-      {/* Image Preview Area */}
-      {imagePreviewUrl && (
-        <div className="relative inline-block mb-2 mr-2 align-bottom"> {/* Added mr-2 and align-bottom */}
-          <img src={imagePreviewUrl} alt="Preview" className="h-16 w-16 object-cover rounded-md border" />
+      {/* File Preview Area */}
+      {filePreviewUrl && (
+        <div className="relative inline-block mb-2 mr-2 align-bottom">
+          <img src={filePreviewUrl} alt="Preview" className="h-16 w-16 object-cover rounded-md border" />
           <Button
             variant="destructive"
-            size="icon"
-            className="absolute -top-2 -right-2 h-5 w-5 rounded-full p-0.5"
+            size="sm"
+            className="absolute -top-2 -right-2 h-5 w-5 rounded-full p-0"
             onClick={clearSelectedFile}
-            aria-label="Remove selected image"
           >
-            <X className="h-3 w-3" /> 
+            <X className="h-3 w-3" />
           </Button>
         </div>
       )}
       {/* Display filename if not an image or no preview */}
-      {!imagePreviewUrl && selectedFile && (
-         <div className="inline-block mb-2 text-sm text-muted-foreground align-bottom"> {/* Added inline-block and align-bottom */}
-            Selected file: {selectedFile.name} 
-            <Button variant="ghost" size="sm" onClick={clearSelectedFile} className="ml-1 h-auto p-0.5 text-xs">Clear</Button>
+      {!filePreviewUrl && selectedFile && (
+        <div className="inline-flex items-center gap-2 mb-2 p-2 bg-muted rounded-md">
+          {getFileIcon(selectedFile.type)}
+          <span className="text-sm text-muted-foreground">{selectedFile.name}</span>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-4 w-4 p-0 ml-auto"
+            onClick={clearSelectedFile}
+          >
+            <X className="h-3 w-3" />
+          </Button>
         </div>
       )}
 
@@ -107,7 +122,7 @@ export function MessageInput({
             className="size-8 sm:size-9 rounded-md lg:inline-flex" // Made always inline-flex like the original ImagePlus was
             type="button"
             onClick={handleAttachmentClick} 
-            aria-label="Add photo"
+            aria-label="Add file"
           >
             <ImagePlus className="h-4 w-4 sm:h-5 sm:w-5 stroke-muted-foreground" />
           </Button>
@@ -117,7 +132,7 @@ export function MessageInput({
             ref={fileInputRef}
             onChange={handleFileChange}
             style={{ display: 'none' }}
-            accept="image/*" // Keep accepting only images as per original intent for this button
+            accept="*/*" // Keep accepting only images as per original intent for this button
           />
           {/* Paperclip button removed */}
         </div>

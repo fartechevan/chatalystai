@@ -4,7 +4,7 @@ export interface SendMediaParams {
   instance: string; // Evolution Instance Name
   integrationId: string; // DB ID from integrations_config, for context/logging if needed by backend
   number: string; // Recipient JID (e.g., xxxxx@c.us)
-  media: string; // Base64 encoded media
+  media: string; // File URL from Supabase Storage (previously base64)
   mimetype: string; // e.g., image/jpeg, image/png
   fileName: string;
   caption?: string; // Optional caption
@@ -28,7 +28,7 @@ export async function sendMediaService(params: SendMediaParams): Promise<SendMed
     action: 'send-media',
     integrationConfigId: integrationId, // Corrected from instanceId to match evolution-api-handler
     recipientJid: number,
-    mediaData: media,
+    mediaData: media, // Changed back to mediaData to match evolution-api-handler expectations
     mimeType: mimetype,
     filename: fileName,
     caption: caption,

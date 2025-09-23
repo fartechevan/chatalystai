@@ -3,15 +3,7 @@ import { sendTextService, SendTextParams, SendTextResponse } from "@/integration
 // Assume a similar service for sending media exists or will be created
 import { sendMediaService, SendMediaParams, SendMediaResponse } from "@/integrations/evolution-api/services/sendMediaService"; // Hypothetical import
 import type { WhatsAppMessageResponse } from "./types"; // Keep response type if still relevant
-
-// Helper to convert file to base64 - should be in a utility file ideally
-const toBase64 = (file: File): Promise<string> =>
-  new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.readAsDataURL(file);
-    reader.onload = () => resolve(reader.result as string);
-    reader.onerror = (error) => reject(error);
-  });
+import { uploadFileToStorage } from "@/services/fileUploadService";
 
 /**
  * Sends a WhatsApp message (text or media) using the Evolution API.
@@ -27,12 +19,21 @@ export async function sendWhatsAppMessage(
     let responseData: SendTextResponse | SendMediaResponse;
 
     if (file) {
-      const base64Media = await toBase64(file);
+      // Upload file to Supabase Storage first
+      const uploadResult = await uploadFileToStorage(file, {
+        folder: 'whatsapp-attachments',
+        fileName: `${Date.now()}-${file.name}`
+      });
+
+      if (!uploadResult.success) {
+        throw new Error(`Failed to upload file: ${uploadResult.error}`);
+      }
+
       const mediaPayload: SendMediaParams = {
         instance: instanceId,
         integrationId: integrationsConfigId, // Pass for context if service needs it
         number: recipientJid,
-        media: base64Media,
+        media: uploadResult.url, // Use the uploaded file URL instead of base64
         mimetype: file.type,
         fileName: file.name,
         caption: message, // Use text message as caption
