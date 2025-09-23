@@ -76,9 +76,7 @@ export function ConversationLeftPanel({
   }
 
   return (
-    <div className={cn("bg-background flex flex-col h-full overflow-hidden", 
-                        "sm:w-56 lg:w-72 2xl:w-80"
-                      )}>
+    <div className={cn("flex flex-col h-full overflow-hidden")}>
       <div className="bg-background sticky top-0 z-10 px-2 pt-3 pb-3 shadow-sm border-b space-y-3">
         <div className="flex items-center justify-between"> 
           <div className="flex items-center gap-2">
