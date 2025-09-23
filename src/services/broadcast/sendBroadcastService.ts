@@ -22,7 +22,7 @@ export interface SendBroadcastParams {
   messageText: string; // Will be caption if media is present
   integrationConfigId: string; // This is integrations_config.id
   instanceId: string;
-  media?: string; // Base64 encoded media
+  media?: string; // File URL from Supabase Storage
   mimetype?: string; // e.g., image/jpeg
   fileName?: string; // e.g., image.jpg
   imageUrl?: string; // Optional image URL (for DB record / UI display)
@@ -67,8 +67,9 @@ export const sendBroadcastService = async (params: SendBroadcastParams): Promise
   });
 
   // Validate required fields
-  if (!targetMode || !messageText || !integrationConfigId || !instanceId || !userId) {
-    throw new Error('Missing required fields: targetMode, messageText, integrationConfigId, instanceId, userId');
+  // messageText is optional if media is present
+  if (!targetMode || !integrationConfigId || !instanceId || !userId || (!messageText && !media)) {
+    throw new Error('Missing required fields: targetMode, messageText (or media), integrationConfigId, instanceId, userId');
   }
 
   // Validate target mode specific requirements

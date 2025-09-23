@@ -21,13 +21,14 @@ import {
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Upload, ListChecks, Users as UsersIcon, X as Cross2Icon } from 'lucide-react'; // Added Cross2Icon for clearing image
+import { Upload, ListChecks, Users as UsersIcon, X as Cross2Icon, FileText } from 'lucide-react'; // Added Cross2Icon for clearing image and FileText for PDF
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useAuthUser } from '@/hooks/useAuthUser';
 import type { Database } from "@/integrations/supabase/types";
 import { sendBroadcastService, type SendBroadcastParams } from '@/services/broadcast/sendBroadcastService';
 import { useWhatsAppBlastLimit } from '@/hooks/useWhatsAppBlastLimit';
+import { uploadFileToStorage } from '@/services/fileUploadService';
 
 type Customer = Database['public']['Tables']['customers']['Row'];
 type Segment = Database['public']['Tables']['segments']['Row'];
@@ -87,6 +88,7 @@ export function BroadcastModal({
   const [selectedImageFile, setSelectedImageFile] = useState<File | null>(null);
   const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const [uploadedFileUrl, setUploadedFileUrl] = useState<string | null>(null);
   const [includeOptOutText, setIncludeOptOutText] = useState(false);
   
   // Use the WhatsApp blast limit hook
@@ -324,8 +326,8 @@ export function BroadcastModal({
       toast({ title: "Error", description: "Please select a segment.", variant: "destructive" });
       return;
     }
-    if (!broadcastMessage.trim()) {
-      toast({ title: "Error", description: "Please enter a message.", variant: "destructive" });
+    if (!uploadedFileUrl) {
+      toast({ title: "Error", description: "Please wait for file upload to complete.", variant: "destructive" });
       return;
     }
     if (!selectedIntegrationId) {
@@ -339,54 +341,29 @@ export function BroadcastModal({
        return;
     }
 
+    if (!userData?.id) {
+      toast({ title: "Error", description: "User not authenticated. Please log in again.", variant: "destructive" });
+      return;
+    }
+
     setIsSending(true);
-    // Removed imageUrl pre-definition and Supabase storage upload logic.
-    // We will now prepare base64 data if an image is selected.
 
     try {
-      let mediaData: string | undefined = undefined;
+      let mediaUrl: string | undefined = undefined;
       let mediaMimeType: string | undefined = undefined;
       let mediaFileName: string | undefined = undefined;
-      const dbImageUrl: string | undefined = undefined; // For storing a URL in DB if needed, separate from sending
 
-      if (selectedImageFile) {
-        setIsUploadingImage(true); // Still use this to indicate processing
-        try {
-          // Convert file to base64
-          const reader = new FileReader();
-          const base64Promise = new Promise<string>((resolve, reject) => {
-            reader.onloadend = () => {
-              if (typeof reader.result === 'string') {
-                resolve(reader.result.split(',')[1]); // Get base64 part
-              } else {
-                reject(new Error("Failed to read file as base64 string."));
-              }
-            };
-            reader.onerror = reject;
-            reader.readAsDataURL(selectedImageFile);
-          });
+      console.log("Preparing commonParams for sendBroadcastService:");
+      console.log("selectedIntegrationId:", selectedIntegrationId);
+      console.log("selectedIntegrationInfo.instanceId:", selectedIntegrationInfo.instanceId);
+      console.log("userData?.id:", userData?.id);
+      console.log("broadcastMessage:", broadcastMessage);
+      console.log("selectedImageFile:", selectedImageFile);
 
-          mediaData = await base64Promise;
-          mediaMimeType = selectedImageFile.type;
-          mediaFileName = selectedImageFile.name;
-          
-          // If you still want to store a public URL for record-keeping or UI display later,
-          // you could upload to Supabase storage here and get `dbImageUrl`.
-          // For now, focusing on direct send. If `imageUrl` was previously used for display
-          // in the broadcast list, this part might need to be re-added or re-thought.
-          // For simplicity of this change, I'm omitting the storage upload.
-          // If a URL is still needed for the `broadcasts` table's `image_url` column,
-          // that upload logic would go here. Let's assume for now it's optional or handled elsewhere.
-
-        } catch (imageProcessingError) {
-          console.error("Error processing image for sending:", imageProcessingError);
-          toast({ title: "Image Processing Failed", description: (imageProcessingError as Error).message, variant: "destructive" });
-          setIsUploadingImage(false);
-          setIsSending(false);
-          return;
-        } finally {
-          setIsUploadingImage(false);
-        }
+      if (selectedImageFile && uploadedFileUrl) {
+        mediaUrl = uploadedFileUrl;
+        mediaMimeType = selectedImageFile.type;
+        mediaFileName = selectedImageFile.name;
       }
 
       let paramsToSend: SendBroadcastParams;
@@ -394,14 +371,26 @@ export function BroadcastModal({
       // Prepend opt-out text to the message if the option is checked
       let finalMessageText = broadcastMessage;
       if (includeOptOutText) {
-        finalMessageText = "If you want to opt out of these marketing messages reply with '0'\n\n" + broadcastMessage;
+        finalMessageText = "If you want to opt out of these marketing messages reply with '0'\n" + finalMessageText;
+      }
+
+      // If a file is selected and the message text is empty, set finalMessageText to null
+      if (selectedImageFile && !finalMessageText.trim()) {
+        finalMessageText = null;
+      }
+
+      // If no message text and no file, prevent sending
+      if (!finalMessageText && !selectedImageFile) {
+        toast({ title: "Error", description: "Please enter a message or attach a file.", variant: "destructive" });
+        setIsSending(false);
+        return;
       }
 
       const commonParams = {
         integrationConfigId: selectedIntegrationId,
         instanceId: selectedIntegrationInfo.instanceId,
-        messageText: finalMessageText, // This will be the caption with opt-out text if enabled
-        media: mediaData,
+        messageText: finalMessageText,
+        media: mediaUrl,
         mimetype: mediaMimeType,
         fileName: mediaFileName,
         includeOptOutButton: !includeOptOutText, // Only include button if opt-out text is NOT checked
@@ -470,31 +459,76 @@ export function BroadcastModal({
     }
   };
 
-  const handleImageChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImageChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
-      if (file.size > 5 * 1024 * 1024) { // 5MB limit
-        toast({ title: "Error", description: "Image size should not exceed 5MB.", variant: "destructive" });
+      // Check file size (5MB limit)
+      if (file.size > 5 * 1024 * 1024) {
+        toast({ title: "Error", description: "File size should not exceed 5MB.", variant: "destructive" });
         setSelectedImageFile(null);
         setImagePreviewUrl(null);
         if (imageFileInputRef.current) imageFileInputRef.current.value = '';
         return;
       }
+      
+      // Check file type
+      const allowedImageTypes = ['image/png', 'image/jpeg', 'image/gif', 'image/webp']; // Added webp
+      const allowedDocumentTypes = ['application/pdf'];
+      const isImage = file.type.startsWith('image/');
+      const isPdf = file.type === 'application/pdf';
+
+      if (!isImage && !isPdf) {
+        toast({ title: "Error", description: "Only image (PNG, JPEG, GIF, WEBP) or PDF files are supported.", variant: "destructive" });
+        setSelectedImageFile(null);
+        setImagePreviewUrl(null);
+        if (imageFileInputRef.current) imageFileInputRef.current.value = '';
+        return;
+      }
+      
       setSelectedImageFile(file);
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setImagePreviewUrl(reader.result as string);
-      };
-      reader.readAsDataURL(file);
+      
+      // Only create preview for images, not PDFs
+      if (file.type.startsWith('image/')) {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+          setImagePreviewUrl(reader.result as string);
+        };
+        reader.readAsDataURL(file);
+      } else {
+        // For PDFs, clear the preview URL since we can't preview them
+        setImagePreviewUrl(null);
+      }
+
+      // Upload file to Supabase Storage
+       setIsUploadingImage(true);
+       try {
+         const uploadResult = await uploadFileToStorage(file);
+         if (uploadResult.success && uploadResult.url) {
+           setUploadedFileUrl(uploadResult.url);
+           toast({ title: "Success", description: "File uploaded successfully" });
+         } else {
+           throw new Error(uploadResult.error || 'Upload failed');
+         }
+       } catch (error) {
+         console.error('Error uploading file:', error);
+         toast({ title: "Error", description: "Failed to upload file", variant: "destructive" });
+         // Clear the file selection on upload error
+         setSelectedImageFile(null);
+         setImagePreviewUrl(null);
+         if (imageFileInputRef.current) imageFileInputRef.current.value = '';
+       } finally {
+         setIsUploadingImage(false);
+       }
     } else {
       setSelectedImageFile(null);
       setImagePreviewUrl(null);
     }
   };
 
-  const clearImageSelection = () => {
+  const clearSelectedImage = () => {
     setSelectedImageFile(null);
     setImagePreviewUrl(null);
+    setUploadedFileUrl(null);
     if (imageFileInputRef.current) {
       imageFileInputRef.current.value = '';
     }
@@ -928,38 +962,55 @@ export function BroadcastModal({
               )}
             </div>
 
-            <Textarea
-              placeholder="Type your broadcast message here..."
-              value={broadcastMessage}
-              onChange={(e) => setBroadcastMessage(e.target.value)}
-              rows={6}
-            />
-
             <div className="mt-4">
-              <Label htmlFor="broadcast-image">Attach Image (Optional, Max 5MB)</Label>
+              <Label htmlFor="broadcast-file">Attach File (Max 5MB) - Images or PDFs</Label>
               <Input
-                id="broadcast-image"
+                id="broadcast-file"
                 type="file"
-                accept="image/png, image/jpeg, image/gif"
+                accept="image/*, application/pdf" // Loosen image to all image types, keep PDF
                 onChange={handleImageChange}
                 className="mt-1"
                 ref={imageFileInputRef}
                 disabled={isSending || isUploadingImage}
               />
-              {imagePreviewUrl && (
-                <div className="mt-2 relative w-fit"> {/* w-fit to contain button correctly */}
-                  <img src={imagePreviewUrl} alt="Preview" className="max-h-40 rounded border" />
+              {(imagePreviewUrl || selectedImageFile) && (
+                <div className="mt-2 relative w-fit">
+                  {imagePreviewUrl ? (
+                    // Show image preview for image files
+                    <img src={imagePreviewUrl} alt="Preview" className="max-h-40 rounded border" />
+                  ) : (
+                    // Show PDF indicator for PDF files
+                    <div className="flex items-center gap-2 p-3 border rounded bg-gray-50">
+                      <FileText className="h-8 w-8 text-gray-600" />
+                      <div>
+                        <p className="text-sm font-medium">{selectedImageFile?.name}</p>
+                        <p className="text-xs text-gray-500">PDF Document</p>
+                      </div>
+                    </div>
+                  )}
                   <Button
                     variant="ghost"
-                    size="icon" // Made it an icon button for better fit
-                    className="absolute top-1 right-1 bg-white/70 hover:bg-white h-6 w-6 p-1" // Adjusted size and padding
-                    onClick={clearImageSelection}
+                    size="icon"
+                    className="absolute top-1 right-1 bg-white/70 hover:bg-white h-6 w-6 p-1"
+                    onClick={clearSelectedImage}
                     disabled={isSending || isUploadingImage}
                   >
                     <Cross2Icon className="h-4 w-4" />
                   </Button>
                 </div>
               )}
+            </div>
+
+            <div className="mt-4">
+              <Label htmlFor="broadcast-message">Broadcast Message</Label>
+              <Textarea
+                id="broadcast-message"
+                placeholder="Type your broadcast message here..."
+                value={broadcastMessage}
+                onChange={(e) => setBroadcastMessage(e.target.value)}
+                className="mt-1 min-h-[100px]"
+                disabled={isSending}
+              />
             </div>
 
             {/* Opt-out Text Toggle */}
@@ -1033,7 +1084,7 @@ export function BroadcastModal({
               <Button variant="outline" onClick={handleBack} disabled={isSending}>Back</Button>
               <Button
                 onClick={handleSend}
-                disabled={!broadcastMessage.trim() || !selectedIntegrationId || isLoadingIntegrations || isSending || isUploadingImage}
+                disabled={(!broadcastMessage.trim() && !selectedImageFile) || !selectedIntegrationId || isLoadingIntegrations || isSending || isUploadingImage}
               >
                 {isSending ? 'Sending...' : isUploadingImage ? 'Uploading...' : 'Send'}
               </Button>

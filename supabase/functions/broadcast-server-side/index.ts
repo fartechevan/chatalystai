@@ -97,13 +97,31 @@ async function sendMessage(params: {
   let payload: any;
   
   if (media && mimetype && fileName) {
+    // Determine message type based on mimetype
+    let messageType = 'document'; // Default to document
+    if (mimetype.startsWith('image/')) {
+      messageType = 'image';
+    } else if (mimetype.startsWith('video/')) {
+      messageType = 'video';
+    } else if (mimetype.startsWith('audio/')) {
+      messageType = 'audio';
+    }
+    
+    // Prepare media data - now it's a file URL from Supabase Storage
+    let mediaData = media;
+    
     // Send media message
     payload = {
       integration_config_id: integrationConfigId,
       recipient_identifier: number,
-      message_type: 'image', // Assuming image for now, could be dynamic based on mimetype
+      message_type: messageType,
       message_content: messageText, // Caption for media
-      media_url: media,
+      media_url: mediaData, // File URL from Supabase Storage
+      media_details: {
+        url: mediaData,
+        mimetype: mimetype,
+        fileName: fileName
+      },
       auth_user_id_override: userId
     };
   } else {
@@ -166,10 +184,22 @@ serve(async (req: Request) => {
     } = params;
     
     // Validate required fields
-    if (!targetMode || !messageText || !integrationConfigId || !instanceId || !userId) {
+    // messageText is optional if media is present
+    const hasMessageText = messageText !== null && messageText !== undefined && messageText.trim() !== '';
+    if (!targetMode || !integrationConfigId || !instanceId || !userId || (!hasMessageText && !media)) {
+      console.log('Validation failed:', {
+        targetMode: !!targetMode,
+        integrationConfigId: !!integrationConfigId,
+        instanceId: !!instanceId,
+        userId: !!userId,
+        messageText: messageText,
+        hasMessageText: hasMessageText,
+        media: !!media,
+        hasMessageOrMedia: !!(messageText || media)
+      });
       return new Response(
         JSON.stringify({ 
-          error: 'Missing required fields: targetMode, messageText, integrationConfigId, instanceId, userId' 
+          error: 'Missing required fields: targetMode, messageText (or media), integrationConfigId, instanceId, userId' 
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
       );
@@ -396,17 +426,18 @@ serve(async (req: Request) => {
         const errorMessage = error instanceof Error ? error.message : String(error);
         updatePayload = { status: 'failed', error_message: errorMessage, sent_at: null };
         console.error(`Failed to send to ${number}:`, errorMessage);
-      }
-      
-      if (recipientRecordId) {
-        try {
-          const { error: updateError } = await supabase
-            .from('broadcast_recipients')
-            .update(updatePayload)
-            .eq('id', recipientRecordId);
-          if (updateError) {
-            console.error(`Failed to update status for recipient ${recipientRecordId} (${number}): ${updateError.message}`);
-          }
+    }
+    
+    // Validate required fields
+    // messageText is optional if media is present
+    if (!targetMode || !integrationConfigId || !instanceId || !userId || (!messageText && !media)) {
+      return new Response(
+        JSON.stringify({ 
+          error: 'Missing required fields: targetMode, messageText (or media), integrationConfigId, instanceId, userId' 
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
+      );
+    }
         } catch (dbUpdateError) {
           console.error(`Database error updating status for recipient ${recipientRecordId}:`, dbUpdateError);
         }
