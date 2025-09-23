@@ -282,6 +282,37 @@ const BroadcastListView = () => {
   const handleViewDetails = (broadcastId: string) => {
     navigate(`/dashboard/broadcasts/${broadcastId}`);
   };
+
+  // Function to refresh broadcast data
+  const refreshBroadcastData = async () => {
+    setIsLoading(true);
+    setError(null);
+    try {
+      const filters = { status: statusFilter };
+      const { data, totalCount: fetchedTotalCount } = await fetchBroadcastsFromAPI(page, pageSize, searchTerm, filters);
+      setBroadcasts(data);
+      setTotalCount(fetchedTotalCount);
+    } catch (err) {
+      console.error("Error refreshing broadcasts:", err);
+      let message = "Failed to refresh broadcasts.";
+      if (err instanceof Error) {
+        message = err.message;
+      } else if (typeof err === 'string') {
+        message = err;
+      }
+      setError(message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Combined callback for when broadcast is sent
+  const handleBroadcastSent = async () => {
+    // Refresh blast limit information
+    await refetchBlastLimit();
+    // Refresh broadcast listing to show the new broadcast
+    await refreshBroadcastData();
+  };
   
   const pageCount = Math.ceil(totalCount / pageSize);
 
@@ -434,7 +465,7 @@ const BroadcastListView = () => {
         isOpen={isModalOpen}
         onClose={handleCloseModal}
         initialMessage={messageToDuplicate ?? undefined}
-        onBroadcastSent={refetchBlastLimit} // Refresh blast limit when a broadcast is sent
+        onBroadcastSent={handleBroadcastSent} // Refresh both blast limit and broadcast listing when a broadcast is sent
       />
     </div>
   );
