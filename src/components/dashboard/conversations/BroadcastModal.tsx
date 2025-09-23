@@ -21,17 +21,20 @@ import {
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
-import { Upload, ListChecks, Users as UsersIcon, X as Cross2Icon, FileText } from 'lucide-react'; // Added Cross2Icon for clearing image and FileText for PDF
+import { Upload, ListChecks, Users as UsersIcon, X as Cross2Icon, FileText, ImagePlus, Loader2 } from 'lucide-react';
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useAuthUser } from '@/hooks/useAuthUser';
 import type { Database } from "@/integrations/supabase/types";
 import { sendBroadcastService, type SendBroadcastParams } from '@/services/broadcast/sendBroadcastService';
 import { useWhatsAppBlastLimit } from '@/hooks/useWhatsAppBlastLimit';
-import { uploadFileToStorage } from '@/services/fileUploadService';
 
 type Customer = Database['public']['Tables']['customers']['Row'];
 type Segment = Database['public']['Tables']['segments']['Row'];
+
+interface SegmentWithMemberCount extends Segment {
+  member_count?: number;
+}
 
 interface IntegrationInstanceInfo {
   configId: string;         // PK of integrations_config table
@@ -63,7 +66,7 @@ export function BroadcastModal({
   const [selectedCustomers, setSelectedCustomers] = useState<string[]>([]);
   const [isLoadingCustomers, setIsLoadingCustomers] = useState(false);
 
-  const [availableSegments, setAvailableSegments] = useState<Segment[]>([]);
+  const [availableSegments, setAvailableSegments] = useState<SegmentWithMemberCount[]>([]);
   const [selectedSegmentId, setSelectedSegmentId] = useState<string>('');
   const [isLoadingSegments, setIsLoadingSegments] = useState(false);
 
@@ -85,17 +88,16 @@ export function BroadcastModal({
   const [selectedIntegrationId, setSelectedIntegrationId] = useState<string>(''); // This will now store configId
   const [isLoadingIntegrations, setIsLoadingIntegrations] = useState(false);
 
-  const [selectedImageFile, setSelectedImageFile] = useState<File | null>(null);
-  const [imagePreviewUrl, setImagePreviewUrl] = useState<string | null>(null);
-  const [isUploadingImage, setIsUploadingImage] = useState(false);
-  const [uploadedFileUrl, setUploadedFileUrl] = useState<string | null>(null);
+  // File handling states - matching MessageInput.tsx exactly
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [filePreviewUrl, setFilePreviewUrl] = useState<string | null>(null);
   const [includeOptOutText, setIncludeOptOutText] = useState(false);
   
   // Use the WhatsApp blast limit hook
   const { blastLimitInfo, isLoading: isLoadingBlastLimit, refetchBlastLimit } = useWhatsAppBlastLimit();
 
   const fileInputRef = useRef<HTMLInputElement>(null); // For CSV
-  const imageFileInputRef = useRef<HTMLInputElement>(null); // For Image
+  const fileAttachmentInputRef = useRef<HTMLInputElement>(null); // For file attachments
 
   useEffect(() => {
     if (isOpen) {
@@ -124,12 +126,11 @@ export function BroadcastModal({
       setAvailableIntegrations([]);
       setIsLoadingIntegrations(false);
 
-      // Reset image states
-      setSelectedImageFile(null);
-      setImagePreviewUrl(null);
-      setIsUploadingImage(false);
-      if (imageFileInputRef.current) {
-        imageFileInputRef.current.value = '';
+      // Reset file states
+      setSelectedFile(null);
+      setFilePreviewUrl(null);
+      if (fileAttachmentInputRef.current) {
+        fileAttachmentInputRef.current.value = '';
       }
     } else {
       setBroadcastMessage('');
@@ -160,12 +161,23 @@ export function BroadcastModal({
       const fetchSegments = async () => {
         setIsLoadingSegments(true);
         try {
-          const { data, error } = await supabase.functions.invoke('segment-handler/segments', { method: 'GET' });
+          // Fetch segments with member count calculated from segment_contacts
+          const { data, error } = await supabase
+            .from('segments')
+            .select(`
+              *,
+              segment_contacts(count)
+            `);
+          
           if (error) throw error;
-          setAvailableSegments((data as Segment[]) || []);
-          if (!data || data.length === 0) {
-            setSelectedSegmentId('');
-          }
+          
+          // Transform the data to include member_count
+          const segmentsWithCount = (data || []).map(segment => ({
+            ...segment,
+            member_count: segment.segment_contacts?.[0]?.count || 0
+          }));
+          
+          setAvailableSegments(segmentsWithCount);
         } catch (error) {
           console.error("Error fetching segments:", error);
           toast({ title: "Error", description: "Could not load segments.", variant: "destructive" });
@@ -177,59 +189,32 @@ export function BroadcastModal({
     }
   }, [isOpen, step, targetMode, toast]);
 
-
   useEffect(() => {
-    if (isOpen && step === 'composeMessage' && availableIntegrations.length === 0) {
-       const fetchIntegrations = async () => {
+    if (isOpen && step === 'composeMessage') {
+      const fetchIntegrations = async () => {
         setIsLoadingIntegrations(true);
         try {
-          const { data: integrationsData, error: integrationsError } = await supabase
-            .from('integrations')
-            .select('id, name');
-          if (integrationsError) throw integrationsError;
-          if (!integrationsData) throw new Error("No integrations found.");
-
-          const { data: configsDataFull, error: configsError } = await supabase
+          const { data, error } = await supabase
             .from('integrations_config')
-            .select('id, integration_id, instance_id, instance_display_name');
-          if (configsError) throw configsError;
-          if (!configsDataFull) throw new Error("No integration configurations found.");
+            .select(`
+              id, 
+              instance_id, 
+              instance_display_name,
+              integrations!inner(name)
+            `)
+            .eq('integrations.name', 'WhatsApp Web');
 
-          const finalDisplayIntegrations: IntegrationInstanceInfo[] = configsDataFull
-            .map(config => {
-              const baseIntegration = integrationsData.find(integ => integ.id === config.integration_id);
+          if (error) throw error;
 
-              if (!baseIntegration || !baseIntegration.name || !config.id || !config.instance_id) {
-                console.warn(`Skipping config with id ${config.id} (integration_id: ${config.integration_id}) due to missing base integration, name, instance_id, or its own id.`);
-                return null;
-              }
+          const integrationInfos: IntegrationInstanceInfo[] = (data || []).map(item => ({
+            configId: item.id,
+            instanceId: item.instance_id,
+            name: item.instance_display_name || `Instance ${item.instance_id}`
+          }));
 
-              return {
-                configId: config.id,
-                instanceId: config.instance_id,
-                name: config.instance_display_name || baseIntegration.name || `Instance ${config.instance_id}`,
-              };
-            })
-            .filter(item => item !== null) as IntegrationInstanceInfo[];
-
-          if (finalDisplayIntegrations.length === 0) {
-             console.warn("No integrations_config entries with valid configurations found to display.");
-             toast({
-                title: "No Integrations Available",
-                description: "No integration configurations found for sending broadcasts. Please check your setup.",
-                variant: "default",
-             });
-          }
-
-          setAvailableIntegrations(finalDisplayIntegrations);
-          if (finalDisplayIntegrations.length > 0) {
-            setSelectedIntegrationId(finalDisplayIntegrations[0].configId);
-          } else {
-             setSelectedIntegrationId('');
-          }
-
+          setAvailableIntegrations(integrationInfos);
         } catch (error) {
-          console.error("Error fetching integrations/configs:", error);
+          console.error("Error fetching integrations:", error);
           toast({ title: "Error", description: "Could not load integrations.", variant: "destructive" });
         } finally {
           setIsLoadingIntegrations(false);
@@ -237,112 +222,16 @@ export function BroadcastModal({
       };
       fetchIntegrations();
     }
-  }, [isOpen, step, availableIntegrations.length, toast]);
+  }, [isOpen, step, toast]);
 
-  const handleSelectCustomer = (customerId: string) => {
-    // If blast limit is reached (remaining = 0), don't allow any selection
-    if (blastLimitInfo && blastLimitInfo.remaining <= 0) {
-      toast({ 
-        title: "WhatsApp Blast Limit Reached", 
-        description: `You've reached the daily limit of ${blastLimitInfo.limit} messages. Try again tomorrow.`, 
-        variant: "destructive" 
-      });
-      return;
-    }
-    
-    setSelectedCustomers(prevSelected => {
-      // If customer is already selected, remove them
-      if (prevSelected.includes(customerId)) {
-        return prevSelected.filter(id => id !== customerId);
-      }
-      
-      // Check if customer selection limit is reached before adding
-      if (prevSelected.length >= 200) {
-        toast({ 
-          title: "Selection Limit Reached", 
-          description: "You can select a maximum of 200 customers for a broadcast.", 
-          variant: "destructive" 
-        });
-        return prevSelected;
-      }
-      
-      // Check if WhatsApp blast limit would be exceeded
-      if (blastLimitInfo && prevSelected.length + 1 > blastLimitInfo.remaining) {
-        toast({ 
-          title: "WhatsApp Blast Limit Reached", 
-          description: `You can only send ${blastLimitInfo.remaining} more messages today. You've already selected ${prevSelected.length} customers.`, 
-          variant: "destructive" 
-        });
-        return prevSelected;
-      }
-      
-      // Add the customer if under both limits
-      return [...prevSelected, customerId];
-    });
-  };
-
-  const handleNext = () => {
-    // Check if blast limit is reached
-    if (blastLimitInfo && blastLimitInfo.remaining <= 0) {
-      toast({ 
-        title: "WhatsApp Blast Limit Reached", 
-        description: `You've reached the daily limit of ${blastLimitInfo.limit} messages. Try again tomorrow.`, 
-        variant: "destructive" 
-      });
-      return;
-    }
-    
-    if (targetMode === 'customers' && selectedCustomers.length === 0) {
-       toast({ title: "Error", description: "Please select at least one customer or import a CSV.", variant: "destructive" });
-       return;
-    }
-    if (targetMode === 'segment' && !selectedSegmentId) {
-       toast({ title: "Error", description: "Please select a target segment.", variant: "destructive" });
-       return;
-    }
-    setStep('composeMessage');
-  };
-
-  const handleBack = () => {
-    setStep('selectTarget');
-  };
-
-  const handleSend = async () => {
-    // Check if blast limit is reached
-    if (blastLimitInfo && blastLimitInfo.remaining <= 0) {
-      toast({ 
-        title: "WhatsApp Blast Limit Reached", 
-        description: `You've reached the daily limit of ${blastLimitInfo.limit} messages. Try again tomorrow.`, 
-        variant: "destructive" 
-      });
-      return;
-    }
-    
-    if (targetMode === 'customers' && selectedCustomers.length === 0) {
-      toast({ title: "Error", description: "Please select customers or import a CSV.", variant: "destructive" });
-      return;
-    }
-     if (targetMode === 'segment' && !selectedSegmentId) {
-      toast({ title: "Error", description: "Please select a segment.", variant: "destructive" });
-      return;
-    }
-    if (!uploadedFileUrl) {
-      toast({ title: "Error", description: "Please wait for file upload to complete.", variant: "destructive" });
-      return;
-    }
+  const handleSendBroadcast = async () => {
     if (!selectedIntegrationId) {
       toast({ title: "Error", description: "Please select an integration.", variant: "destructive" });
       return;
     }
 
-    const selectedIntegrationInfo = availableIntegrations.find(int => int.configId === selectedIntegrationId);
-    if (!selectedIntegrationInfo || !selectedIntegrationInfo.instanceId) {
-       toast({ title: "Error", description: "Selected integration is missing configuration.", variant: "destructive" });
-       return;
-    }
-
-    if (!userData?.id) {
-      toast({ title: "Error", description: "User not authenticated. Please log in again.", variant: "destructive" });
+    if (!broadcastMessage.trim() && !selectedFile) {
+      toast({ title: "Error", description: "Please enter a message or attach a file.", variant: "destructive" });
       return;
     }
 
@@ -350,195 +239,143 @@ export function BroadcastModal({
 
     try {
       let mediaUrl: string | undefined = undefined;
-      let mediaMimeType: string | undefined = undefined;
-      let mediaFileName: string | undefined = undefined;
 
-      console.log("Preparing commonParams for sendBroadcastService:");
-      console.log("selectedIntegrationId:", selectedIntegrationId);
-      console.log("selectedIntegrationInfo.instanceId:", selectedIntegrationInfo.instanceId);
-      console.log("userData?.id:", userData?.id);
-      console.log("broadcastMessage:", broadcastMessage);
-      console.log("selectedImageFile:", selectedImageFile);
+      // 1. Upload file to Supabase Storage if selected
+      if (selectedFile) {
+        const fileExt = selectedFile.name.split('.').pop();
+        const fileName = `${Date.now()}.${fileExt}`;
+        // Use the specified path: assets/whatsapp-attachments/<user-id>/<filename>
+        const filePath = `whatsapp-attachments/${userData?.id}/${fileName}`;
 
-      if (selectedImageFile && uploadedFileUrl) {
-        mediaUrl = uploadedFileUrl;
-        mediaMimeType = selectedImageFile.type;
-        mediaFileName = selectedImageFile.name;
+        toast({ title: "Uploading file...", description: "Please wait." });
+
+        const { error: uploadError } = await supabase.storage
+          .from('assets') // Use the 'assets' bucket
+          .upload(filePath, selectedFile);
+
+        if (uploadError) {
+          throw new Error(`File upload failed: ${uploadError.message}`);
+        }
+
+        // 2. Get the public URL of the uploaded file
+        const { data: publicUrlData } = supabase.storage
+          .from('assets')
+          .getPublicUrl(filePath);
+
+        if (!publicUrlData?.publicUrl) {
+          throw new Error("Could not get public URL for the uploaded file.");
+        }
+        
+        mediaUrl = publicUrlData.publicUrl;
+        toast({ title: "File uploaded successfully." });
+      }
+
+      const selectedIntegrationInfo = availableIntegrations.find(
+        integration => integration.configId === selectedIntegrationId
+      );
+
+      if (!selectedIntegrationInfo) {
+        throw new Error("Selected integration not found");
       }
 
       let paramsToSend: SendBroadcastParams;
 
-      // Prepend opt-out text to the message if the option is checked
-      let finalMessageText = broadcastMessage;
+      let finalMessageText: string | null = broadcastMessage;
       if (includeOptOutText) {
         finalMessageText = "If you want to opt out of these marketing messages reply with '0'\n" + finalMessageText;
       }
 
-      // If a file is selected and the message text is empty, set finalMessageText to null
-      if (selectedImageFile && !finalMessageText.trim()) {
+      if (selectedFile && !finalMessageText.trim()) {
         finalMessageText = null;
       }
 
-      // If no message text and no file, prevent sending
-      if (!finalMessageText && !selectedImageFile) {
+      if (!finalMessageText && !selectedFile) {
         toast({ title: "Error", description: "Please enter a message or attach a file.", variant: "destructive" });
         setIsSending(false);
         return;
       }
 
+      // 3. Use the public mediaUrl instead of a blob URL
       const commonParams = {
+        targetMode,
+        messageText: finalMessageText,
         integrationConfigId: selectedIntegrationId,
         instanceId: selectedIntegrationInfo.instanceId,
-        messageText: finalMessageText,
-        media: mediaUrl,
-        mimetype: mediaMimeType,
-        fileName: mediaFileName,
-        includeOptOutButton: !includeOptOutText, // Only include button if opt-out text is NOT checked
-        userId: userData?.id || '', // Add user ID for authentication
+        media: mediaUrl, // Use the public URL from storage
+        mimetype: selectedFile?.type,
+        fileName: selectedFile?.name,
+        userId: userData?.id || '',
       };
 
-      if (targetMode === 'segment') {
-        paramsToSend = {
-          targetMode: 'segment',
-          segmentId: selectedSegmentId,
-          ...commonParams,
-        };
-      } else if (targetMode === 'customers') {
-        paramsToSend = {
-          targetMode: 'customers',
-          customerIds: selectedCustomers,
-          ...commonParams,
-        };
-      } else { // CSV
-        if (csvRecipients.length === 0) {
-          toast({ title: "Error", description: "No recipients found from CSV.", variant: "destructive" });
-          setIsSending(false);
-          return;
-        }
-        paramsToSend = {
-          targetMode: 'csv',
-          phoneNumbers: csvRecipients,
-          ...commonParams,
-        };
+      if (targetMode === 'customers') {
+        if (selectedCustomers.length === 0) throw new Error("Please select at least one customer.");
+        paramsToSend = { ...commonParams, customerIds: selectedCustomers };
+      } else if (targetMode === 'segment') {
+        if (!selectedSegmentId) throw new Error("Please select a segment.");
+        paramsToSend = { ...commonParams, segmentId: selectedSegmentId };
+      } else if (targetMode === 'csv') {
+        if (csvRecipients.length === 0) throw new Error("Please import a CSV file with recipients.");
+        const allRecipientIds = [...existingContactIdsFromCsv, ...addedCustomerIdsFromCsv];
+        if (allRecipientIds.length === 0) throw new Error("No valid recipients found from CSV.");
+        paramsToSend = { ...commonParams, phoneNumbers: csvRecipients };
+      } else {
+        throw new Error("Invalid target mode");
       }
+
+      console.log("Final paramsToSend:", paramsToSend);
 
       const result = await sendBroadcastService(paramsToSend);
-      const { successfulSends, failedSends, totalAttempted, broadcastId } = result;
 
-      if (failedSends > 0) {
-        toast({
-          title: "Broadcast Partially Failed",
-          description: `${failedSends} out of ${totalAttempted} messages failed. Broadcast ID: ${broadcastId}. Check server logs.`,
-          variant: "destructive",
-        });
+      if (result.broadcastId) {
+        toast({ title: "Success", description: `Broadcast sent successfully to ${result.successfulSends} recipients.` });
+        onBroadcastSent?.();
+        onClose();
+        refetchBlastLimit();
       } else {
-        toast({
-          title: "Broadcast Sent Successfully",
-          description: `Message sent to ${successfulSends} recipient(s). Broadcast ID: ${broadcastId}.`,
-        });
-        
-        // Refresh the blast limit information after successful broadcast
-        await refetchBlastLimit();
-        
-        // Call the onBroadcastSent callback if provided
-        if (onBroadcastSent) {
-          onBroadcastSent();
-        }
+        throw new Error('Failed to send broadcast');
       }
-    } catch (error: unknown) {
-      const errorMessage = error instanceof Error ? error.message : "An unknown error occurred.";
-      console.error("Error sending broadcast:", errorMessage);
-      toast({
-        title: "Broadcast Failed",
-        description: errorMessage,
-        variant: "destructive",
+    } catch (error) {
+      console.error("Error sending broadcast:", error);
+      toast({ 
+        title: "Error", 
+        description: error instanceof Error ? error.message : "Failed to send broadcast.", 
+        variant: "destructive" 
       });
     } finally {
       setIsSending(false);
-      onClose();
     }
   };
 
-  const handleImageChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
+  // File handling functions - matching MessageInput.tsx exactly
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
     if (file) {
-      // Check file size (5MB limit)
-      if (file.size > 5 * 1024 * 1024) {
-        toast({ title: "Error", description: "File size should not exceed 5MB.", variant: "destructive" });
-        setSelectedImageFile(null);
-        setImagePreviewUrl(null);
-        if (imageFileInputRef.current) imageFileInputRef.current.value = '';
-        return;
-      }
-      
-      // Check file type
-      const allowedImageTypes = ['image/png', 'image/jpeg', 'image/gif', 'image/webp']; // Added webp
-      const allowedDocumentTypes = ['application/pdf'];
-      const isImage = file.type.startsWith('image/');
-      const isPdf = file.type === 'application/pdf';
-
-      if (!isImage && !isPdf) {
-        toast({ title: "Error", description: "Only image (PNG, JPEG, GIF, WEBP) or PDF files are supported.", variant: "destructive" });
-        setSelectedImageFile(null);
-        setImagePreviewUrl(null);
-        if (imageFileInputRef.current) imageFileInputRef.current.value = '';
-        return;
-      }
-      
-      setSelectedImageFile(file);
-      
-      // Only create preview for images, not PDFs
-      if (file.type.startsWith('image/')) {
+      setSelectedFile(file);
+      // Generate a preview URL for images
+      if (file.type.startsWith("image/")) {
         const reader = new FileReader();
         reader.onloadend = () => {
-          setImagePreviewUrl(reader.result as string);
+          setFilePreviewUrl(reader.result as string);
         };
         reader.readAsDataURL(file);
       } else {
-        // For PDFs, clear the preview URL since we can't preview them
-        setImagePreviewUrl(null);
+        setFilePreviewUrl(null);
       }
-
-      // Upload file to Supabase Storage
-       setIsUploadingImage(true);
-       try {
-         const uploadResult = await uploadFileToStorage(file);
-         if (uploadResult.success && uploadResult.url) {
-           setUploadedFileUrl(uploadResult.url);
-           toast({ title: "Success", description: "File uploaded successfully" });
-         } else {
-           throw new Error(uploadResult.error || 'Upload failed');
-         }
-       } catch (error) {
-         console.error('Error uploading file:', error);
-         toast({ title: "Error", description: "Failed to upload file", variant: "destructive" });
-         // Clear the file selection on upload error
-         setSelectedImageFile(null);
-         setImagePreviewUrl(null);
-         if (imageFileInputRef.current) imageFileInputRef.current.value = '';
-       } finally {
-         setIsUploadingImage(false);
-       }
     } else {
-      setSelectedImageFile(null);
-      setImagePreviewUrl(null);
+      setSelectedFile(null);
+      setFilePreviewUrl(null);
     }
   };
 
-  const clearSelectedImage = () => {
-    setSelectedImageFile(null);
-    setImagePreviewUrl(null);
-    setUploadedFileUrl(null);
-    if (imageFileInputRef.current) {
-      imageFileInputRef.current.value = '';
+  const clearSelectedFile = () => {
+    setSelectedFile(null);
+    setFilePreviewUrl(null);
+    if (fileAttachmentInputRef.current) {
+      fileAttachmentInputRef.current.value = '';
     }
   };
 
-  const handleImportClick = () => {
-    fileInputRef.current?.click();
-  };
-
-  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleCsvFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (!file || targetMode !== 'csv') return;
 
@@ -599,362 +436,392 @@ export function BroadcastModal({
             toast({ title: "Check Complete", description: resultMessage });
             setShowAddContactsPrompt(false);
           }
-        } else { 
-            toast({ title: "Check Complete", description: resultMessage });
-            setShowAddContactsPrompt(false);
+        } else {
+          toast({ title: "Check Complete", description: resultMessage });
+          setShowAddContactsPrompt(false);
         }
-
-      } catch (err) { 
-         const message = err instanceof Error ? err.message : "Failed to check contacts against database.";
-         console.error("Error checking CSV contacts:", err);
-         toast({ title: "Database Check Error", description: message, variant: "destructive" });
-         setCsvFileName(null);
-         setCsvRecipients([]);
-         setNewContactsFromCsv([]);
-         setExistingContactIdsFromCsv([]);
-         setAddedCustomerIdsFromCsv([]);
-         setShowAddContactsPrompt(false);
-         setShowCreateSegmentPrompt(false);
-         checkError = err instanceof Error ? err : new Error(message); 
+      } catch (error) {
+        console.error('Error checking CSV contacts:', error);
+        toast({ title: "Error", description: `Failed to check contacts: ${error instanceof Error ? error.message : 'Unknown error'}`, variant: "destructive" });
+        setExistingContactIdsFromCsv([]);
+        setNewContactsFromCsv([]);
+        setShowAddContactsPrompt(false);
       }
-
     } catch (error) {
-       if (!checkError && error instanceof Error) {
-         checkError = error;
-       } else if (!checkError) {
-         checkError = new Error("An unknown error occurred during CSV processing.");
-       }
-      const message = error instanceof Error ? error.message : "Failed to process CSV file.";
-      console.error("Error processing CSV:", error);
-      toast({ title: "Import Error", description: message, variant: "destructive" });
-      setCsvFileName(null);
+      console.error('Error processing CSV:', error);
+      toast({ title: "Error", description: `Failed to process CSV: ${error instanceof Error ? error.message : 'Unknown error'}`, variant: "destructive" });
       setCsvRecipients([]);
+      setCsvFileName(null);
+      setExistingContactIdsFromCsv([]);
+      setNewContactsFromCsv([]);
+      setShowAddContactsPrompt(false);
     } finally {
       setIsProcessingCsv(false);
-      if (uniquePhoneNumbers.length > 0 && checkError === null) {
-        setShowCreateSegmentPrompt(true);
-      } else {
-        setShowCreateSegmentPrompt(false);
-      }
     }
   };
 
-  const handleAddNewContacts = async () => {
+  const handleImportClick = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleAddContacts = async () => {
     if (newContactsFromCsv.length === 0) return;
+
     setIsAddingContacts(true);
     try {
-      const contactsToAdd = newContactsFromCsv.map(phone => ({ phone_number: phone }));
-      const { data, error } = await supabase.functions.invoke<{ addedCount: number, newCustomerIds: string[] }>('add-new-customers', {
-        body: { newContacts: contactsToAdd },
+      const { data: addResult, error: addError } = await supabase.functions.invoke('add-csv-contacts', {
+        body: { phoneNumbers: newContactsFromCsv },
       });
-      if (error) throw error;
-      const addedIds = data?.newCustomerIds || [];
-      setAddedCustomerIdsFromCsv(addedIds);
-      toast({
-        title: "Success",
-        description: `${data?.addedCount || 0} new customers added successfully.`,
-      });
+
+      if (addError) throw addError;
+
+      const { addedCustomerIds } = addResult as { addedCustomerIds: string[] };
+      setAddedCustomerIdsFromCsv(addedCustomerIds || []);
       setShowAddContactsPrompt(false);
+      toast({ title: "Success", description: `${addedCustomerIds?.length || 0} new contacts added successfully.` });
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Failed to add new customers.";
-      console.error("Error adding new contacts:", error);
-      toast({ title: "Error Adding Contacts", description: message, variant: "destructive" });
+      console.error('Error adding contacts:', error);
+      toast({ title: "Error", description: `Failed to add contacts: ${error instanceof Error ? error.message : 'Unknown error'}`, variant: "destructive" });
     } finally {
       setIsAddingContacts(false);
-      setShowCreateSegmentPrompt(true);
     }
   };
 
   const handleCreateSegment = async () => {
     if (!newSegmentName.trim()) {
-      toast({ title: "Error", description: "Please enter a name for the new segment.", variant: "destructive" });
+      toast({ title: "Error", description: "Please enter a segment name.", variant: "destructive" });
       return;
-    }
-    if (!userData?.id) {
-      toast({ title: "Error", description: "User not authenticated.", variant: "destructive" });
-      return;
-    }
-
-    let customerIdsForSegment: string[] = [];
-    const initialMode = targetMode;
-
-    if (initialMode === 'csv') {
-      customerIdsForSegment = [...new Set([...existingContactIdsFromCsv, ...addedCustomerIdsFromCsv])];
-      if (customerIdsForSegment.length === 0) {
-        toast({ title: "Error", description: "No customers identified from the CSV to add to the segment.", variant: "destructive" });
-        return;
-      }
-    } else if (initialMode === 'customers') {
-      customerIdsForSegment = selectedCustomers;
-       if (customerIdsForSegment.length === 0) {
-        toast({ title: "Error", description: "No customers selected to add to the segment.", variant: "destructive" });
-        return;
-      }
-    } else {
-       toast({ title: "Error", description: "Invalid mode for segment creation.", variant: "destructive" });
-       return;
     }
 
     setIsCreatingSegment(true);
     try {
-      const { data: newSegment, error } = await supabase.functions.invoke<Segment>('segment-handler', {
-        body: {
-          segmentName: newSegmentName,
-          customerIds: customerIdsForSegment,
-          userId: userData.id,
+      const allRecipientIds = [...existingContactIdsFromCsv, ...addedCustomerIdsFromCsv];
+
+      const { data: segmentResult, error: segmentError } = await supabase.functions.invoke('create-segment-from-csv', {
+        body: { 
+          segmentName: newSegmentName.trim(),
+          customerIds: allRecipientIds
         },
       });
-      if (error) throw error;
-      if (!newSegment) throw new Error("Segment creation did not return segment data.");
-      toast({
-        title: "Segment Created",
-        description: `Segment "${newSegment.name}" created with ${customerIdsForSegment.length} contacts.`,
-      });
-      setAvailableSegments(prev => [...prev, newSegment]);
-      if (initialMode === 'csv') {
-        setTargetMode('segment');
-        setSelectedSegmentId(newSegment.id);
+
+      if (segmentError) throw segmentError;
+
+      const { segmentId } = segmentResult as { segmentId: string };
+      
+      // Refresh segments list
+      const { data: segmentsData, error: segmentsError } = await supabase.from('segments').select('*, segment_contacts(count)');
+      if (!segmentsError) {
+        const segmentsWithCount = (segmentsData || []).map(segment => ({
+          ...segment,
+          member_count: segment.segment_contacts?.[0]?.count || 0
+        }));
+        setAvailableSegments(segmentsWithCount);
       }
-      setNewSegmentName('');
+
       setShowCreateSegmentPrompt(false);
+      setNewSegmentName('');
+      toast({ title: "Success", description: `Segment "${newSegmentName}" created successfully with ${allRecipientIds.length} contacts.` });
     } catch (error) {
-      const message = error instanceof Error ? error.message : "Failed to create segment.";
-      console.error("Error creating segment:", error);
-      toast({ title: "Segment Creation Failed", description: message, variant: "destructive" });
+      console.error('Error creating segment:', error);
+      toast({ title: "Error", description: `Failed to create segment: ${error instanceof Error ? error.message : 'Unknown error'}`, variant: "destructive" });
     } finally {
       setIsCreatingSegment(false);
     }
   };
 
-  const isNextDisabled = () => {
-    if (targetMode === 'customers') return isLoadingCustomers || selectedCustomers.length === 0 || isCreatingSegment || (showCreateSegmentPrompt && selectedCustomers.length > 0);
-    if (targetMode === 'segment') return isLoadingSegments || !selectedSegmentId;
-    if (targetMode === 'csv') return isProcessingCsv || csvRecipients.length === 0 || isAddingContacts || isCreatingSegment || showAddContactsPrompt || showCreateSegmentPrompt;
-    return true;
+  const handleNext = () => {
+    if (step === 'selectTarget') {
+      if (targetMode === 'customers' && selectedCustomers.length === 0) {
+        toast({ title: "Error", description: "Please select at least one customer.", variant: "destructive" });
+        return;
+      }
+      if (targetMode === 'segment' && !selectedSegmentId) {
+        toast({ title: "Error", description: "Please select a segment.", variant: "destructive" });
+        return;
+      }
+      if (targetMode === 'csv' && csvRecipients.length === 0) {
+        toast({ title: "Error", description: "Please import a CSV file with recipients.", variant: "destructive" });
+        return;
+      }
+      setStep('composeMessage');
+    }
   };
 
-  const recipientCount = () => {
-     if (targetMode === 'customers') return selectedCustomers.length;
-     if (targetMode === 'csv') return csvRecipients.length;
-     if (targetMode === 'segment') return 'N/A';
-     return 0;
-  }
+  const handleBack = () => {
+    if (step === 'composeMessage') {
+      setStep('selectTarget');
+    }
+  };
+
+  const getRecipientCount = () => {
+    if (targetMode === 'customers') {
+      return selectedCustomers.length;
+    } else if (targetMode === 'segment') {
+      const segment = availableSegments.find(s => s.id === selectedSegmentId);
+      return segment?.member_count || 0;
+    } else if (targetMode === 'csv') {
+      return existingContactIdsFromCsv.length + addedCustomerIdsFromCsv.length;
+    }
+    return 0;
+  };
+
+  const renderFilePreview = () => {
+    if (!selectedFile) return null;
+
+    return (
+      <div className="mt-2 p-2 border rounded-lg bg-gray-50 flex items-center justify-between">
+        <div className="flex items-center space-x-2">
+          {filePreviewUrl ? (
+            <img src={filePreviewUrl} alt="Preview" className="w-10 h-10 object-cover rounded" />
+          ) : (
+            <FileText className="w-10 h-10 text-gray-400" />
+          )}
+          <div>
+            <p className="text-sm font-medium">{selectedFile.name}</p>
+            <p className="text-xs text-gray-500">{(selectedFile.size / 1024 / 1024).toFixed(2)} MB</p>
+          </div>
+        </div>
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          onClick={clearSelectedFile}
+        >
+          <Cross2Icon className="w-4 h-4" />
+        </Button>
+      </div>
+    );
+  };
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[600px]">
+      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>New Broadcast</DialogTitle>
+          <DialogTitle>Send Broadcast Message</DialogTitle>
           <DialogDescription>
-            {step === 'selectTarget'
-              ? 'Choose how to target your broadcast.'
-              : 'Compose your broadcast message.'}
+            {step === 'selectTarget' ? 'Select your target audience' : 'Compose your message'}
           </DialogDescription>
         </DialogHeader>
 
         {step === 'selectTarget' && (
-          <div className="py-4 space-y-4">
-            <RadioGroup value={targetMode} onValueChange={(value) => setTargetMode(value as TargetMode)} className="flex space-x-4">
-              <div className="flex items-center space-x-2">
-                <RadioGroupItem value="customers" id="mode-customers" />
-                <Label htmlFor="mode-customers">Select Customers</Label>
-              </div>
-              <div className="flex items-center space-x-2">
-                <RadioGroupItem value="segment" id="mode-segment" />
-                <Label htmlFor="mode-segment">Select Segment</Label>
-              </div>
-              <div className="flex items-center space-x-2">
-                <RadioGroupItem value="csv" id="mode-csv" />
-                <Label htmlFor="mode-csv">Upload CSV</Label>
-              </div>
-            </RadioGroup>
+          <div className="space-y-6">
+            <div>
+              <Label className="text-base font-medium">Target Audience</Label>
+              <RadioGroup value={targetMode} onValueChange={(value) => setTargetMode(value as TargetMode)} className="mt-2">
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="customers" id="customers" />
+                  <Label htmlFor="customers" className="flex items-center space-x-2 cursor-pointer">
+                    <UsersIcon className="w-4 h-4" />
+                    <span>Select Customers</span>
+                  </Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="segment" id="segment" />
+                  <Label htmlFor="segment" className="flex items-center space-x-2 cursor-pointer">
+                    <ListChecks className="w-4 h-4" />
+                    <span>Select Segment</span>
+                  </Label>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <RadioGroupItem value="csv" id="csv" />
+                  <Label htmlFor="csv" className="flex items-center space-x-2 cursor-pointer">
+                    <Upload className="w-4 h-4" />
+                    <span>Import CSV</span>
+                  </Label>
+                </div>
+              </RadioGroup>
+            </div>
 
             {targetMode === 'customers' && (
-              <div className="space-y-2">
-                <Label>
-                  Select Customers
-                  {blastLimitInfo && (
-                    <span className={`ml-2 text-sm ${blastLimitInfo.remaining <= 0 ? 'text-red-600 font-medium' : 'text-blue-600'}`}>
-                      (WhatsApp daily limit: {blastLimitInfo.remaining} remaining of {blastLimitInfo.limit})
-                    </span>
-                  )}
-                </Label>
-                <div className="text-xs text-muted-foreground mb-2">
-                  {selectedCustomers.length} selected
-                  {blastLimitInfo && blastLimitInfo.remaining <= 0 && (
-                    <span className="ml-2 text-red-600 font-medium">
-                      Daily limit reached! Try again tomorrow.
-                    </span>
-                  )}
-                </div>
-                <ScrollArea className="h-[300px] border rounded-md">
-                  {isLoadingCustomers ? (
-                    <p className="p-4 text-sm text-muted-foreground">Loading customers...</p>
-                  ) : customers.length === 0 ? (
-                    <p className="p-4 text-sm text-muted-foreground">No customers found.</p>
-                  ) : blastLimitInfo && blastLimitInfo.remaining <= 0 ? (
-                    <div className="p-4 text-center">
-                      <p className="text-red-600 font-medium">Daily WhatsApp blast limit reached!</p>
-                      <p className="text-sm text-muted-foreground mt-2">You've sent {blastLimitInfo.current_count} messages today. Try again tomorrow.</p>
-                    </div>
-                  ) : (
-                    <ul className="p-2">
+              <div>
+                <Label className="text-sm font-medium">Select Customers</Label>
+                {isLoadingCustomers ? (
+                  <div className="flex items-center justify-center py-4">
+                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-gray-900"></div>
+                  </div>
+                ) : (
+                  <ScrollArea className="h-64 mt-2 border rounded-md p-4">
+                    <div className="space-y-2">
                       {customers.map((customer) => (
-                        <li 
-                          key={customer.id} 
-                          className={`flex items-center justify-between p-2 hover:bg-muted rounded cursor-pointer`} 
-                          onClick={() => handleSelectCustomer(customer.id)}
-                        >
-                          <span>{customer.name} ({customer.phone_number})</span>
-                          <input type="checkbox" readOnly checked={selectedCustomers.includes(customer.id)} className="pointer-events-none h-4 w-4" />
-                        </li>
+                        <div key={customer.id} className="flex items-center space-x-2">
+                          <input
+                            type="checkbox"
+                            id={customer.id}
+                            checked={selectedCustomers.includes(customer.id)}
+                            onChange={(e) => {
+                              if (e.target.checked) {
+                                setSelectedCustomers([...selectedCustomers, customer.id]);
+                              } else {
+                                setSelectedCustomers(selectedCustomers.filter(id => id !== customer.id));
+                              }
+                            }}
+                            className="rounded border-gray-300"
+                          />
+                          <Label htmlFor={customer.id} className="text-sm cursor-pointer">
+                            {customer.name} ({customer.phone_number})
+                          </Label>
+                        </div>
                       ))}
-                    </ul>
-                  )}
-                </ScrollArea>
-                 {selectedCustomers.length > 0 && !isLoadingCustomers && (
-                    <div className="mt-4 p-3 border rounded-md bg-blue-50 border-blue-200 space-y-2">
-                      <Label htmlFor="new-segment-name-customer" className="text-sm font-medium text-blue-800">
-                        Optionally, create a new segment from these {selectedCustomers.length} selected contacts:
-                      </Label>
-                      <div className="flex items-center gap-2">
-                        <Input
-                          id="new-segment-name-customer"
-                          placeholder="New Segment Name"
-                          value={newSegmentName}
-                          onChange={(e) => setNewSegmentName(e.target.value)}
-                          className="flex-grow bg-white"
-                          disabled={isCreatingSegment}
-                        />
-                        <Button
-                          size="sm"
-                          onClick={handleCreateSegment}
-                          disabled={isCreatingSegment || !newSegmentName.trim()}
-                        >
-                          {isCreatingSegment ? 'Creating...' : 'Create Segment'}
-                        </Button>
-                      </div>
-                       <p className="text-xs text-muted-foreground">
-                         If created, the target will switch to this new segment. Otherwise, proceed with the selected customers.
-                       </p>
                     </div>
-                  )}
+                  </ScrollArea>
+                )}
+                <p className="text-sm text-gray-500 mt-2">
+                  {selectedCustomers.length} customer(s) selected
+                </p>
               </div>
             )}
 
             {targetMode === 'segment' && (
-              <div className="space-y-2">
-                 <Label htmlFor="segment-select">Target Segment:</Label>
-                 <Select
-                   value={selectedSegmentId}
-                   onValueChange={setSelectedSegmentId}
-                   disabled={isLoadingSegments}
-                 >
-                   <SelectTrigger id="segment-select" className="w-full">
-                     <SelectValue placeholder={isLoadingSegments ? "Loading segments..." : "Select segment..."} />
-                   </SelectTrigger>
-                   <SelectContent>
-                     {availableSegments.length === 0 && !isLoadingSegments && (
-                        <p className="p-2 text-sm text-muted-foreground">No segments found.</p>
-                     )}
-                     {availableSegments.map((segment) => (
-                       <SelectItem key={segment.id} value={segment.id}>
-                         {segment.name}
-                       </SelectItem>
-                     ))}
-                   </SelectContent>
-                 </Select>
+              <div>
+                <Label className="text-sm font-medium">Select Segment</Label>
+                {isLoadingSegments ? (
+                  <div className="flex items-center justify-center py-4">
+                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-gray-900"></div>
+                  </div>
+                ) : (
+                  <Select value={selectedSegmentId} onValueChange={setSelectedSegmentId}>
+                    <SelectTrigger className="mt-2">
+                      <SelectValue placeholder="Choose a segment" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {availableSegments.map((segment) => (
+                        <SelectItem key={segment.id} value={segment.id}>
+                          {segment.name} ({segment.member_count || 0} customers)
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
               </div>
             )}
 
             {targetMode === 'csv' && (
-              <div className="space-y-3 border p-4 rounded-md bg-muted/20">
-                 <Label>Upload CSV File</Label>
-                 <div className="flex items-center gap-2">
-                   <Button variant="outline" size="sm" onClick={handleImportClick} disabled={isProcessingCsv}>
-                     <Upload className="mr-2 h-4 w-4" /> {csvFileName ? 'Change File' : 'Select File'}
-                   </Button>
-                   <Input ref={fileInputRef} type="file" accept=".csv" onChange={handleFileChange} className="hidden" />
-                   {isProcessingCsv && <p className="text-sm text-muted-foreground">Processing...</p>}
-                   {csvFileName && !isProcessingCsv && (
-                     <p className="text-sm text-muted-foreground truncate">
-                       File: {csvFileName} ({csvRecipients.length} recipients)
-                     </p>
-                   )}
-                 </div>
-                 <p className="text-xs text-muted-foreground">
-                   CSV must contain a 'phone_number' column header.
-                   <a href="/sample_contacts.csv" download="sample_contacts.csv" className="ml-2 underline hover:text-primary">
-                     Download Sample
-                   </a>
-                 </p>
-                 {showAddContactsPrompt && newContactsFromCsv.length > 0 && !isAddingContacts && (
-                   <div className="mt-4 p-3 border rounded-md bg-amber-50 border-amber-200 space-y-2">
-                     <p className="text-sm font-medium text-amber-800">
-                       Found {newContactsFromCsv.length} new phone number(s) not in your customer list:
-                     </p>
-                     <ScrollArea className="h-[100px] text-xs text-amber-700 border bg-white rounded p-1">
-                       {newContactsFromCsv.join(', ')}
-                     </ScrollArea>
-                     <div className="flex justify-end gap-2 pt-2">
-                       <Button size="sm" variant="outline" onClick={() => setShowAddContactsPrompt(false)} disabled={isAddingContacts}>
-                         Skip Adding
-                       </Button>
-                       <Button size="sm" onClick={() => handleAddNewContacts()} disabled={isAddingContacts}>
-                         {isAddingContacts ? 'Adding...' : 'Add New Customers'}
-                        </Button>
+              <div className="space-y-4">
+                <div>
+                  <Label className="text-sm font-medium">Import CSV File</Label>
+                  <p className="text-xs text-gray-500 mt-1">
+                    CSV must contain a 'phone_number' column header
+                  </p>
+                  <div className="mt-2">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      onClick={handleImportClick}
+                      disabled={isProcessingCsv}
+                      className="w-full"
+                    >
+                      <Upload className="w-4 h-4 mr-2" />
+                      {isProcessingCsv ? 'Processing...' : 'Choose CSV File'}
+                    </Button>
+                    <Input ref={fileInputRef} type="file" accept=".csv" onChange={handleCsvFileChange} className="hidden" />
+                  </div>
+                </div>
+
+                {csvFileName && (
+                  <Alert>
+                    <AlertDescription>
+                      <strong>File:</strong> {csvFileName}<br />
+                      <strong>Recipients:</strong> {csvRecipients.length} phone numbers<br />
+                      <strong>Existing Customers:</strong> {existingContactIdsFromCsv.length}<br />
+                      <strong>New Numbers:</strong> {newContactsFromCsv.length}
+                    </AlertDescription>
+                  </Alert>
+                )}
+
+                {showAddContactsPrompt && (
+                  <Alert>
+                    <AlertDescription>
+                      <div className="space-y-2">
+                        <p>{newContactsFromCsv.length} new phone numbers found. Would you like to add them as customers?</p>
+                        <div className="flex space-x-2">
+                          <Button
+                            size="sm"
+                            onClick={handleAddContacts}
+                            disabled={isAddingContacts}
+                          >
+                            {isAddingContacts ? 'Adding...' : 'Add Contacts'}
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => setShowAddContactsPrompt(false)}
+                          >
+                            Skip
+                          </Button>
+                        </div>
                       </div>
-                    </div>
-                  )}
-                  {showCreateSegmentPrompt && !isProcessingCsv && csvRecipients.length > 0 && !showAddContactsPrompt && (
-                    <div className="mt-4 p-3 border rounded-md bg-blue-50 border-blue-200 space-y-2">
-                      <Label htmlFor="new-segment-name" className="text-sm font-medium text-blue-800">
-                        Optionally, create a new segment from these {existingContactIdsFromCsv.length + addedCustomerIdsFromCsv.length} contacts:
-                      </Label>
-                      <div className="flex items-center gap-2">
+                    </AlertDescription>
+                  </Alert>
+                )}
+
+                {(existingContactIdsFromCsv.length > 0 || addedCustomerIdsFromCsv.length > 0) && (
+                  <div className="space-y-2">
+                    <Button
+                      variant="outline"
+                      onClick={() => setShowCreateSegmentPrompt(true)}
+                      className="w-full"
+                    >
+                      Create Segment from CSV
+                    </Button>
+
+                    {showCreateSegmentPrompt && (
+                      <div className="space-y-2">
                         <Input
-                          id="new-segment-name"
-                          placeholder="New Segment Name"
+                          placeholder="Enter segment name"
                           value={newSegmentName}
                           onChange={(e) => setNewSegmentName(e.target.value)}
-                          className="flex-grow bg-white"
-                          disabled={isCreatingSegment}
                         />
-                        <Button
-                          size="sm"
-                          onClick={handleCreateSegment}
-                          disabled={isCreatingSegment || !newSegmentName.trim()}
-                        >
-                          {isCreatingSegment ? 'Creating...' : 'Create Segment'}
-                        </Button>
+                        <div className="flex space-x-2">
+                          <Button
+                            size="sm"
+                            onClick={handleCreateSegment}
+                            disabled={isCreatingSegment || !newSegmentName.trim()}
+                          >
+                            {isCreatingSegment ? 'Creating...' : 'Create Segment'}
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              setShowCreateSegmentPrompt(false);
+                              setNewSegmentName('');
+                            }}
+                          >
+                            Cancel
+                          </Button>
+                        </div>
                       </div>
-                       <p className="text-xs text-muted-foreground">
-                         If created, the target will switch to this new segment. Otherwise, proceed to send directly to the CSV list.
-                       </p>
-                    </div>
-                  )}
+                    )}
+                  </div>
+                )}
               </div>
             )}
           </div>
         )}
 
         {step === 'composeMessage' && (
-          <div className="py-4 space-y-4">
+          <div className="space-y-4">
+            <Alert>
+              <AlertDescription>
+                <strong>Recipients:</strong> {getRecipientCount()} contacts will receive this message
+              </AlertDescription>
+            </Alert>
+
             <div>
-              <Label htmlFor="integration-select">Send From:</Label>
+              <Label className="text-sm font-medium">Select WhatsApp Integration</Label>
               {isLoadingIntegrations ? (
-                <p className="text-sm text-muted-foreground">Loading integrations...</p>
-              ) : availableIntegrations.length === 0 ? (
-                <p className="text-sm text-red-500">No integrations found.</p>
+                <div className="flex items-center justify-center py-4">
+                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-gray-900"></div>
+                </div>
               ) : (
                 <Select value={selectedIntegrationId} onValueChange={setSelectedIntegrationId}>
-                  <SelectTrigger id="integration-select" className="w-full mt-1">
-                    <SelectValue placeholder="Select integration..." />
+                  <SelectTrigger className="mt-2">
+                    <SelectValue placeholder="Choose an integration" />
                   </SelectTrigger>
                   <SelectContent>
-                    {availableIntegrations.map((integrationInfo) => (
-                      <SelectItem key={integrationInfo.configId} value={integrationInfo.configId}>
-                        {integrationInfo.name} 
+                    {availableIntegrations.map((integration) => (
+                      <SelectItem key={integration.configId} value={integration.configId}>
+                        {integration.name}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -962,133 +829,94 @@ export function BroadcastModal({
               )}
             </div>
 
-            <div className="mt-4">
-              <Label htmlFor="broadcast-file">Attach File (Max 5MB) - Images or PDFs</Label>
-              <Input
-                id="broadcast-file"
-                type="file"
-                accept="image/*, application/pdf" // Loosen image to all image types, keep PDF
-                onChange={handleImageChange}
-                className="mt-1"
-                ref={imageFileInputRef}
-                disabled={isSending || isUploadingImage}
-              />
-              {(imagePreviewUrl || selectedImageFile) && (
-                <div className="mt-2 relative w-fit">
-                  {imagePreviewUrl ? (
-                    // Show image preview for image files
-                    <img src={imagePreviewUrl} alt="Preview" className="max-h-40 rounded border" />
-                  ) : (
-                    // Show PDF indicator for PDF files
-                    <div className="flex items-center gap-2 p-3 border rounded bg-gray-50">
-                      <FileText className="h-8 w-8 text-gray-600" />
-                      <div>
-                        <p className="text-sm font-medium">{selectedImageFile?.name}</p>
-                        <p className="text-xs text-gray-500">PDF Document</p>
-                      </div>
-                    </div>
-                  )}
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="absolute top-1 right-1 bg-white/70 hover:bg-white h-6 w-6 p-1"
-                    onClick={clearSelectedImage}
-                    disabled={isSending || isUploadingImage}
-                  >
-                    <Cross2Icon className="h-4 w-4" />
-                  </Button>
-                </div>
-              )}
-            </div>
-
-            <div className="mt-4">
-              <Label htmlFor="broadcast-message">Broadcast Message</Label>
+            <div>
+              <Label className="text-sm font-medium">Message</Label>
               <Textarea
-                id="broadcast-message"
-                placeholder="Type your broadcast message here..."
+                placeholder="Enter your broadcast message..."
                 value={broadcastMessage}
                 onChange={(e) => setBroadcastMessage(e.target.value)}
-                className="mt-1 min-h-[100px]"
-                disabled={isSending}
+                className="mt-2 min-h-[120px]"
               />
             </div>
 
-            {/* Opt-out Text Toggle */}
-            <div className="flex items-center space-x-2 p-3 border rounded-md bg-slate-50">
+            <div>
+              <Label className="text-sm font-medium">Attach File (Optional)</Label>
+              <div className="mt-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => fileAttachmentInputRef.current?.click()}
+                  className="w-full"
+                >
+                  <ImagePlus className="w-4 h-4 mr-2" />
+                  Choose File
+                </Button>
+                <Input
+                  ref={fileAttachmentInputRef}
+                  type="file"
+                  onChange={handleFileChange}
+                  className="hidden"
+                />
+              </div>
+              {renderFilePreview()}
+            </div>
+
+            <div className="flex items-center space-x-2">
               <input
                 type="checkbox"
-                id="include-opt-out"
+                id="includeOptOut"
                 checked={includeOptOutText}
                 onChange={(e) => setIncludeOptOutText(e.target.checked)}
-                className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                className="rounded border-gray-300"
               />
-              <Label htmlFor="include-opt-out" className="text-sm font-medium">
-                Include opt-out text
+              <Label htmlFor="includeOptOut" className="text-sm cursor-pointer">
+                Include opt-out text at the beginning of the message
               </Label>
-              <span className="text-xs text-muted-foreground ml-2">
-                (Adds "If you want to opt out of these marketing messages reply with '0'" to the top of your message)
-              </span>
             </div>
 
-            <p className="text-sm text-muted-foreground mt-2">
-              Sending to: {
-                targetMode === 'segment' ? `Segment "${availableSegments.find(s => s.id === selectedSegmentId)?.name || '...'}"` :
-                targetMode === 'csv' ? `${csvRecipients.length} recipient(s) from ${csvFileName || 'CSV'}` :
-                `${selectedCustomers.length} selected customer(s)`
-              }
-            </p>
-            
-            {/* WhatsApp Blast Limit Information */}
             {blastLimitInfo && (
-              <Alert className="mt-4 bg-blue-50 border-blue-200">
-                <AlertDescription className="text-sm">
-                  <div className="flex justify-between items-center">
-                    <span>WhatsApp Daily Blast Limit:</span>
-                    <span className="font-medium">{blastLimitInfo.remaining} remaining of {blastLimitInfo.limit}</span>
-                  </div>
-                  <div className="w-full bg-gray-200 rounded-full h-2.5 mt-2">
-                    <div 
-                      className={`h-2.5 rounded-full ${blastLimitInfo.remaining === 0 ? 'bg-red-600' : 'bg-blue-600'}`}
-                      style={{ width: `${(blastLimitInfo.current_count / blastLimitInfo.limit) * 100}%` }}
-                    ></div>
-                  </div>
-                  <div className="text-xs mt-1 text-gray-500">
-                    You've sent {blastLimitInfo.current_count} messages today
-                    {blastLimitInfo.remaining === 0 && (
-                      <span className="text-red-600 font-medium ml-1">
-                        - Daily limit reached! Try again tomorrow.
-                      </span>
-                    )}
-                  </div>
+              <Alert>
+                <AlertDescription>
+                  <strong>Daily Limit:</strong> {blastLimitInfo.current_count}/{blastLimitInfo.limit} messages sent today
+                  {blastLimitInfo.remaining < getRecipientCount() && (
+                    <span className="text-red-600 block mt-1">
+                      Warning: This broadcast ({getRecipientCount()} messages) exceeds your remaining limit ({blastLimitInfo.remaining})
+                    </span>
+                  )}
                 </AlertDescription>
               </Alert>
-            )}
-            
-            {isLoadingBlastLimit && (
-              <p className="text-xs text-muted-foreground mt-2">Loading blast limit information...</p>
             )}
           </div>
         )}
 
         <DialogFooter>
-          {step === 'selectTarget' && (
-            <>
-              <Button variant="outline" onClick={onClose}>Cancel</Button>
-              <Button onClick={handleNext} disabled={isNextDisabled()}>
-                Next
+          {step === 'selectTarget' ? (
+            <Button onClick={handleNext} disabled={
+              (targetMode === 'customers' && selectedCustomers.length === 0) ||
+              (targetMode === 'segment' && !selectedSegmentId) ||
+              (targetMode === 'csv' && csvRecipients.length === 0)
+            }>
+              Next
+            </Button>
+          ) : (
+            <div className="flex space-x-2">
+              <Button variant="outline" onClick={handleBack}>
+                Back
               </Button>
-            </>
-          )}
-          {step === 'composeMessage' && (
-            <>
-              <Button variant="outline" onClick={handleBack} disabled={isSending}>Back</Button>
               <Button
-                onClick={handleSend}
-                disabled={(!broadcastMessage.trim() && !selectedImageFile) || !selectedIntegrationId || isLoadingIntegrations || isSending || isUploadingImage}
+                onClick={handleSendBroadcast}
+                disabled={(!broadcastMessage.trim() && !selectedFile) || !selectedIntegrationId || isLoadingIntegrations || isSending}
               >
-                {isSending ? 'Sending...' : isUploadingImage ? 'Uploading...' : 'Send'}
+                {isSending ? (
+                  <>
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    Sending...
+                  </>
+                ) : (
+                  `Send to ${getRecipientCount()} Recipients`
+                )}
               </Button>
-            </>
+            </div>
           )}
         </DialogFooter>
       </DialogContent>

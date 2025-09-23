@@ -276,13 +276,42 @@ serve(async (req: Request) => {
         }>;
       };
 
-      if (!integrationConfigId ||
-          (action === 'sendText' && (!number || !text)) ||
-          (action === 'send-media' && (!recipientJid || !mediaData || !mimeType || !filename)) ||
-          (action === 'send-buttons' && (!recipientJid || !title || !description || !buttons || buttons.length === 0))
-      ) {
-        console.error(`evolution-api-handler: '${action}' missing parameters. Body:`, bodyParsed);
-        return new Response(JSON.stringify({ error: `Missing required parameters for ${action}` }), {
+      // Runtime validation for parameters
+      const errors: string[] = [];
+
+      if (!integrationConfigId || typeof integrationConfigId !== 'string') {
+        errors.push('integrationConfigId must be a string.');
+      }
+
+      if (action === 'sendText') {
+        if (!number || typeof number !== 'string') errors.push('number must be a string for sendText.');
+        if (!text || typeof text !== 'string') errors.push('text must be a string for sendText.');
+      } else if (action === 'send-media') {
+        if (!recipientJid || typeof recipientJid !== 'string') errors.push('recipientJid must be a string for send-media.');
+        if (!mediaData || typeof mediaData !== 'string') errors.push('mediaData must be a string for send-media.');
+        if (!mimeType || typeof mimeType !== 'string') errors.push('mimeType must be a string for send-media.');
+        if (!filename || typeof filename !== 'string') errors.push('filename must be a string for send-media.');
+        if (caption && typeof caption !== 'string') errors.push('caption must be a string if provided for send-media.');
+      } else if (action === 'send-buttons') {
+        if (!recipientJid || typeof recipientJid !== 'string') errors.push('recipientJid must be a string for send-buttons.');
+        if (!title || typeof title !== 'string') errors.push('title must be a string for send-buttons.');
+        if (!description || typeof description !== 'string') errors.push('description must be a string for send-buttons.');
+        if (footer && typeof footer !== 'string') errors.push('footer must be a string if provided for send-buttons.');
+        if (!buttons || !Array.isArray(buttons) || buttons.length === 0) {
+          errors.push('buttons must be a non-empty array for send-buttons.');
+        } else {
+          for (const btn of buttons) {
+            if (typeof btn !== 'object' || btn === null || typeof btn.title !== 'string' || typeof btn.displayText !== 'string' || typeof btn.id !== 'string') {
+              errors.push('Each button must have title (string), displayText (string), and id (string).');
+              break; // Stop checking further buttons if one is invalid
+            }
+          }
+        }
+      }
+
+      if (errors.length > 0) {
+        console.error(`evolution-api-handler: '${action}' parameter validation failed. Errors:`, errors);
+        return new Response(JSON.stringify({ error: `Missing or invalid parameters for ${action}: ${errors.join(' ')}` }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400
         });
       }
@@ -318,54 +347,55 @@ serve(async (req: Request) => {
       }
 
       if (action === 'sendText') {
-        const recipientNumber = number!.includes('@') ? number : `${number}@c.us`;
+        // The validation block guarantees `number` and `text` are strings.
+        const recipientNumber = number!.includes('@') ? number! : `${number!}@c.us`;
         evolutionApiUrl = `${config.integration.base_url}/message/sendText/${evolutionInstanceName}`;
-        // Corrected payload: 'text' should be a top-level property, not nested in textMessage
-        payload = { number: recipientNumber, options: { presence: "composing", delay: 1200}, text: text! };
-        console.log(`Action: sendText to ${recipientNumber} via instance name: ${evolutionInstanceName} (DB config ID: ${integrationConfigId})`);
-      } else if (action === 'send-media') { // Explicitly check for 'send-media'
-        console.log(`send-media action: Received body keys: ${Object.keys(bodyParsed).join(', ')}`);
-        console.log(`send-media action: Values - integrationConfigId: ${integrationConfigId}, recipientJid: ${recipientJid}, mimeType: ${mimeType}, filename: ${filename}, mediaData (present): ${!!mediaData}, caption: ${caption}, text: ${text}`);
+        payload = { number: recipientNumber, options: { presence: "composing", delay: 1200 }, text: text! };
+        console.log(`Action: sendText to ${recipientNumber} via instance name: ${evolutionInstanceName}`);
+
+      } else if (action === 'send-media') {
+        // The validation block should guarantee these are strings, but we add extra checks for absolute safety.
+        if (typeof recipientJid !== 'string' || typeof mediaData !== 'string' || typeof mimeType !== 'string' || typeof filename !== 'string') {
+          console.error("Internal error: Media parameters are missing or not strings despite passing validation.", { recipientJid, mediaData, mimeType, filename });
+          return new Response(JSON.stringify({ error: "Internal server error: Invalid media parameters." }), {
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500
+          });
+        }
 
         evolutionApiUrl = `${config.integration.base_url}/message/sendMedia/${evolutionInstanceName}`;
-        let determinedMediatype: string;
-        if (mimeType === 'application/pdf') {
-          determinedMediatype = 'document';
-        } else if (mimeType!.startsWith('image/')) {
+        let determinedMediatype = 'document'; // Default
+        if (mimeType.startsWith('image/')) {
           determinedMediatype = 'image';
-        } else if (mimeType!.startsWith('video/')) {
+        } else if (mimeType.startsWith('video/')) {
           determinedMediatype = 'video';
-        } else if (mimeType!.startsWith('audio/')) {
+        } else if (mimeType.startsWith('audio/')) {
           determinedMediatype = 'audio';
-        } else {
-          determinedMediatype = 'document'; // Default to document for other types
+        } else if (mimeType === 'application/pdf') {
+          determinedMediatype = 'document';
         }
-        console.log(`send-media action: Determined mediatype: '${determinedMediatype}' from mimeType: '${mimeType}'`);
+        console.log(`Determined mediatype: '${determinedMediatype}' from mimeType: '${mimeType}'`);
 
-        let finalMediaData = mediaData!;
-        let isUrl = false;
-        
-        // Always treat mediaData as a URL for documents, if it's a URL.
-        // For other media types, handle base64 if present.
-        if (mediaData && (mediaData.startsWith('http://') || mediaData.startsWith('https://'))) {
-          isUrl = true;
-          console.log(`send-media action: Media data is a URL: ${mediaData}`);
-        } else if (determinedMediatype !== 'document' && mediaData && mediaData.startsWith('data:') && mediaData.includes(';base64,')) {
+        let finalMediaData = mediaData;
+        const isUrl = mediaData.startsWith('http://') || mediaData.startsWith('https://');
+
+        if (!isUrl && determinedMediatype !== 'document' && mediaData.startsWith('data:') && mediaData.includes(';base64,')) {
           finalMediaData = mediaData.substring(mediaData.indexOf(';base64,') + ';base64,'.length);
-          console.log(`send-media action: Stripped data URL prefix. Media data is now raw base64.`);
+          console.log(`Stripped data URL prefix for base64 upload.`);
         }
+
+        const recipientNumber = recipientJid.includes('@') ? recipientJid : `${recipientJid}@c.us`;
 
         payload = {
-          number: recipientJid!,
+          number: recipientNumber,
           options: { presence: "composing", delay: 1200 },
           mediatype: determinedMediatype,
-          mimetype: mimeType!,
-          media: isUrl ? mediaData! : finalMediaData,
-          fileName: filename!,            
+          mimetype: mimeType,
+          media: finalMediaData,
+          fileName: filename,
           caption: caption || text || undefined
         };
-        console.log(`Action: sendMedia to ${recipientJid} via instance name: ${evolutionInstanceName} (DB config ID: ${integrationConfigId})`);
         console.log(`Final Payload for Evolution API (sendMedia):`, JSON.stringify(payload, null, 2));
+
       } else if (action === 'send-buttons') {
         console.log(`send-buttons action: Received body keys: ${Object.keys(bodyParsed).join(', ')}`);
         console.log(`send-buttons action: Values - integrationConfigId: ${integrationConfigId}, recipientJid: ${recipientJid}, title: ${title}, description: ${description}, buttons: ${JSON.stringify(buttons)}`);

@@ -1,8 +1,6 @@
-export type Segment = {
-  id: string; // Assuming UUID from Supabase
-  created_at: string; // ISO date string
-  name: string;
-  description?: string | null;
-  criteria?: Record<string, unknown> | null; // JSONB or similar for segment criteria
+import { Database } from '@/integrations/supabase/types';
+
+// Base segment type from database
+export type Segment = Database['public']['Tables']['segments']['Row'] & {
   member_count?: number; // Could be a calculated field or updated via trigger
 };

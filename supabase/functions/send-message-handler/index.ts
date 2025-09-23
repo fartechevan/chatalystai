@@ -178,7 +178,7 @@ serve(async (req: Request) => {
       console.warn(`No active plan found for ${billingEntityType} ${billingEntityId}. Allowing message (no quota).`);
     }
     
-    const messagesPerMonthLimit = activePlanDetails?.messages_per_month || null;
+    let messagesPerMonthLimit = activePlanDetails?.messages_per_month || null;
     const subscription_id = activePlanDetails?.subscription_id || null;
     console.log(`Active plan: ${activePlanDetails?.plan_name}, Subscription ID: ${subscription_id}, Limit: ${messagesPerMonthLimit ?? 'Unlimited'}`);
     
@@ -196,14 +196,20 @@ serve(async (req: Request) => {
         .eq('billing_cycle_month', currentMonth)
         .single();
 
-      if (usageError && usageError.code !== 'PGRST116') {
+      if (usageError && usageError.code !== 'PGRST116') { // 'PGRST116' means no rows found, which is fine.
         console.error("Error fetching message usage:", usageError);
-        return new Response(JSON.stringify({ error: "Failed to retrieve message usage." }), {
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-          status: 500,
-        });
+        // If the table doesn't exist (42P01) or another error occurs,
+        // we'll log it but not block the message sending.
+        if (usageError.code === '42P01') {
+          console.warn('Warning: `plan_message_usage` table not found. Skipping quota check.');
+        } else {
+          console.warn(`Warning: Could not verify message usage due to an error. Proceeding without quota check. Error: ${usageError.message}`);
+        }
+        // Reset the limit check to allow the message to be sent.
+        messagesPerMonthLimit = null;
+      } else {
+        messagesSentThisCycle = usageData?.messages_sent_this_cycle || 0;
       }
-      messagesSentThisCycle = usageData?.messages_sent_this_cycle || 0;
       console.log(`Current usage: ${messagesSentThisCycle} / ${messagesPerMonthLimit}`);
     } else {
       console.log("Skipping usage fetch: No subscription with quota or no limit.");
@@ -318,8 +324,13 @@ serve(async (req: Request) => {
       );
 
       if (evoFunctionError) {
-        console.error("Error invoking evolution-api-handler:", evoFunctionError);
-        throw evoFunctionError; 
+        console.error("Error invoking evolution-api-handler:", evoFunctionError.message);
+        // The actual response from the failed function is often in the context property
+        if (evoFunctionError.context) {
+          console.error("Detailed context from failed evolution-api-handler invocation:", JSON.stringify(evoFunctionError.context, null, 2));
+        }
+        // Re-throw to be caught by the outer catch block, which will handle logging to message_logs
+        throw evoFunctionError;
       }
       
       if (typeof evoFunctionResponse === 'object' && evoFunctionResponse !== null && 'success' in evoFunctionResponse) {
@@ -330,8 +341,21 @@ serve(async (req: Request) => {
       }
 
     } catch (error) {
-      console.error("Error invoking/simulating Evolution API handler:", error);
-      providerResponse = { success: false, error_message: (error as Error).message || "Failed to call Evolution API handler" };
+      console.error("Error in API handler call block:", error);
+      // Attempt to extract a more detailed error message from the function invocation error
+      const context = (error as any).context;
+      let detailedMessage = (error as Error).message;
+      if (context && typeof context === 'object') {
+        // If the context has an error_message, use it directly.
+        const contextError = (context as any).error_message;
+        if (contextError) {
+          detailedMessage = contextError;
+        } else {
+          // Otherwise, stringify the whole context.
+          detailedMessage = JSON.stringify(context);
+        }
+      }
+      providerResponse = { success: false, error_message: detailedMessage || "Failed to call Evolution API handler" };
     }
 
     if (!providerResponse) {
@@ -358,7 +382,8 @@ serve(async (req: Request) => {
           p_month: currentMonth
         });
         if (rpcError) {
-          console.error("Error incrementing message usage via RPC:", rpcError);
+          // If the RPC function doesn't exist or fails, log it but don't block the user.
+          console.warn(`Warning: Failed to increment message usage. Error: ${rpcError.message}`);
         } else {
           console.log("Successfully incremented message usage.");
         }

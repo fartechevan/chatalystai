@@ -96,7 +96,9 @@ verify_jwt = false
 [functions.vectorize-schema]
 verify_jwt = false
 
-# New auth section from the diff
+[functions.upload-file]
+verify_jwt = false
+
 [auth]
 enabled = true
 site_url = "http://localhost:3000"
@@ -125,3 +127,13 @@ secure_password_change = false
 max_frequency = "1m0s"
 otp_length = 6
 otp_expiry = 3600
+
+# Storage configuration for file attachments
+[storage]
+enabled = true
+file_size_limit = "50MiB"
+
+[storage.buckets.attachments]
+public = true
+file_size_limit = "50MiB"
+allowed_mime_types = ["image/*", "application/pdf", "application/msword", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "text/*", "video/*", "audio/*"]
