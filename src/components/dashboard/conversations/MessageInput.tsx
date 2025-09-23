@@ -35,6 +35,18 @@ export function MessageInput({
     setRows(Math.min(lineCount, 4)); // Maximum 4 rows
   };
 
+  const handlePaste = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    e.preventDefault();
+    const pastedText = e.clipboardData.getData('text/plain');
+    const target = e.currentTarget;
+    const start = target.selectionStart;
+    const end = target.selectionEnd;
+    const newValue = target.value.substring(0, start) + pastedText + target.value.substring(end);
+    setNewMessage(newValue);
+    const lineCount = newValue.split('\n').length;
+    setRows(Math.min(lineCount, 4));
+  };
+
   return (
     <div className="border-t p-4">
       <div className="flex items-center gap-2">
@@ -43,6 +55,7 @@ export function MessageInput({
           className="flex-1 min-h-[40px] max-h-[120px] resize-none"
           value={newMessage}
           onChange={handleChange}
+          onPaste={handlePaste}
           onKeyPress={handleKeyPress}
           disabled={!selectedConversation}
           rows={rows}

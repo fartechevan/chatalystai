@@ -1,4 +1,4 @@
-import { useState, useRef, ChangeEvent } from "react"; // Added useRef, ChangeEvent
+import { useState, useRef, ChangeEvent, ClipboardEvent } from "react"; // Added useRef, ChangeEvent, ClipboardEvent
 import { Loader2, Send, ImagePlus, X, File, FileText, FileVideo, FileAudio } from "lucide-react"; // Added file type icons
 import { UseMutationResult } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
@@ -26,6 +26,19 @@ export function MessageInput({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [filePreviewUrl, setFilePreviewUrl] = useState<string | null>(null); // For image preview
+  const [rows, setRows] = useState(1);
+
+  const handlePaste = (e: ClipboardEvent<HTMLTextAreaElement>) => {
+    e.preventDefault();
+    const pastedText = e.clipboardData.getData('text/plain');
+    const target = e.currentTarget;
+    const start = target.selectionStart;
+    const end = target.selectionEnd;
+    const newValue = target.value.substring(0, start) + pastedText + target.value.substring(end);
+    setNewMessage(newValue);
+    const lineCount = newValue.split('\n').length;
+    setRows(Math.min(lineCount, 4)); // Max 4 rows
+  };
 
   const internalHandleSend = () => {
     if (!newMessage.trim() && !selectedFile) return;
@@ -36,6 +49,13 @@ export function MessageInput({
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
     }
+    setRows(1); // Reset rows after sending
+  };
+
+  const handleMessageChange = (e: ChangeEvent<HTMLTextAreaElement>) => {
+    setNewMessage(e.target.value);
+    const lineCount = e.target.value.split('\n').length;
+    setRows(Math.min(lineCount, 4)); // Max 4 rows
   };
 
   const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
@@ -112,7 +132,7 @@ export function MessageInput({
         </div>
       )}
 
-      <div className="border-input focus-within:ring-ring flex items-center gap-1 sm:gap-2 rounded-md border px-2 py-1 focus-within:ring-1 focus-within:outline-hidden lg:gap-3 h-12">
+      <div className="border-input focus-within:ring-ring flex items-end gap-1 sm:gap-2 rounded-md border px-2 py-1 focus-within:ring-1 focus-within:outline-hidden lg:gap-3">
         {/* Action Buttons */}
         <div className="flex items-center space-x-0.5 sm:space-x-1">
           {/* Plus button removed */}
@@ -140,12 +160,12 @@ export function MessageInput({
         {/* Text Input */}
         <label className="flex-1 h-full"> {/* Make label take full height of parent */}
           <span className="sr-only">Chat Text Box</span>
-          <input
+          <textarea
             placeholder={isWhatsAppConversation ? "Type your WhatsApp message..." : "Type your messages..."}
-            className="h-full w-full bg-inherit text-sm focus-visible:outline-none placeholder:text-muted-foreground px-1 sm:px-2" // Adjusted padding
-            type="text"
+            className="h-full w-full bg-inherit text-sm focus-visible:outline-none placeholder:text-muted-foreground px-1 sm:px-2 resize-none"
             value={newMessage}
-            onChange={(e) => setNewMessage(e.target.value)}
+            onChange={handleMessageChange}
+            onPaste={handlePaste}
             onKeyDown={(e) => {
               if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
@@ -153,6 +173,7 @@ export function MessageInput({
               }
             }}
             disabled={sendMessageMutation.isPending || !!selectedFile} // Disable if sending or file selected
+            rows={rows}
           />
         </label>
 

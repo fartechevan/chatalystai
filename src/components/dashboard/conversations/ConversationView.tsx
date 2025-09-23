@@ -191,7 +191,7 @@ export function ConversationView() {
     sendMessageMutation.mutate({
       // instanceId: instanceId, // This is passed to useEvolutionAPI, so it should be available in its context
       chatId: customerJid, // Use the JID from external_user_identifier
-      message: messageText.trim(), // Use the passed messageText
+      message: messageText, // Use the passed messageText
       file: file, // Pass the file
     });
     setNewMessage(""); // Clear input after attempting to send

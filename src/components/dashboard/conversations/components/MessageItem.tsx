@@ -26,6 +26,7 @@ export function MessageItem({ message, conversation, onMediaPreviewRequest }: Me
   const isVideoMessage = message.media_type === 'video' && message.media_data;
   const isAudioMessage = message.media_type === 'audio' && message.media_data;
   const isDocumentMessage = message.media_type === 'document' && message.media_data;
+  const isMediaMessage = isImageMessage || isVideoMessage || isAudioMessage || isDocumentMessage;
   const hasCaption = !!message.content;
 
   const getFileIcon = (mimeType?: string) => {
@@ -207,13 +208,16 @@ export function MessageItem({ message, conversation, onMediaPreviewRequest }: Me
               </div>
             )}
             
-            {hasCaption && (
+            {/* Render content for text-only messages */}
+            {!isMediaMessage && (
+              <p className="text-sm whitespace-pre-wrap break-all">{message.content || "[Empty message]"}</p>
+            )}
+
+            {/* Render caption for media messages */}
+            {isMediaMessage && hasCaption && (
               <p className="text-sm whitespace-pre-wrap mt-1 break-all">{message.content}</p>
             )}
-            {/* Fallback for non-media text messages or media without thumbnail/caption */}
-            {!(isImageMessage || isVideoMessage || isAudioMessage || isDocumentMessage) && !hasCaption && (
-                 <p className="text-sm whitespace-pre-wrap break-all">{message.content || "[Empty message]"}</p>
-            )}
+
              {/* If it's media but no thumbnail and no caption, show media type */}
             {(isImageMessage || isVideoMessage || isAudioMessage || isDocumentMessage) && !mediaThumbnailSrc && !hasCaption && (
               <div 

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, ClipboardEvent } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -92,6 +92,7 @@ export function BroadcastModal({
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [filePreviewUrl, setFilePreviewUrl] = useState<string | null>(null);
   const [includeOptOutText, setIncludeOptOutText] = useState(false);
+  const [broadcastTextareaRows, setBroadcastTextareaRows] = useState(5); // Initial rows for broadcast
   
   // Use the WhatsApp blast limit hook
   const { blastLimitInfo, isLoading: isLoadingBlastLimit, refetchBlastLimit } = useWhatsAppBlastLimit();
@@ -132,6 +133,7 @@ export function BroadcastModal({
       if (fileAttachmentInputRef.current) {
         fileAttachmentInputRef.current.value = '';
       }
+      setBroadcastTextareaRows(5);
     } else {
       setBroadcastMessage('');
     }
@@ -553,6 +555,24 @@ export function BroadcastModal({
     }
   };
 
+  const handleBroadcastPaste = (e: ClipboardEvent<HTMLTextAreaElement>) => {
+    e.preventDefault();
+    const pastedText = e.clipboardData.getData('text/plain');
+    const target = e.currentTarget;
+    const start = target.selectionStart;
+    const end = target.selectionEnd;
+    const newValue = target.value.substring(0, start) + pastedText + target.value.substring(end);
+    setBroadcastMessage(newValue);
+    const lineCount = newValue.split('\n').length;
+    setBroadcastTextareaRows(Math.max(5, Math.min(lineCount, 10))); // Min 5, max 10 rows
+  };
+
+  const handleBroadcastMessageChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setBroadcastMessage(e.target.value);
+    const lineCount = e.target.value.split('\n').length;
+    setBroadcastTextareaRows(Math.max(5, Math.min(lineCount, 10))); // Min 5, max 10 rows
+  };
+
   const getRecipientCount = () => {
     if (targetMode === 'customers') {
       return selectedCustomers.length;
@@ -821,8 +841,10 @@ export function BroadcastModal({
               <Textarea
                 placeholder="Enter your broadcast message..."
                 value={broadcastMessage}
-                onChange={(e) => setBroadcastMessage(e.target.value)}
-                className="mt-2 min-h-[120px]"
+                onChange={handleBroadcastMessageChange}
+                onPaste={handleBroadcastPaste}
+                className="mt-2 resize-none"
+                rows={broadcastTextareaRows}
               />
             </div>
 
